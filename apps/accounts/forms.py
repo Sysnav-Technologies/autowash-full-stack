@@ -131,68 +131,44 @@ class UserProfileForm(forms.ModelForm):
         return profile
 
 class BusinessRegistrationForm(forms.ModelForm):
-    """Business registration form"""
+    """Minimal Business registration form for debugging"""
     
     class Meta:
         model = Business
-        fields = [
-            'name', 'description', 'business_type', 'logo',
-            'street_address', 'city', 'state', 'postal_code',
-            'email', 'phone', 'website',
-            'opening_time', 'closing_time', 'timezone',
-            'registration_number', 'tax_number'
-        ]
+        fields = ['name', 'business_type']
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 3}),
-            'opening_time': forms.TimeInput(attrs={'type': 'time'}),
-            'closing_time': forms.TimeInput(attrs={'type': 'time'}),
+            'name': forms.TextInput(attrs={
+                'placeholder': 'Your Business Name', 
+                'class': 'form-control',
+                'required': True
+            }),
+            'business_type': forms.Select(attrs={'class': 'form-select'}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.layout = Layout(
-            HTML('<h5>Business Information</h5>'),
-            Row(
-                Column('name', css_class='form-group col-md-8'),
-                Column('business_type', css_class='form-group col-md-4'),
-            ),
-            'description',
-            'logo',
-            HTML('<h5 class="mt-4">Contact Information</h5>'),
-            Row(
-                Column('email', css_class='form-group col-md-6'),
-                Column('phone', css_class='form-group col-md-6'),
-            ),
-            'website',
-            HTML('<h5 class="mt-4">Address</h5>'),
-            'street_address',
-            Row(
-                Column('city', css_class='form-group col-md-4'),
-                Column('state', css_class='form-group col-md-4'),
-                Column('postal_code', css_class='form-group col-md-4'),
-            ),
-            HTML('<h5 class="mt-4">Business Hours</h5>'),
-            Row(
-                Column('opening_time', css_class='form-group col-md-4'),
-                Column('closing_time', css_class='form-group col-md-4'),
-                Column('timezone', css_class='form-group col-md-4'),
-            ),
-            HTML('<h5 class="mt-4">Registration Details</h5>'),
-            Row(
-                Column('registration_number', css_class='form-group col-md-6'),
-                Column('tax_number', css_class='form-group col-md-6'),
-            ),
-            FormActions(
-                Submit('submit', 'Register Business', css_class='btn btn-primary btn-lg')
-            )
-        )
+        print(f"=== FORM INIT ===")
+        print(f"Form fields: {list(self.fields.keys())}")
+        
+        # Make sure required fields are marked
+        self.fields['name'].required = True
+        self.fields['business_type'].required = True
+        
+        print(f"Name field: {self.fields['name']}")
+        print(f"Business type field: {self.fields['business_type']}")
     
     def clean_name(self):
-        name = self.cleaned_data['name']
-        if Business.objects.filter(name__iexact=name).exists():
-            raise ValidationError("Business name already exists.")
+        name = self.cleaned_data.get('name')
+        print(f"=== CLEANING NAME: {name} ===")
+        if not name:
+            raise ValidationError("Business name is required.")
         return name
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        print(f"=== FORM CLEAN ===")
+        print(f"Cleaned data: {cleaned_data}")
+        return cleaned_data
 
 class BusinessSettingsForm(forms.ModelForm):
     """Business settings form"""

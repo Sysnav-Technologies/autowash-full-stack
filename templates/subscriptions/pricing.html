@@ -1,0 +1,447 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Choose Your Plan - Autowash{% endblock %}
+
+{% block public_content %}
+<!-- Hero Section -->
+<section class="bg-primary text-white py-5">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-lg-8" data-aos="fade-up">
+                <h1 class="display-4 fw-bold font-heading mb-4">Choose the Perfect Plan</h1>
+                <p class="lead mb-4">Start with a 14-day free trial. No credit card required. Upgrade or cancel anytime.</p>
+                
+                {% if user.is_authenticated %}
+                    <div class="alert alert-light border-0 d-inline-block">
+                        <div class="d-flex align-items-center text-dark">
+                            <i class="fas fa-user-circle me-2"></i>
+                            <span>Welcome back, <strong>{{ user.get_full_name|default:user.username }}</strong>!</span>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Billing Toggle -->
+<section class="py-4 bg-light">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-auto">
+                <div class="btn-group bg-white rounded-pill p-1 shadow-sm" role="group" data-aos="fade-up">
+                    <input type="radio" class="btn-check" name="billing" id="monthly" checked>
+                    <label class="btn btn-outline-primary rounded-pill px-4" for="monthly">Monthly Billing</label>
+                    
+                    <input type="radio" class="btn-check" name="billing" id="annual">
+                    <label class="btn btn-outline-primary rounded-pill px-4" for="annual">
+                        Annual Billing <span class="badge bg-success ms-1">Save up to 20%</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Plans -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row g-4 justify-content-center">
+            {% for plan in plans %}
+            <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:100 }}">
+                <div class="card border-0 shadow-lg h-100 position-relative plan-card {% if plan.is_popular %}popular-plan{% endif %}">
+                    {% if plan.is_popular %}
+                    <div class="position-absolute top-0 start-50 translate-middle">
+                        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-semibold">
+                            <i class="fas fa-star me-1"></i>Most Popular
+                        </span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="card-body p-4 {% if plan.is_popular %}bg-primary text-white{% endif %}">
+                        <!-- Plan Header -->
+                        <div class="text-center mb-4">
+                            <div class="{% if plan.is_popular %}bg-white bg-opacity-20{% else %}bg-light{% endif %} rounded-circle p-3 d-inline-flex mb-3">
+                                <i class="fas {{ plan.icon|default:'fa-rocket' }} {% if plan.is_popular %}text-white{% else %}text-primary{% endif %}" style="font-size: 1.5rem;"></i>
+                            </div>
+                            <h4 class="fw-bold font-heading">{{ plan.name }}</h4>
+                            <p class="{% if plan.is_popular %}text-white-75{% else %}text-muted{% endif %}">{{ plan.description }}</p>
+                        </div>
+                        
+                        <!-- Pricing -->
+                        <div class="text-center mb-4">
+                            <div class="monthly-price">
+                                <span class="h1 fw-bold">KES {{ plan.monthly_price|floatformat:0 }}</span>
+                                <span class="{% if plan.is_popular %}text-white-75{% else %}text-muted{% endif %}">/month</span>
+                            </div>
+                            {% if plan.annual_price %}
+                            <div class="annual-price d-none">
+                                <span class="h1 fw-bold">KES {{ plan.annual_price|floatformat:0 }}</span>
+                                <span class="{% if plan.is_popular %}text-white-75{% else %}text-muted{% endif %}">/year</span>
+                                {% if plan.annual_savings > 0 %}
+                                <div class="small {% if plan.is_popular %}text-warning{% else %}text-success{% endif %}">
+                                    Save {{ plan.annual_savings }}% annually
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            
+                            {% if plan.trial_days > 0 %}
+                            <div class="mt-2">
+                                <span class="badge {% if plan.is_popular %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ plan.trial_days }}-day free trial
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Features -->
+                        <ul class="list-unstyled mb-4">
+                            {% if plan.max_employees == -1 %}
+                                <li class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-check {% if plan.is_popular %}text-warning{% else %}text-success{% endif %} me-3"></i>
+                                    <span>Unlimited employees</span>
+                                </li>
+                            {% else %}
+                                <li class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-check {% if plan.is_popular %}text-warning{% else %}text-success{% endif %} me-3"></i>
+                                    <span>Up to {{ plan.max_employees }} employees</span>
+                                </li>
+                            {% endif %}
+                            
+                            {% if plan.max_customers == -1 %}
+                                <li class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-check {% if plan.is_popular %}text-warning{% else %}text-success{% endif %} me-3"></i>
+                                    <span>Unlimited customers</span>
+                                </li>
+                            {% else %}
+                                <li class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-check {% if plan.is_popular %}text-warning{% else %}text-success{% endif %} me-3"></i>
+                                    <span>Up to {{ plan.max_customers }} customers</span>
+                                </li>
+                            {% endif %}
+                            
+                            {% for feature in plan.features_list %}
+                                <li class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-check {% if plan.is_popular %}text-warning{% else %}text-success{% endif %} me-3"></i>
+                                    <span>{{ feature }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        
+                        <!-- CTA Button -->
+                        {% if user_has_subscription %}
+                            {% if current_subscription.plan.id == plan.id %}
+                                <div class="d-grid">
+                                    <a href="{% url 'subscriptions:manage_subscription' %}" class="btn {% if plan.is_popular %}btn-light{% else %}btn-outline-primary{% endif %} py-3 fw-semibold">
+                                        <i class="fas fa-cog me-2"></i>Current Plan
+                                    </a>
+                                </div>
+                            {% else %}
+                                <div class="d-grid">
+                                    <a href="{% url 'subscriptions:upgrade_subscription' plan.slug %}" class="btn {% if plan.is_popular %}btn-light{% else %}btn-primary{% endif %} py-3 fw-semibold">
+                                        <i class="fas fa-arrow-up me-2"></i>
+                                        {% if plan.monthly_price > current_subscription.plan.monthly_price %}Upgrade{% else %}Change Plan{% endif %}
+                                    </a>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="d-grid">
+                                <a href="{% url 'subscriptions:subscribe' plan.slug %}" class="btn {% if plan.is_popular %}btn-light{% else %}btn-primary{% endif %} py-3 fw-semibold">
+                                    <i class="fas fa-rocket me-2"></i>Get Started
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- FAQ Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center text-center mb-5">
+            <div class="col-lg-8" data-aos="fade-up">
+                <h2 class="display-5 fw-bold font-heading mb-4">Frequently Asked Questions</h2>
+                <p class="lead text-muted">Everything you need to know about our pricing and plans.</p>
+            </div>
+        </div>
+        
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="accordion" id="pricingFaqAccordion">
+                    <div class="accordion-item border-0 mb-3 shadow-sm rounded-3" data-aos="fade-up" data-aos-delay="100">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button fw-semibold rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                How does the free trial work?
+                            </button>
+                        </h2>
+                        <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#pricingFaqAccordion">
+                            <div class="accordion-body">
+                                You get full access to all features for 14 days, no credit card required. You can upgrade to a paid plan anytime during or after the trial period.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item border-0 mb-3 shadow-sm rounded-3" data-aos="fade-up" data-aos-delay="200">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fw-semibold rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                Can I change plans later?
+                            </button>
+                        </h2>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#pricingFaqAccordion">
+                            <div class="accordion-body">
+                                Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately, and billing is prorated automatically.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item border-0 mb-3 shadow-sm rounded-3" data-aos="fade-up" data-aos-delay="300">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fw-semibold rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                What payment methods do you accept?
+                            </button>
+                        </h2>
+                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#pricingFaqAccordion">
+                            <div class="accordion-body">
+                                We accept M-Pesa, credit/debit cards, and bank transfers. All payments are processed securely and you'll receive receipts automatically.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item border-0 mb-3 shadow-sm rounded-3" data-aos="fade-up" data-aos-delay="400">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fw-semibold rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                What happens when my trial ends?
+                            </button>
+                        </h2>
+                        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#pricingFaqAccordion">
+                            <div class="accordion-body">
+                                Your account remains active with limited features. You can upgrade at any time to restore full functionality. No data is lost during the transition.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item border-0 mb-3 shadow-sm rounded-3" data-aos="fade-up" data-aos-delay="500">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fw-semibold rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                                Do you offer refunds?
+                            </button>
+                        </h2>
+                        <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#pricingFaqAccordion">
+                            <div class="accordion-body">
+                                Yes, we offer a 30-day money-back guarantee. If you're not satisfied with our service, contact us for a full refund within 30 days of your first payment.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Trust Indicators -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-lg-10" data-aos="fade-up">
+                <div class="row g-4">
+                    <div class="col-md-3 col-6">
+                        <div class="text-center">
+                            <div class="h2 fw-bold text-primary mb-1">500+</div>
+                            <small class="text-muted">Active Businesses</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center">
+                            <div class="h2 fw-bold text-success mb-1">99.9%</div>
+                            <small class="text-muted">Uptime Guarantee</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center">
+                            <div class="h2 fw-bold text-info mb-1">24/7</div>
+                            <small class="text-muted">Support Available</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="text-center">
+                            <div class="h2 fw-bold text-warning mb-1">4.9/5</div>
+                            <small class="text-muted">Customer Rating</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Final CTA -->
+<section class="py-5 bg-primary text-white">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-lg-8" data-aos="fade-up">
+                <h2 class="display-5 fw-bold font-heading mb-4">Ready to Transform Your Business?</h2>
+                <p class="lead mb-4">Join hundreds of car wash businesses already using Autowash to streamline operations and increase profits.</p>
+                
+                {% if not user.is_authenticated %}
+                <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+                    <a href="{% url 'accounts:register' %}" class="btn btn-light btn-lg px-5 py-3 fw-semibold">
+                        <i class="fas fa-rocket me-2"></i>Start Your Free Trial
+                    </a>
+                    <a href="{% url 'contact' %}" class="btn btn-outline-light btn-lg px-5 py-3 fw-semibold">
+                        <i class="fas fa-phone me-2"></i>Talk to Sales
+                    </a>
+                </div>
+                {% else %}
+                <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+                    <a href="{% url 'accounts:business_register' %}" class="btn btn-light btn-lg px-5 py-3 fw-semibold">
+                        <i class="fas fa-building me-2"></i>Register Your Business
+                    </a>
+                    <a href="{% url 'contact' %}" class="btn btn-outline-light btn-lg px-5 py-3 fw-semibold">
+                        <i class="fas fa-headset me-2"></i>Get Help
+                    </a>
+                </div>
+                {% endif %}
+                
+                <p class="mt-3 mb-0"><small>No credit card required • 14-day free trial • Cancel anytime</small></p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const monthlyRadio = document.getElementById('monthly');
+    const annualRadio = document.getElementById('annual');
+    const monthlyPrices = document.querySelectorAll('.monthly-price');
+    const annualPrices = document.querySelectorAll('.annual-price');
+    
+    function togglePricing() {
+        if (annualRadio.checked) {
+            monthlyPrices.forEach(el => el.classList.add('d-none'));
+            annualPrices.forEach(el => el.classList.remove('d-none'));
+        } else {
+            monthlyPrices.forEach(el => el.classList.remove('d-none'));
+            annualPrices.forEach(el => el.classList.add('d-none'));
+        }
+    }
+    
+    monthlyRadio.addEventListener('change', togglePricing);
+    annualRadio.addEventListener('change', togglePricing);
+    
+    // Add hover effects to plan cards
+    const planCards = document.querySelectorAll('.plan-card');
+    planCards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-10px)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+</script>
+
+<style>
+.plan-card {
+    transition: all 0.3s ease;
+    border-radius: var(--border-radius-lg);
+}
+
+.plan-card:hover {
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1) !important;
+}
+
+.popular-plan {
+    border: 2px solid var(--primary-color);
+    transform: scale(1.05);
+}
+
+.popular-plan .card-body {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+}
+
+.text-white-75 {
+    color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.btn-check:checked + .btn {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.accordion-button {
+    background-color: white;
+    border: none;
+    box-shadow: none;
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: rgba(37, 99, 235, 0.05);
+    color: var(--primary-color);
+}
+
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+}
+
+.accordion-item {
+    border-radius: var(--border-radius-md) !important;
+    overflow: hidden;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 6px 12px;
+}
+
+/* Animation for plan cards */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.plan-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .popular-plan {
+        transform: scale(1);
+        margin-top: 2rem;
+    }
+    
+    .display-4 {
+        font-size: 2.5rem;
+    }
+    
+    .card-body {
+        padding: 2rem 1.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        border-radius: 0.5rem !important;
+        margin: 0.25rem 0;
+    }
+}
+</style>
+{% endblock %}

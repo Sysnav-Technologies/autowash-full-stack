@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ title|default:"Autowash" }}{% endblock %}</title>
+    <title>{% block title %}{{ title|default:"Autowash - Professional Car Wash Management" }}{% endblock %}</title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{% load static %}{% static 'img/favicon.ico' %}">
@@ -15,7 +15,10 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- AOS Animation -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     
     <!-- Custom CSS -->
     <link href="{% static 'css/custom.css' %}" rel="stylesheet">
@@ -26,149 +29,492 @@
     
     <style>
         :root {
-            --primary-color: #3b82f6;
+            --primary-color: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #3b82f6;
             --secondary-color: #64748b;
             --success-color: #10b981;
             --warning-color: #f59e0b;
             --danger-color: #ef4444;
             --info-color: #06b6d4;
-            --dark-color: #1e293b;
+            --dark-color: #0f172a;
             --light-color: #f8fafc;
             --border-color: #e2e8f0;
             --text-color: #334155;
+            --text-muted: #64748b;
             --sidebar-width: 280px;
+            --header-height: 70px;
+            --border-radius-lg: 16px;
+            --border-radius-md: 12px;
+            --border-radius-sm: 8px;
+            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background-color: var(--light-color);
             color: var(--text-color);
             line-height: 1.6;
+            font-weight: 400;
+            overflow-x: hidden;
         }
         
+        .font-heading {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Navigation Styles */
         .navbar-brand {
-            font-weight: 700;
+            font-weight: 800;
+            font-size: 1.5rem;
             color: var(--primary-color) !important;
+            font-family: 'Plus Jakarta Sans', sans-serif;
         }
         
+        .navbar-brand i {
+            background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-right: 8px;
+        }
+        
+        /* Sidebar Styles */
         .sidebar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
             min-height: 100vh;
             width: var(--sidebar-width);
             position: fixed;
             top: 0;
             left: 0;
             z-index: 1000;
-            transition: all 0.3s ease;
-            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-xl);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.03"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.03"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.02"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
         }
         
         .sidebar.collapsed {
             width: 80px;
         }
         
-        .sidebar .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            margin: 2px 10px;
-            border-radius: 8px;
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 2;
+        }
+        
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
             transition: all 0.3s ease;
+        }
+        
+        .sidebar.collapsed .sidebar-brand .brand-text {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        
+        .sidebar-nav {
+            padding: 1rem 0;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .nav-section-title {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0 1.5rem;
+            margin: 1.5rem 0 0.5rem;
+        }
+        
+        .sidebar.collapsed .nav-section-title {
+            display: none;
+        }
+        
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 1.5rem;
+            margin: 2px 1rem;
+            border-radius: var(--border-radius-md);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             align-items: center;
             text-decoration: none;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .sidebar .nav-link::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .sidebar .nav-link:hover::before,
+        .sidebar .nav-link.active::before {
+            opacity: 1;
         }
         
         .sidebar .nav-link:hover,
         .sidebar .nav-link.active {
-            background: rgba(255,255,255,0.2);
             color: white;
             transform: translateX(5px);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .sidebar .nav-link.active {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.6));
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         .sidebar .nav-link i {
             width: 20px;
-            margin-right: 10px;
+            margin-right: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
         }
         
+        .sidebar.collapsed .nav-link {
+            justify-content: center;
+            padding: 12px;
+        }
+        
+        .sidebar.collapsed .nav-link i {
+            margin-right: 0;
+        }
+        
+        .sidebar.collapsed .nav-link .nav-text {
+            display: none;
+        }
+        
+        /* Main Content */
         .main-content {
             margin-left: var(--sidebar-width);
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             min-height: 100vh;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         }
         
         .main-content.expanded {
             margin-left: 80px;
         }
         
+        /* Top Bar */
         .topbar {
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             padding: 1rem 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-sm);
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
             z-index: 999;
+            height: var(--header-height);
+            border-bottom: 1px solid var(--border-color);
         }
         
-        .content-wrapper {
-            padding: 2rem;
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
         
-        .card {
+        .sidebar-toggle {
+            background: none;
             border: none;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            color: var(--text-color);
+            font-size: 1.2rem;
+            padding: 8px;
+            border-radius: var(--border-radius-sm);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .sidebar-toggle:hover {
+            background: var(--light-color);
+            color: var(--primary-color);
+        }
+        
+        .breadcrumb {
+            background: none;
+            padding: 0;
+            margin: 0;
+            font-size: 0.9rem;
+        }
+        
+        .breadcrumb-item {
+            color: var(--text-muted);
+        }
+        
+        .breadcrumb-item.active {
+            color: var(--text-color);
+            font-weight: 500;
+        }
+        
+        .breadcrumb-item + .breadcrumb-item::before {
+            content: ">";
+            color: var(--text-muted);
+        }
+        
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        /* Quick Actions */
+        .quick-actions .btn {
+            border-radius: var(--border-radius-sm);
+            font-weight: 500;
+            padding: 8px 16px;
+            border: none;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .quick-actions .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            box-shadow: var(--shadow-md);
+        }
+        
+        .quick-actions .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        /* Notifications */
+        .notification-btn {
+            position: relative;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.1rem;
+            padding: 10px;
+            border-radius: var(--border-radius-sm);
             transition: all 0.3s ease;
         }
         
+        .notification-btn:hover {
+            background: var(--light-color);
+            color: var(--primary-color);
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            border: 2px solid white;
+        }
+        
+        /* User Menu */
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            padding: 8px 12px 8px 8px;
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--shadow-sm);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+        }
+        
+        .user-menu:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
+        }
+        
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border-color);
+        }
+        
+        .user-avatar.placeholder {
+            background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .user-info {
+            text-align: left;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 0.9rem;
+            line-height: 1.2;
+        }
+        
+        .user-role {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: capitalize;
+        }
+        
+        /* Content Wrapper */
+        .content-wrapper {
+            padding: 2rem;
+            min-height: calc(100vh - var(--header-height));
+        }
+        
+        /* Cards */
+        .card {
+            border: none;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-sm);
+            transition: all 0.3s ease;
+            background: white;
+            overflow: hidden;
+        }
+        
         .card:hover {
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-md);
             transform: translateY(-2px);
         }
         
         .card-header {
             background: white;
             border-bottom: 1px solid var(--border-color);
-            border-radius: 12px 12px 0 0 !important;
+            border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0 !important;
+            padding: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .card-body {
             padding: 1.5rem;
         }
         
+        /* Buttons */
         .btn {
-            border-radius: 8px;
+            border-radius: var(--border-radius-sm);
             font-weight: 500;
             padding: 10px 20px;
             transition: all 0.3s ease;
+            border: none;
+            position: relative;
+            overflow: hidden;
         }
         
         .btn-primary {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            box-shadow: var(--shadow-sm);
         }
         
         .btn-primary:hover {
-            background: #2563eb;
-            border-color: #2563eb;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            box-shadow: var(--shadow-md);
         }
         
+        .btn-outline-primary {
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            background: transparent;
+        }
+        
+        .btn-outline-primary:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+        
+        /* Forms */
         .form-control, .form-select {
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-sm);
+            border: 2px solid var(--border-color);
             padding: 12px 16px;
             transition: all 0.3s ease;
+            background: white;
         }
         
         .form-control:focus, .form-select:focus {
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
         
+        .form-label {
+            font-weight: 500;
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Tables */
         .table {
-            border-radius: 8px;
+            border-radius: var(--border-radius-md);
             overflow: hidden;
+            background: white;
         }
         
         .table thead th {
@@ -177,6 +523,9 @@
             font-weight: 600;
             color: var(--text-color);
             padding: 1rem;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
         }
         
         .table tbody td {
@@ -185,62 +534,135 @@
             vertical-align: middle;
         }
         
+        .table tbody tr:hover {
+            background: rgba(37, 99, 235, 0.02);
+        }
+        
+        /* Badges */
         .badge {
             font-weight: 500;
             padding: 6px 12px;
-            border-radius: 6px;
+            border-radius: var(--border-radius-sm);
+            font-size: 0.75rem;
         }
         
-        .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 12px;
-            padding: 2rem;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .stats-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100px;
-            height: 100px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 50%;
-            transform: translate(30px, -30px);
-        }
-        
+        /* Alerts */
         .alert {
             border: none;
-            border-radius: 8px;
+            border-radius: var(--border-radius-md);
             padding: 1rem 1.5rem;
+            border-left: 4px solid;
         }
         
-        .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+            border-left-color: var(--success-color);
         }
         
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border-left-color: var(--danger-color);
+        }
+        
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+            border-left-color: var(--warning-color);
+        }
+        
+        .alert-info {
+            background: rgba(6, 182, 212, 0.1);
+            color: #0891b2;
+            border-left-color: var(--info-color);
+        }
+        
+        /* Dropdown */
         .dropdown-menu {
             border: none;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border-radius: var(--border-radius-md);
             padding: 0.5rem 0;
+            margin-top: 0.5rem;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.95);
         }
         
         .dropdown-item {
             padding: 10px 20px;
             transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .dropdown-item:hover {
             background: var(--light-color);
+            color: var(--primary-color);
         }
         
+        .dropdown-divider {
+            margin: 0.5rem 0;
+            border-color: var(--border-color);
+        }
+        
+        /* Stats Cards */
+        .stats-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+            color: white;
+            border-radius: var(--border-radius-lg);
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .stats-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        /* Loading States */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+            position: relative;
+        }
+        
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            transform: translate(-50%, -50%);
+        }
+        
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        /* Mobile Responsive */
         @media (max-width: 768px) {
             .sidebar {
                 width: 0;
@@ -262,205 +684,251 @@
             .content-wrapper {
                 padding: 1rem;
             }
+            
+            .user-menu {
+                padding: 6px 8px 6px 6px;
+            }
+            
+            .user-info {
+                display: none;
+            }
         }
         
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
+        @media (max-width: 576px) {
+            .topbar-right > *:not(.user-menu) {
+                display: none;
+            }
         }
         
-        .spinner-border-sm {
-            width: 1rem;
-            height: 1rem;
+        /* Public Page Styles */
+        .public-navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: var(--shadow-sm);
+            padding: 1rem 0;
         }
         
-        .notification-badge {
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 90vh;
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-section::before {
+            content: '';
             position: absolute;
-            top: -5px;
-            right: -5px;
-            background: var(--danger-color);
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" stroke-width="0.5" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+        }
+        
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+            transition: all 0.3s ease;
+            border: 1px solid var(--border-color);
+            height: 100%;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-xl);
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+            border-radius: var(--border-radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
         }
         
-        .quick-action {
-            background: white;
-            border: 2px dashed var(--border-color);
-            border-radius: 12px;
-            padding: 2rem;
-            text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
+        /* Animation Classes */
+        .fade-in {
+            animation: fadeIn 0.6s ease-in-out;
         }
         
-        .quick-action:hover {
-            border-color: var(--primary-color);
-            background: rgba(59, 130, 246, 0.05);
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        .page-header {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        .slide-in-left {
+            animation: slideInLeft 0.6s ease-in-out;
         }
         
-        .breadcrumb {
-            background: none;
-            padding: 0;
-            margin: 0;
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-30px); }
+            to { opacity: 1; transform: translateX(0); }
         }
         
-        .breadcrumb-item + .breadcrumb-item::before {
-            content: ">";
-            color: var(--secondary-color);
+        .slide-in-right {
+            animation: slideInRight 0.6s ease-in-out;
+        }
+        
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
         }
     </style>
 </head>
 <body>
     {% if user.is_authenticated and business %}
+        <!-- Authenticated Business User Layout -->
+        
         <!-- Sidebar -->
         <nav class="sidebar" id="sidebar">
-            <div class="p-4">
-                <div class="d-flex align-items-center mb-4">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
                     {% if business.logo %}
-                        <img src="{{ business.logo.url }}" alt="{{ business.name }}" class="avatar me-3">
+                        <img src="{{ business.logo.url }}" alt="{{ business.name }}" class="user-avatar me-3">
                     {% else %}
-                        <div class="avatar me-3 bg-primary d-flex align-items-center justify-content-center text-white">
+                        <div class="user-avatar placeholder me-3">
                             {{ business.name|first|upper }}
                         </div>
                     {% endif %}
-                    <div class="sidebar-text">
-                        <h6 class="text-white mb-0">{{ business.name }}</h6>
+                    <div class="brand-text">
+                        <h6 class="text-white mb-0 font-heading">{{ business.name }}</h6>
                         <small class="text-white-50">{{ business.business_type|title }}</small>
                     </div>
                 </div>
             </div>
             
-            <ul class="nav flex-column">
-                <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'businesses:dashboard' %}">
-                        <i class="fas fa-tachometer-alt"></i>
-                        <span class="sidebar-text">Dashboard</span>
-                    </a>
-                </li>
+            <div class="sidebar-nav">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'businesses:dashboard' %}">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span class="nav-text">Dashboard</span>
+                        </a>
+                    </li>
+                    
+                    {% if request.employee.role in 'owner,manager' %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'employees' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'employees:list' %}">
+                            <i class="fas fa-users"></i>
+                            <span class="nav-text">Team</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'customers' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'customers:list' %}">
+                            <i class="fas fa-user-friends"></i>
+                            <span class="nav-text">Customers</span>
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'services' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'services:list' %}">
+                            <i class="fas fa-car-wash"></i>
+                            <span class="nav-text">Services</span>
+                        </a>
+                    </li>
+                    
+                    {% if request.employee.role in 'owner,manager' %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'inventory' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'inventory:list' %}">
+                            <i class="fas fa-boxes"></i>
+                            <span class="nav-text">Inventory</span>
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'suppliers' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'suppliers:list' %}">
+                            <i class="fas fa-truck"></i>
+                            <span class="nav-text">Suppliers</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'payments' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'payments:list' %}">
+                            <i class="fas fa-credit-card"></i>
+                            <span class="nav-text">Payments</span>
+                        </a>
+                    </li>
+                    
+                    {% if request.employee.role in 'owner,manager' %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'expenses' in request.resolver_match.namespace %}active{% endif %}" href="#"> <!-- {% url 'expenses:list' %} -->
+                            <i class="fas fa-receipt"></i>
+                            <span class="nav-text">Expenses</span>
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'reports' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'reports:dashboard' %}">
+                            <i class="fas fa-chart-bar"></i>
+                            <span class="nav-text">Reports</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
                 
-                {% if request.employee.role in 'owner,manager' %}
-                <li class="nav-item">
-                    <a class="nav-link {% if 'employees' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'employees:list' %}">
-                        <i class="fas fa-users"></i>
-                        <span class="sidebar-text">Employees</span>
-                    </a>
-                </li>
-                {% endif %}
-                
-                <li class="nav-item">
-                    <a class="nav-link {% if 'customers' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'customers:list' %}">
-                        <i class="fas fa-user-friends"></i>
-                        <span class="sidebar-text">Customers</span>
-                    </a>
-                </li>
-                
-                <li class="nav-item">
-                    <a class="nav-link {% if 'services' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'services:list' %}">
-                        <i class="fas fa-car-wash"></i>
-                        <span class="sidebar-text">Services</span>
-                    </a>
-                </li>
-                
-                {% if request.employee.role in 'owner,manager' %}
-                <li class="nav-item">
-                    <a class="nav-link {% if 'inventory' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'inventory:list' %}">
-                        <i class="fas fa-boxes"></i>
-                        <span class="sidebar-text">Inventory</span>
-                    </a>
-                </li>
-                
-                <li class="nav-item">
-                    <a class="nav-link {% if 'suppliers' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'suppliers:list' %}">
-                        <i class="fas fa-truck"></i>
-                        <span class="sidebar-text">Suppliers</span>
-                    </a>
-                </li>
-                {% endif %}
-                
-                <li class="nav-item">
-                    <a class="nav-link {% if 'payments' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'payments:list' %}">
-                        <i class="fas fa-credit-card"></i>
-                        <span class="sidebar-text">Payments</span>
-                    </a>
-                </li>
-                
-                {% if request.employee.role in 'owner,manager' %}
-                <li class="nav-item">
-                    <a class="nav-link {% if 'expenses' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'expenses:list' %}">
-                        <i class="fas fa-receipt"></i>
-                        <span class="sidebar-text">Expenses</span>
-                    </a>
-                </li>
-                
-                <li class="nav-item">
-                    <a class="nav-link {% if 'reports' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'reports:dashboard' %}">
-                        <i class="fas fa-chart-bar"></i>
-                        <span class="sidebar-text">Reports</span>
-                    </a>
-                </li>
-                {% endif %}
-                
-                <li class="nav-item mt-4">
-                    <h6 class="text-white-50 px-3 mb-2">Personal</h6>
-                </li>
-                
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'employees:attendance' %}">
-                        <i class="fas fa-clock"></i>
-                        <span class="sidebar-text">My Attendance</span>
-                    </a>
-                </li>
-                
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'employees:leave_list' %}">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span class="sidebar-text">My Leaves</span>
-                    </a>
-                </li>
+                <div class="nav-section-title">Personal</div>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'employees:attendance' %}">
+                            <i class="fas fa-clock"></i>
+                            <span class="nav-text">Attendance</span>
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'employees:leave_list' %}">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span class="nav-text">Leave Requests</span>
+                        </a>
+                    </li>
+                </ul>
                 
                 {% if request.employee.role == 'owner' %}
-                <li class="nav-item mt-4">
-                    <h6 class="text-white-50 px-3 mb-2">Settings</h6>
-                </li>
-                
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'accounts:business_settings' %}">
-                        <i class="fas fa-cog"></i>
-                        <span class="sidebar-text">Business Settings</span>
-                    </a>
-                </li>
+                <div class="nav-section-title">Settings</div>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'accounts:business_settings' %}">
+                            <i class="fas fa-cog"></i>
+                            <span class="nav-text">Business</span>
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'accounts:profile' %}">
+                            <i class="fas fa-user"></i>
+                            <span class="nav-text">Profile</span>
+                        </a>
+                    </li>
+                </ul>
                 {% endif %}
-                
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'accounts:profile' %}">
-                        <i class="fas fa-user"></i>
-                        <span class="sidebar-text">My Profile</span>
-                    </a>
-                </li>
-            </ul>
+            </div>
         </nav>
         
         <!-- Main Content -->
         <main class="main-content" id="main-content">
             <!-- Top Bar -->
             <div class="topbar">
-                <div class="d-flex align-items-center">
-                    <button class="btn btn-link p-0 me-3" id="sidebarToggle">
-                        <i class="fas fa-bars text-dark"></i>
+                <div class="topbar-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">
+                        <i class="fas fa-bars"></i>
                     </button>
                     
                     <nav aria-label="breadcrumb">
@@ -472,75 +940,104 @@
                     </nav>
                 </div>
                 
-                <div class="d-flex align-items-center">
+                <div class="topbar-right">
                     <!-- Quick Actions -->
-                    <div class="dropdown me-3">
-                        <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-plus"></i> Quick Add
+                    <div class="quick-actions dropdown">
+                        <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-plus me-1"></i> Quick Add
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'customers:create' %}"><i class="fas fa-user-plus me-2"></i>New Customer</a></li>
-                            <li><a class="dropdown-item" href="{% url 'services:create_order' %}"><i class="fas fa-plus-circle me-2"></i>New Service</a></li>
+                            <li><a class="dropdown-item" href="{% url 'customers:create' %}">
+                                <i class="fas fa-user-plus"></i>New Customer
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'services:create_order' %}">
+                                <i class="fas fa-plus-circle"></i>New Service
+                            </a></li>
                             {% if request.employee.role in 'owner,manager' %}
-                            <li><a class="dropdown-item" href="{% url 'employees:create' %}"><i class="fas fa-user-tie me-2"></i>New Employee</a></li>
+                            <li><a class="dropdown-item" href="{% url 'employees:create' %}">
+                                <i class="fas fa-user-tie"></i>New Employee
+                            </a></li>
                             {% endif %}
                         </ul>
                     </div>
                     
                     <!-- Notifications -->
-                    <div class="dropdown me-3">
-                        <button class="btn btn-link position-relative p-2" type="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-bell text-dark"></i>
+                    <div class="dropdown">
+                        <button class="notification-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bell"></i>
                             {% if unread_notifications_count > 0 %}
                             <span class="notification-badge">{{ unread_notifications_count }}</span>
                             {% endif %}
                         </button>
-                        <div class="dropdown-menu dropdown-menu-end" style="width: 300px;">
-                            <h6 class="dropdown-header">Notifications</h6>
+                        <div class="dropdown-menu dropdown-menu-end" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                            <div class="dropdown-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">Notifications</h6>
+                                {% if unread_notifications_count > 0 %}
+                                <small class="badge bg-primary">{{ unread_notifications_count }} new</small>
+                                {% endif %}
+                            </div>
                             {% for notification in recent_notifications %}
-                            <a class="dropdown-item" href="{{ notification.url }}">
-                                <div class="d-flex">
+                            <a class="dropdown-item py-3" href="{{ notification.url }}">
+                                <div class="d-flex align-items-start">
                                     <div class="flex-shrink-0">
-                                        <i class="fas fa-{{ notification.icon }} text-{{ notification.type }}"></i>
+                                        <div class="rounded-circle bg-{{ notification.type }} bg-opacity-10 p-2">
+                                            <i class="fas fa-{{ notification.icon }} text-{{ notification.type }}"></i>
+                                        </div>
                                     </div>
-                                    <div class="flex-grow-1 ms-2">
-                                        <p class="mb-1 small">{{ notification.message }}</p>
+                                    <div class="flex-grow-1 ms-3">
+                                        <p class="mb-1 fw-medium">{{ notification.message }}</p>
                                         <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
                                     </div>
                                 </div>
                             </a>
                             {% empty %}
-                            <span class="dropdown-item-text">No new notifications</span>
+                            <div class="dropdown-item-text text-center py-4">
+                                <i class="fas fa-bell-slash text-muted mb-2" style="font-size: 2rem;"></i>
+                                <p class="text-muted mb-0">No new notifications</p>
+                            </div>
                             {% endfor %}
+                            {% if recent_notifications %}
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item text-center" href="{% url 'notifications:list' %}">View all notifications</a>
+                            <a class="dropdown-item text-center fw-medium" href="{% url 'notifications:list' %}">
+                                View all notifications
+                            </a>
+                            {% endif %}
                         </div>
                     </div>
                     
                     <!-- User Menu -->
                     <div class="dropdown">
-                        <button class="btn btn-link d-flex align-items-center p-0" type="button" data-bs-toggle="dropdown">
+                        <div class="user-menu" data-bs-toggle="dropdown" aria-expanded="false">
                             {% if request.employee.photo %}
-                                <img src="{{ request.employee.photo.url }}" alt="{{ request.employee.full_name }}" class="avatar me-2">
+                                <img src="{{ request.employee.photo.url }}" alt="{{ request.employee.full_name }}" class="user-avatar">
                             {% else %}
-                                <div class="avatar me-2 bg-primary d-flex align-items-center justify-content-center text-white">
+                                <div class="user-avatar placeholder">
                                     {{ request.employee.full_name|first|upper }}
                                 </div>
                             {% endif %}
-                            <div class="text-start">
-                                <div class="fw-semibold text-dark">{{ request.employee.full_name }}</div>
-                                <small class="text-muted">{{ request.employee.get_role_display }}</small>
+                            <div class="user-info">
+                                <div class="user-name">{{ request.employee.full_name }}</div>
+                                <div class="user-role">{{ request.employee.get_role_display }}</div>
                             </div>
-                        </button>
+                            <i class="fas fa-chevron-down text-muted" style="font-size: 0.8rem;"></i>
+                        </div>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{% url 'accounts:profile' %}"><i class="fas fa-user me-2"></i>My Profile</a></li>
-                            <li><a class="dropdown-item" href="{% url 'employees:attendance' %}"><i class="fas fa-clock me-2"></i>My Attendance</a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                                <i class="fas fa-user"></i>My Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'employees:attendance' %}">
+                                <i class="fas fa-clock"></i>My Attendance
+                            </a></li>
                             {% if request.employee.role == 'owner' %}
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'accounts:business_settings' %}"><i class="fas fa-cog me-2"></i>Business Settings</a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:business_settings' %}">
+                                <i class="fas fa-cog"></i>Business Settings
+                            </a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'accounts:logout' %}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                            <li><a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}">
+                                <i class="fas fa-sign-out-alt"></i>Logout
+                            </a></li>
                         </ul>
                     </div>
                 </div>
@@ -554,9 +1051,11 @@
                     <div class="col-12">
                         {% for message in messages %}
                         <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+                                <div class="flex-grow-1">{{ message }}</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
@@ -566,48 +1065,55 @@
                 {% block content %}{% endblock %}
             </div>
         </main>
+        
     {% else %}
         <!-- Public Layout -->
-        <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <nav class="navbar navbar-expand-lg public-navbar fixed-top">
             <div class="container">
-                <a class="navbar-brand" href="{% url 'landing' %}">
-                    <i class="fas fa-car-wash me-2"></i>Autowash
+                <a class="navbar-brand font-heading" href="{% url 'landing' %}">
+                    <i class="fas fa-car-wash"></i>Autowash
                 </a>
                 
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'landing' %}">Home</a>
+                            <a class="nav-link fw-medium" href="{% url 'landing' %}">Home</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'features' %}">Features</a>
+                            <a class="nav-link fw-medium" href="{% url 'features' %}">Features</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'pricing' %}">Pricing</a>
+                            <a class="nav-link fw-medium" href="{% url 'pricing' %}">Pricing</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'contact' %}">Contact</a>
+                            <a class="nav-link fw-medium" href="{% url 'contact' %}">Contact</a>
                         </li>
                     </ul>
                     
                     <ul class="navbar-nav">
                         {% if user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'accounts:dashboard_redirect' %}">Dashboard</a>
+                            <a class="nav-link fw-medium" href="{% url 'accounts:dashboard_redirect' %}">
+                                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'accounts:logout' %}">Logout</a>
+                            <a class="nav-link fw-medium text-danger" href="{% url 'accounts:logout' %}">
+                                <i class="fas fa-sign-out-alt me-1"></i>Logout
+                            </a>
                         </li>
                         {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'accounts:login' %}">Login</a>
+                            <a class="nav-link fw-medium" href="{% url 'accounts:login' %}">Login</a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-primary ms-2" href="{% url 'accounts:register' %}">Get Started</a>
+                            <a class="btn btn-primary ms-2 px-4" href="{% url 'accounts:register' %}">
+                                Get Started Free
+                            </a>
                         </li>
                         {% endif %}
                     </ul>
@@ -615,21 +1121,93 @@
             </div>
         </nav>
         
-        <main>
+        <main style="padding-top: 76px;">
             <!-- Messages for public pages -->
             {% if messages %}
             <div class="container mt-4">
-                {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <div class="row">
+                    <div class="col-12">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+                                <div class="flex-grow-1">{{ message }}</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
-                {% endfor %}
             </div>
             {% endif %}
             
             {% block public_content %}{% endblock %}
         </main>
+        
+        <!-- Footer for public pages -->
+        <footer class="bg-dark text-white py-5 mt-5">
+            <div class="container">
+                <div class="row">
+                    <div class="col-lg-4 mb-4">
+                        <h5 class="font-heading mb-3">
+                            <i class="fas fa-car-wash text-primary me-2"></i>Autowash
+                        </h5>
+                        <p class="text-light">Professional car wash management software that helps you streamline operations, manage customers, and grow your business.</p>
+                        <div class="d-flex gap-3">
+                            <a href="#" class="text-light"><i class="fab fa-facebook-f"></i></a>
+                            <a href="#" class="text-light"><i class="fab fa-twitter"></i></a>
+                            <a href="#" class="text-light"><i class="fab fa-linkedin-in"></i></a>
+                            <a href="#" class="text-light"><i class="fab fa-instagram"></i></a>
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-4">
+                        <h6 class="fw-bold mb-3">Product</h6>
+                        <ul class="list-unstyled">
+                            <li><a href="{% url 'features' %}" class="text-light text-decoration-none">Features</a></li>
+                            <li><a href="{% url 'pricing' %}" class="text-light text-decoration-none">Pricing</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">Security</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">Updates</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-4">
+                        <h6 class="fw-bold mb-3">Company</h6>
+                        <ul class="list-unstyled">
+                            <li><a href="#" class="text-light text-decoration-none">About</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">Blog</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">Careers</a></li>
+                            <li><a href="{% url 'contact' %}" class="text-light text-decoration-none">Contact</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-4">
+                        <h6 class="fw-bold mb-3">Resources</h6>
+                        <ul class="list-unstyled">
+                            <li><a href="#" class="text-light text-decoration-none">Help Center</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">API Docs</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">Guides</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">Community</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-4">
+                        <h6 class="fw-bold mb-3">Legal</h6>
+                        <ul class="list-unstyled">
+                            <li><a href="#" class="text-light text-decoration-none">Privacy</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">Terms</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">License</a></li>
+                            <li><a href="#" class="text-light text-decoration-none">Cookies</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <hr class="my-4 border-secondary">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <p class="mb-0 text-light">&copy; {{ "now"|date:"Y" }} Autowash. All rights reserved.</p>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <p class="mb-0 text-light">Made with <i class="fas fa-heart text-danger"></i> in Kenya</p>
+                    </div>
+                </div>
+            </div>
+        </footer>
     {% endif %}
     
     <!-- Bootstrap JS -->
@@ -638,27 +1216,52 @@
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     
+    <!-- AOS Animation -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    
     <!-- Custom JavaScript -->
     <script>
-        // Sidebar toggle
-        document.getElementById('sidebarToggle')?.addEventListener('click', function() {
-            document.getElementById('sidebar').classList.toggle('collapsed');
-            document.getElementById('main-content').classList.toggle('expanded');
+        // Initialize AOS
+        AOS.init({
+            duration: 800,
+            easing: 'ease-in-out',
+            once: true,
+            offset: 100
         });
         
-        // Mobile sidebar toggle
-        if (window.innerWidth <= 768) {
-            document.getElementById('sidebarToggle')?.addEventListener('click', function() {
-                document.getElementById('sidebar').classList.toggle('mobile-open');
-            });
-        }
+        // Sidebar toggle
+        document.getElementById('sidebarToggle')?.addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('mobile-open');
+            } else {
+                sidebar.classList.toggle('collapsed');
+                mainContent.classList.toggle('expanded');
+            }
+        });
+        
+        // Close mobile sidebar when clicking outside
+        document.addEventListener('click', function(event) {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const sidebarToggle = document.getElementById('sidebarToggle');
+                
+                if (!sidebar?.contains(event.target) && !sidebarToggle?.contains(event.target)) {
+                    sidebar?.classList.remove('mobile-open');
+                }
+            }
+        });
         
         // Auto-hide alerts
         setTimeout(function() {
-            $('.alert').fadeOut('slow');
+            $('.alert').each(function() {
+                $(this).fadeOut('slow');
+            });
         }, 5000);
         
-        // AJAX setup
+        // AJAX setup for Django CSRF
         $.ajaxSetup({
             beforeSend: function(xhr, settings) {
                 if (!this.crossDomain) {
@@ -667,16 +1270,83 @@
             }
         });
         
-        // Loading states
+        // Loading states for forms
         $(document).on('submit', 'form', function() {
-            $(this).addClass('loading');
-            $(this).find('button[type="submit"]').html('<span class="spinner-border spinner-border-sm me-2"></span>Processing...');
+            const submitBtn = $(this).find('button[type="submit"]');
+            const originalText = submitBtn.html();
+            
+            submitBtn.prop('disabled', true);
+            submitBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Processing...');
+            
+            // Re-enable after 10 seconds as fallback
+            setTimeout(() => {
+                submitBtn.prop('disabled', false);
+                submitBtn.html(originalText);
+            }, 10000);
         });
         
-        // Tooltips
+        // Initialize tooltips
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        // Add animation classes on scroll
+        const animateOnScroll = () => {
+            const elements = document.querySelectorAll('.animate-on-scroll');
+            elements.forEach(element => {
+                const elementTop = element.getBoundingClientRect().top;
+                const elementVisible = 150;
+                
+                if (elementTop < window.innerHeight - elementVisible) {
+                    element.classList.add('fade-in');
+                }
+            });
+        };
+        
+        window.addEventListener('scroll', animateOnScroll);
+        
+        // Real-time form validation feedback
+        const addInputValidation = () => {
+            const inputs = document.querySelectorAll('.form-control, .form-select');
+            inputs.forEach(input => {
+                input.addEventListener('blur', function() {
+                    if (this.checkValidity()) {
+                        this.classList.remove('is-invalid');
+                        this.classList.add('is-valid');
+                    } else {
+                        this.classList.remove('is-valid');
+                        this.classList.add('is-invalid');
+                    }
+                });
+                
+                input.addEventListener('input', function() {
+                    if (this.classList.contains('is-invalid') && this.checkValidity()) {
+                        this.classList.remove('is-invalid');
+                        this.classList.add('is-valid');
+                    }
+                });
+            });
+        };
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            addInputValidation();
+            animateOnScroll();
         });
     </script>
     

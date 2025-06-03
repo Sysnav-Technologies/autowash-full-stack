@@ -1,165 +1,180 @@
-{% extends "base/base.html" %}
+{% extends 'base/base.html' %}
+{% load static %}
 
-{% block title %}Register Your Business{% endblock %}
+{% block title %}Register Your Business - Autowash{% endblock %}
 
-{% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card shadow-sm">
-                <div class="card-body p-5">
-                    <div class="text-center mb-5">
-                        <h2>Register Your Business</h2>
-                        <p class="text-muted">Complete the form below to register your car wash business</p>
+{% block public_content %}
+<section class="py-5 bg-light min-vh-100">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-lg">
+                    <div class="card-body p-5">
+                        <!-- Header -->
+                        <div class="text-center mb-5">
+                            <h2 class="fw-bold">Register Your Business</h2>
+                            <p class="text-muted">Tell us about your car wash business</p>
+                        </div>
+
+                        <!-- Debug Messages -->
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        <!-- Debug Information -->
+                        <div class="alert alert-info">
+                            <strong>Debug Info:</strong><br>
+                            Form object: {{ form }}<br>
+                            Form fields: 
+                            {% for field in form %}
+                                {{ field.name }}, 
+                            {% endfor %}
+                        </div>
+
+                        <!-- Business Registration Form -->
+                        <form method="post" enctype="multipart/form-data" id="businessForm" action="{% url 'accounts:business_register' %}">
+                            {% csrf_token %}
+                            
+                            <!-- Show form errors at the top -->
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {% for error in form.non_field_errors %}
+                                        <p>{{ error }}</p>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Business Name -->
+                            <div class="mb-3">
+                                <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold">Business Name *</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                    <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Business Type -->
+                            <div class="mb-3">
+                                <label for="{{ form.business_type.id_for_label }}" class="form-label fw-semibold">Business Type *</label>
+                                {{ form.business_type }}
+                                {% if form.business_type.errors %}
+                                    <div class="text-danger small mt-1">{{ form.business_type.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Description -->
+                            <div class="mb-3">
+                                <label for="{{ form.description.id_for_label }}" class="form-label fw-semibold">Description</label>
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                    <div class="text-danger small mt-1">{{ form.description.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Logo -->
+                            <div class="mb-4">
+                                <label for="{{ form.logo.id_for_label }}" class="form-label fw-semibold">Logo (Optional)</label>
+                                {{ form.logo }}
+                                {% if form.logo.errors %}
+                                    <div class="text-danger small mt-1">{{ form.logo.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Simple checkbox (no required) -->
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="businessTerms">
+                                    <label class="form-check-label" for="businessTerms">
+                                        I agree to the terms and conditions
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                    Register Business
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="testSubmit()">
+                                    Test Submit (Debug)
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Business Name</label>
-                            {{ form.name }}
-                            <div class="form-text">This will be your business's public name</div>
-                            {% if form.name.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.name.errors.0 }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Business Type</label>
-                            {{ form.business_type }}
-                            {% if form.business_type.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.business_type.errors.0 }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Business Logo</label>
-                            {{ form.logo }}
-                            <div class="form-text">Recommended size: 300x300 pixels</div>
-                            {% if form.logo.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.logo.errors.0 }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Phone Number</label>
-                                {{ form.phone }}
-                                {% if form.phone.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.phone.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Email</label>
-                                {{ form.email }}
-                                {% if form.email.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.email.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Address</label>
-                            {{ form.address }}
-                            {% if form.address.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.address.errors.0 }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">City</label>
-                            {{ form.city }}
-                            {% if form.city.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.city.errors.0 }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">State/Province</label>
-                                {{ form.state }}
-                                {% if form.state.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.state.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Postal Code</label>
-                                {{ form.postal_code }}
-                                {% if form.postal_code.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.postal_code.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Country</label>
-                            {{ form.country }}
-                            {% if form.country.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.country.errors.0 }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="form-label">Business Description</label>
-                            {{ form.description }}
-                            {% if form.description.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.description.errors.0 }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">Register Business</button>
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
+</section>
 
-{% block extra_js %}
 <script>
-$(document).ready(function() {
-    // Check business name availability
-    $('#id_name').on('blur', function() {
-        const name = $(this).val();
-        if (name.length > 2) {
-            $.get('{% url "accounts:check_business_name" %}', {name: name}, function(data) {
-                const feedback = $('#id_name').nextAll('.form-text').first();
-                if (data.available) {
-                    feedback.removeClass('text-danger').addClass('text-success').text(data.message);
-                } else {
-                    feedback.removeClass('text-success').addClass('text-danger').text(data.message);
-                }
-            });
-        }
-    });
+console.log('=== SCRIPT LOADED ===');
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DOM CONTENT LOADED ===');
+    
+    const businessForm = document.getElementById('businessForm');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    console.log('Form element:', businessForm);
+    console.log('Submit button:', submitBtn);
+    
+    if (businessForm) {
+        console.log('Form found, adding event listener');
+        
+        businessForm.addEventListener('submit', function(e) {
+            console.log('=== FORM SUBMIT EVENT TRIGGERED ===');
+            console.log('Event:', e);
+            
+            // Don't check terms for now - just debug
+            console.log('Allowing form submission...');
+            
+            const originalText = submitBtn.innerHTML;
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Registering...';
+            
+            console.log('Submit button disabled, form should submit now');
+            
+            // Re-enable button after timeout (fallback)
+            setTimeout(() => {
+                console.log('Re-enabling submit button (timeout)');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }, 10000);
+        });
+        
+        // Add click event directly to button as backup
+        submitBtn.addEventListener('click', function(e) {
+            console.log('=== SUBMIT BUTTON CLICKED ===');
+            console.log('Button click event:', e);
+        });
+    } else {
+        console.error('Business form not found!');
+    }
+});
+
+// Test function
+function testSubmit() {
+    console.log('=== TEST SUBMIT CLICKED ===');
+    const form = document.getElementById('businessForm');
+    if (form) {
+        console.log('Submitting form programmatically...');
+        form.submit();
+    } else {
+        console.error('Form not found for test submit');
+    }
+}
+
+// Check for any JavaScript errors
+window.addEventListener('error', function(e) {
+    console.error('JavaScript error:', e.error);
 });
 </script>
 {% endblock %}

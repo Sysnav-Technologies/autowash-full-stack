@@ -1,0 +1,525 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Subscribe to {{ plan.name }} - Autowash{% endblock %}
+
+{% block public_content %}
+<section class="py-5 bg-light min-vh-100">
+    <div class="container">
+        <!-- Progress Indicator -->
+        <div class="row justify-content-center mb-4">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm" data-aos="fade-down">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-success rounded-circle p-2 me-3">
+                                    <i class="fas fa-check text-white"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Account Ready</h6>
+                                    <small class="text-muted">Business registered</small>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary rounded-circle p-2 me-3">
+                                    <i class="fas fa-credit-card text-white"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Choose Plan</h6>
+                                    <small class="text-muted">Current step</small>
+                                </div>
+                            </div>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <div class="d-flex align-items-center">
+                                <div class="border border-2 border-muted rounded-circle p-2 me-3">
+                                    <i class="fas fa-rocket text-muted"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 text-muted">Get Started</h6>
+                                    <small class="text-muted">Final step</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center">
+            <!-- Plan Summary -->
+            <div class="col-lg-4 mb-4">
+                <div class="card border-0 shadow-lg sticky-top" style="top: 2rem;" data-aos="fade-right">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0 fw-bold d-flex align-items-center">
+                            <i class="fas fa-star me-2"></i>{{ plan.name }} Plan
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- Plan Details -->
+                        <div class="text-center mb-4">
+                            <div class="h2 fw-bold text-primary mb-0" id="planPrice">
+                                KES {{ plan.monthly_price|floatformat:0 }}
+                            </div>
+                            <small class="text-muted" id="planBilling">/month</small>
+                            
+                            {% if plan.trial_days > 0 %}
+                            <div class="mt-2">
+                                <span class="badge bg-success">{{ plan.trial_days }}-day FREE trial</span>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Features -->
+                        <ul class="list-unstyled mb-4">
+                            {% if plan.max_employees == -1 %}
+                                <li class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-check text-success me-3"></i>
+                                    <span>Unlimited employees</span>
+                                </li>
+                            {% else %}
+                                <li class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-check text-success me-3"></i>
+                                    <span>Up to {{ plan.max_employees }} employees</span>
+                                </li>
+                            {% endif %}
+                            
+                            {% if plan.max_customers == -1 %}
+                                <li class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-check text-success me-3"></i>
+                                    <span>Unlimited customers</span>
+                                </li>
+                            {% else %}
+                                <li class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-check text-success me-3"></i>
+                                    <span>Up to {{ plan.max_customers }} customers</span>
+                                </li>
+                            {% endif %}
+                            
+                            {% for feature in plan.features_list %}
+                                <li class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-check text-success me-3"></i>
+                                    <span>{{ feature }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+
+                        <!-- Pricing Breakdown -->
+                        <div class="border-top pt-4">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Plan cost:</span>
+                                <span class="fw-semibold" id="planCost">KES {{ plan.monthly_price|floatformat:0 }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2" id="discountRow" style="display: none !important;">
+                                <span class="text-muted">Discount:</span>
+                                <span class="text-success fw-semibold" id="discountAmount">-KES 0</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span class="text-muted">Free trial:</span>
+                                <span class="text-success fw-semibold">{{ plan.trial_days }} days</span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-bold">Total due today:</span>
+                                <span class="fw-bold text-primary" id="totalDue">KES 0</span>
+                            </div>
+                            <small class="text-muted d-block mt-2">Billing starts after trial period</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subscription Form -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-lg" data-aos="fade-left">
+                    <div class="card-header bg-white">
+                        <h4 class="mb-0 fw-bold d-flex align-items-center">
+                            <i class="fas fa-cog me-2 text-primary"></i>
+                            Subscription Details
+                        </h4>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="post" id="subscriptionForm">
+                            {% csrf_token %}
+                            
+                            <!-- Billing Cycle -->
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Billing Cycle</label>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="form-check billing-option">
+                                            <input class="form-check-input" type="radio" name="billing_cycle" id="monthly" value="monthly" checked>
+                                            <label class="form-check-label w-100" for="monthly">
+                                                <div class="card border h-100">
+                                                    <div class="card-body text-center py-3">
+                                                        <div class="fw-bold">Monthly</div>
+                                                        <div class="text-muted small">KES {{ plan.monthly_price|floatformat:0 }}/month</div>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% if plan.annual_price %}
+                                    <div class="col-6">
+                                        <div class="form-check billing-option">
+                                            <input class="form-check-input" type="radio" name="billing_cycle" id="annual" value="annual">
+                                            <label class="form-check-label w-100" for="annual">
+                                                <div class="card border h-100">
+                                                    <div class="card-body text-center py-3">
+                                                        <div class="fw-bold">Annual</div>
+                                                        <div class="text-muted small">KES {{ plan.annual_price|floatformat:0 }}/year</div>
+                                                        {% if plan.annual_savings > 0 %}
+                                                        <div class="badge bg-success mt-1">Save {{ plan.annual_savings }}%</div>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Discount Code -->
+                            <div class="mb-4">
+                                <label for="discountCode" class="form-label fw-semibold">
+                                    <i class="fas fa-tag me-2 text-warning"></i>Discount Code (Optional)
+                                </label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="discountCode" name="discount_code" placeholder="Enter discount code">
+                                    <button class="btn btn-outline-primary" type="button" id="applyDiscount">
+                                        Apply
+                                    </button>
+                                </div>
+                                <div id="discountMessage" class="mt-2"></div>
+                            </div>
+
+                            <!-- Business Information Summary -->
+                            <div class="mb-4">
+                                <h6 class="fw-bold mb-3">Business Information</h6>
+                                <div class="bg-light rounded p-3">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <small class="text-muted d-block">Business Name</small>
+                                            <span class="fw-semibold">{{ business.name }}</span>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small class="text-muted d-block">Business Type</small>
+                                            <span class="fw-semibold">{{ business.get_business_type_display }}</span>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small class="text-muted d-block">Email</small>
+                                            <span class="fw-semibold">{{ business.email }}</span>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small class="text-muted d-block">Phone</small>
+                                            <span class="fw-semibold">{{ business.phone }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Terms and Conditions -->
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="termsAccepted" required>
+                                    <label class="form-check-label" for="termsAccepted">
+                                        I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Trial Information -->
+                            {% if plan.trial_days > 0 %}
+                            <div class="alert alert-info border-0 mb-4">
+                                <div class="d-flex align-items-start">
+                                    <i class="fas fa-info-circle me-3 mt-1"></i>
+                                    <div>
+                                        <h6 class="fw-bold mb-1">Free Trial Information</h6>
+                                        <p class="mb-2">Your {{ plan.trial_days }}-day free trial starts immediately. You won't be charged until the trial period ends.</p>
+                                        <small class="text-muted">You can cancel anytime during the trial with no charges.</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Submit Button -->
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg py-3 fw-semibold">
+                                    <i class="fas fa-rocket me-2"></i>Start {{ plan.trial_days }}-Day Free Trial
+                                </button>
+                                <a href="{% url 'subscriptions:plans' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Choose Different Plan
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Security Notice -->
+                <div class="text-center mt-4">
+                    <div class="d-flex justify-content-center align-items-center gap-4 text-muted">
+                        <small><i class="fas fa-shield-alt me-1"></i> SSL Secured</small>
+                        <small><i class="fas fa-lock me-1"></i> Data Protected</small>
+                        <small><i class="fas fa-undo me-1"></i> Cancel Anytime</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const monthlyRadio = document.getElementById('monthly');
+    const annualRadio = document.getElementById('annual');
+    const planPrice = document.getElementById('planPrice');
+    const planBilling = document.getElementById('planBilling');
+    const planCost = document.getElementById('planCost');
+    const totalDue = document.getElementById('totalDue');
+    
+    const monthlyPrice = {{ plan.monthly_price }};
+    const annualPrice = {{ plan.annual_price|default:0 }};
+    
+    let currentDiscount = 0;
+    
+    function updatePricing() {
+        const isAnnual = annualRadio && annualRadio.checked;
+        const price = isAnnual ? annualPrice : monthlyPrice;
+        const billing = isAnnual ? '/year' : '/month';
+        
+        planPrice.textContent = `KES ${price.toLocaleString()}`;
+        planBilling.textContent = billing;
+        planCost.textContent = `KES ${price.toLocaleString()}`;
+        
+        // Update total due (considering free trial)
+        const finalAmount = Math.max(0, price - currentDiscount);
+        totalDue.textContent = {% if plan.trial_days > 0 %}'KES 0'{% else %}`KES ${finalAmount.toLocaleString()}`{% endif %};
+    }
+    
+    // Billing cycle change handlers
+    if (monthlyRadio) monthlyRadio.addEventListener('change', updatePricing);
+    if (annualRadio) annualRadio.addEventListener('change', updatePricing);
+    
+    // Discount code functionality
+    const discountCode = document.getElementById('discountCode');
+    const applyDiscount = document.getElementById('applyDiscount');
+    const discountMessage = document.getElementById('discountMessage');
+    const discountRow = document.getElementById('discountRow');
+    const discountAmount = document.getElementById('discountAmount');
+    
+    applyDiscount.addEventListener('click', function() {
+        const code = discountCode.value.trim();
+        if (!code) {
+            showDiscountMessage('Please enter a discount code', 'danger');
+            return;
+        }
+        
+        // Show loading state
+        applyDiscount.disabled = true;
+        applyDiscount.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        // Make AJAX request to validate discount
+        fetch(`{% url 'subscriptions:check_discount' %}?code=${encodeURIComponent(code)}&plan_id={{ plan.id }}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.valid) {
+                    currentDiscount = data.discount_amount;
+                    discountAmount.textContent = `-KES ${currentDiscount.toLocaleString()}`;
+                    discountRow.style.display = 'flex';
+                    showDiscountMessage(data.message, 'success');
+                    updatePricing();
+                } else {
+                    currentDiscount = 0;
+                    discountRow.style.display = 'none';
+                    showDiscountMessage(data.message, 'danger');
+                    updatePricing();
+                }
+            })
+            .catch(error => {
+                showDiscountMessage('Error validating discount code', 'danger');
+            })
+            .finally(() => {
+                applyDiscount.disabled = false;
+                applyDiscount.innerHTML = 'Apply';
+            });
+    });
+    
+    function showDiscountMessage(message, type) {
+        discountMessage.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show py-2">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`;
+    }
+    
+    // Form submission
+    const subscriptionForm = document.getElementById('subscriptionForm');
+    subscriptionForm.addEventListener('submit', function(e) {
+        const termsCheckbox = document.getElementById('termsAccepted');
+        if (!termsCheckbox.checked) {
+            e.preventDefault();
+            alert('Please accept the Terms of Service and Privacy Policy to continue.');
+            return;
+        }
+
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting Trial...';
+        
+        // Re-enable button after form submission
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }, 5000);
+    });
+    
+    // Billing option styling
+    const billingOptions = document.querySelectorAll('.billing-option input[type="radio"]');
+    billingOptions.forEach(option => {
+        option.addEventListener('change', function() {
+            // Remove active class from all cards
+            document.querySelectorAll('.billing-option .card').forEach(card => {
+                card.classList.remove('border-primary', 'bg-primary', 'bg-opacity-10');
+            });
+            
+            // Add active class to selected card
+            if (this.checked) {
+                const card = this.parentElement.querySelector('.card');
+                card.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+            }
+        });
+    });
+    
+    // Initialize with monthly selected
+    const monthlyCard = monthlyRadio.parentElement.querySelector('.card');
+    monthlyCard.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+});
+</script>
+
+<style>
+.billing-option {
+    position: relative;
+}
+
+.billing-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.billing-option label {
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+.billing-option .card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.billing-option .card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.sticky-top {
+    position: sticky;
+    top: 2rem;
+    z-index: 1020;
+}
+
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.form-check-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+}
+
+.alert {
+    border-radius: var(--border-radius-sm);
+}
+
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.badge {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+}
+
+/* Progress indicator styling */
+.progress-step {
+    transition: all 0.3s ease;
+}
+
+.progress-step.active {
+    transform: scale(1.05);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .sticky-top {
+        position: static;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .row.g-3 > * {
+        margin-bottom: 1rem;
+    }
+    
+    .billing-option .card-body {
+        padding: 1rem;
+    }
+}
+
+/* Animation for cards */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideInUp 0.6s ease-out;
+}
+
+/* Custom input focus styles */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+}
+
+/* Security notice styling */
+.text-muted {
+    font-size: 0.875rem;
+}
+
+.text-muted i {
+    color: var(--success-color);
+}
+</style>
+{% endblock %}

@@ -1,3 +1,4 @@
+import re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
@@ -11,13 +12,13 @@ from django.utils.decorators import method_decorator
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+import uuid
 from apps.core.decorators import ajax_required
 from .models import UserProfile, Business, BusinessSettings, BusinessVerification
 from .forms import (
     UserRegistrationForm, UserProfileForm, BusinessRegistrationForm,
     BusinessSettingsForm, BusinessVerificationForm
 )
-import uuid
 
 class LandingView(TemplateView):
     """Public landing page"""
@@ -55,7 +56,7 @@ class LandingView(TemplateView):
 def register_view(request):
     """User registration view"""
     if request.user.is_authenticated:
-        return redirect('dashboard')
+        return redirect('accounts:dashboard_redirect')
     
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
@@ -78,8 +79,6 @@ def register_view(request):
                     if user:
                         login(request, user)
                         messages.success(request, 'Account created successfully!')
-                        
-                        # Redirect to business registration
                         return redirect('accounts:business_register')
                         
             except Exception as e:
@@ -92,7 +91,7 @@ def register_view(request):
 def login_view(request):
     """User login view"""
     if request.user.is_authenticated:
-        return redirect('dashboard')
+        return redirect('accounts:dashboard_redirect')
     
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -104,12 +103,237 @@ def login_view(request):
             messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
             
             # Redirect to next URL or dashboard
-            next_url = request.GET.get('next', 'dashboard')
+            next_url = request.GET.get('next', 'accounts:dashboard_redirect')
             return redirect(next_url)
         else:
             messages.error(request, 'Invalid credentials. Please try again.')
     
     return render(request, 'auth/login.html')
+
+@login_required
+def dashboard_redirect(request):
+    """Smart dashboard redirect based on user context"""
+    
+    # Check if we're in a business tenant (multi-tenant setup)
+    if hasattr(request, 'business') and request.business:
+        # User is in a business tenant - check if they're an employee
+        try:
+            from apps.employees.models import Employee
+            employee = Employee.objects.get(user=request.user, is_active=True)
+            
+            # Check business verification and subscription
+            if not request.business.is_verified:
+                if employee.role == 'owner':
+                    messages.warning(request, 'Please complete business verification.')
+                    return redirect('accounts:business_verification')
+                else:
+                    messages.info(request, 'Business verification is pending.')
+            
+            if not request.business.subscription or not request.business.subscription.is_active:
+                if employee.role == 'owner':
+                    messages.warning(request, 'Please activate your subscription.')
+                    return redirect('subscriptions:plans')
+                else:
+                    messages.info(request, 'Business subscription is inactive.')
+            
+            # Redirect based on role
+            if employee.role == 'owner':
+                return redirect('businesses:dashboard')
+            else:
+                return redirect('employees:dashboard')
+                
+        except Employee.DoesNotExist:
+            # User is in tenant but not an employee - shouldn't happen
+            messages.error(request, 'Access denied. You are not authorized for this business.')
+            return redirect('accounts:logout')
+    
+    # Public schema - check if user owns a business
+    business = request.user.owned_businesses.first()
+    if business:
+        # Redirect to business tenant
+        domain = business.domains.filter(is_primary=True).first()
+        if domain:
+            return redirect(f'http://{domain.domain}/dashboard/')
+        else:
+            messages.error(request, 'Business domain not configured.')
+            return redirect('subscriptions:plans')
+    
+    # No business found - redirect to business registration
+    messages.info(request, 'Welcome! Please register your business to get started.')
+    return redirect('accounts:business_register')
+
+@login_required
+def business_register_view(request):
+    """Working Business registration view with fixed employee creation"""
+    print(f"\n" + "="*50)
+    print(f"BUSINESS REGISTER VIEW CALLED")
+    print(f"Request method: {request.method}")
+    print(f"User: {request.user}")
+    print(f"="*50)
+    
+    # Check if user already owns a business
+    existing_businesses = request.user.owned_businesses.all()
+    print(f"Existing businesses count: {existing_businesses.count()}")
+    
+    if existing_businesses.exists():
+        messages.info(request, 'You already have a registered business.')
+        return redirect('accounts:dashboard_redirect')
+    
+    if request.method == 'POST':
+        print("\n" + "="*30 + " POST REQUEST " + "="*30)
+        
+        # Print all POST data
+        print("POST data:")
+        for key, value in request.POST.items():
+            print(f"  {key}: {value}")
+        
+        # Print all FILES data
+        print("FILES data:")
+        for key, value in request.FILES.items():
+            print(f"  {key}: {value}")
+        
+        print("\nCreating form...")
+        form = BusinessRegistrationForm(request.POST, request.FILES)
+        print(f"Form created: {type(form)}")
+        
+        print(f"Form is bound: {form.is_bound}")
+        print(f"Form data: {form.data}")
+        
+        is_valid = form.is_valid()
+        print(f"Form is valid: {is_valid}")
+        
+        if not is_valid:
+            print("=== FORM VALIDATION ERRORS ===")
+            for field, errors in form.errors.items():
+                print(f"  {field}: {errors}")
+            print(f"Non-field errors: {form.non_field_errors()}")
+        else:
+            print("=== FORM IS VALID - ATTEMPTING SAVE ===")
+            try:
+                with transaction.atomic():
+                    business = form.save(commit=False)
+                    business.owner = request.user
+                    business.slug = slugify(business.name)
+                    
+                    # Create schema name for django-tenants
+                    schema_name = re.sub(r'[^a-z0-9]', '', business.name.lower())
+                    if not schema_name or not schema_name[0].isalpha():
+                        schema_name = 'biz' + schema_name
+                    business.schema_name = schema_name[:20]
+                    
+                    print(f"About to save business: {business.name}")
+                    print(f"Schema name: {business.schema_name}")
+                    
+                    # Check for conflicts
+                    original_slug = business.slug
+                    original_schema = business.schema_name
+                    counter = 1
+                    while (Business.objects.filter(slug=business.slug).exists() or 
+                           Business.objects.filter(schema_name=business.schema_name).exists()):
+                        business.slug = f"{original_slug}{counter}"
+                        business.schema_name = f"{original_schema}{counter}"
+                        counter += 1
+                        print(f"Conflict found, trying: {business.slug}")
+                    
+                    business.save()
+                    print(f"Business saved successfully! ID: {business.id}")
+                    
+                    # Create domain for the business
+                    print("Creating domain...")
+                    from .models import Domain
+                    domain_name = f"{business.slug}.localhost"
+                    domain = Domain.objects.create(
+                        domain=domain_name,
+                        tenant=business,
+                        is_primary=True
+                    )
+                    print(f"Domain created: {domain.domain}")
+                    
+                    # Create business settings
+                    print("Creating business settings...")
+                    settings = BusinessSettings.objects.create(business=business)
+                    print(f"Business settings created: {settings.id}")
+                    
+                    # Create business verification record
+                    print("Creating business verification...")
+                    verification = BusinessVerification.objects.create(business=business)
+                    print(f"Business verification created: {verification.id}")
+                    
+                    # Try to create employee record with correct parameters
+                    try:
+                        from django_tenants.utils import schema_context
+                        with schema_context(business.schema_name):
+                            try:
+                                from apps.employees.models import Employee
+                                from apps.core.utils import generate_unique_code
+                                
+                                print("Creating employee record...")
+                                
+                                # Create employee with the correct fields based on your Employee model
+                                employee = Employee.objects.create(
+                                    user=request.user,
+                                    # Don't pass 'business' directly if it's not a field
+                                    role='owner',  # or 'manager' depending on your model
+                                    is_active=True,
+                                    employee_id=generate_unique_code('EMP', 6),
+                                    created_by=request.user,
+                                    # Add other required fields based on your Employee model
+                                    first_name=request.user.first_name,
+                                    last_name=request.user.last_name,
+                                    email=request.user.email,
+                                )
+                                print(f"Employee record created: {employee.id}")
+                                
+                            except ImportError as e:
+                                print(f"Employee model not found: {e}")
+                            except Exception as e:
+                                print(f"Employee creation error: {e}")
+                                # Let's try a simpler approach without the generate_unique_code
+                                try:
+                                    employee = Employee.objects.create(
+                                        user=request.user,
+                                        role='owner',
+                                        is_active=True,
+                                        first_name=request.user.first_name or 'Owner',
+                                        last_name=request.user.last_name or '',
+                                        email=request.user.email,
+                                    )
+                                    print(f"Employee record created (simple): {employee.id}")
+                                except Exception as e2:
+                                    print(f"Simple employee creation also failed: {e2}")
+                                    # Print the Employee model fields to debug
+                                    try:
+                                        from apps.employees.models import Employee
+                                        fields = [f.name for f in Employee._meta.fields]
+                                        print(f"Employee model fields: {fields}")
+                                    except:
+                                        pass
+                                    
+                    except Exception as e:
+                        print(f"Schema context error: {e}")
+                    
+                    messages.success(request, f'Business "{business.name}" registered successfully!')
+                    
+                    # Try to redirect to subscriptions, fallback to dashboard
+                    try:
+                        return redirect('subscriptions:plans')
+                    except:
+                        print("Subscriptions app not found, redirecting to dashboard")
+                        return redirect('accounts:dashboard_redirect')
+                
+            except Exception as e:
+                print(f"=== SAVE ERROR ===")
+                print(f"Error: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                messages.error(request, f'Registration failed: {str(e)}')
+    else:
+        print("\n" + "="*30 + " GET REQUEST " + "="*30)
+        form = BusinessRegistrationForm()
+        print(f"Empty form created")
+    
+    print(f"\nRendering template with form: {form}")
+    return render(request, 'auth/business_register.html', {'form': form})
 
 def logout_view(request):
     """User logout view"""
@@ -137,56 +361,6 @@ def profile_view(request):
         'title': 'My Profile'
     }
     return render(request, 'auth/profile.html', context)
-
-@login_required
-def business_register_view(request):
-    """Business registration view"""
-    # Check if user already owns a business
-    if request.user.owned_businesses.exists():
-        messages.info(request, 'You already have a registered business.')
-        return redirect('dashboard')
-    
-    if request.method == 'POST':
-        form = BusinessRegistrationForm(request.POST, request.FILES)
-        if form.is_valid():
-            try:
-                with transaction.atomic():
-                    business = form.save(commit=False)
-                    business.owner = request.user
-                    business.slug = slugify(business.name)
-                    
-                    # Ensure unique slug
-                    original_slug = business.slug
-                    counter = 1
-                    while Business.objects.filter(slug=business.slug).exists():
-                        business.slug = f"{original_slug}-{counter}"
-                        counter += 1
-                    
-                    business.save()
-                    
-                    # Create business settings
-                    BusinessSettings.objects.create(business=business)
-                    
-                    # Create business verification record
-                    BusinessVerification.objects.create(business=business)
-                    
-                    # Create domain for the business
-                    from .models import Domain
-                    domain = Domain.objects.create(
-                        domain=f"{business.slug}.localhost",  # Change in production
-                        tenant=business,
-                        is_primary=True
-                    )
-                    
-                    messages.success(request, 'Business registered successfully! Please wait for verification.')
-                    return redirect('subscriptions:plans')
-                    
-            except Exception as e:
-                messages.error(request, f'Business registration failed: {str(e)}')
-    else:
-        form = BusinessRegistrationForm()
-    
-    return render(request, 'auth/business_register.html', {'form': form})
 
 @login_required
 def business_settings_view(request):
@@ -218,7 +392,7 @@ def business_settings_view(request):
         
     except Exception as e:
         messages.error(request, f'Error loading settings: {str(e)}')
-        return redirect('dashboard')
+        return redirect('accounts:dashboard_redirect')
 
 @login_required
 def business_verification_view(request):
@@ -253,7 +427,7 @@ def business_verification_view(request):
         
     except Exception as e:
         messages.error(request, f'Error loading verification: {str(e)}')
-        return redirect('dashboard')
+        return redirect('accounts:dashboard_redirect')
 
 @login_required
 @ajax_required
@@ -271,35 +445,3 @@ def check_business_name(request):
         'available': not exists,
         'message': 'Name is available' if not exists else 'Name is already taken'
     })
-
-@login_required
-def dashboard_redirect(request):
-    """Redirect to appropriate dashboard based on user role"""
-    # Check if user has a business
-    business = request.user.owned_businesses.first()
-    if business:
-        # Check if business is verified
-        if not business.is_verified:
-            messages.warning(request, 'Your business is pending verification.')
-            return redirect('accounts:business_verification')
-        
-        # Check subscription
-        if not business.subscription or not business.subscription.is_active:
-            messages.warning(request, 'Please choose a subscription plan to continue.')
-            return redirect('subscriptions:plans')
-        
-        # Redirect to business dashboard
-        return redirect('businesses:dashboard')
-    
-    # Check if user is an employee
-    try:
-        from apps.employees.models import Employee
-        employee = Employee.objects.get(user=request.user)
-        if employee.is_active:
-            return redirect('employees:dashboard')
-    except Employee.DoesNotExist:
-        pass
-    
-    # No business or employee role found
-    messages.info(request, 'Please register your business or contact your employer.')
-    return redirect('accounts:business_register')

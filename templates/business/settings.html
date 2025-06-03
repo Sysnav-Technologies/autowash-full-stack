@@ -1,181 +1,593 @@
-{% extends "base/base.html" %}
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
 
-{% block title %}Business Settings{% endblock %}
+{% block title %}Business Settings - Autowash{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
-<li class="breadcrumb-item active">Settings</li>
+<li class="breadcrumb-item active">Business Settings</li>
 {% endblock %}
 
 {% block content %}
 <div class="row">
-    <div class="col-lg-8">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Business Settings</h5>
+    <!-- Settings Navigation -->
+    <div class="col-lg-3 mb-4">
+        <div class="card border-0 shadow-sm" data-aos="fade-right">
+            <div class="card-header bg-white">
+                <h6 class="mb-0 fw-bold">Settings</h6>
             </div>
-            
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Business Name</label>
-                        <input type="text" class="form-control" value="{{ business.name }}" disabled>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Business Type</label>
-                        <input type="text" class="form-control" value="{{ business.get_business_type_display }}" disabled>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Timezone</label>
-                        {{ form.timezone }}
-                        {% if form.timezone.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.timezone.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Currency</label>
-                        {{ form.currency }}
-                        {% if form.currency.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.currency.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Date Format</label>
-                        {{ form.date_format }}
-                        {% if form.date_format.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.date_format.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Time Format</label>
-                        {{ form.time_format }}
-                        {% if form.time_format.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.time_format.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Week Starts On</label>
-                        {{ form.week_starts_on }}
-                        {% if form.week_starts_on.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.week_starts_on.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="text-end">
-                        <button type="submit" class="btn btn-primary">Save Settings</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-4">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Business Logo</h5>
-            </div>
-            
-            <div class="card-body text-center">
-                {% if business.logo %}
-                    <img src="{{ business.logo.url }}" alt="Business Logo" class="img-fluid rounded mb-3" style="max-height: 200px;">
-                {% else %}
-                    <div class="bg-light rounded d-flex align-items-center justify-content-center mb-3" style="height: 200px;">
-                        <span class="text-muted">No logo uploaded</span>
-                    </div>
-                {% endif %}
-                
-                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#logoModal">
-                    <i class="fas fa-upload me-1"></i> Update Logo
-                </button>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Business Verification</h5>
-            </div>
-            
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="flex-shrink-0">
-                        {% if business.is_verified %}
-                            <i class="fas fa-check-circle text-success fs-3"></i>
-                        {% elif business.verification.status == 'in_review' %}
-                            <i class="fas fa-clock text-warning fs-3"></i>
-                        {% else %}
-                            <i class="fas fa-times-circle text-danger fs-3"></i>
-                        {% endif %}
-                    </div>
-                    <div class="flex-grow-1 ms-3">
-                        <h6 class="mb-0">
-                            {% if business.is_verified %}
-                                Verified
-                            {% elif business.verification.status == 'in_review' %}
-                                Under Review
-                            {% else %}
-                                Not Verified
-                            {% endif %}
-                        </h6>
-                        <small class="text-muted">
-                            {% if business.is_verified %}
-                                Your business has been verified
-                            {% elif business.verification.status == 'in_review' %}
-                                Your documents are under review
-                            {% else %}
-                                Please submit verification documents
-                            {% endif %}
-                        </small>
-                    </div>
-                </div>
-                
-                <a href="{% url 'accounts:business_verification' %}" class="btn btn-outline-primary btn-sm w-100">
-                    <i class="fas fa-id-card me-1"></i> Verification Details
+            <div class="list-group list-group-flush">
+                <a href="#business-info" class="list-group-item list-group-item-action active" data-bs-toggle="pill">
+                    <i class="fas fa-building text-primary me-2"></i>Business Information
+                </a>
+                <a href="#notifications" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="fas fa-bell text-success me-2"></i>Notifications
+                </a>
+                <a href="#services" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="fas fa-cog text-info me-2"></i>Service Settings
+                </a>
+                <a href="#payments" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="fas fa-credit-card text-warning me-2"></i>Payment Settings
+                </a>
+                <a href="#inventory" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="fas fa-boxes text-secondary me-2"></i>Inventory
+                </a>
+                <a href="#reports" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="fas fa-chart-bar text-danger me-2"></i>Reports
+                </a>
+                <a href="#customers" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="fas fa-users text-dark me-2"></i>Customer Features
                 </a>
             </div>
         </div>
+
+        <!-- Quick Stats -->
+        <div class="card border-0 shadow-sm mt-4" data-aos="fade-right" data-aos-delay="100">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">Business Status</h6>
+                <div class="mb-3">
+                    <small class="text-muted d-block">Verification Status</small>
+                    {% if business.is_verified %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-check-circle me-1"></i>Verified
+                        </span>
+                    {% else %}
+                        <span class="badge bg-warning">
+                            <i class="fas fa-clock me-1"></i>Pending
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted d-block">Subscription</small>
+                    {% if business.subscription %}
+                        <span class="badge bg-primary">{{ business.subscription.plan.name }}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">No Plan</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <small class="text-muted d-block">Last Updated</small>
+                    <small>{{ business.updated_at|timesince }} ago</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Content -->
+    <div class="col-lg-9">
+        <form method="post" id="settingsForm">
+            {% csrf_token %}
+            
+            <div class="tab-content">
+                <!-- Business Information -->
+                <div class="tab-pane fade show active" id="business-info">
+                    <div class="card border-0 shadow-sm" data-aos="fade-left">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0 fw-bold d-flex align-items-center">
+                                <i class="fas fa-building text-primary me-2"></i>
+                                Business Information
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Business Name</label>
+                                    <input type="text" class="form-control" value="{{ business.name }}" readonly>
+                                    <div class="form-text">Contact support to change business name</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Business Type</label>
+                                    <input type="text" class="form-control" value="{{ business.get_business_type_display }}" readonly>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Description</label>
+                                    <textarea class="form-control" rows="3" readonly>{{ business.description }}</textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Email</label>
+                                    <input type="email" class="form-control" value="{{ business.email }}" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Phone</label>
+                                    <input type="text" class="form-control" value="{{ business.phone }}" readonly>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Address</label>
+                                    <input type="text" class="form-control" value="{{ business.street_address }}, {{ business.city }}" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Opening Time</label>
+                                    <input type="time" class="form-control" value="{{ business.opening_time|time:'H:i' }}" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Closing Time</label>
+                                    <input type="time" class="form-control" value="{{ business.closing_time|time:'H:i' }}" readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <a href="#" class="btn btn-outline-primary">
+                                    <i class="fas fa-edit me-2"></i>Edit Business Information
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications -->
+                <div class="tab-pane fade" id="notifications">
+                    <div class="card border-0 shadow-sm" data-aos="fade-left">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0 fw-bold d-flex align-items-center">
+                                <i class="fas fa-bell text-success me-2"></i>
+                                Notification Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-4">
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.sms_notifications }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.sms_notifications.id_for_label }}">
+                                            SMS Notifications
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Receive SMS alerts for important events</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.email_notifications }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.email_notifications.id_for_label }}">
+                                            Email Notifications
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Receive email alerts and reports</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.customer_sms_notifications }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.customer_sms_notifications.id_for_label }}">
+                                            Customer SMS
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Send SMS to customers automatically</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Service Settings -->
+                <div class="tab-pane fade" id="services">
+                    <div class="card border-0 shadow-sm" data-aos="fade-left">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0 fw-bold d-flex align-items-center">
+                                <i class="fas fa-cog text-info me-2"></i>
+                                Service Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-4">
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.auto_assign_attendants }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.auto_assign_attendants.id_for_label }}">
+                                            Auto-assign Attendants
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Automatically assign available staff to new services</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.require_customer_approval }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.require_customer_approval.id_for_label }}">
+                                            Customer Approval Required
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Require customer approval before starting service</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.send_service_reminders }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.send_service_reminders.id_for_label }}">
+                                            Service Reminders
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Send reminders for upcoming services</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Settings -->
+                <div class="tab-pane fade" id="payments">
+                    <div class="card border-0 shadow-sm" data-aos="fade-left">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0 fw-bold d-flex align-items-center">
+                                <i class="fas fa-credit-card text-warning me-2"></i>
+                                Payment Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="fw-bold mb-3">Accepted Payment Methods</h6>
+                            <div class="row g-4 mb-4">
+                                <div class="col-md-3">
+                                    <div class="form-check form-switch">
+                                        {{ form.accept_cash }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.accept_cash.id_for_label }}">
+                                            Cash Payments
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Accept cash payments</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check form-switch">
+                                        {{ form.accept_card }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.accept_card.id_for_label }}">
+                                            Card Payments
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Accept debit/credit cards</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check form-switch">
+                                        {{ form.accept_mpesa }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.accept_mpesa.id_for_label }}">
+                                            M-Pesa
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Accept M-Pesa payments</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check form-switch">
+                                        {{ form.require_payment_confirmation }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.require_payment_confirmation.id_for_label }}">
+                                            Payment Confirmation
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Require payment confirmation</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventory Settings -->
+                <div class="tab-pane fade" id="inventory">
+                    <div class="card border-0 shadow-sm" data-aos="fade-left">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0 fw-bold d-flex align-items-center">
+                                <i class="fas fa-boxes text-secondary me-2"></i>
+                                Inventory Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-4">
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.track_inventory }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.track_inventory.id_for_label }}">
+                                            Track Inventory
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Enable inventory tracking</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.auto_reorder }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.auto_reorder.id_for_label }}">
+                                            Auto Reorder
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Automatically reorder when stock is low</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold" for="{{ form.low_stock_threshold.id_for_label }}">Low Stock Threshold</label>
+                                    {{ form.low_stock_threshold|add_class:"form-control" }}
+                                    <small class="text-muted">Alert when stock falls below this number</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reports -->
+                <div class="tab-pane fade" id="reports">
+                    <div class="card border-0 shadow-sm" data-aos="fade-left">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0 fw-bold d-flex align-items-center">
+                                <i class="fas fa-chart-bar text-danger me-2"></i>
+                                Report Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-4">
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.daily_reports }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.daily_reports.id_for_label }}">
+                                            Daily Reports
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Receive daily performance reports</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.weekly_reports }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.weekly_reports.id_for_label }}">
+                                            Weekly Reports
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Receive weekly summary reports</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.monthly_reports }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.monthly_reports.id_for_label }}">
+                                            Monthly Reports
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Receive comprehensive monthly reports</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Features -->
+                <div class="tab-pane fade" id="customers">
+                    <div class="card border-0 shadow-sm" data-aos="fade-left">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0 fw-bold d-flex align-items-center">
+                                <i class="fas fa-users text-dark me-2"></i>
+                                Customer Features
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-4">
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.loyalty_program }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.loyalty_program.id_for_label }}">
+                                            Loyalty Program
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Enable customer loyalty rewards</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.customer_rating }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.customer_rating.id_for_label }}">
+                                            Customer Ratings
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Allow customers to rate services</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-switch">
+                                        {{ form.customer_feedback }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.customer_feedback.id_for_label }}">
+                                            Customer Feedback
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Collect customer feedback</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="card border-0 shadow-sm mt-4" data-aos="fade-up">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1 fw-bold">Save Changes</h6>
+                            <small class="text-muted">Changes will be applied immediately to your business</small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+                                <i class="fas fa-undo me-2"></i>Reset
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 
-<!-- Logo Modal -->
-<div class="modal fade" id="logoModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="post" enctype="multipart/form-data" action="{% url 'accounts:update_logo' %}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title">Update Business Logo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <input type="file" class="form-control" name="logo" accept="image/*" required>
-                        <div class="form-text">Recommended size: 300x300 pixels, PNG or JPG</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Upload</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle tab switching
+    const tabLinks = document.querySelectorAll('[data-bs-toggle="pill"]');
+    tabLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Remove active class from all tabs
+            tabLinks.forEach(l => l.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.remove('show', 'active');
+            });
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Show corresponding content
+            const targetId = this.getAttribute('href').substring(1);
+            const targetPane = document.getElementById(targetId);
+            if (targetPane) {
+                targetPane.classList.add('show', 'active');
+            }
+        });
+    });
+
+    // Form submission
+    const settingsForm = document.getElementById('settingsForm');
+    settingsForm.addEventListener('submit', function(e) {
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        
+        // Re-enable button after form submission
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }, 3000);
+    });
+
+    // Real-time validation for threshold input
+    const thresholdInput = document.getElementById('id_low_stock_threshold');
+    if (thresholdInput) {
+        thresholdInput.addEventListener('input', function() {
+            const value = parseInt(this.value);
+            if (isNaN(value) || value < 0) {
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            }
+        });
+    }
+});
+
+function resetForm() {
+    const form = document.getElementById('settingsForm');
+    if (confirm('Are you sure you want to reset all changes?')) {
+        form.reset();
+        // Remove validation classes
+        form.querySelectorAll('.is-valid, .is-invalid').forEach(el => {
+            el.classList.remove('is-valid', 'is-invalid');
+        });
+    }
+}
+
+// Auto-save functionality (optional)
+function enableAutoSave() {
+    const form = document.getElementById('settingsForm');
+    const inputs = form.querySelectorAll('input, select, textarea');
+    
+    inputs.forEach(input => {
+        input.addEventListener('change', function() {
+            // Show auto-save indicator
+            showAutoSaveIndicator();
+            
+            // Auto-save after 2 seconds of inactivity
+            clearTimeout(this.autoSaveTimeout);
+            this.autoSaveTimeout = setTimeout(() => {
+                saveSettings();
+            }, 2000);
+        });
+    });
+}
+
+function showAutoSaveIndicator() {
+    // Implementation for showing auto-save status
+    console.log('Auto-saving...');
+}
+
+function saveSettings() {
+    // Implementation for AJAX save
+    console.log('Settings auto-saved');
+}
+</script>
+
+<style>
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.form-check-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+}
+
+.list-group-item-action:hover {
+    background-color: rgba(37, 99, 235, 0.05);
+}
+
+.list-group-item-action.active {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.tab-content {
+    min-height: 400px;
+}
+
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+
+.form-check-label {
+    cursor: pointer;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 6px 12px;
+}
+
+/* Custom switch styling */
+.form-switch .form-check-input {
+    width: 2.5em;
+    height: 1.25em;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28255,255,255,1.0%29'/%3e%3c/svg%3e");
+}
+
+.form-switch .form-check-input:checked {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28255,255,255,1.0%29'/%3e%3c/svg%3e");
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .col-lg-3 {
+        margin-bottom: 2rem;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .row.g-4 > * {
+        margin-bottom: 1.5rem;
+    }
+}
+</style>
 {% endblock %}

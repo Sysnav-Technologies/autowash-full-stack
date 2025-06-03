@@ -1,188 +1,521 @@
-{% extends "base/base.html" %}
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
 
-{% block title %}Business Verification{% endblock %}
+{% block title %}Business Verification - Autowash{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
-<li class="breadcrumb-item"><a href="{% url 'accounts:business_settings' %}">Settings</a></li>
-<li class="breadcrumb-item active">Verification</li>
+<li class="breadcrumb-item active">Business Verification</li>
 {% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row justify-content-center">
     <div class="col-lg-8">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Business Verification</h5>
-            </div>
-            
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Please upload the required documents to verify your business. This helps us ensure the security and legitimacy of all businesses on our platform.
+        <!-- Verification Status -->
+        <div class="card border-0 shadow-sm mb-4" data-aos="fade-down">
+            <div class="card-body p-4">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <div class="d-flex align-items-center">
+                            {% if verification.status == 'verified' %}
+                                <div class="bg-success bg-opacity-10 rounded-circle p-3 me-4">
+                                    <i class="fas fa-check-circle text-success" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1 fw-bold text-success">Business Verified</h5>
+                                    <p class="text-muted mb-0">Your business has been successfully verified on {{ verification.verified_at|date:"F d, Y" }}</p>
+                                </div>
+                            {% elif verification.status == 'in_review' %}
+                                <div class="bg-info bg-opacity-10 rounded-circle p-3 me-4">
+                                    <i class="fas fa-clock text-info" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1 fw-bold text-info">Under Review</h5>
+                                    <p class="text-muted mb-0">Your documents are being reviewed. We'll notify you within 24-48 hours.</p>
+                                </div>
+                            {% elif verification.status == 'rejected' %}
+                                <div class="bg-danger bg-opacity-10 rounded-circle p-3 me-4">
+                                    <i class="fas fa-times-circle text-danger" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1 fw-bold text-danger">Verification Rejected</h5>
+                                    <p class="text-muted mb-0">Please review the feedback and resubmit your documents.</p>
+                                </div>
+                            {% else %}
+                                <div class="bg-warning bg-opacity-10 rounded-circle p-3 me-4">
+                                    <i class="fas fa-upload text-warning" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1 fw-bold text-warning">Verification Pending</h5>
+                                    <p class="text-muted mb-0">Please upload the required documents to verify your business.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <span class="badge bg-{{ verification.status|default:'secondary' }} bg-opacity-10 text-{{ verification.status|default:'secondary' }} px-3 py-2 fs-6">
+                            {{ verification.get_status_display }}
+                        </span>
+                    </div>
                 </div>
                 
-                <form method="post" enctype="multipart/form-data">
+                {% if verification.rejection_reason %}
+                <div class="alert alert-danger border-0 mt-4">
+                    <h6 class="fw-bold mb-2">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Rejection Reason
+                    </h6>
+                    <p class="mb-0">{{ verification.rejection_reason }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Verification Requirements -->
+        <div class="card border-0 shadow-sm mb-4" data-aos="fade-up">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold d-flex align-items-center">
+                    <i class="fas fa-list-check text-primary me-2"></i>
+                    Verification Requirements
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">To verify your business, please provide the following documents. All documents should be clear, legible, and in PDF, JPG, or PNG format.</p>
+                
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="text-center p-4 border rounded-3 h-100">
+                            <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
+                                <i class="fas fa-certificate text-primary"></i>
+                            </div>
+                            <h6 class="fw-bold mb-2">Business License</h6>
+                            <p class="text-muted small mb-0">Valid business registration certificate or license</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-4 border rounded-3 h-100">
+                            <div class="bg-success bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
+                                <i class="fas fa-file-invoice text-success"></i>
+                            </div>
+                            <h6 class="fw-bold mb-2">Tax Certificate</h6>
+                            <p class="text-muted small mb-0">KRA PIN certificate or tax compliance document</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-4 border rounded-3 h-100">
+                            <div class="bg-info bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
+                                <i class="fas fa-id-card text-info"></i>
+                            </div>
+                            <h6 class="fw-bold mb-2">ID Document</h6>
+                            <p class="text-muted small mb-0">Valid national ID or passport of business owner</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Document Upload Form -->
+        {% if verification.status != 'verified' %}
+        <div class="card border-0 shadow-sm" data-aos="fade-up" data-aos-delay="100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold d-flex align-items-center">
+                    <i class="fas fa-cloud-upload-alt text-success me-2"></i>
+                    Upload Documents
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" id="verificationForm">
                     {% csrf_token %}
                     
-                    <div class="mb-3">
-                        <label class="form-label">Business Registration Document</label>
-                        {{ form.registration_document }}
-                        <div class="form-text">Upload a scanned copy of your business registration certificate</div>
-                        {% if form.registration_document.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.registration_document.errors.0 }}
-                        </div>
-                        {% endif %}
-                        
-                        {% if verification.registration_document %}
-                        <div class="mt-2">
-                            <a href="{{ verification.registration_document.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-eye me-1"></i> View Uploaded
-                            </a>
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Tax Identification Document</label>
-                        {{ form.tax_document }}
-                        <div class="form-text">Upload a scanned copy of your tax identification document</div>
-                        {% if form.tax_document.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.tax_document.errors.0 }}
-                        </div>
-                        {% endif %}
-                        
-                        {% if verification.tax_document %}
-                        <div class="mt-2">
-                            <a href="{{ verification.tax_document.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-eye me-1"></i> View Uploaded
-                            </a>
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Owner Identification Document</label>
-                        {{ form.owner_id }}
-                        <div class="form-text">Upload a scanned copy of your government-issued ID (e.g., passport, driver's license)</div>
-                        {% if form.owner_id.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.owner_id.errors.0 }}
-                        </div>
-                        {% endif %}
-                        
-                        {% if verification.owner_id %}
-                        <div class="mt-2">
-                            <a href="{{ verification.owner_id.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-eye me-1"></i> View Uploaded
-                            </a>
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Proof of Address</label>
-                        {{ form.address_proof }}
-                        <div class="form-text">Upload a recent utility bill or bank statement showing your business address</div>
-                        {% if form.address_proof.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.address_proof.errors.0 }}
-                        </div>
-                        {% endif %}
-                        
-                        {% if verification.address_proof %}
-                        <div class="mt-2">
-                            <a href="{{ verification.address_proof.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-eye me-1"></i> View Uploaded
-                            </a>
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Additional Notes</label>
-                        {{ form.notes }}
-                        <div class="form-text">Add any additional information that might help with verification</div>
-                        {% if form.notes.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ form.notes.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="text-end">
-                        <button type="submit" class="btn btn-primary">
-                            {% if verification.status == 'in_review' %}
-                                Update Documents
-                            {% else %}
-                                Submit for Verification
+                    <div class="row g-4">
+                        <!-- Business License -->
+                        <div class="col-12">
+                            <label for="{{ form.business_license.id_for_label }}" class="form-label fw-semibold">
+                                <i class="fas fa-certificate text-primary me-2"></i>Business License *
+                            </label>
+                            <div class="upload-area" onclick="triggerFileInput('{{ form.business_license.id_for_label }}')">
+                                <div class="upload-content">
+                                    <i class="fas fa-cloud-upload-alt text-muted mb-2" style="font-size: 2rem;"></i>
+                                    <p class="mb-1 fw-semibold">Click to upload business license</p>
+                                    <p class="text-muted small mb-0">PDF, JPG, PNG (Max 5MB)</p>
+                                </div>
+                                {{ form.business_license|add_class:"d-none" }}
+                            </div>
+                            {% if verification.business_license %}
+                                <div class="current-file mt-2">
+                                    <i class="fas fa-file text-success me-2"></i>
+                                    <a href="{{ verification.business_license.url }}" target="_blank" class="text-decoration-none">
+                                        Current: {{ verification.business_license.name|default:"business_license.pdf" }}
+                                    </a>
+                                </div>
                             {% endif %}
+                            {% if form.business_license.errors %}
+                                <div class="text-danger small mt-1">{{ form.business_license.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Tax Certificate -->
+                        <div class="col-12">
+                            <label for="{{ form.tax_certificate.id_for_label }}" class="form-label fw-semibold">
+                                <i class="fas fa-file-invoice text-success me-2"></i>Tax Certificate *
+                            </label>
+                            <div class="upload-area" onclick="triggerFileInput('{{ form.tax_certificate.id_for_label }}')">
+                                <div class="upload-content">
+                                    <i class="fas fa-cloud-upload-alt text-muted mb-2" style="font-size: 2rem;"></i>
+                                    <p class="mb-1 fw-semibold">Click to upload tax certificate</p>
+                                    <p class="text-muted small mb-0">PDF, JPG, PNG (Max 5MB)</p>
+                                </div>
+                                {{ form.tax_certificate|add_class:"d-none" }}
+                            </div>
+                            {% if verification.tax_certificate %}
+                                <div class="current-file mt-2">
+                                    <i class="fas fa-file text-success me-2"></i>
+                                    <a href="{{ verification.tax_certificate.url }}" target="_blank" class="text-decoration-none">
+                                        Current: {{ verification.tax_certificate.name|default:"tax_certificate.pdf" }}
+                                    </a>
+                                </div>
+                            {% endif %}
+                            {% if form.tax_certificate.errors %}
+                                <div class="text-danger small mt-1">{{ form.tax_certificate.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- ID Document -->
+                        <div class="col-12">
+                            <label for="{{ form.id_document.id_for_label }}" class="form-label fw-semibold">
+                                <i class="fas fa-id-card text-info me-2"></i>ID Document *
+                            </label>
+                            <div class="upload-area" onclick="triggerFileInput('{{ form.id_document.id_for_label }}')">
+                                <div class="upload-content">
+                                    <i class="fas fa-cloud-upload-alt text-muted mb-2" style="font-size: 2rem;"></i>
+                                    <p class="mb-1 fw-semibold">Click to upload ID document</p>
+                                    <p class="text-muted small mb-0">PDF, JPG, PNG (Max 5MB)</p>
+                                </div>
+                                {{ form.id_document|add_class:"d-none" }}
+                            </div>
+                            {% if verification.id_document %}
+                                <div class="current-file mt-2">
+                                    <i class="fas fa-file text-success me-2"></i>
+                                    <a href="{{ verification.id_document.url }}" target="_blank" class="text-decoration-none">
+                                        Current: {{ verification.id_document.name|default:"id_document.pdf" }}
+                                    </a>
+                                </div>
+                            {% endif %}
+                            {% if form.id_document.errors %}
+                                <div class="text-danger small mt-1">{{ form.id_document.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Additional Notes -->
+                        <div class="col-12">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label fw-semibold">
+                                <i class="fas fa-sticky-note text-warning me-2"></i>Additional Notes
+                            </label>
+                            {{ form.notes|add_class:"form-control" }}
+                            {% if form.notes.errors %}
+                                <div class="text-danger small mt-1">{{ form.notes.errors.0 }}</div>
+                            {% endif %}
+                            <div class="form-text">Any additional information you'd like to provide (optional)</div>
+                        </div>
+                    </div>
+
+                    <!-- Terms -->
+                    <div class="alert alert-light border mt-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="verificationTerms" required>
+                            <label class="form-check-label" for="verificationTerms">
+                                I confirm that all documents are authentic and accurate. I understand that providing false information may result in account suspension.
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg py-3 fw-semibold">
+                            <i class="fas fa-upload me-2"></i>Submit for Verification
                         </button>
+                        <a href="{% url 'businesses:dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
                     </div>
                 </form>
             </div>
         </div>
-    </div>
-    
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Verification Status</h5>
+        {% endif %}
+
+        <!-- Help Section -->
+        <div class="card border-0 shadow-sm mt-4" data-aos="fade-up" data-aos-delay="200">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold d-flex align-items-center">
+                    <i class="fas fa-question-circle text-info me-2"></i>
+                    Need Help?
+                </h5>
             </div>
-            
             <div class="card-body">
-                <div class="d-flex align-items-start mb-4">
-                    <div class="flex-shrink-0">
-                        {% if business.is_verified %}
-                            <i class="fas fa-check-circle text-success fs-3"></i>
-                        {% elif verification.status == 'in_review' %}
-                            <i class="fas fa-clock text-warning fs-3"></i>
-                        {% else %}
-                            <i class="fas fa-times-circle text-danger fs-3"></i>
-                        {% endif %}
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-start">
+                            <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                                <i class="fas fa-clock text-primary"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-1">Verification Timeline</h6>
+                                <p class="text-muted small mb-0">Most verifications are completed within 24-48 hours during business days.</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex-grow-1 ms-3">
-                        <h5 class="mb-1">
-                            {% if business.is_verified %}
-                                Verified
-                            {% elif verification.status == 'in_review' %}
-                                Under Review
-                            {% else %}
-                                Not Verified
-                            {% endif %}
-                        </h5>
-                        <p class="mb-0 text-muted">
-                            {% if business.is_verified %}
-                                Your business has been successfully verified on {{ verification.verified_at|date:"M d, Y" }}
-                            {% elif verification.status == 'in_review' %}
-                                Submitted on {{ verification.updated_at|date:"M d, Y" }}
-                            {% else %}
-                                Please submit all required documents
-                            {% endif %}
-                        </p>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-start">
+                            <div class="bg-success bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                                <i class="fas fa-file-alt text-success"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-1">Document Quality</h6>
+                                <p class="text-muted small mb-0">Ensure documents are clear, readable, and show all required information.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-start">
+                            <div class="bg-warning bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                                <i class="fas fa-shield-alt text-warning"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-1">Security</h6>
+                                <p class="text-muted small mb-0">Your documents are encrypted and stored securely. We never share your information.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-start">
+                            <div class="bg-info bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                                <i class="fas fa-headset text-info"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-1">Support</h6>
+                                <p class="text-muted small mb-0">Contact our support team if you need assistance with verification.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                
-                {% if verification.status == 'rejected' %}
-                <div class="alert alert-danger">
-                    <h6><i class="fas fa-exclamation-triangle me-2"></i> Verification Rejected</h6>
-                    <p class="mb-0">{{ verification.rejection_reason }}</p>
-                </div>
-                {% endif %}
-                
-                <div class="mt-4">
-                    <h6 class="mb-3">Verification Requirements</h6>
-                    <ul class="list-unstyled">
-                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Clear business registration document</li>
-                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Valid tax identification</li>
-                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Owner identification</li>
-                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Proof of business address</li>
-                    </ul>
+
+                <div class="text-center mt-4">
+                    <a href="{% url 'contact' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-envelope me-2"></i>Contact Support
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // File upload functionality
+    setupFileUploads();
+    
+    // Form submission
+    const verificationForm = document.getElementById('verificationForm');
+    if (verificationForm) {
+        verificationForm.addEventListener('submit', function(e) {
+            const termsCheckbox = document.getElementById('verificationTerms');
+            if (!termsCheckbox.checked) {
+                e.preventDefault();
+                alert('Please confirm that all documents are authentic and accurate.');
+                return;
+            }
+
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Uploading Documents...';
+            
+            // Re-enable button after form submission
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }, 5000);
+        });
+    }
+});
+
+function triggerFileInput(inputId) {
+    document.getElementById(inputId).click();
+}
+
+function setupFileUploads() {
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    
+    fileInputs.forEach(input => {
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const uploadArea = this.closest('.upload-area') || this.parentElement.querySelector('.upload-area');
+            
+            if (file) {
+                // Validate file size (5MB max)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB');
+                    this.value = '';
+                    return;
+                }
+                
+                // Validate file type
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+                if (!allowedTypes.includes(file.type)) {
+                    alert('Please select a valid file type (PDF, JPG, PNG)');
+                    this.value = '';
+                    return;
+                }
+                
+                // Update upload area
+                if (uploadArea) {
+                    const uploadContent = uploadArea.querySelector('.upload-content');
+                    if (uploadContent) {
+                        uploadContent.innerHTML = `
+                            <div class="d-flex align-items-center justify-content-center">
+                                <i class="fas fa-file-check text-success me-2"></i>
+                                <span class="fw-semibold text-success">${file.name}</span>
+                            </div>
+                            <p class="text-muted small mb-0 mt-1">Click to change file</p>
+                        `;
+                        uploadArea.classList.add('file-selected');
+                    }
+                }
+            }
+        });
+    });
+    
+    // Drag and drop functionality
+    const uploadAreas = document.querySelectorAll('.upload-area');
+    uploadAreas.forEach(area => {
+        area.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        });
+        
+        area.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+        });
+        
+        area.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const fileInput = this.querySelector('input[type="file"]');
+                if (fileInput) {
+                    fileInput.files = files;
+                    fileInput.dispatchEvent(new Event('change'));
+                }
+            }
+        });
+    });
+}
+</script>
+
+<style>
+.upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #fafbfc;
+}
+
+.upload-area:hover {
+    border-color: var(--primary-color);
+    background: rgba(37, 99, 235, 0.02);
+}
+
+.upload-area.drag-over {
+    border-color: var(--primary-color);
+    background: rgba(37, 99, 235, 0.05);
+    transform: scale(1.02);
+}
+
+.upload-area.file-selected {
+    border-color: var(--success-color);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.upload-content {
+    pointer-events: none;
+}
+
+.current-file {
+    padding: 0.5rem 1rem;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: var(--border-radius-sm);
+    border-left: 3px solid var(--success-color);
+}
+
+.current-file a {
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+.current-file a:hover {
+    color: #059669;
+}
+
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+
+.badge {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.alert-light {
+    background-color: rgba(248, 250, 252, 0.8);
+    border-color: #e2e8f0;
+}
+
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.form-check-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+}
+
+/* Status-specific colors */
+.bg-pending { background-color: rgba(245, 158, 11, 0.1) !important; }
+.text-pending { color: #d97706 !important; }
+.bg-in_review { background-color: rgba(6, 182, 212, 0.1) !important; }
+.text-in_review { color: #0891b2 !important; }
+.bg-verified { background-color: rgba(16, 185, 129, 0.1) !important; }
+.text-verified { color: #059669 !important; }
+.bg-rejected { background-color: rgba(239, 68, 68, 0.1) !important; }
+.text-rejected { color: #dc2626 !important; }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .upload-area {
+        padding: 1.5rem 1rem;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .row.g-4 > * {
+        margin-bottom: 1.5rem;
+    }
+}
+</style>
 {% endblock %}
