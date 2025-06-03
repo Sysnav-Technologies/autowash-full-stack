@@ -1,0 +1,696 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Dashboard - Autowash{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block page_subtitle %}
+    <p class="text-muted mb-0">Welcome back, {{ user.get_short_name }}! Here's what's happening today.</p>
+{% endblock %}
+
+{% block page_actions %}
+    <div class="d-flex gap-2">
+        {% if user.can_manage_business %}
+            <button class="btn btn-outline-primary">
+                <i class="fas fa-plus me-2"></i>New Service
+            </button>
+        {% endif %}
+        <button class="btn btn-primary">
+            <i class="fas fa-download me-2"></i>Export Report
+        </button>
+    </div>
+{% endblock %}
+
+{% block content %}
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-2 opacity-75">Today's Revenue</h6>
+                    <h3 class="mb-0">KSh 45,200</h3>
+                    <small class="opacity-75">
+                        <i class="fas fa-arrow-up me-1"></i>12% from yesterday
+                    </small>
+                </div>
+                <div class="fs-1 opacity-50">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stats-card success">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-2 opacity-75">Services Today</h6>
+                    <h3 class="mb-0">23</h3>
+                    <small class="opacity-75">
+                        <i class="fas fa-arrow-up me-1"></i>8% from yesterday
+                    </small>
+                </div>
+                <div class="fs-1 opacity-50">
+                    <i class="fas fa-car"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stats-card warning">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-2 opacity-75">Queue Length</h6>
+                    <h3 class="mb-0">7</h3>
+                    <small class="opacity-75">
+                        <i class="fas fa-clock me-1"></i>~35 min wait
+                    </small>
+                </div>
+                <div class="fs-1 opacity-50">
+                    <i class="fas fa-list"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stats-card info">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-2 opacity-75">Active Staff</h6>
+                    <h3 class="mb-0">5/8</h3>
+                    <small class="opacity-75">
+                        <i class="fas fa-users me-1"></i>3 on break
+                    </small>
+                </div>
+                <div class="fs-1 opacity-50">
+                    <i class="fas fa-user-friends"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Row -->
+<div class="row">
+    <!-- Revenue Chart -->
+    <div class="col-xl-8 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Revenue Overview</h5>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Last 7 days
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#">Last 7 days</a></li>
+                        <li><a class="dropdown-item" href="#">Last 30 days</a></li>
+                        <li><a class="dropdown-item" href="#">Last 3 months</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="revenueChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="col-xl-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex align-items-center">
+                        <div class="avatar-sm bg-success rounded-circle d-flex align-items-center justify-content-center me-3">
+                            <i class="fas fa-check text-white"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">Service completed</h6>
+                            <p class="mb-0 text-muted small">Car wash for KBC 123A - KSh 1,500</p>
+                            <small class="text-muted">2 minutes ago</small>
+                        </div>
+                    </div>
+                    
+                    <div class="list-group-item d-flex align-items-center">
+                        <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-3">
+                            <i class="fas fa-user-plus text-white"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">New customer registered</h6>
+                            <p class="mb-0 text-muted small">John Doe joined the system</p>
+                            <small class="text-muted">15 minutes ago</small>
+                        </div>
+                    </div>
+                    
+                    <div class="list-group-item d-flex align-items-center">
+                        <div class="avatar-sm bg-warning rounded-circle d-flex align-items-center justify-content-center me-3">
+                            <i class="fas fa-exclamation text-white"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">Low inventory alert</h6>
+                            <p class="mb-0 text-muted small">Car shampoo running low (5 units left)</p>
+                            <small class="text-muted">1 hour ago</small>
+                        </div>
+                    </div>
+                    
+                    <div class="list-group-item d-flex align-items-center">
+                        <div class="avatar-sm bg-info rounded-circle d-flex align-items-center justify-content-center me-3">
+                            <i class="fas fa-money-bill text-white"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">Payment received</h6>
+                            <p class="mb-0 text-muted small">M-Pesa payment of KSh 2,000</p>
+                            <small class="text-muted">2 hours ago</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer text-center">
+                    <a href="#" class="btn btn-link btn-sm">View all activities</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Service Queue and Performance -->
+<div class="row">
+    <!-- Current Queue -->
+    <div class="col-xl-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Current Service Queue</h5>
+                <span class="badge bg-primary">7 in queue</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th>Vehicle</th>
+                                <th>Service</th>
+                                <th>Wait Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <span class="badge bg-success">1</span>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>KBC 123A</strong>
+                                        <br>
+                                        <small class="text-muted">Toyota Vitz</small>
+                                    </div>
+                                </td>
+                                <td>Full Wash</td>
+                                <td>
+                                    <span class="badge bg-warning">In Progress</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="badge bg-primary">2</span>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>KCA 456B</strong>
+                                        <br>
+                                        <small class="text-muted">Honda Fit</small>
+                                    </div>
+                                </td>
+                                <td>Quick Wash</td>
+                                <td>5 min</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary">3</span>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>KDD 789C</strong>
+                                        <br>
+                                        <small class="text-muted">Nissan Note</small>
+                                    </div>
+                                </td>
+                                <td>Premium Wash</td>
+                                <td>12 min</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer text-center">
+                    <a href="{% url 'services:queue' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-list me-2"></i>View Full Queue
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Performance Metrics -->
+    <div class="col-xl-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Today's Performance</h5>
+            </div>
+            <div class="card-body">
+                <!-- Service Distribution -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Quick Wash</span>
+                        <span class="fw-bold">12 services</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div class="progress-bar bg-primary" style="width: 60%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Full Wash</span>
+                        <span class="fw-bold">8 services</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div class="progress-bar bg-success" style="width: 40%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Premium Wash</span>
+                        <span class="fw-bold">3 services</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div class="progress-bar bg-warning" style="width: 15%"></div>
+                    </div>
+                </div>
+                
+                <!-- Key Metrics -->
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="border-end">
+                            <h4 class="text-primary mb-1">23</h4>
+                            <small class="text-muted">Total Services</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border-end">
+                            <h4 class="text-success mb-1">18m</h4>
+                            <small class="text-muted">Avg. Time</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <h4 class="text-warning mb-1">4.8</h4>
+                        <small class="text-muted">Rating</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-xl-2 col-md-4 col-6">
+                        <a href="{% url 'customers:create' %}" class="btn btn-light w-100 h-100 d-flex flex-column align-items-center justify-content-center text-decoration-none p-3">
+                            <i class="fas fa-user-plus fs-2 text-primary mb-2"></i>
+                            <span class="text-dark">Add Customer</span>
+                        </a>
+                    </div>
+                    
+                    <div class="col-xl-2 col-md-4 col-6">
+                        <a href="{% url 'services:create' %}" class="btn btn-light w-100 h-100 d-flex flex-column align-items-center justify-content-center text-decoration-none p-3">
+                            <i class="fas fa-plus fs-2 text-success mb-2"></i>
+                            <span class="text-dark">New Service</span>
+                        </a>
+                    </div>
+                    
+                    <div class="col-xl-2 col-md-4 col-6">
+                        <a href="{% url 'payments:process' %}" class="btn btn-light w-100 h-100 d-flex flex-column align-items-center justify-content-center text-decoration-none p-3">
+                            <i class="fas fa-credit-card fs-2 text-warning mb-2"></i>
+                            <span class="text-dark">Process Payment</span>
+                        </a>
+                    </div>
+                    
+                    <div class="col-xl-2 col-md-4 col-6">
+                        <a href="{% url 'inventory:list' %}" class="btn btn-light w-100 h-100 d-flex flex-column align-items-center justify-content-center text-decoration-none p-3">
+                            <i class="fas fa-boxes fs-2 text-info mb-2"></i>
+                            <span class="text-dark">Check Inventory</span>
+                        </a>
+                    </div>
+                    
+                    <div class="col-xl-2 col-md-4 col-6">
+                        <a href="{% url 'reports:daily' %}" class="btn btn-light w-100 h-100 d-flex flex-column align-items-center justify-content-center text-decoration-none p-3">
+                            <i class="fas fa-chart-bar fs-2 text-secondary mb-2"></i>
+                            <span class="text-dark">View Reports</span>
+                        </a>
+                    </div>
+                    
+                    <div class="col-xl-2 col-md-4 col-6">
+                        <a href="{% url 'notifications:send' %}" class="btn btn-light w-100 h-100 d-flex flex-column align-items-center justify-content-center text-decoration-none p-3">
+                            <i class="fas fa-bell fs-2 text-danger mb-2"></i>
+                            <span class="text-dark">Send Alert</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Customers & Low Stock Alerts -->
+<div class="row mt-4">
+    <!-- Recent Customers -->
+    <div class="col-xl-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Customers</h5>
+                <a href="{% url 'customers:list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Vehicle</th>
+                                <th>Last Service</th>
+                                <th>Total Spent</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <img src="/static/img/default-avatar.png" alt="Avatar" class="rounded-circle me-3" width="40" height="40">
+                                        <div>
+                                            <strong>John Doe</strong>
+                                            <br>
+                                            <small class="text-muted">+254 700 123 456</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>KBC 123A</strong>
+                                    <br>
+                                    <small class="text-muted">Toyota Vitz</small>
+                                </td>
+                                <td>Today</td>
+                                <td>KSh 15,400</td>
+                                <td>
+                                    <span class="badge bg-success">VIP</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <img src="/static/img/default-avatar.png" alt="Avatar" class="rounded-circle me-3" width="40" height="40">
+                                        <div>
+                                            <strong>Jane Smith</strong>
+                                            <br>
+                                            <small class="text-muted">+254 701 234 567</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>KCA 456B</strong>
+                                    <br>
+                                    <small class="text-muted">Honda Fit</small>
+                                </td>
+                                <td>Yesterday</td>
+                                <td>KSh 8,200</td>
+                                <td>
+                                    <span class="badge bg-primary">Regular</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <img src="/static/img/default-avatar.png" alt="Avatar" class="rounded-circle me-3" width="40" height="40">
+                                        <div>
+                                            <strong>Mike Johnson</strong>
+                                            <br>
+                                            <small class="text-muted">+254 702 345 678</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>KDD 789C</strong>
+                                    <br>
+                                    <small class="text-muted">Nissan Note</small>
+                                </td>
+                                <td>2 days ago</td>
+                                <td>KSh 3,500</td>
+                                <td>
+                                    <span class="badge bg-secondary">New</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alerts & Notifications -->
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Alerts & Notifications</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning d-flex align-items-center" role="alert">
+                    <i class="fas fa-exclamation-triangle me-3"></i>
+                    <div>
+                        <strong>Low Stock Alert</strong>
+                        <br>
+                        <small>5 items running low</small>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info d-flex align-items-center" role="alert">
+                    <i class="fas fa-calendar me-3"></i>
+                    <div>
+                        <strong>Maintenance Due</strong>
+                        <br>
+                        <small>Equipment check needed</small>
+                    </div>
+                </div>
+                
+                <div class="alert alert-success d-flex align-items-center" role="alert">
+                    <i class="fas fa-check-circle me-3"></i>
+                    <div>
+                        <strong>Goal Achieved</strong>
+                        <br>
+                        <small>Daily target reached!</small>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <a href="{% url 'notifications:list' %}" class="btn btn-outline-primary btn-sm">
+                        View All Notifications
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Revenue Chart
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    const revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Revenue (KSh)',
+                data: [32000, 28000, 35000, 41000, 38000, 45000, 52000],
+                borderColor: 'rgba(37, 99, 235, 1)',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: 'rgba(37, 99, 235, 1)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(37, 99, 235, 1)',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return 'Revenue: KSh ' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#64748b'
+                    }
+                },
+                y: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    },
+                    ticks: {
+                        color: '#64748b',
+                        callback: function(value) {
+                            return 'KSh ' + (value / 1000) + 'k';
+                        }
+                    }
+                }
+            },
+            elements: {
+                point: {
+                    hoverRadius: 8
+                }
+            }
+        }
+    });
+    
+    // Auto-refresh data every 30 seconds
+    setInterval(function() {
+        updateDashboardData();
+    }, 30000);
+    
+    // Real-time updates
+    function updateDashboardData() {
+        // This would fetch real-time data from the server
+        // For now, we'll simulate updates
+        console.log('Updating dashboard data...');
+    }
+    
+    // Quick action animations
+    const quickActionBtns = document.querySelectorAll('.card-body .btn');
+    quickActionBtns.forEach(btn => {
+        btn.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+        });
+        
+        btn.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+    
+    // Stats card animations
+    const statsCards = document.querySelectorAll('.stats-card');
+    statsCards.forEach((card, index) => {
+        setTimeout(() => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'all 0.5s ease';
+            
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 100);
+        }, index * 100);
+    });
+});
+
+// Function to handle service queue updates
+function updateServiceQueue() {
+    fetch('/api/services/queue/')
+        .then(response => response.json())
+        .then(data => {
+            // Update queue display
+            console.log('Queue updated:', data);
+        })
+        .catch(error => {
+            console.error('Error updating queue:', error);
+        });
+}
+
+// Function to show notification
+function showNotification(title, message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        <strong>${title}</strong><br>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

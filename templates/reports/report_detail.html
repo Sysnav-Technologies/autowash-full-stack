@@ -1,0 +1,414 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ report.template.name }} - Report{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'reports:dashboard' %}">Reports</a></li>
+<li class="breadcrumb-item"><a href="{% url 'reports:generated_list' %}">Generated</a></li>
+<li class="breadcrumb-item active">{{ report.template.name }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<style>
+.report-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid #3b82f6;
+    transition: transform 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #3b82f6;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    color: #6b7280;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.chart-container {
+    position: relative;
+    height: 400px;
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.data-table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.export-btn {
+    margin: 0 0.25rem;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+    transform: translateY(-1px);
+    text-decoration: none;
+}
+
+.status-badge {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #f3f4f6;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Report Header -->
+<div class="report-header">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h1 class="h3 mb-2">{{ report.template.name }}</h1>
+            <p class="mb-2 opacity-75">{{ report.template.description|default:"Automated report generated from template" }}</p>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-light text-dark me-2">{{ report.template.get_report_type_display }}</span>
+                <span class="me-3">
+                    <i class="fas fa-calendar me-1"></i>{{ report.date_from }} to {{ report.date_to }}
+                </span>
+                <span class="me-3">
+                    <i class="fas fa-clock me-1"></i>Generated {{ report.created_at|timesince }} ago
+                </span>
+                {% if report.generated_by %}
+                <span>
+                    <i class="fas fa-user me-1"></i>{{ report.generated_by.full_name }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="mb-2">
+                <span class="status-badge bg-{% if report.status == 'completed' %}success{% elif report.status == 'generating' %}warning{% else %}danger{% endif %}">
+                    {% if report.status == 'generating' %}
+                    <span class="loading-spinner me-2"></span>
+                    {% endif %}
+                    {{ report.get_status_display }}
+                </span>
+            </div>
+            {% if report.status == 'completed' %}
+            <div class="d-flex justify-content-md-end flex-wrap">
+                <a href="{% url 'reports:export_report' report.report_id 'pdf' %}" class="export-btn btn btn-danger btn-sm">
+                    <i class="fas fa-file-pdf me-1"></i>PDF
+                </a>
+                <a href="{% url 'reports:export_report' report.report_id 'excel' %}" class="export-btn btn btn-success btn-sm">
+                    <i class="fas fa-file-excel me-1"></i>Excel
+                </a>
+                <a href="{% url 'reports:export_report' report.report_id 'csv' %}" class="export-btn btn btn-info btn-sm">
+                    <i class="fas fa-file-csv me-1"></i>CSV
+                </a>
+                <a href="{% url 'reports:export_report' report.report_id 'json' %}" class="export-btn btn btn-secondary btn-sm">
+                    <i class="fas fa-code me-1"></i>JSON
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if report.status == 'completed' %}
+<!-- Summary Metrics -->
+{% if report.summary_data %}
+<div class="row mb-4">
+    {% for key, value in report.summary_data.items %}
+    {% if key != 'total_records' and key != 'date_range' %}
+    <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+        <div class="metric-card">
+            <div class="metric-value">
+                {% if 'revenue' in key or 'amount' in key or 'total' in key %}
+                KES {{ value|floatformat:0 }}
+                {% elif 'rate' in key or 'percentage' in key or 'margin' in key %}
+                {{ value|floatformat:1 }}%
+                {% else %}
+                {{ value|floatformat:0 }}
+                {% endif %}
+            </div>
+            <div class="metric-label">{{ key|title|replace:'_',' ' }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Charts -->
+{% if report.charts_data %}
+<div class="row mb-4">
+    {% for chart_name, chart_data in report.charts_data.items %}
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">{{ chart_name|title|replace:'_',' ' }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="chart_{{ forloop.counter }}"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Report Data -->
+{% if report.report_data %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-table me-2"></i>Report Data
+        </h5>
+        <div>
+            <span class="badge bg-primary">{{ report.row_count }} record{{ report.row_count|pluralize }}</span>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="data-table-container">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark sticky-top">
+                    <tr>
+                        {% if report.report_data.0 %}
+                        {% for key in report.report_data.0.keys %}
+                        <th>{{ key|title|replace:'_',' ' }}</th>
+                        {% endfor %}
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report.report_data|slice:":100" %}
+                    <tr>
+                        {% for value in row.values %}
+                        <td>
+                            {% if value|floatformat:2 != value %}
+                            {{ value|floatformat:2 }}
+                            {% else %}
+                            {{ value|truncatechars:50 }}
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if report.row_count > 100 %}
+        <div class="card-footer text-muted">
+            Showing first 100 records. Download the full report for complete data.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Report Info -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Report Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-sm">
+                    <div class="col-6 mb-2">
+                        <strong>Report ID:</strong><br>
+                        <span class="text-muted">{{ report.report_id }}</span>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <strong>Template:</strong><br>
+                        <span class="text-muted">{{ report.template.name }}</span>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <strong>Date Range:</strong><br>
+                        <span class="text-muted">{{ report.date_from }} to {{ report.date_to }}</span>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <strong>Generated:</strong><br>
+                        <span class="text-muted">{{ report.created_at }}</span>
+                    </div>
+                    {% if report.generation_time %}
+                    <div class="col-6 mb-2">
+                        <strong>Generation Time:</strong><br>
+                        <span class="text-muted">{{ report.generation_time|floatformat:2 }} seconds</span>
+                    </div>
+                    {% endif %}
+                    {% if report.file_size %}
+                    <div class="col-6 mb-2">
+                        <strong>File Size:</strong><br>
+                        <span class="text-muted">{{ report.file_size|filesizeformat }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Template Configuration
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-sm">
+                    <div class="col-12 mb-2">
+                        <strong>Data Sources:</strong><br>
+                        {% for source in report.template.data_sources %}
+                        <span class="badge bg-light text-dark me-1">{{ source|title }}</span>
+                        {% endfor %}
+                    </div>
+                    {% if report.template.filters %}
+                    <div class="col-12 mb-2">
+                        <strong>Filters Applied:</strong><br>
+                        <span class="text-muted small">{{ report.template.filters|truncatechars:100 }}</span>
+                    </div>
+                    {% endif %}
+                    {% if report.template.aggregations %}
+                    <div class="col-12 mb-2">
+                        <strong>Aggregations:</strong><br>
+                        {% for agg_field, agg_type in report.template.aggregations.items %}
+                        <span class="badge bg-info me-1">{{ agg_field }}: {{ agg_type }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% elif report.status == 'failed' %}
+<!-- Error Message -->
+<div class="alert alert-danger">
+    <h5 class="alert-heading">
+        <i class="fas fa-exclamation-triangle me-2"></i>Report Generation Failed
+    </h5>
+    <p class="mb-0">
+        {% if report.summary_data.error %}
+        {{ report.summary_data.error }}
+        {% else %}
+        An error occurred while generating this report. Please try again or contact support if the issue persists.
+        {% endif %}
+    </p>
+</div>
+
+<div class="text-center">
+    <a href="{% url 'reports:generate_report' report.template.id %}" class="btn btn-primary">
+        <i class="fas fa-redo me-2"></i>Try Again
+    </a>
+</div>
+
+{% elif report.status == 'generating' %}
+<!-- Generating Message -->
+<div class="alert alert-info">
+    <h5 class="alert-heading">
+        <span class="loading-spinner me-2"></span>Report Generation in Progress
+    </h5>
+    <p class="mb-0">Your report is being generated. This page will automatically refresh when complete.</p>
+</div>
+
+<script>
+// Auto-refresh page every 5 seconds if report is still generating
+setTimeout(function() {
+    if ('{{ report.status }}' === 'generating') {
+        location.reload();
+    }
+}, 5000);
+</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if report.status == 'completed' and report.charts_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+$(document).ready(function() {
+    const chartsData = {{ charts_data|safe }};
+    
+    {% for chart_name, chart_data in report.charts_data.items %}
+    // Chart {{ forloop.counter }}: {{ chart_name }}
+    const ctx{{ forloop.counter }} = document.getElementById('chart_{{ forloop.counter }}').getContext('2d');
+    const chartData{{ forloop.counter }} = chartsData['{{ chart_name }}'];
+    
+    new Chart(ctx{{ forloop.counter }}, {
+        type: chartData{{ forloop.counter }}.type || 'bar',
+        data: {
+            labels: chartData{{ forloop.counter }}.labels || [],
+            datasets: [{
+                label: '{{ chart_name|title }}',
+                data: chartData{{ forloop.counter }}.data || [],
+                backgroundColor: [
+                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                    '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280'
+                ],
+                borderColor: '#ffffff',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: chartData{{ forloop.counter }}.type !== 'pie'
+                }
+            },
+            scales: chartData{{ forloop.counter }}.type === 'pie' ? {} : {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    {% endfor %}
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Report Templates{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'reports:dashboard' %}">Reports</a></li>
+<li class="breadcrumb-item active">Templates</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h3 mb-2">Report Templates</h1>
+            <p class="text-muted mb-0">Create and manage report templates for automated insights</p>
+        </div>
+        <div>
+            <a href="{% url 'reports:template_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Template
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="type" class="form-label">Report Type</label>
+                <select name="type" id="type" class="form-select">
+                    <option value="">All Types</option>
+                    {% for value, label in report_types %}
+                    <option value="{{ value }}" {% if current_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="search" class="form-label">Search</label>
+                <input type="text" name="search" id="search" class="form-control" 
+                       placeholder="Search templates..." value="{{ current_search }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search me-2"></i>Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Templates Grid -->
+<div class="row">
+    {% for template in templates %}
+    <div class="col-xl-4 col-lg-6 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="card-title mb-1">{{ template.name }}</h6>
+                    <small class="text-muted">{{ template.get_report_type_display }}</small>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{% url 'reports:generate_report' template.id %}">
+                            <i class="fas fa-play me-2"></i>Generate Report
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'reports:template_edit' template.pk %}">
+                            <i class="fas fa-edit me-2"></i>Edit Template
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'reports:template_delete' template.pk %}">
+                            <i class="fas fa-trash me-2"></i>Delete
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="card-text">{{ template.description|truncatewords:15 }}</p>
+                
+                <div class="row text-center mb-3">
+                    <div class="col-4">
+                        <div class="small text-muted">Data Sources</div>
+                        <div class="fw-semibold">{{ template.data_sources|length }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Columns</div>
+                        <div class="fw-semibold">{{ template.columns|length }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Charts</div>
+                        <div class="fw-semibold">{{ template.charts|length }}</div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-1 mb-3">
+                    {% if template.is_scheduled %}
+                    <span class="badge bg-primary">Scheduled</span>
+                    {% endif %}
+                    {% if template.is_public %}
+                    <span class="badge bg-success">Public</span>
+                    {% endif %}
+                    {% if template.auto_email %}
+                    <span class="badge bg-info">Auto Email</span>
+                    {% endif %}
+                    {% if not template.is_active %}
+                    <span class="badge bg-secondary">Inactive</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        Updated {{ template.updated_at|timesince }} ago
+                    </small>
+                    <a href="{% url 'reports:generate_report' template.id %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-play me-1"></i>Generate
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-file-alt fa-4x text-muted mb-4"></i>
+                <h4>No Report Templates Found</h4>
+                <p class="text-muted mb-4">
+                    {% if current_search or current_type %}
+                    No templates match your current filters. Try adjusting your search criteria.
+                    {% else %}
+                    Get started by creating your first report template to generate automated insights.
+                    {% endif %}
+                </p>
+                {% if current_search or current_type %}
+                <a href="{% url 'reports:template_list' %}" class="btn btn-outline-primary me-2">Clear Filters</a>
+                {% endif %}
+                <a href="{% url 'reports:template_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Create Template
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<nav aria-label="Template pagination">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        
+        {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+        <li class="page-item active">
+            <span class="page-link">{{ num }}</span>
+        </li>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ num }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">{{ num }}</a>
+        </li>
+        {% endif %}
+        {% endfor %}
+        
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,375 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Reports Dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Reports</li>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<style>
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100px;
+    height: 100px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+.kpi-card {
+    border-left: 4px solid #3b82f6;
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.kpi-status-excellent { border-left-color: #10b981; }
+.kpi-status-good { border-left-color: #3b82f6; }
+.kpi-status-average { border-left-color: #f59e0b; }
+.kpi-status-poor { border-left-color: #ef4444; }
+
+.progress-ring {
+    width: 60px;
+    height: 60px;
+}
+
+.progress-ring-circle {
+    stroke: #e5e7eb;
+    stroke-width: 4;
+    fill: transparent;
+    r: 26;
+    cx: 30;
+    cy: 30;
+}
+
+.progress-ring-progress {
+    stroke: #3b82f6;
+    stroke-width: 4;
+    stroke-linecap: round;
+    fill: transparent;
+    r: 26;
+    cx: 30;
+    cy: 30;
+    stroke-dasharray: 163.36;
+    stroke-dashoffset: 163.36;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h3 mb-2">Reports Dashboard</h1>
+            <p class="text-muted mb-0">Monitor your business performance and generate insightful reports</p>
+        </div>
+        <div>
+            <a href="{% url 'reports:template_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Template
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ metrics.total_templates }}</div>
+            <div class="metric-label">
+                <i class="fas fa-file-alt me-2"></i>Report Templates
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ metrics.generated_today }}</div>
+            <div class="metric-label">
+                <i class="fas fa-chart-line me-2"></i>Generated Today
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ metrics.scheduled_reports }}</div>
+            <div class="metric-label">
+                <i class="fas fa-clock me-2"></i>Scheduled Reports
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ metrics.total_kpis }}</div>
+            <div class="metric-label">
+                <i class="fas fa-bullseye me-2"></i>Active KPIs
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Revenue Chart -->
+    <div class="col-xl-8 col-lg-7 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2 text-primary"></i>Revenue Trend (Last 7 Days)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="col-xl-4 col-lg-5 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bullseye me-2 text-primary"></i>Key Performance Indicators
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for kpi in kpis %}
+                <div class="kpi-card kpi-status-{{ kpi.status }} card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1">{{ kpi.name }}</h6>
+                                <p class="card-text text-muted small mb-2">{{ kpi.formatted_value }} / {{ kpi.formatted_target }}</p>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-{% if kpi.status == 'excellent' %}success{% elif kpi.status == 'good' %}primary{% elif kpi.status == 'average' %}warning{% else %}danger{% endif %}" 
+                                         style="width: {{ kpi.achievement_percentage|floatformat:0 }}%"></div>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-{% if kpi.status == 'excellent' %}success{% elif kpi.status == 'good' %}primary{% elif kpi.status == 'average' %}warning{% else %}danger{% endif %}">
+                                    {{ kpi.achievement_percentage|floatformat:0 }}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted">No KPIs configured yet.</p>
+                <a href="{% url 'reports:kpi_create' %}" class="btn btn-sm btn-outline-primary">Create KPI</a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Report Templates -->
+    <div class="col-xl-6 col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-alt me-2 text-primary"></i>Report Templates
+                </h5>
+                <a href="{% url 'reports:template_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% for template in templates|slice:":5" %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <h6 class="mb-1">{{ template.name }}</h6>
+                        <small class="text-muted">{{ template.get_report_type_display }}</small>
+                    </div>
+                    <div>
+                        <a href="{% url 'reports:generate_report' template.id %}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-play me-1"></i>Generate
+                        </a>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No report templates created yet.</p>
+                    <a href="{% url 'reports:template_create' %}" class="btn btn-primary">Create First Template</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Reports -->
+    <div class="col-xl-6 col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2 text-primary"></i>Recent Reports
+                </h5>
+                <a href="{% url 'reports:generated_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% for report in recent_reports %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <h6 class="mb-1">{{ report.template.name }}</h6>
+                        <small class="text-muted">{{ report.date_from }} to {{ report.date_to }}</small>
+                        <br>
+                        <small class="text-muted">{{ report.created_at|timesince }} ago</small>
+                    </div>
+                    <div>
+                        <a href="{% url 'reports:report_detail' report.report_id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-1"></i>View
+                        </a>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No reports generated yet.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bolt me-2 text-primary"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="quick-action text-center">
+                            <i class="fas fa-chart-bar fa-2x text-primary mb-3"></i>
+                            <h6>Business Metrics</h6>
+                            <p class="text-muted small">View detailed business performance metrics</p>
+                            <a href="{% url 'reports:business_metrics' %}" class="btn btn-primary btn-sm">View Metrics</a>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="quick-action text-center">
+                            <i class="fas fa-chart-pie fa-2x text-success mb-3"></i>
+                            <h6>Analytics</h6>
+                            <p class="text-muted small">Explore advanced analytics and insights</p>
+                            <a href="{% url 'reports:analytics_dashboard' %}" class="btn btn-success btn-sm">View Analytics</a>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="quick-action text-center">
+                            <i class="fas fa-clock fa-2x text-warning mb-3"></i>
+                            <h6>Scheduled Reports</h6>
+                            <p class="text-muted small">Manage automated report generation</p>
+                            <a href="{% url 'reports:schedule_list' %}" class="btn btn-warning btn-sm">Manage Schedules</a>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="quick-action text-center">
+                            <i class="fas fa-tachometer-alt fa-2x text-info mb-3"></i>
+                            <h6>Custom Dashboard</h6>
+                            <p class="text-muted small">Create personalized dashboards</p>
+                            <a href="{% url 'reports:dashboard_list' %}" class="btn btn-info btn-sm">View Dashboards</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Revenue Chart
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    const chartData = {{ chart_data.revenue_chart|safe }};
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.map(item => {
+                const date = new Date(item.date);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
+            datasets: [{
+                label: 'Revenue (KES)',
+                data: chartData.map(item => item.revenue),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'KES ' + value.toLocaleString();
+                        }
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+
+    // Auto-refresh page every 5 minutes
+    setTimeout(function() {
+        location.reload();
+    }, 300000);
+});
+</script>
+{% endblock %}

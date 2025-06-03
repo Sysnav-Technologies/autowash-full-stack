@@ -1,0 +1,357 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payments Dashboard - {{ block.super }}{% endblock %}
+
+{% block breadcrumbs %}
+{{ block.super }}
+<li class="breadcrumb-item active">Payments</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Page Header -->
+    <div class="col-12">
+        <div class="page-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="h3 mb-2">Payments Dashboard</h1>
+                    <p class="text-muted mb-0">Monitor and manage all payment transactions</p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <a href="{% url 'payments:create' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>New Payment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Today's Statistics -->
+<div class="row">
+    <div class="col-md-3 mb-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-money-bill-wave fa-2x opacity-75"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Today's Revenue</h6>
+                        <h4 class="mb-0">KES {{ today_stats.total_amount|floatformat:0 }}</h4>
+                        <small class="opacity-75">{{ today_stats.total_count }} transactions</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-hand-holding-usd fa-2x opacity-75"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Cash Payments</h6>
+                        <h4 class="mb-0">KES {{ today_stats.cash_amount|floatformat:0 }}</h4>
+                        <small class="opacity-75">Physical cash received</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-mobile-alt fa-2x opacity-75"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">M-Pesa Payments</h6>
+                        <h4 class="mb-0">KES {{ today_stats.mpesa_amount|floatformat:0 }}</h4>
+                        <small class="opacity-75">Mobile money</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-credit-card fa-2x opacity-75"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Card Payments</h6>
+                        <h4 class="mb-0">KES {{ today_stats.card_amount|floatformat:0 }}</h4>
+                        <small class="opacity-75">Credit/Debit cards</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Pending Payments -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2 text-warning"></i>Pending Payments
+                    </h5>
+                    <span class="badge bg-warning">{{ pending_payments|length }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if pending_payments %}
+                    {% for payment in pending_payments %}
+                    <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
+                        <div class="flex-shrink-0">
+                            <div class="bg-warning rounded-circle p-2">
+                                <i class="fas fa-{{ payment.payment_method.icon|default:'credit-card' }} text-white"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="mb-1">
+                                <a href="{% url 'payments:detail' payment.payment_id %}" class="text-decoration-none">
+                                    {{ payment.payment_id }}
+                                </a>
+                            </h6>
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">{{ payment.customer.display_name }}</small>
+                                <span class="fw-bold text-primary">KES {{ payment.amount }}</span>
+                            </div>
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>{{ payment.created_at|timesince }} ago
+                            </small>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <span class="badge bg-{{ payment.status|yesno:'success,warning' }}">
+                                {{ payment.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                        <p>No pending payments</p>
+                    </div>
+                {% endif %}
+                
+                {% if pending_payments %}
+                <div class="text-center mt-3">
+                    <a href="{% url 'payments:list' %}?status=pending" class="btn btn-outline-warning">
+                        View All Pending
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-history me-2 text-success"></i>Recent Transactions
+                </h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                {% if recent_payments %}
+                    {% for payment in recent_payments %}
+                    <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
+                        <div class="flex-shrink-0">
+                            <div class="bg-success rounded-circle p-2">
+                                <i class="fas fa-{{ payment.payment_method.icon|default:'credit-card' }} text-white"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="mb-1">
+                                <a href="{% url 'payments:detail' payment.payment_id %}" class="text-decoration-none">
+                                    {{ payment.payment_id }}
+                                </a>
+                            </h6>
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">{{ payment.customer.display_name }}</small>
+                                <span class="fw-bold text-success">KES {{ payment.amount }}</span>
+                            </div>
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>{{ payment.completed_at|timesince }} ago
+                            </small>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <span class="badge bg-success">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-credit-card fa-3x mb-3"></i>
+                        <p>No recent transactions</p>
+                    </div>
+                {% endif %}
+                
+                {% if recent_payments %}
+                <div class="text-center mt-3">
+                    <a href="{% url 'payments:list' %}" class="btn btn-outline-success">
+                        View All Payments
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Methods Performance -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Payment Methods Performance (This Month)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for method in method_stats %}
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center p-3 border rounded">
+                            <div class="mb-2">
+                                <i class="fas fa-{{ method.icon|default:'credit-card' }} fa-2x" style="color: {{ method.color }}"></i>
+                            </div>
+                            <h6 class="mb-1">{{ method.name }}</h6>
+                            <h4 class="mb-0 text-primary">KES {{ method.this_month_amount|default:0|floatformat:0 }}</h4>
+                            <small class="text-muted">{{ method.this_month_count|default:0 }} transactions</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'payments:create' %}" class="quick-action text-decoration-none">
+                            <div class="text-center">
+                                <i class="fas fa-plus fa-2x text-primary mb-2"></i>
+                                <h6>New Payment</h6>
+                                <small class="text-muted">Process a new payment</small>
+                            </div>
+                        </a>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'payments:reconciliation' %}" class="quick-action text-decoration-none">
+                            <div class="text-center">
+                                <i class="fas fa-balance-scale fa-2x text-success mb-2"></i>
+                                <h6>Reconciliation</h6>
+                                <small class="text-muted">Reconcile payments</small>
+                            </div>
+                        </a>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'payments:reports' %}" class="quick-action text-decoration-none">
+                            <div class="text-center">
+                                <i class="fas fa-chart-line fa-2x text-info mb-2"></i>
+                                <h6>Reports</h6>
+                                <small class="text-muted">View payment reports</small>
+                            </div>
+                        </a>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'payments:methods' %}" class="quick-action text-decoration-none">
+                            <div class="text-center">
+                                <i class="fas fa-cogs fa-2x text-warning mb-2"></i>
+                                <h6>Settings</h6>
+                                <small class="text-muted">Payment methods</small>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if failed_payments > 0 %}
+<!-- Failed Payments Alert -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-warning">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">Failed Payments Alert</h6>
+                    <p class="mb-0">{{ failed_payments }} payment{{ failed_payments|pluralize }} failed today. Please review and take necessary action.</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <a href="{% url 'payments:list' %}?status=failed" class="btn btn-warning">
+                        Review Failed Payments
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Auto-refresh payment data every 30 seconds
+    setInterval(function() {
+        $.get('{% url "payments:summary_ajax" %}', function(data) {
+            // Update today's statistics (you can implement this)
+            console.log('Payment data refreshed');
+        });
+    }, 30000);
+    
+    // Real-time payment status updates
+    $('.payment-status').each(function() {
+        const paymentId = $(this).data('payment-id');
+        const status = $(this).data('status');
+        
+        if (status === 'processing') {
+            // Check status every 5 seconds for processing payments
+            const checkStatus = setInterval(function() {
+                $.get(`/payments/ajax/payment-status/${paymentId}/`, function(data) {
+                    if (data.status !== 'processing') {
+                        location.reload(); // Reload to show updated status
+                        clearInterval(checkStatus);
+                    }
+                });
+            }, 5000);
+        }
+    });
+});
+</script>
+{% endblock %}

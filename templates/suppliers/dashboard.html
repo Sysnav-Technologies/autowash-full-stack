@@ -1,0 +1,465 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Suppliers Dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Suppliers</li>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<style>
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100px;
+    height: 100px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+.supplier-card {
+    border-left: 4px solid #3b82f6;
+    transition: all 0.3s ease;
+}
+
+.supplier-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.rating-stars {
+    color: #fbbf24;
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+}
+
+.quick-action {
+    background: white;
+    border: 2px dashed #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.quick-action:hover {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h3 mb-2">Suppliers Dashboard</h1>
+            <p class="text-muted mb-0">Manage your suppliers and purchase orders</p>
+        </div>
+        <div>
+            <a href="{% url 'suppliers:create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Add Supplier
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ metrics.total_suppliers }}</div>
+            <div class="metric-label">
+                <i class="fas fa-truck me-2"></i>Total Suppliers
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ metrics.active_suppliers }}</div>
+            <div class="metric-label">
+                <i class="fas fa-check-circle me-2"></i>Active Suppliers
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ metrics.pending_orders }}</div>
+            <div class="metric-label">
+                <i class="fas fa-clock me-2"></i>Pending Orders
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ metrics.overdue_orders }}</div>
+            <div class="metric-label">
+                <i class="fas fa-exclamation-triangle me-2"></i>Overdue Orders
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Purchase Trends Chart -->
+    <div class="col-xl-8 col-lg-7 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2 text-primary"></i>Purchase Trends (Last 6 Months)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="purchaseTrendsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Suppliers -->
+    <div class="col-xl-4 col-lg-5 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-star me-2 text-primary"></i>Top Suppliers
+                </h5>
+                <a href="{% url 'suppliers:list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% for supplier in top_suppliers %}
+                <div class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                    <div>
+                        <h6 class="mb-1">{{ supplier.name }}</h6>
+                        <small class="text-muted">{{ supplier.total_orders }} orders</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-semibold">KES {{ supplier.total_value|floatformat:0 }}</div>
+                        <div class="rating-stars">
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= supplier.rating %}
+                                <i class="fas fa-star"></i>
+                                {% else %}
+                                <i class="far fa-star"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted text-center">No suppliers found</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Recent Purchase Orders -->
+    <div class="col-xl-6 col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-shopping-cart me-2 text-primary"></i>Recent Purchase Orders
+                </h5>
+                <a href="{% url 'suppliers:purchase_order_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% for order in recent_orders %}
+                <div class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                    <div>
+                        <h6 class="mb-1">PO-{{ order.po_number }}</h6>
+                        <small class="text-muted">{{ order.supplier.name }}</small>
+                        <br>
+                        <small class="text-muted">{{ order.created_at|timesince }} ago</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-semibold">KES {{ order.total_amount|floatformat:0 }}</div>
+                        <span class="status-badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% else %}primary{% endif %}">
+                            {{ order.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No purchase orders yet</p>
+                    <a href="{% url 'suppliers:purchase_order_create' %}" class="btn btn-primary">Create Order</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Goods Receipts -->
+    <div class="col-xl-6 col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-truck-loading me-2 text-primary"></i>Recent Goods Receipts
+                </h5>
+                <a href="{% url 'suppliers:goods_receipt_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% for receipt in recent_receipts %}
+                <div class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                    <div>
+                        <h6 class="mb-1">GR-{{ receipt.receipt_number }}</h6>
+                        <small class="text-muted">{{ receipt.supplier.name }}</small>
+                        <br>
+                        <small class="text-muted">{{ receipt.receipt_date }}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="small">{{ receipt.total_items }} items</div>
+                        <span class="status-badge bg-{% if receipt.status == 'completed' %}success{% elif receipt.status == 'pending' %}warning{% elif receipt.status == 'discrepancy' %}danger{% else %}primary{% endif %}">
+                            {{ receipt.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="fas fa-truck-loading fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No goods receipts yet</p>
+                    <a href="{% url 'suppliers:goods_receipt_create' %}" class="btn btn-primary">Create Receipt</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bolt me-2 text-primary"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <a href="{% url 'suppliers:create' %}" class="quick-action text-decoration-none">
+                            <i class="fas fa-plus fa-2x text-primary mb-3"></i>
+                            <h6>Add Supplier</h6>
+                            <p class="text-muted small">Register a new supplier</p>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <a href="{% url 'suppliers:purchase_order_create' %}" class="quick-action text-decoration-none">
+                            <i class="fas fa-shopping-cart fa-2x text-success mb-3"></i>
+                            <h6>Create Purchase Order</h6>
+                            <p class="text-muted small">Order from suppliers</p>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <a href="{% url 'suppliers:goods_receipt_create' %}" class="quick-action text-decoration-none">
+                            <i class="fas fa-truck-loading fa-2x text-info mb-3"></i>
+                            <h6>Receive Goods</h6>
+                            <p class="text-muted small">Record goods received</p>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <a href="{% url 'suppliers:performance_report' %}" class="quick-action text-decoration-none">
+                            <i class="fas fa-chart-bar fa-2x text-warning mb-3"></i>
+                            <h6>Performance Report</h6>
+                            <p class="text-muted small">View supplier performance</p>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Supplier Performance -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-award me-2 text-primary"></i>Supplier Performance
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for supplier in supplier_ratings %}
+                    <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+                        <div class="supplier-card card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="card-title mb-1">{{ supplier.name }}</h6>
+                                        <small class="text-muted">{{ supplier.get_supplier_type_display }}</small>
+                                    </div>
+                                    {% if supplier.is_preferred %}
+                                    <span class="badge bg-success">Preferred</span>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="small">Overall Rating</span>
+                                        <span class="small fw-semibold">{{ supplier.average_rating|floatformat:1 }}/5</span>
+                                    </div>
+                                    <div class="progress mb-2" style="height: 6px;">
+                                        <div class="progress-bar" style="width: {{ supplier.average_rating|mul:20 }}%"></div>
+                                    </div>
+                                    
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <div class="small text-muted">Orders</div>
+                                            <div class="fw-semibold">{{ supplier.total_orders }}</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="small text-muted">Value</div>
+                                            <div class="fw-semibold">{{ supplier.total_value|floatformat:0|add:"K" }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <a href="{% url 'suppliers:detail' supplier.pk %}" class="btn btn-sm btn-outline-primary w-100">
+                                        View Details
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12">
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No supplier performance data available</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Purchase Trends Chart
+    const ctx = document.getElementById('purchaseTrendsChart').getContext('2d');
+    const monthlyData = {{ monthly_purchases|safe }};
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: monthlyData.map(item => {
+                const date = new Date(item.month + '-01');
+                return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            }),
+            datasets: [{
+                label: 'Purchase Value (KES)',
+                data: monthlyData.map(item => item.total_amount),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Order Count',
+                data: monthlyData.map(item => item.order_count),
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: true,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'KES ' + value.toLocaleString();
+                        }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value + ' orders';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Auto-refresh dashboard every 5 minutes
+    setTimeout(function() {
+        location.reload();
+    }, 300000);
+});
+</script>
+{% endblock %}

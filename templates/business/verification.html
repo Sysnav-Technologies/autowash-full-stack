@@ -1,0 +1,188 @@
+{% extends "base/base.html" %}
+
+{% block title %}Business Verification{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'accounts:business_settings' %}">Settings</a></li>
+<li class="breadcrumb-item active">Verification</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Business Verification</h5>
+            </div>
+            
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Please upload the required documents to verify your business. This helps us ensure the security and legitimacy of all businesses on our platform.
+                </div>
+                
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Business Registration Document</label>
+                        {{ form.registration_document }}
+                        <div class="form-text">Upload a scanned copy of your business registration certificate</div>
+                        {% if form.registration_document.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.registration_document.errors.0 }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if verification.registration_document %}
+                        <div class="mt-2">
+                            <a href="{{ verification.registration_document.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye me-1"></i> View Uploaded
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Tax Identification Document</label>
+                        {{ form.tax_document }}
+                        <div class="form-text">Upload a scanned copy of your tax identification document</div>
+                        {% if form.tax_document.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.tax_document.errors.0 }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if verification.tax_document %}
+                        <div class="mt-2">
+                            <a href="{{ verification.tax_document.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye me-1"></i> View Uploaded
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Owner Identification Document</label>
+                        {{ form.owner_id }}
+                        <div class="form-text">Upload a scanned copy of your government-issued ID (e.g., passport, driver's license)</div>
+                        {% if form.owner_id.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.owner_id.errors.0 }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if verification.owner_id %}
+                        <div class="mt-2">
+                            <a href="{{ verification.owner_id.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye me-1"></i> View Uploaded
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Proof of Address</label>
+                        {{ form.address_proof }}
+                        <div class="form-text">Upload a recent utility bill or bank statement showing your business address</div>
+                        {% if form.address_proof.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.address_proof.errors.0 }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if verification.address_proof %}
+                        <div class="mt-2">
+                            <a href="{{ verification.address_proof.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye me-1"></i> View Uploaded
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Additional Notes</label>
+                        {{ form.notes }}
+                        <div class="form-text">Add any additional information that might help with verification</div>
+                        {% if form.notes.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.notes.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary">
+                            {% if verification.status == 'in_review' %}
+                                Update Documents
+                            {% else %}
+                                Submit for Verification
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Verification Status</h5>
+            </div>
+            
+            <div class="card-body">
+                <div class="d-flex align-items-start mb-4">
+                    <div class="flex-shrink-0">
+                        {% if business.is_verified %}
+                            <i class="fas fa-check-circle text-success fs-3"></i>
+                        {% elif verification.status == 'in_review' %}
+                            <i class="fas fa-clock text-warning fs-3"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle text-danger fs-3"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5 class="mb-1">
+                            {% if business.is_verified %}
+                                Verified
+                            {% elif verification.status == 'in_review' %}
+                                Under Review
+                            {% else %}
+                                Not Verified
+                            {% endif %}
+                        </h5>
+                        <p class="mb-0 text-muted">
+                            {% if business.is_verified %}
+                                Your business has been successfully verified on {{ verification.verified_at|date:"M d, Y" }}
+                            {% elif verification.status == 'in_review' %}
+                                Submitted on {{ verification.updated_at|date:"M d, Y" }}
+                            {% else %}
+                                Please submit all required documents
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                {% if verification.status == 'rejected' %}
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-triangle me-2"></i> Verification Rejected</h6>
+                    <p class="mb-0">{{ verification.rejection_reason }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="mt-4">
+                    <h6 class="mb-3">Verification Requirements</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Clear business registration document</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Valid tax identification</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Owner identification</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Proof of business address</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
