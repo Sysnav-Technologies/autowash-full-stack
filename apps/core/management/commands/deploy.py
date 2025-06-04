@@ -180,63 +180,73 @@ class Command(BaseCommand):
         """Collect static files"""
         call_command('collectstatic', '--noinput', verbosity=1)
 
-    def create_public_tenant(self, owner_user):
-        """Create public tenant for main site with specified owner"""
+    # Update this section in your apps/core/management/commands/deploy.py
+
+def create_public_tenant(self, owner_user):
+    """Create public tenant for main site with specified owner"""
+    try:
+        from apps.accounts.models import Business, Domain
+        
+        # Check if public tenant exists
         try:
-            from apps.accounts.models import Business, Domain
-            
-            # Check if public tenant exists
-            try:
-                public_tenant = Business.objects.get(schema_name='public')
-                self.stdout.write('Public tenant already exists')
-            except Business.DoesNotExist:
-                # Create public tenant with owner
-                public_tenant = Business.objects.create(
-                    name='Autowash Public',
-                    slug='public',
-                    schema_name='public',
-                    description='Main public site',
-                    business_type='full_service',
-                    owner=owner_user,  # THIS IS THE KEY FIX
-                    # Optional: Set other required fields
-                    country='Kenya',
-                    timezone='Africa/Nairobi',
-                    currency='KES',
-                    language='en',
-                    is_active=True,
-                    is_verified=True  # Public tenant should be verified
-                )
-                self.stdout.write('Public tenant created with owner')
+            public_tenant = Business.objects.get(schema_name='public')
+            self.stdout.write('Public tenant already exists')
+        except Business.DoesNotExist:
+            # Create public tenant with owner
+            public_tenant = Business.objects.create(
+                name='Autowash Public',
+                slug='public',
+                schema_name='public',
+                description='Main public site',
+                business_type='full_service',
+                owner=owner_user,
+                country='Kenya',
+                timezone='Africa/Nairobi',
+                currency='KES',
+                language='en',
+                is_active=True,
+                is_verified=True
+            )
+            self.stdout.write('Public tenant created with owner')
 
-            # Create domains for public tenant
-            if settings.DEBUG:
-                domains_to_create = [
-                    ('127.0.0.1:8000', True),
-                    ('localhost:8000', False),
-                    
-                ]
+        # Smart domain creation - Render vs Local vs Production
+        if settings.DEBUG:
+            # Local development
+            domains_to_create = [
+                ('127.0.0.1:8000', True),
+                ('localhost:8000', False),
+            ]
+        elif 'RENDER' in os.environ:
+            # Render deployment
+            render_service = os.environ.get('RENDER_SERVICE_NAME', 'autowash-web')
+            domains_to_create = [
+                (f'{render_service}.onrender.com', True),
+                ('autowash.co.ke', False),
+                ('www.autowash.co.ke', False),
+            ]
+            self.stdout.write(f'Creating Render domains for {render_service}.onrender.com')
+        else:
+            # Other production (like CPanel)
+            domains_to_create = [
+                ('autowash.co.ke', True),
+                ('www.autowash.co.ke', False),
+            ]
+
+        for domain_name, is_primary in domains_to_create:
+            domain, created = Domain.objects.get_or_create(
+                domain=domain_name,
+                defaults={
+                    'tenant': public_tenant,
+                    'is_primary': is_primary
+                }
+            )
+            if created:
+                self.stdout.write(f'Created domain: {domain_name}')
             else:
-                domains_to_create = [
-                    ('autowash.co.ke', True),
-                    ('www.autowash.co.ke', False),
-                    
-                ]
+                self.stdout.write(f'Domain already exists: {domain_name}')
 
-            for domain_name, is_primary in domains_to_create:
-                domain, created = Domain.objects.get_or_create(
-                    domain=domain_name,
-                    defaults={
-                        'tenant': public_tenant,
-                        'is_primary': is_primary
-                    }
-                )
-                if created:
-                    self.stdout.write(f'Created domain: {domain_name}')
-                else:
-                    self.stdout.write(f'Domain already exists: {domain_name}')
-
-        except Exception as e:
-            raise Exception(f"Failed to create public tenant: {e}")
+    except Exception as e:
+        raise Exception(f"Failed to create public tenant: {e}")
 
     def create_superuser(self):
         """Create superuser with predefined credentials"""
