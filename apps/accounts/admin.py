@@ -1,4 +1,4 @@
-# apps/accounts/admin.py
+# apps/accounts/admin.py - FIXED VERSION
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
@@ -24,6 +24,7 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
     verbose_name_plural = 'Profile'
+    fk_name = 'user'  # FIX: Specify the foreign key field name
     fields = (
         'phone', 'avatar', 'date_of_birth', 'gender', 'bio',
         'is_verified', 'language', 'timezone',
@@ -104,12 +105,13 @@ class BusinessAdmin(admin.ModelAdmin):
     """Comprehensive Business admin"""
     list_display = (
         'name', 'business_type', 'owner_link', 'verification_status',
-        'is_active', 'subscription_status', 'employee_count', 'customer_count',
+        'is_active', 'employee_count', 'customer_count',
         'created_at', 'domain_link'
     )
+    # FIX: Remove the invalid subscription__is_active filter
     list_filter = (
         'business_type', 'is_active', 'is_verified', 'verification__status',
-        'created_at', 'subscription__is_active', 'currency', 'timezone'
+        'created_at', 'currency', 'timezone'
     )
     search_fields = (
         'name', 'slug', 'description', 'owner__username', 
@@ -197,14 +199,6 @@ class BusinessAdmin(admin.ModelAdmin):
             return format_html('<span style="color: red;">No Verification</span>')
     verification_status.short_description = 'Verification'
     
-    def subscription_status(self, obj):
-        if obj.subscription and obj.subscription.is_active:
-            return format_html('<span style="color: green;">✓ Active</span>')
-        elif obj.subscription:
-            return format_html('<span style="color: red;">✗ Inactive</span>')
-        return format_html('<span style="color: gray;">No Subscription</span>')
-    subscription_status.short_description = 'Subscription'
-    
     def domain_link(self, obj):
         domain = obj.domains.filter(is_primary=True).first()
         if domain:
@@ -213,6 +207,23 @@ class BusinessAdmin(admin.ModelAdmin):
             return format_html('<a href="{}" target="_blank">{}</a>', url, domain.domain)
         return 'No Domain'
     domain_link.short_description = 'Domain'
+    
+    # FIX: Add employee_count and customer_count methods with error handling
+    def employee_count(self, obj):
+        try:
+            from apps.employees.models import Employee
+            return Employee.objects.filter(is_active=True).count()
+        except ImportError:
+            return 'N/A'
+    employee_count.short_description = 'Employees'
+    
+    def customer_count(self, obj):
+        try:
+            from apps.customers.models import Customer
+            return Customer.objects.count()
+        except ImportError:
+            return 'N/A'
+    customer_count.short_description = 'Customers'
     
     # Admin Actions
     def verify_businesses(self, request, queryset):
@@ -253,7 +264,7 @@ class BusinessAdmin(admin.ModelAdmin):
         writer = csv.writer(response)
         writer.writerow([
             'Name', 'Type', 'Owner', 'Email', 'Phone', 'Status', 'Verified',
-            'Subscription', 'Created', 'Domain'
+            'Created', 'Domain'
         ])
         
         for business in queryset:
@@ -265,7 +276,6 @@ class BusinessAdmin(admin.ModelAdmin):
                 business.phone,
                 'Active' if business.is_active else 'Inactive',
                 'Yes' if business.is_verified else 'No',
-                business.subscription.plan if business.subscription else 'None',
                 business.created_at.strftime('%Y-%m-%d'),
                 business.domain_url or 'No Domain'
             ])
