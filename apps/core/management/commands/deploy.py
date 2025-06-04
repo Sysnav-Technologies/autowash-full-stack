@@ -211,13 +211,15 @@ class Command(BaseCommand):
             # Create domains for public tenant
             if settings.DEBUG:
                 domains_to_create = [
-                    ('localhost:8000', True),
-                    ('127.0.0.1:8000', False),
+                    ('127.0.0.1:8000', True),
+                    ('localhost:8000', False),
+                    
                 ]
             else:
                 domains_to_create = [
-                    ('www.autowash.co.ke', True),
-                    ('autowash.co.ke', False),
+                    ('autowash.co.ke', True),
+                    ('www.autowash.co.ke', False),
+                    
                 ]
 
             for domain_name, is_primary in domains_to_create:

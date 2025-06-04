@@ -13,8 +13,9 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 import uuid
+from django.conf import settings
 from apps.core.decorators import ajax_required
-from .models import UserProfile, Business, BusinessSettings, BusinessVerification
+from .models import UserProfile, Business, BusinessSettings, BusinessVerification, Domain
 from .forms import (
     UserRegistrationForm, UserProfileForm, BusinessRegistrationForm,
     BusinessSettingsForm, BusinessVerificationForm
@@ -162,6 +163,12 @@ def dashboard_redirect(request):
     messages.info(request, 'Welcome! Please register your business to get started.')
     return redirect('accounts:business_register')
 
+# Add these imports at the top of your apps/accounts/views.py file
+
+
+  # ADD THIS IMPORT
+
+
 @login_required
 def business_register_view(request):
     """Smart business registration view - works for both local and CPanel production"""
@@ -241,8 +248,6 @@ def business_register_view(request):
                     
                     # SMART DOMAIN CREATION - Local vs Production
                     print("Creating domain...")
-                    from .models import Domain
-                    from django.conf import settings
                     
                     if settings.DEBUG:
                         # LOCAL DEVELOPMENT

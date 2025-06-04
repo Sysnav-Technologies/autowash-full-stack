@@ -149,16 +149,21 @@ DATABASES = {
 # Override engine for django-tenants
 DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
 
-# Add SSL requirement and search path for external database
-DATABASES['default']['OPTIONS'] = {
-    'sslmode': 'require',
-    'options': '-c search_path=public'
-}
-
-if DEBUG:
-    print(f"📊 Using PostgreSQL database via DATABASE_URL (DEBUG MODE)")
+# Configure SSL based on environment
+if 'localhost' in database_url or '127.0.0.1' in database_url:
+    # Local database - disable SSL
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'disable',
+        'options': '-c search_path=public'
+    }
+    print(f"📊 Using LOCAL PostgreSQL database via DATABASE_URL (SSL disabled)")
 else:
-    print(f"📊 Using PostgreSQL database via DATABASE_URL (PRODUCTION)")
+    # External database - require SSL
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
+        'options': '-c search_path=public'
+    }
+    print(f"📊 Using EXTERNAL PostgreSQL database via DATABASE_URL (SSL required)")
 
 # Redis & Channels
 CHANNEL_LAYERS = {
@@ -428,11 +433,6 @@ LOGGING = {
         'django': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
-            'propagate': False,
-        },
-        'apps': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
             'propagate': False,
         },
         'django_tenants': {
