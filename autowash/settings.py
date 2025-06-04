@@ -490,9 +490,14 @@ else:
     CORS_ALLOWED_ORIGINS = [
         "https://autowash.co.ke",
         "https://www.autowash.co.ke",
+        'https://www.autowash-3jpr.onrender.com',
+        'https://autowash-3jpr.onrender.com'
+'
+        
     ]
     CORS_ALLOWED_ORIGIN_REGEXES = [
         r"^https://.*\.autowash\.co\.ke$",
+        r"^https://.*\.autowash-3jpr\.onrender\.com$",
     ]
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_ALL_ORIGINS = False
