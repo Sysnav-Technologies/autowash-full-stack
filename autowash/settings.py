@@ -219,48 +219,82 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# SMART STATIC FILES CONFIGURATION WITH WHITENOISE
-if DEBUG:
-    # Local development
-    STATIC_URL = '/static/'
-    STATIC_ROOT = BASE_DIR / 'staticfiles'
-    STATICFILES_DIRS = [BASE_DIR / 'static']
+# Production (CPanel) with WhiteNoise
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static')
+]
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# WhiteNoise configuration for production
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# WhiteNoise settings
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True
+WHITENOISE_MTIME = None
+WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
+
+# Serve media files through WhiteNoise (only if needed)
+# Note: For large media files, consider using a CDN instead
+WHITENOISE_MANIFEST_STRICT = False
+
+# Custom MIME types for WhiteNoise
+WHITENOISE_MIMETYPES = {
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+}
+
+# Skip compression for these file types
+WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
+
+print("📁 Using PRODUCTION (CPanel) static/media file paths with WhiteNoise")
+
+
+# # SMART STATIC FILES CONFIGURATION WITH WHITENOISE
+# if DEBUG:
+#     # Local development
+#     STATIC_URL = '/static/'
+#     STATIC_ROOT = BASE_DIR / 'staticfiles'
+#     STATICFILES_DIRS = [BASE_DIR / 'static']
     
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
-    print("📁 Using LOCAL static/media file paths")
-else:
-    # Production (CPanel) with WhiteNoise
-    STATIC_URL = '/static/'
-    STATIC_ROOT = BASE_DIR / 'staticfiles'
-    STATICFILES_DIRS = [BASE_DIR / 'static']
+#     MEDIA_URL = '/media/'
+#     MEDIA_ROOT = BASE_DIR / 'media'
+#     print("📁 Using LOCAL static/media file paths")
+# else:
+#     # Production (CPanel) with WhiteNoise
+#     STATIC_URL = '/static/'
+#     STATIC_ROOT = BASE_DIR / 'staticfiles'
+#     STATICFILES_DIRS = [BASE_DIR / 'static']
     
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
+#     MEDIA_URL = '/media/'
+#     MEDIA_ROOT = BASE_DIR / 'media'
     
-    # WhiteNoise configuration for production
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+#     # WhiteNoise configuration for production
+#     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
     
-    # WhiteNoise settings
-    # WHITENOISE_USE_FINDERS = True
-    # WHITENOISE_AUTOREFRESH = True
-    # WHITENOISE_MTIME = None
-    # WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
+#     # WhiteNoise settings
+#     WHITENOISE_USE_FINDERS = True
+#     WHITENOISE_AUTOREFRESH = True
+#     WHITENOISE_MTIME = None
+#     WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
     
-    # # Serve media files through WhiteNoise (only if needed)
-    # # Note: For large media files, consider using a CDN instead
-    # WHITENOISE_MANIFEST_STRICT = False
+#     # Serve media files through WhiteNoise (only if needed)
+#     # Note: For large media files, consider using a CDN instead
+#     WHITENOISE_MANIFEST_STRICT = False
     
-    # # Custom MIME types for WhiteNoise
-    # WHITENOISE_MIMETYPES = {
-    #     '.js': 'application/javascript',
-    #     '.css': 'text/css',
-    # }
+#     # Custom MIME types for WhiteNoise
+#     WHITENOISE_MIMETYPES = {
+#         '.js': 'application/javascript',
+#         '.css': 'text/css',
+#     }
     
-    # # Skip compression for these file types
-    # WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
+#     # Skip compression for these file types
+#     WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
     
-    print("📁 Using PRODUCTION (CPanel) static/media file paths with WhiteNoise")
+#     print("📁 Using PRODUCTION (CPanel) static/media file paths with WhiteNoise")
 
 # Create static directory if it doesn't exist (fixes the warning)
 static_dir = BASE_DIR / 'static'
