@@ -164,11 +164,12 @@ def dashboard_redirect(request):
 
 @login_required
 def business_register_view(request):
-    """Working Business registration view with fixed employee creation"""
+    """Smart business registration view - works for both local and CPanel production"""
     print(f"\n" + "="*50)
     print(f"BUSINESS REGISTER VIEW CALLED")
     print(f"Request method: {request.method}")
     print(f"User: {request.user}")
+    print(f"Environment: {'LOCAL' if settings.DEBUG else 'PRODUCTION'}")
     print(f"="*50)
     
     # Check if user already owns a business
@@ -238,10 +239,20 @@ def business_register_view(request):
                     business.save()
                     print(f"Business saved successfully! ID: {business.id}")
                     
-                    # Create domain for the business
+                    # SMART DOMAIN CREATION - Local vs Production
                     print("Creating domain...")
                     from .models import Domain
-                    domain_name = f"{business.slug}.localhost"
+                    from django.conf import settings
+                    
+                    if settings.DEBUG:
+                        # LOCAL DEVELOPMENT
+                        domain_name = f"{business.slug}.localhost:8000"
+                        print(f"Creating LOCAL domain: {domain_name}")
+                    else:
+                        # PRODUCTION (CPanel)
+                        domain_name = f"{business.slug}.autowash.co.ke"
+                        print(f"Creating PRODUCTION domain: {domain_name}")
+                    
                     domain = Domain.objects.create(
                         domain=domain_name,
                         tenant=business,
@@ -251,68 +262,30 @@ def business_register_view(request):
                     
                     # Create business settings
                     print("Creating business settings...")
-                    settings = BusinessSettings.objects.create(business=business)
-                    print(f"Business settings created: {settings.id}")
+                    business_settings = BusinessSettings.objects.create(business=business)
+                    print(f"Business settings created: {business_settings.id}")
                     
                     # Create business verification record
                     print("Creating business verification...")
                     verification = BusinessVerification.objects.create(business=business)
                     print(f"Business verification created: {verification.id}")
                     
-                    # Try to create employee record with correct parameters
-                    try:
-                        from django_tenants.utils import schema_context
-                        with schema_context(business.schema_name):
-                            try:
-                                from apps.employees.models import Employee
-                                from apps.core.utils import generate_unique_code
-                                
-                                print("Creating employee record...")
-                                
-                                # Create employee with the correct fields based on your Employee model
-                                employee = Employee.objects.create(
-                                    user=request.user,
-                                    # Don't pass 'business' directly if it's not a field
-                                    role='owner',  # or 'manager' depending on your model
-                                    is_active=True,
-                                    employee_id=generate_unique_code('EMP', 6),
-                                    created_by=request.user,
-                                    # Add other required fields based on your Employee model
-                                    first_name=request.user.first_name,
-                                    last_name=request.user.last_name,
-                                    email=request.user.email,
-                                )
-                                print(f"Employee record created: {employee.id}")
-                                
-                            except ImportError as e:
-                                print(f"Employee model not found: {e}")
-                            except Exception as e:
-                                print(f"Employee creation error: {e}")
-                                # Let's try a simpler approach without the generate_unique_code
-                                try:
-                                    employee = Employee.objects.create(
-                                        user=request.user,
-                                        role='owner',
-                                        is_active=True,
-                                        first_name=request.user.first_name or 'Owner',
-                                        last_name=request.user.last_name or '',
-                                        email=request.user.email,
-                                    )
-                                    print(f"Employee record created (simple): {employee.id}")
-                                except Exception as e2:
-                                    print(f"Simple employee creation also failed: {e2}")
-                                    # Print the Employee model fields to debug
-                                    try:
-                                        from apps.employees.models import Employee
-                                        fields = [f.name for f in Employee._meta.fields]
-                                        print(f"Employee model fields: {fields}")
-                                    except:
-                                        pass
-                                    
-                    except Exception as e:
-                        print(f"Schema context error: {e}")
+                    # Skip employee creation for now - handle separately
+                    print("Skipping employee creation - will be handled in employee management section")
                     
-                    messages.success(request, f'Business "{business.name}" registered successfully!')
+                    # Smart success message based on environment
+                    if settings.DEBUG:
+                        success_message = (
+                            f'Business "{business.name}" registered successfully! '
+                            f'Your local business URL is: http://{domain_name}'
+                        )
+                    else:
+                        success_message = (
+                            f'Business "{business.name}" registered successfully! '
+                            f'Your business URL is: https://{domain_name}'
+                        )
+                    
+                    messages.success(request, success_message)
                     
                     # Try to redirect to subscriptions, fallback to dashboard
                     try:

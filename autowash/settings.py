@@ -10,7 +10,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
+
+# SMART ALLOWED_HOSTS based on environment
+if DEBUG:
+    # Local development
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
+    print("🏠 Running in LOCAL DEVELOPMENT mode")
+else:
+    # Production (CPanel)
+    ALLOWED_HOSTS = [
+        'autowash.co.ke',
+        'www.autowash.co.ke', 
+        '*.autowash.co.ke',
+        '.autowash.co.ke'
+    ]
+    print("🚀 Running in PRODUCTION mode")
 
 # Multi-tenant Apps Configuration
 SHARED_APPS = [
@@ -31,7 +45,7 @@ SHARED_APPS = [
     'django_filters',
     'import_export',
     'corsheaders',
-   'rest_framework',
+    'rest_framework',
     'rest_framework.authtoken',
     'dj_rest_auth',
     'allauth',
@@ -118,20 +132,59 @@ TEMPLATES = [
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 
-# Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': config('DB_NAME', default='autowash_db'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='password'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-        'OPTIONS': {
-            'options': '-c search_path=public'
+# SMART DATABASE CONFIGURATION
+if DEBUG:
+    # Local PostgreSQL
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            'NAME': config('DB_NAME', default='autowash_db'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default='password'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'OPTIONS': {
+                'options': '-c search_path=public'
+            }
         }
     }
-}
+    print(f"📊 Using LOCAL PostgreSQL database: {config('DB_NAME', default='autowash_db')}")
+else:
+    # Production (CPanel) - Could be PostgreSQL or MySQL
+    db_engine = config('DB_ENGINE', default='postgresql')
+    if 'mysql' in db_engine.lower():
+        # CPanel MySQL
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.mysql',
+                'NAME': config('DB_NAME'),
+                'USER': config('DB_USER'),
+                'PASSWORD': config('DB_PASSWORD'),
+                'HOST': config('DB_HOST', default='localhost'),
+                'PORT': config('DB_PORT', default='3306'),
+                'OPTIONS': {
+                    'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                    'charset': 'utf8mb4',
+                }
+            }
+        }
+        print(f"📊 Using PRODUCTION MySQL database: {config('DB_NAME')}")
+    else:
+        # CPanel PostgreSQL
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django_tenants.postgresql_backend',
+                'NAME': config('DB_NAME'),
+                'USER': config('DB_USER'),
+                'PASSWORD': config('DB_PASSWORD'),
+                'HOST': config('DB_HOST', default='localhost'),
+                'PORT': config('DB_PORT', default='5432'),
+                'OPTIONS': {
+                    'options': '-c search_path=public'
+                }
+            }
+        }
+        print(f"📊 Using PRODUCTION PostgreSQL database: {config('DB_NAME')}")
 
 # Redis & Channels
 CHANNEL_LAYERS = {
@@ -143,13 +196,26 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Cache
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': config('REDIS_URL', default='redis://127.0.0.1:6379/2'),
+# SMART CACHE CONFIGURATION
+redis_url = config('REDIS_URL', default=None)
+if redis_url and redis_url != '':
+    # Redis available
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': redis_url.replace('/1', '/2'),  # Use different Redis DB for cache
+        }
     }
-}
+    print("💾 Using Redis cache")
+else:
+    # Fallback to database cache (common in CPanel)
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'cache_table',
+        }
+    }
+    print("💾 Using database cache (Redis not available)")
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -165,14 +231,25 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-
-# Media files
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# SMART STATIC FILES CONFIGURATION
+if DEBUG:
+    # Local development
+    STATIC_URL = '/static/'
+    STATIC_ROOT = BASE_DIR / 'staticfiles'
+    STATICFILES_DIRS = [BASE_DIR / 'static']
+    
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+    print("📁 Using LOCAL static/media file paths")
+else:
+    # Production (CPanel)
+    STATIC_URL = '/static/'
+    STATIC_ROOT = BASE_DIR / 'public_html' / 'static'
+    STATICFILES_DIRS = [BASE_DIR / 'static']
+    
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'public_html' / 'media'
+    print("📁 Using PRODUCTION (CPanel) static/media file paths")
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -190,26 +267,51 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
-# Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@autowash.com')
+# SMART EMAIL CONFIGURATION
+if DEBUG:
+    # Local development - Gmail SMTP
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+    EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+    EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+    EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+    DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@localhost')
+    print("📧 Using LOCAL email configuration (Gmail SMTP)")
+else:
+    # Production - Domain email
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = config('EMAIL_HOST', default='mail.autowash.co.ke')
+    EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+    EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+    EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='noreply@autowash.co.ke')
+    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+    DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Autowash <noreply@autowash.co.ke>')
+    print("📧 Using PRODUCTION email configuration (Domain email)")
 
 # SMS Configuration
 SMS_API_KEY = config('SMS_API_KEY', default='')
 SMS_USERNAME = config('SMS_USERNAME', default='sandbox')
 
-# M-Pesa Configuration
-MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='sandbox')
-MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
-MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
-MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
-MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
-MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://yourdomain.com/api/mpesa/callback/')
+# SMART M-PESA CONFIGURATION
+if DEBUG:
+    # Sandbox for development
+    MPESA_ENVIRONMENT = 'sandbox'
+    MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
+    MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
+    MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
+    MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
+    MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='http://localhost:8000/api/mpesa/callback/')
+    print("💰 Using SANDBOX M-Pesa configuration")
+else:
+    # Production
+    MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='production')
+    MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
+    MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
+    MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
+    MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
+    MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://www.autowash.co.ke/api/mpesa/callback/')
+    print("💰 Using PRODUCTION M-Pesa configuration")
 
 # REST Framework
 REST_FRAMEWORK = {
@@ -244,19 +346,32 @@ ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 
-# Security Settings
+# SMART SECURITY SETTINGS
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+
+if DEBUG:
+    # Local development - relaxed security
+    SECURE_HSTS_SECONDS = 0
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    print("🔒 Using LOCAL security settings (relaxed)")
+else:
+    # Production - strict security
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    print("🔒 Using PRODUCTION security settings (strict)")
 
 # Session Settings
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
 
 # Rate Limiting
 RATELIMIT_ENABLE = True
@@ -265,7 +380,10 @@ RATELIMIT_ENABLE = True
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
-# Logging
+# SMART LOGGING CONFIGURATION
+log_dir = BASE_DIR / 'logs'
+log_dir.mkdir(exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -283,18 +401,18 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
+            'filename': log_dir / 'django.log',
             'formatter': 'verbose',
         },
         'console': {
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
     },
     'root': {
         'handlers': ['console', 'file'],
-        'level': 'INFO',
+        'level': 'DEBUG' if DEBUG else 'INFO',
     },
     'loggers': {
         'django': {
@@ -310,14 +428,34 @@ LOGGING = {
     },
 }
 
+# SMART CORS CONFIGURATION
+if DEBUG:
+    # Local development - allow all
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+    print("🌐 Using LOCAL CORS settings (allow all)")
+else:
+    # Production - specific domains only
+    CORS_ALLOWED_ORIGINS = [
+        "https://autowash.co.ke",
+        "https://www.autowash.co.ke",
+    ]
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^https://.*\.autowash\.co\.ke$",
+    ]
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_ALL_ORIGINS = False
+    print("🌐 Using PRODUCTION CORS settings (restricted)")
+
 # Sentry Configuration (Production Error Tracking)
-if not DEBUG:
+if not DEBUG and config('SENTRY_DSN', default=''):
     sentry_sdk.init(
-        dsn=config('SENTRY_DSN', default=''),
+        dsn=config('SENTRY_DSN'),
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True
     )
+    print("🐛 Sentry error tracking enabled")
 
 # Custom Settings
 BUSINESS_LOGO_UPLOAD_PATH = 'business_logos/'
@@ -348,3 +486,23 @@ SUBSCRIPTION_PLANS = {
         'features': ['All features', 'API access', 'Custom integrations', 'Priority support']
     }
 }
+
+# Environment-specific startup message
+if DEBUG:
+    print("\n" + "="*60)
+    print("🏠 AUTOWASH - LOCAL DEVELOPMENT ENVIRONMENT")
+    print("="*60)
+    print("🌐 Tenant URLs will be: businessname.localhost:8000")
+    print("📧 Using Gmail SMTP for emails")
+    print("💰 Using M-Pesa sandbox")
+    print("🔒 Security settings are relaxed")
+    print("="*60 + "\n")
+else:
+    print("\n" + "="*60) 
+    print("🚀 AUTOWASH - PRODUCTION ENVIRONMENT")
+    print("="*60)
+    print("🌐 Tenant URLs will be: businessname.autowash.co.ke")
+    print("📧 Using domain email server")
+    print("💰 Using M-Pesa production")
+    print("🔒 Security settings are strict")
+    print("="*60 + "\n")
