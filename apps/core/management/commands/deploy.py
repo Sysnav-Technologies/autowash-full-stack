@@ -1,6 +1,3 @@
-# Save this as: management/commands/deploy.py
-# Run with: python manage.py deploy
-
 import os
 import sys
 from django.core.management.base import BaseCommand
@@ -73,18 +70,25 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.WARNING('⏭️ Skipping static files'))
 
-            # Step 6: Create public tenant
-            self.stdout.write('🏢 Creating public tenant...')
-            self.create_public_tenant()
-            self.stdout.write(self.style.SUCCESS('✅ Public tenant created'))
-
-            # Step 7: Create superuser
+            # Step 6: Create superuser FIRST (required for public tenant)
             if not options['skip_superuser']:
                 self.stdout.write('👤 Creating superuser...')
-                self.create_superuser()
+                superuser = self.create_superuser()
                 self.stdout.write(self.style.SUCCESS('✅ Superuser created'))
             else:
                 self.stdout.write(self.style.WARNING('⏭️ Skipping superuser creation'))
+                # Get existing superuser for public tenant
+                try:
+                    superuser = User.objects.filter(is_superuser=True).first()
+                    if not superuser:
+                        raise Exception("No superuser found. Cannot create public tenant without an owner.")
+                except Exception as e:
+                    raise Exception(f"Failed to find superuser for public tenant: {e}")
+
+            # Step 7: Create public tenant (with superuser as owner)
+            self.stdout.write('🏢 Creating public tenant...')
+            self.create_public_tenant(superuser)
+            self.stdout.write(self.style.SUCCESS('✅ Public tenant created'))
 
             # Step 8: Run health checks
             self.stdout.write('🏥 Running health checks...')
@@ -176,8 +180,8 @@ class Command(BaseCommand):
         """Collect static files"""
         call_command('collectstatic', '--noinput', verbosity=1)
 
-    def create_public_tenant(self):
-        """Create public tenant for main site"""
+    def create_public_tenant(self, owner_user):
+        """Create public tenant for main site with specified owner"""
         try:
             from apps.accounts.models import Business, Domain
             
@@ -186,15 +190,23 @@ class Command(BaseCommand):
                 public_tenant = Business.objects.get(schema_name='public')
                 self.stdout.write('Public tenant already exists')
             except Business.DoesNotExist:
-                # Create public tenant
+                # Create public tenant with owner
                 public_tenant = Business.objects.create(
                     name='Autowash Public',
                     slug='public',
                     schema_name='public',
                     description='Main public site',
-                    business_type='full_service'
+                    business_type='full_service',
+                    owner=owner_user,  # THIS IS THE KEY FIX
+                    # Optional: Set other required fields
+                    country='Kenya',
+                    timezone='Africa/Nairobi',
+                    currency='KES',
+                    language='en',
+                    is_active=True,
+                    is_verified=True  # Public tenant should be verified
                 )
-                self.stdout.write('Public tenant created')
+                self.stdout.write('Public tenant created with owner')
 
             # Create domains for public tenant
             if settings.DEBUG:
@@ -228,12 +240,13 @@ class Command(BaseCommand):
         """Create superuser with predefined credentials"""
         try:
             # Check if superuser exists
-            if User.objects.filter(email='admin@autowash.co.ke').exists():
+            superuser = User.objects.filter(email='admin@autowash.co.ke').first()
+            if superuser:
                 self.stdout.write('Superuser already exists')
-                return
+                return superuser
 
             # Create superuser
-            User.objects.create_superuser(
+            superuser = User.objects.create_superuser(
                 username='autowash',
                 email='admin@autowash.co.ke',
                 password='123456',
@@ -241,9 +254,16 @@ class Command(BaseCommand):
                 last_name='User'
             )
             self.stdout.write('Superuser created successfully')
+            return superuser
 
         except IntegrityError:
-            self.stdout.write('Superuser already exists')
+            # Handle case where username might exist but not email
+            try:
+                superuser = User.objects.get(username='autowash')
+                self.stdout.write('Superuser already exists (found by username)')
+                return superuser
+            except User.DoesNotExist:
+                raise Exception("IntegrityError but superuser not found")
         except Exception as e:
             raise Exception(f"Failed to create superuser: {e}")
 
