@@ -1,3 +1,5 @@
+# apps/accounts/views.py - Updated version
+
 import re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
@@ -113,7 +115,7 @@ def login_view(request):
 
 @login_required
 def dashboard_redirect(request):
-    """Smart dashboard redirect based on user context"""
+    """Smart dashboard redirect based on user context and verification status"""
     
     # Check if we're in a business tenant (multi-tenant setup)
     if hasattr(request, 'business') and request.business:
@@ -122,22 +124,24 @@ def dashboard_redirect(request):
             from apps.employees.models import Employee
             employee = Employee.objects.get(user=request.user, is_active=True)
             
-            # Check business verification and subscription
+            # Check business verification
             if not request.business.is_verified:
                 if employee.role == 'owner':
-                    messages.warning(request, 'Please complete business verification.')
+                    messages.warning(request, 'Your business is pending verification. Please upload required documents.')
                     return redirect('accounts:business_verification')
                 else:
                     messages.info(request, 'Business verification is pending.')
+                    return redirect('accounts:verification_pending')
             
+            # Check subscription only for verified businesses
             if not request.business.subscription or not request.business.subscription.is_active:
                 if employee.role == 'owner':
-                    messages.warning(request, 'Please activate your subscription.')
+                    messages.warning(request, 'Please activate your subscription to access all features.')
                     return redirect('subscriptions:plans')
                 else:
                     messages.info(request, 'Business subscription is inactive.')
             
-            # Redirect based on role
+            # Redirect based on role for verified businesses
             if employee.role == 'owner':
                 return redirect('businesses:dashboard')
             else:
@@ -151,27 +155,28 @@ def dashboard_redirect(request):
     # Public schema - check if user owns a business
     business = request.user.owned_businesses.first()
     if business:
-        # Redirect to business tenant
+        # Check verification status
+        if not business.is_verified:
+            # Business is not verified yet
+            messages.info(request, 'Your business is pending verification. Please check your verification status.')
+            return redirect('accounts:verification_pending')
+        
+        # Business is verified - check if schema exists and redirect to tenant
         domain = business.domains.filter(is_primary=True).first()
         if domain:
-            return redirect(f'http://{domain.domain}/dashboard/')
+            protocol = 'http' if settings.DEBUG else 'https'
+            return redirect(f'{protocol}://{domain.domain}/dashboard/')
         else:
-            messages.error(request, 'Business domain not configured.')
-            return redirect('subscriptions:plans')
+            messages.error(request, 'Business domain not configured. Please contact support.')
+            return redirect('accounts:verification_pending')
     
     # No business found - redirect to business registration
     messages.info(request, 'Welcome! Please register your business to get started.')
     return redirect('accounts:business_register')
 
-# Add these imports at the top of your apps/accounts/views.py file
-
-
-  # ADD THIS IMPORT
-
-
 @login_required
 def business_register_view(request):
-    """Smart business registration view - works for both local and CPanel production"""
+    """Business registration without immediate schema creation"""
     print(f"\n" + "="*50)
     print(f"BUSINESS REGISTER VIEW CALLED")
     print(f"Request method: {request.method}")
@@ -184,38 +189,21 @@ def business_register_view(request):
     print(f"Existing businesses count: {existing_businesses.count()}")
     
     if existing_businesses.exists():
-        messages.info(request, 'You already have a registered business.')
-        return redirect('accounts:dashboard_redirect')
+        business = existing_businesses.first()
+        if business.is_verified:
+            messages.info(request, 'You already have a verified business.')
+            return redirect('accounts:dashboard_redirect')
+        else:
+            messages.info(request, 'Your business registration is pending verification.')
+            return redirect('accounts:verification_pending')
     
     if request.method == 'POST':
         print("\n" + "="*30 + " POST REQUEST " + "="*30)
         
-        # Print all POST data
-        print("POST data:")
-        for key, value in request.POST.items():
-            print(f"  {key}: {value}")
-        
-        # Print all FILES data
-        print("FILES data:")
-        for key, value in request.FILES.items():
-            print(f"  {key}: {value}")
-        
-        print("\nCreating form...")
         form = BusinessRegistrationForm(request.POST, request.FILES)
-        print(f"Form created: {type(form)}")
+        print(f"Form is valid: {form.is_valid()}")
         
-        print(f"Form is bound: {form.is_bound}")
-        print(f"Form data: {form.data}")
-        
-        is_valid = form.is_valid()
-        print(f"Form is valid: {is_valid}")
-        
-        if not is_valid:
-            print("=== FORM VALIDATION ERRORS ===")
-            for field, errors in form.errors.items():
-                print(f"  {field}: {errors}")
-            print(f"Non-field errors: {form.non_field_errors()}")
-        else:
+        if form.is_valid():
             print("=== FORM IS VALID - ATTEMPTING SAVE ===")
             try:
                 with transaction.atomic():
@@ -223,14 +211,14 @@ def business_register_view(request):
                     business.owner = request.user
                     business.slug = slugify(business.name)
                     
-                    # Create schema name for django-tenants
+                    # Create schema name for future use
                     schema_name = re.sub(r'[^a-z0-9]', '', business.name.lower())
                     if not schema_name or not schema_name[0].isalpha():
                         schema_name = 'biz' + schema_name
                     business.schema_name = schema_name[:20]
                     
                     print(f"About to save business: {business.name}")
-                    print(f"Schema name: {business.schema_name}")
+                    print(f"Schema name (for future): {business.schema_name}")
                     
                     # Check for conflicts
                     original_slug = business.slug
@@ -243,66 +231,40 @@ def business_register_view(request):
                         counter += 1
                         print(f"Conflict found, trying: {business.slug}")
                     
+                    # IMPORTANT: Don't create schema yet - wait for verification
+                    business.auto_create_schema = False
+                    business.is_verified = False  # Explicitly set to False
                     business.save()
                     print(f"Business saved successfully! ID: {business.id}")
                     
-                    # SMART DOMAIN CREATION - Local vs Production
-                    print("Creating domain...")
-                    
+                    # Create domain record but don't activate schema yet
+                    print("Creating domain record...")
                     if settings.DEBUG:
-                        # LOCAL DEVELOPMENT
                         domain_name = f"{business.slug}.localhost:8000"
-                        print(f"Creating LOCAL domain: {domain_name}")
                     else:
-                        # Render 
                         domain_name = f"{business.slug}.autowash-3jpr.onrender.com"
-                        print(f"Creating PRODUCTION domain: {domain_name}")
 
-                    # else:
-                    #     # PRODUCTION (CPanel)
-                    #     domain_name = f"{business.slug}.autowash.co.ke"
-                    #     print(f"Creating PRODUCTION domain: {domain_name}")
-                    
+                    # Create domain but note that schema doesn't exist yet
                     domain = Domain.objects.create(
                         domain=domain_name,
                         tenant=business,
                         is_primary=True
                     )
-                    print(f"Domain created: {domain.domain}")
+                    print(f"Domain record created: {domain.domain}")
                     
-                    # Create business settings
-                    print("Creating business settings...")
-                    business_settings = BusinessSettings.objects.create(business=business)
-                    print(f"Business settings created: {business_settings.id}")
+                    # Create business settings and verification records
+                    print("Creating business settings and verification...")
+                    BusinessSettings.objects.create(business=business)
+                    BusinessVerification.objects.create(business=business, status='pending')
                     
-                    # Create business verification record
-                    print("Creating business verification...")
-                    verification = BusinessVerification.objects.create(business=business)
-                    print(f"Business verification created: {verification.id}")
-                    
-                    # Skip employee creation for now - handle separately
-                    print("Skipping employee creation - will be handled in employee management section")
-                    
-                    # Smart success message based on environment
-                    if settings.DEBUG:
-                        success_message = (
-                            f'Business "{business.name}" registered successfully! '
-                            f'Your local business URL is: http://{domain_name}'
-                        )
-                    else:
-                        success_message = (
-                            f'Business "{business.name}" registered successfully! '
-                            f'Your business URL is: https://{domain_name}'
-                        )
-                    
+                    success_message = (
+                        f'Business "{business.name}" registered successfully! '
+                        f'Please upload verification documents to activate your account.'
+                    )
                     messages.success(request, success_message)
                     
-                    # Try to redirect to subscriptions, fallback to dashboard
-                    try:
-                        return redirect('subscriptions:plans')
-                    except:
-                        print("Subscriptions app not found, redirecting to dashboard")
-                        return redirect('accounts:dashboard_redirect')
+                    # Redirect to verification upload
+                    return redirect('accounts:business_verification')
                 
             except Exception as e:
                 print(f"=== SAVE ERROR ===")
@@ -310,13 +272,75 @@ def business_register_view(request):
                 import traceback
                 traceback.print_exc()
                 messages.error(request, f'Registration failed: {str(e)}')
+        else:
+            print("=== FORM VALIDATION ERRORS ===")
+            for field, errors in form.errors.items():
+                print(f"  {field}: {errors}")
     else:
-        print("\n" + "="*30 + " GET REQUEST " + "="*30)
         form = BusinessRegistrationForm()
-        print(f"Empty form created")
     
-    print(f"\nRendering template with form: {form}")
     return render(request, 'auth/business_register.html', {'form': form})
+
+@login_required
+def verification_pending(request):
+    """Show verification pending status"""
+    business = request.user.owned_businesses.first()
+    if not business:
+        messages.error(request, 'No business found.')
+        return redirect('accounts:business_register')
+    
+    # If business is already verified, redirect to dashboard
+    if business.is_verified:
+        messages.success(request, 'Your business has been verified!')
+        return redirect('accounts:dashboard_redirect')
+    
+    try:
+        verification = business.verification
+    except BusinessVerification.DoesNotExist:
+        verification = BusinessVerification.objects.create(business=business)
+    
+    context = {
+        'business': business,
+        'verification': verification,
+        'title': 'Verification Status'
+    }
+    
+    return render(request, 'auth/verification_pending.html', context)
+
+@login_required
+def business_verification_view(request):
+    """Business verification document upload"""
+    try:
+        business = request.user.owned_businesses.first()
+        if not business:
+            messages.error(request, 'You do not own any business.')
+            return redirect('accounts:business_register')
+        
+        verification, created = BusinessVerification.objects.get_or_create(business=business)
+        
+        if request.method == 'POST':
+            form = BusinessVerificationForm(request.POST, request.FILES, instance=verification)
+            if form.is_valid():
+                verification = form.save(commit=False)
+                verification.status = 'in_review'
+                verification.save()
+                
+                messages.success(request, 'Verification documents submitted successfully! We will review them within 24-48 hours.')
+                return redirect('accounts:verification_pending')
+        else:
+            form = BusinessVerificationForm(instance=verification)
+        
+        context = {
+            'form': form,
+            'business': business,
+            'verification': verification,
+            'title': 'Business Verification'
+        }
+        return render(request, 'auth/business_verification.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error loading verification: {str(e)}')
+        return redirect('accounts:dashboard_redirect')
 
 def logout_view(request):
     """User logout view"""
@@ -347,12 +371,16 @@ def profile_view(request):
 
 @login_required
 def business_settings_view(request):
-    """Business settings view"""
+    """Business settings view - only for verified businesses"""
     try:
         business = request.user.owned_businesses.first()
         if not business:
             messages.error(request, 'You do not own any business.')
             return redirect('accounts:business_register')
+        
+        if not business.is_verified:
+            messages.warning(request, 'Please complete business verification first.')
+            return redirect('accounts:verification_pending')
         
         settings_obj, created = BusinessSettings.objects.get_or_create(business=business)
         
@@ -378,40 +406,33 @@ def business_settings_view(request):
         return redirect('accounts:dashboard_redirect')
 
 @login_required
-def business_verification_view(request):
-    """Business verification view"""
+def check_verification_status(request):
+    """AJAX endpoint to check verification status"""
+    if not request.user.owned_businesses.exists():
+        return JsonResponse({'error': 'No business found'}, status=404)
+    
+    business = request.user.owned_businesses.first()
+    
     try:
-        business = request.user.owned_businesses.first()
-        if not business:
-            messages.error(request, 'You do not own any business.')
-            return redirect('accounts:business_register')
-        
-        verification, created = BusinessVerification.objects.get_or_create(business=business)
-        
-        if request.method == 'POST':
-            form = BusinessVerificationForm(request.POST, request.FILES, instance=verification)
-            if form.is_valid():
-                verification = form.save(commit=False)
-                verification.status = 'in_review'
-                verification.save()
-                
-                messages.success(request, 'Verification documents submitted successfully!')
-                return redirect('accounts:business_verification')
-        else:
-            form = BusinessVerificationForm(instance=verification)
-        
-        context = {
-            'form': form,
-            'business': business,
-            'verification': verification,
-            'title': 'Business Verification'
-        }
-        return render(request, 'business/verification.html', context)
-        
-    except Exception as e:
-        messages.error(request, f'Error loading verification: {str(e)}')
-        return redirect('accounts:dashboard_redirect')
-
+        verification = business.verification
+        return JsonResponse({
+            'status': verification.status,
+            'status_display': verification.get_status_display(),
+            'is_verified': business.is_verified,
+            'submitted_at': verification.submitted_at.isoformat() if verification.submitted_at else None,
+            'verified_at': verification.verified_at.isoformat() if verification.verified_at else None,
+            'has_documents': bool(verification.business_license and verification.tax_certificate and verification.id_document),
+        })
+    except BusinessVerification.DoesNotExist:
+        return JsonResponse({
+            'status': 'pending',
+            'status_display': 'Pending',
+            'is_verified': False,
+            'submitted_at': None,
+            'verified_at': None,
+            'has_documents': False,
+        })
+    
 @login_required
 @ajax_required
 def check_business_name(request):

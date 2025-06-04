@@ -1,0 +1,834 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Business Verification - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .verification-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    
+    .verification-card {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .upload-zone {
+        border: 2px dashed #e2e8f0;
+        border-radius: 12px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        background: #fafbfc;
+        cursor: pointer;
+        position: relative;
+        min-height: 150px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .upload-zone:hover {
+        border-color: #3b82f6;
+        background: #eff6ff;
+    }
+    
+    .upload-zone.dragover {
+        border-color: #2563eb;
+        background: #dbeafe;
+        transform: scale(1.02);
+    }
+    
+    .upload-zone.has-file {
+        border-color: #10b981;
+        background: #ecfdf5;
+    }
+    
+    .upload-zone.error {
+        border-color: #ef4444;
+        background: #fef2f2;
+    }
+    
+    .upload-icon {
+        font-size: 3rem;
+        color: #9ca3af;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .upload-zone:hover .upload-icon {
+        color: #3b82f6;
+        transform: scale(1.1);
+    }
+    
+    .upload-zone.has-file .upload-icon {
+        color: #10b981;
+    }
+    
+    .file-input {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+    
+    .file-info {
+        display: none;
+    }
+    
+    .file-info.show {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .progress-container {
+        display: none;
+        margin-top: 1rem;
+    }
+    
+    .progress-container.show {
+        display: block;
+    }
+    
+    .progress-bar-custom {
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #10b981);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+        width: 0%;
+    }
+    
+    .document-section {
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .document-title {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .document-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+    }
+    
+    .requirements-box {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .requirement-item {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 0.75rem;
+    }
+    
+    .requirement-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .requirement-icon {
+        width: 20px;
+        margin-right: 0.75rem;
+        margin-top: 0.125rem;
+        flex-shrink: 0;
+    }
+    
+    .error-message {
+        color: #dc2626;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+        display: none;
+    }
+    
+    .error-message.show {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .success-message {
+        color: #059669;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+        display: none;
+    }
+    
+    .success-message.show {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .file-preview {
+        display: none;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .file-preview.show {
+        display: flex;
+        align-items: center;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .file-preview-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: #eff6ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        color: #3b82f6;
+    }
+    
+    .file-details {
+        flex-grow: 1;
+    }
+    
+    .file-name {
+        font-weight: 500;
+        color: #1f2937;
+        margin-bottom: 0.25rem;
+    }
+    
+    .file-size {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    .file-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .btn-file-action {
+        padding: 0.5rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-remove {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+    
+    .btn-remove:hover {
+        background: #fee2e2;
+    }
+    
+    .btn-change {
+        background: #eff6ff;
+        color: #3b82f6;
+    }
+    
+    .btn-change:hover {
+        background: #dbeafe;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .submit-section {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-radius: 12px;
+        padding: 2rem;
+        text-align: center;
+        margin-top: 2rem;
+    }
+    
+    .form-notes {
+        background: white;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .form-notes textarea {
+        border: none;
+        border-radius: 8px;
+        resize: vertical;
+    }
+    
+    .form-notes textarea:focus {
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+</style>
+{% endblock %}
+
+{% block public_content %}
+<div class="verification-container">
+    <!-- Header -->
+    <div class="text-center mb-5">
+        <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+            <i class="fas fa-shield-alt text-primary" style="font-size: 2rem;"></i>
+        </div>
+        <h2 class="font-heading mb-2">Business Verification</h2>
+        <p class="text-muted">Upload your business documents to complete the verification process</p>
+    </div>
+
+    <!-- Business Info -->
+    <div class="card verification-card mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-center">
+                <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                    <i class="fas fa-building text-primary"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="mb-1">{{ business.name }}</h5>
+                    <p class="text-muted mb-0">{{ business.get_business_type_display|default:business.business_type|title }}</p>
+                </div>
+                <div class="status-badge">
+                    <span class="badge bg-warning">Pending Verification</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Requirements -->
+    <div class="requirements-box">
+        <h6 class="fw-bold mb-3">
+            <i class="fas fa-info-circle text-info me-2"></i>
+            Document Requirements
+        </h6>
+        <div class="requirement-item">
+            <i class="fas fa-check text-success requirement-icon"></i>
+            <div>
+                <strong>Business License or Certificate of Incorporation</strong>
+                <div class="text-muted small">Official document proving your business registration</div>
+            </div>
+        </div>
+        <div class="requirement-item">
+            <i class="fas fa-check text-success requirement-icon"></i>
+            <div>
+                <strong>Tax Registration Certificate (KRA PIN)</strong>
+                <div class="text-muted small">Certificate showing your business tax registration</div>
+            </div>
+        </div>
+        <div class="requirement-item">
+            <i class="fas fa-check text-success requirement-icon"></i>
+            <div>
+                <strong>Valid ID Document</strong>
+                <div class="text-muted small">National ID, Passport, or Driver's License</div>
+            </div>
+        </div>
+        <div class="requirement-item">
+            <i class="fas fa-info-circle text-info requirement-icon"></i>
+            <div>
+                <strong>File Requirements:</strong>
+                <div class="text-muted small">PDF, JPG, or PNG format • Maximum 5MB per file • Clear and legible</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Form -->
+    <form method="post" enctype="multipart/form-data" id="verification-form">
+        {% csrf_token %}
+        
+        <!-- Business License Upload -->
+        <div class="document-section">
+            <div class="document-title">
+                <div class="document-icon bg-primary bg-opacity-10">
+                    <i class="fas fa-certificate text-primary"></i>
+                </div>
+                <div>
+                    <div>Business License / Certificate of Incorporation</div>
+                    <small class="text-muted">Required document</small>
+                </div>
+            </div>
+            
+            <div class="upload-zone" data-field="business_license">
+                <input type="file" 
+                       name="business_license" 
+                       id="id_business_license"
+                       class="file-input"
+                       accept=".pdf,.jpg,.jpeg,.png"
+                       required>
+                <div class="upload-content">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h6 class="mb-2">Click to upload or drag and drop</h6>
+                    <p class="text-muted mb-0">PDF, JPG, PNG up to 5MB</p>
+                </div>
+            </div>
+            
+            <div class="file-preview" id="preview-business_license">
+                <div class="file-preview-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="file-details">
+                    <div class="file-name"></div>
+                    <div class="file-size"></div>
+                </div>
+                <div class="file-actions">
+                    <button type="button" class="btn-file-action btn-change" title="Change file">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn-file-action btn-remove" title="Remove file">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="progress-container" id="progress-business_license">
+                <div class="progress-bar-custom">
+                    <div class="progress-fill"></div>
+                </div>
+                <small class="text-muted">Uploading...</small>
+            </div>
+            
+            <div class="error-message" id="error-business_license"></div>
+            <div class="success-message" id="success-business_license">
+                <i class="fas fa-check-circle me-1"></i>File uploaded successfully
+            </div>
+            
+            {% if verification.business_license %}
+            <div class="alert alert-success mt-2">
+                <i class="fas fa-check-circle me-2"></i>
+                Current file: {{ verification.business_license.name }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tax Certificate Upload -->
+        <div class="document-section">
+            <div class="document-title">
+                <div class="document-icon bg-warning bg-opacity-10">
+                    <i class="fas fa-receipt text-warning"></i>
+                </div>
+                <div>
+                    <div>Tax Registration Certificate (KRA PIN)</div>
+                    <small class="text-muted">Required document</small>
+                </div>
+            </div>
+            
+            <div class="upload-zone" data-field="tax_certificate">
+                <input type="file" 
+                       name="tax_certificate" 
+                       id="id_tax_certificate"
+                       class="file-input"
+                       accept=".pdf,.jpg,.jpeg,.png"
+                       required>
+                <div class="upload-content">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h6 class="mb-2">Click to upload or drag and drop</h6>
+                    <p class="text-muted mb-0">PDF, JPG, PNG up to 5MB</p>
+                </div>
+            </div>
+            
+            <div class="file-preview" id="preview-tax_certificate">
+                <div class="file-preview-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="file-details">
+                    <div class="file-name"></div>
+                    <div class="file-size"></div>
+                </div>
+                <div class="file-actions">
+                    <button type="button" class="btn-file-action btn-change" title="Change file">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn-file-action btn-remove" title="Remove file">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="progress-container" id="progress-tax_certificate">
+                <div class="progress-bar-custom">
+                    <div class="progress-fill"></div>
+                </div>
+                <small class="text-muted">Uploading...</small>
+            </div>
+            
+            <div class="error-message" id="error-tax_certificate"></div>
+            <div class="success-message" id="success-tax_certificate">
+                <i class="fas fa-check-circle me-1"></i>File uploaded successfully
+            </div>
+            
+            {% if verification.tax_certificate %}
+            <div class="alert alert-success mt-2">
+                <i class="fas fa-check-circle me-2"></i>
+                Current file: {{ verification.tax_certificate.name }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ID Document Upload -->
+        <div class="document-section">
+            <div class="document-title">
+                <div class="document-icon bg-info bg-opacity-10">
+                    <i class="fas fa-id-card text-info"></i>
+                </div>
+                <div>
+                    <div>Valid ID Document</div>
+                    <small class="text-muted">National ID, Passport, or Driver's License</small>
+                </div>
+            </div>
+            
+            <div class="upload-zone" data-field="id_document">
+                <input type="file" 
+                       name="id_document" 
+                       id="id_id_document"
+                       class="file-input"
+                       accept=".pdf,.jpg,.jpeg,.png"
+                       required>
+                <div class="upload-content">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h6 class="mb-2">Click to upload or drag and drop</h6>
+                    <p class="text-muted mb-0">PDF, JPG, PNG up to 5MB</p>
+                </div>
+            </div>
+            
+            <div class="file-preview" id="preview-id_document">
+                <div class="file-preview-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="file-details">
+                    <div class="file-name"></div>
+                    <div class="file-size"></div>
+                </div>
+                <div class="file-actions">
+                    <button type="button" class="btn-file-action btn-change" title="Change file">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn-file-action btn-remove" title="Remove file">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="progress-container" id="progress-id_document">
+                <div class="progress-bar-custom">
+                    <div class="progress-fill"></div>
+                </div>
+                <small class="text-muted">Uploading...</small>
+            </div>
+            
+            <div class="error-message" id="error-id_document"></div>
+            <div class="success-message" id="success-id_document">
+                <i class="fas fa-check-circle me-1"></i>File uploaded successfully
+            </div>
+            
+            {% if verification.id_document %}
+            <div class="alert alert-success mt-2">
+                <i class="fas fa-check-circle me-2"></i>
+                Current file: {{ verification.id_document.name }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Additional Notes -->
+        <div class="document-section">
+            <div class="document-title">
+                <div class="document-icon bg-secondary bg-opacity-10">
+                    <i class="fas fa-sticky-note text-secondary"></i>
+                </div>
+                <div>
+                    <div>Additional Notes (Optional)</div>
+                    <small class="text-muted">Any additional information</small>
+                </div>
+            </div>
+            
+            <div class="form-notes">
+                <textarea class="form-control" 
+                        name="notes" 
+                        id="id_notes" 
+                        rows="4" 
+                        placeholder="Provide any additional information about your business or documents (optional)">{{ verification.notes|default:"" }}</textarea>
+            </div>
+        </div>
+
+        <!-- Submit Section -->
+        <div class="submit-section">
+            <h5 class="mb-3">Ready to Submit?</h5>
+            <p class="text-muted mb-4">
+                Please ensure all required documents are uploaded and clearly readable before submitting.
+                Our team will review your documents within 24-48 hours.
+            </p>
+            
+            <div class="d-flex justify-content-center gap-3">
+                <a href="{% url 'accounts:verification_pending' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg px-5" id="submit-btn">
+                    <i class="fas fa-paper-plane me-2"></i>
+                    Submit for Verification
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    
+    // File upload handling for each upload zone
+    $('.upload-zone').each(function() {
+        const uploadZone = $(this);
+        const fieldName = uploadZone.data('field');
+        const fileInput = uploadZone.find('.file-input');
+        const preview = $(`#preview-${fieldName}`);
+        const progress = $(`#progress-${fieldName}`);
+        const errorMsg = $(`#error-${fieldName}`);
+        const successMsg = $(`#success-${fieldName}`);
+        
+        // Click to upload
+        uploadZone.on('click', function(e) {
+            if (!$(e.target).hasClass('btn-file-action')) {
+                fileInput.click();
+            }
+        });
+        
+        // Drag and drop
+        uploadZone.on('dragover', function(e) {
+            e.preventDefault();
+            $(this).addClass('dragover');
+        });
+        
+        uploadZone.on('dragleave', function(e) {
+            e.preventDefault();
+            $(this).removeClass('dragover');
+        });
+        
+        uploadZone.on('drop', function(e) {
+            e.preventDefault();
+            $(this).removeClass('dragover');
+            
+            const files = e.originalEvent.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelection(files[0], fieldName);
+            }
+        });
+        
+        // File input change
+        fileInput.on('change', function() {
+            if (this.files.length > 0) {
+                handleFileSelection(this.files[0], fieldName);
+            }
+        });
+        
+        // Change file button
+        preview.find('.btn-change').on('click', function() {
+            fileInput.click();
+        });
+        
+        // Remove file button
+        preview.find('.btn-remove').on('click', function() {
+            clearFile(fieldName);
+        });
+    });
+    
+    function handleFileSelection(file, fieldName) {
+        const uploadZone = $(`.upload-zone[data-field="${fieldName}"]`);
+        const preview = $(`#preview-${fieldName}`);
+        const progress = $(`#progress-${fieldName}`);
+        const errorMsg = $(`#error-${fieldName}`);
+        const successMsg = $(`#success-${fieldName}`);
+        
+        // Clear previous states
+        clearMessages(fieldName);
+        
+        // Validate file
+        if (!validateFile(file, fieldName)) {
+            return;
+        }
+        
+        // Show file preview
+        showFilePreview(file, fieldName);
+        
+        // Simulate upload progress (in real implementation, you'd handle actual upload)
+        simulateUpload(fieldName);
+    }
+    
+    function validateFile(file, fieldName) {
+        const errorMsg = $(`#error-${fieldName}`);
+        
+        // Check file size
+        if (file.size > maxFileSize) {
+            showError(fieldName, 'File size must be less than 5MB');
+            return false;
+        }
+        
+        // Check file type
+        if (!allowedTypes.includes(file.type)) {
+            showError(fieldName, 'Please upload PDF, JPG, or PNG files only');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    function showFilePreview(file, fieldName) {
+        const uploadZone = $(`.upload-zone[data-field="${fieldName}"]`);
+        const preview = $(`#preview-${fieldName}`);
+        
+        // Update upload zone state
+        uploadZone.addClass('has-file');
+        uploadZone.find('.upload-content').hide();
+        
+        // Show preview
+        preview.find('.file-name').text(file.name);
+        preview.find('.file-size').text(formatFileSize(file.size));
+        preview.addClass('show');
+    }
+    
+    function simulateUpload(fieldName) {
+        const progress = $(`#progress-${fieldName}`);
+        const progressFill = progress.find('.progress-fill');
+        
+        progress.addClass('show');
+        
+        let width = 0;
+        const interval = setInterval(() => {
+            width += Math.random() * 15;
+            if (width >= 100) {
+                width = 100;
+                clearInterval(interval);
+                setTimeout(() => {
+                    progress.removeClass('show');
+                    showSuccess(fieldName);
+                }, 500);
+            }
+            progressFill.css('width', width + '%');
+        }, 100);
+    }
+    
+    function clearFile(fieldName) {
+        const uploadZone = $(`.upload-zone[data-field="${fieldName}"]`);
+        const fileInput = uploadZone.find('.file-input');
+        const preview = $(`#preview-${fieldName}`);
+        
+        // Clear file input
+        fileInput.val('');
+        
+        // Reset upload zone
+        uploadZone.removeClass('has-file');
+        uploadZone.find('.upload-content').show();
+        
+        // Hide preview
+        preview.removeClass('show');
+        
+        // Clear messages
+        clearMessages(fieldName);
+    }
+    
+    function showError(fieldName, message) {
+        const uploadZone = $(`.upload-zone[data-field="${fieldName}"]`);
+        const errorMsg = $(`#error-${fieldName}`);
+        
+        uploadZone.addClass('error');
+        errorMsg.text(message).addClass('show');
+    }
+    
+    function showSuccess(fieldName) {
+        const successMsg = $(`#success-${fieldName}`);
+        successMsg.addClass('show');
+    }
+    
+    function clearMessages(fieldName) {
+        const uploadZone = $(`.upload-zone[data-field="${fieldName}"]`);
+        const errorMsg = $(`#error-${fieldName}`);
+        const successMsg = $(`#success-${fieldName}`);
+        
+        uploadZone.removeClass('error');
+        errorMsg.removeClass('show');
+        successMsg.removeClass('show');
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    // Form submission
+    $('#verification-form').on('submit', function(e) {
+        const submitBtn = $('#submit-btn');
+        const originalText = submitBtn.html();
+        
+        // Check if required files are selected
+        const requiredFields = ['business_license', 'tax_certificate', 'id_document'];
+        let allFilesSelected = true;
+        
+        requiredFields.forEach(field => {
+            const fileInput = $(`input[name="${field}"]`)[0];
+            const hasExistingFile = $(`.alert:contains("Current file")`).length > 0;
+            
+            if (!fileInput.files.length && !hasExistingFile) {
+                showError(field, 'This document is required');
+                allFilesSelected = false;
+            }
+        });
+        
+        if (!allFilesSelected) {
+            e.preventDefault();
+            $('html, body').animate({
+                scrollTop: $('.error-message.show').first().offset().top - 100
+            }, 500);
+            return;
+        }
+        
+        // Show loading state
+        submitBtn.prop('disabled', true);
+        submitBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Submitting...');
+        
+        // Re-enable after 30 seconds as fallback
+        setTimeout(() => {
+            submitBtn.prop('disabled', false);
+            submitBtn.html(originalText);
+        }, 30000);
+    });
+    
+    // Auto-save notes
+    let notesTimeout;
+    $('#id_notes').on('input', function() {
+        clearTimeout(notesTimeout);
+        notesTimeout = setTimeout(() => {
+            // In a real implementation, you could auto-save notes here
+            console.log('Notes auto-saved');
+        }, 2000);
+    });
+});
+</script>
+{% endblock %}

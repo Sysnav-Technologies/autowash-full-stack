@@ -1,4 +1,4 @@
-# apps/accounts/admin.py - FIXED VERSION
+# apps/accounts/admin.py - Fixed to match actual model fields
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
@@ -11,6 +11,7 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import connection, transaction
 import csv
 from django.http import HttpResponse
 
@@ -24,7 +25,7 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
     verbose_name_plural = 'Profile'
-    fk_name = 'user'  # FIX: Specify the foreign key field name
+    fk_name = 'user'
     fields = (
         'phone', 'avatar', 'date_of_birth', 'gender', 'bio',
         'is_verified', 'language', 'timezone',
@@ -102,26 +103,27 @@ class BusinessVerificationInline(admin.StackedInline):
 
 @admin.register(Business)
 class BusinessAdmin(admin.ModelAdmin):
-    """Comprehensive Business admin"""
+    """Comprehensive Business admin - FIXED field references"""
     list_display = (
         'name', 'business_type', 'owner_link', 'verification_status',
-        'is_active', 'employee_count', 'customer_count',
+        'is_active', 'is_verified', 'schema_status',
         'created_at', 'domain_link'
     )
-    # FIX: Remove the invalid subscription__is_active filter
     list_filter = (
-        'business_type', 'is_active', 'is_verified', 'verification__status',
+        'business_type', 'is_active', 'is_verified', 
         'created_at', 'currency', 'timezone'
     )
     search_fields = (
         'name', 'slug', 'description', 'owner__username', 
         'owner__first_name', 'owner__last_name', 'owner__email',
-        'registration_number', 'tax_number'
+        'registration_number', 'tax_number', 'phone', 'email'
     )
     readonly_fields = (
         'slug', 'schema_name', 'created_at', 'updated_at',
-        'employee_count', 'customer_count', 'domain_link'
+        'domain_link', 'schema_status'
     )
+    
+    # FIXED: Only use fields that actually exist in the Business model
     fieldsets = (
         ('Basic Information', {
             'fields': (
@@ -141,11 +143,11 @@ class BusinessAdmin(admin.ModelAdmin):
         }),
         ('Contact Information', {
             'fields': (
-                'phone', 'email', 'website', 'address', 'city', 'state', 'country'
+                'phone', 'email', 'website'
             ),
             'classes': ('collapse',)
         }),
-        ('Business Settings', {
+        ('Business Operations', {
             'fields': (
                 'opening_time', 'closing_time', 'timezone', 'currency', 'language'
             ),
@@ -159,7 +161,7 @@ class BusinessAdmin(admin.ModelAdmin):
         }),
         ('Technical Details', {
             'fields': (
-                'schema_name', 'employee_count', 'customer_count', 'domain_link',
+                'schema_name', 'schema_status', 'domain_link',
                 'created_at', 'updated_at'
             ),
             'classes': ('collapse',)
@@ -173,7 +175,7 @@ class BusinessAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
-            'owner', 'subscription', 'verification'
+            'owner', 'subscription'
         ).prefetch_related('domains')
     
     def owner_link(self, obj):
@@ -183,7 +185,8 @@ class BusinessAdmin(admin.ModelAdmin):
     
     def verification_status(self, obj):
         try:
-            status = obj.verification.status
+            verification = BusinessVerification.objects.get(business=obj)
+            status = verification.status
             colors = {
                 'pending': 'orange',
                 'in_review': 'blue',
@@ -193,11 +196,27 @@ class BusinessAdmin(admin.ModelAdmin):
             return format_html(
                 '<span style="color: {}; font-weight: bold;">{}</span>',
                 colors.get(status, 'gray'),
-                obj.verification.get_status_display()
+                verification.get_status_display()
             )
         except BusinessVerification.DoesNotExist:
             return format_html('<span style="color: red;">No Verification</span>')
     verification_status.short_description = 'Verification'
+    
+    def schema_status(self, obj):
+        """Check if schema exists"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
+                    [obj.schema_name]
+                )
+                if cursor.fetchone():
+                    return format_html('<span style="color: green;">✓ Created</span>')
+                else:
+                    return format_html('<span style="color: orange;">⚠ Not Created</span>')
+        except:
+            return format_html('<span style="color: red;">✗ Error</span>')
+    schema_status.short_description = 'Schema'
     
     def domain_link(self, obj):
         domain = obj.domains.filter(is_primary=True).first()
@@ -208,26 +227,9 @@ class BusinessAdmin(admin.ModelAdmin):
         return 'No Domain'
     domain_link.short_description = 'Domain'
     
-    # FIX: Add employee_count and customer_count methods with error handling
-    def employee_count(self, obj):
-        try:
-            from apps.employees.models import Employee
-            return Employee.objects.filter(is_active=True).count()
-        except ImportError:
-            return 'N/A'
-    employee_count.short_description = 'Employees'
-    
-    def customer_count(self, obj):
-        try:
-            from apps.customers.models import Customer
-            return Customer.objects.count()
-        except ImportError:
-            return 'N/A'
-    customer_count.short_description = 'Customers'
-    
     # Admin Actions
     def verify_businesses(self, request, queryset):
-        """Bulk verify businesses"""
+        """Bulk verify businesses WITHOUT creating schemas"""
         count = 0
         for business in queryset:
             verification, created = BusinessVerification.objects.get_or_create(business=business)
@@ -241,20 +243,20 @@ class BusinessAdmin(admin.ModelAdmin):
                 business.save()
                 count += 1
         
-        self.message_user(request, f'{count} business(es) verified successfully.')
-    verify_businesses.short_description = "Verify selected businesses"
+        self.message_user(request, f'{count} business(es) verified successfully. Use "Approve and Create Schema" action in BusinessVerification to create tenant schemas.')
+    verify_businesses.short_description = "✅ Verify businesses (no schema)"
     
     def deactivate_businesses(self, request, queryset):
         """Bulk deactivate businesses"""
         count = queryset.update(is_active=False)
         self.message_user(request, f'{count} business(es) deactivated.')
-    deactivate_businesses.short_description = "Deactivate selected businesses"
+    deactivate_businesses.short_description = "❌ Deactivate selected businesses"
     
     def activate_businesses(self, request, queryset):
         """Bulk activate businesses"""
         count = queryset.update(is_active=True)
         self.message_user(request, f'{count} business(es) activated.')
-    activate_businesses.short_description = "Activate selected businesses"
+    activate_businesses.short_description = "✅ Activate selected businesses"
     
     def export_businesses_csv(self, request, queryset):
         """Export businesses to CSV"""
@@ -273,7 +275,7 @@ class BusinessAdmin(admin.ModelAdmin):
                 business.get_business_type_display(),
                 business.owner.get_full_name() or business.owner.username,
                 business.owner.email,
-                business.phone,
+                business.phone or '',
                 'Active' if business.is_active else 'Inactive',
                 'Yes' if business.is_verified else 'No',
                 business.created_at.strftime('%Y-%m-%d'),
@@ -281,7 +283,7 @@ class BusinessAdmin(admin.ModelAdmin):
             ])
         
         return response
-    export_businesses_csv.short_description = "Export to CSV"
+    export_businesses_csv.short_description = "📁 Export to CSV"
     
     def send_verification_reminder(self, request, queryset):
         """Send verification reminder emails"""
@@ -290,7 +292,7 @@ class BusinessAdmin(admin.ModelAdmin):
             try:
                 send_mail(
                     subject=f'Complete verification for {business.name}',
-                    message=f'Dear {business.owner.get_full_name()},\n\n'
+                    message=f'Dear {business.owner.get_full_name() or business.owner.username},\n\n'
                            f'Please complete the verification process for your business "{business.name}".\n\n'
                            f'Log in to your dashboard to upload the required documents.\n\n'
                            f'Best regards,\nAutowash Team',
@@ -303,14 +305,14 @@ class BusinessAdmin(admin.ModelAdmin):
                 self.message_user(request, f'Failed to send email to {business.owner.email}: {e}', level=messages.ERROR)
         
         self.message_user(request, f'Verification reminders sent to {count} business owner(s).')
-    send_verification_reminder.short_description = "Send verification reminders"
+    send_verification_reminder.short_description = "📧 Send verification reminders"
 
 @admin.register(BusinessVerification)
 class BusinessVerificationAdmin(admin.ModelAdmin):
     """Dedicated admin for business verification management"""
     list_display = (
         'business_link', 'status', 'submitted_at', 'verified_by', 'verified_at',
-        'has_documents', 'business_owner'
+        'has_documents', 'business_owner', 'schema_exists'
     )
     list_filter = (
         'status', 'submitted_at', 'verified_at', 'verified_by'
@@ -319,10 +321,10 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
         'business__name', 'business__owner__username', 
         'business__owner__email', 'notes', 'rejection_reason'
     )
-    readonly_fields = ('submitted_at', 'business_owner')
+    readonly_fields = ('submitted_at', 'business_owner', 'schema_exists')
     fieldsets = (
         ('Business Information', {
-            'fields': ('business', 'business_owner', 'status')
+            'fields': ('business', 'business_owner', 'status', 'schema_exists')
         }),
         ('Verification Details', {
             'fields': (
@@ -337,8 +339,12 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
         }),
     )
     actions = [
-        'approve_verifications', 'reject_verifications', 'mark_in_review',
-        'send_approval_emails', 'send_rejection_emails'
+        'approve_verifications', 
+        'approve_and_create_schema',  # MAIN ACTION
+        'reject_verifications', 
+        'mark_in_review',
+        'send_approval_emails', 
+        'send_rejection_emails'
     ]
     
     def business_link(self, obj):
@@ -362,9 +368,117 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
         return format_html('<span style="color: red;">✗ None (0/3)</span>')
     has_documents.short_description = 'Documents'
     
-    # Admin Actions
+    def schema_exists(self, obj):
+        """Check if schema exists for this business"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
+                    [obj.business.schema_name]
+                )
+                if cursor.fetchone():
+                    return format_html('<span style="color: green;">✓ Schema Created</span>')
+                else:
+                    return format_html('<span style="color: orange;">⚠ No Schema</span>')
+        except:
+            return format_html('<span style="color: red;">✗ Error</span>')
+    schema_exists.short_description = 'Schema Status'
+    
+    # MAIN ADMIN ACTION for verification
+    def approve_and_create_schema(self, request, queryset):
+        """Approve verifications and create tenant schemas - MAIN ACTION"""
+        count = 0
+        failed = 0
+        
+        for verification in queryset.exclude(status='verified'):
+            try:
+                with transaction.atomic():
+                    # Update verification
+                    verification.status = 'verified'
+                    verification.verified_by = request.user
+                    verification.verified_at = timezone.now()
+                    verification.save()
+                    
+                    # Update business
+                    business = verification.business
+                    business.is_verified = True
+                    business.save()
+                    
+                    # Check if schema already exists
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
+                            [business.schema_name]
+                        )
+                        if cursor.fetchone():
+                            print(f"Schema already exists for: {business.name}")
+                        else:
+                            # Create the tenant schema
+                            print(f"Creating schema for business: {business.name}")
+                            
+                            # Create schema
+                            cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{business.schema_name}"')
+                            
+                            # Run migrations in the new schema
+                            from django_tenants.utils import schema_context
+                            from django.core.management import call_command
+                            
+                            with schema_context(business.schema_name):
+                                call_command('migrate', 
+                                           '--run-syncdb',
+                                           verbosity=0,
+                                           interactive=False)
+                            
+                            print(f"Schema created successfully for: {business.name}")
+                    
+                    # Send approval email
+                    try:
+                        domain = business.domains.filter(is_primary=True).first()
+                        dashboard_url = f"http{'s' if not settings.DEBUG else ''}://{domain.domain}/dashboard/" if domain else ""
+                        
+                        send_mail(
+                            subject=f'🎉 {business.name} has been verified!',
+                            message=f'''Congratulations! Your business "{business.name}" has been successfully verified.
+
+You can now:
+✅ Access your business dashboard: {dashboard_url}
+✅ Start managing your operations
+✅ Add employees and customers
+
+Thank you for choosing Autowash!
+
+Best regards,
+The Autowash Team''',
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[business.owner.email],
+                            fail_silently=True,
+                        )
+                        print(f"Approval email sent to: {business.owner.email}")
+                    except Exception as email_error:
+                        print(f"Failed to send email: {email_error}")
+                    
+                    count += 1
+                    
+            except Exception as e:
+                failed += 1
+                print(f"Failed to approve business {verification.business.name}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                
+                # Mark as failed
+                verification.status = 'rejected'
+                verification.rejection_reason = f"Technical error during approval: {str(e)}"
+                verification.save()
+        
+        if count > 0:
+            self.message_user(request, f'{count} business(es) verified and schemas created successfully.')
+        if failed > 0:
+            self.message_user(request, f'{failed} business(es) failed to process.', level=messages.ERROR)
+
+    approve_and_create_schema.short_description = "🚀 Approve and create business schemas"
+    
     def approve_verifications(self, request, queryset):
-        """Bulk approve verifications"""
+        """Bulk approve verifications WITHOUT creating schemas"""
         count = 0
         for verification in queryset.exclude(status='verified'):
             verification.status = 'verified'
@@ -377,8 +491,8 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
             verification.business.save()
             count += 1
         
-        self.message_user(request, f'{count} verification(s) approved.')
-    approve_verifications.short_description = "Approve selected verifications"
+        self.message_user(request, f'{count} verification(s) approved. Use "Approve and Create Schema" to create tenant schemas.')
+    approve_verifications.short_description = "✅ Approve verifications (no schema)"
     
     def reject_verifications(self, request, queryset):
         """Bulk reject verifications"""
@@ -394,13 +508,13 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
             verification.business.save()
         
         self.message_user(request, f'{count} verification(s) rejected.')
-    reject_verifications.short_description = "Reject selected verifications"
+    reject_verifications.short_description = "❌ Reject selected verifications"
     
     def mark_in_review(self, request, queryset):
         """Mark verifications as in review"""
         count = queryset.update(status='in_review')
         self.message_user(request, f'{count} verification(s) marked as in review.')
-    mark_in_review.short_description = "Mark as in review"
+    mark_in_review.short_description = "👀 Mark as in review"
     
     def send_approval_emails(self, request, queryset):
         """Send approval notification emails"""
@@ -421,7 +535,7 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
                 self.message_user(request, f'Failed to send email: {e}', level=messages.ERROR)
         
         self.message_user(request, f'Approval emails sent to {count} business owner(s).')
-    send_approval_emails.short_description = "Send approval emails"
+    send_approval_emails.short_description = "📧 Send approval emails"
     
     def send_rejection_emails(self, request, queryset):
         """Send rejection notification emails"""
@@ -444,7 +558,7 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
                 self.message_user(request, f'Failed to send email: {e}', level=messages.ERROR)
         
         self.message_user(request, f'Rejection emails sent to {count} business owner(s).')
-    send_rejection_emails.short_description = "Send rejection emails"
+    send_rejection_emails.short_description = "📧 Send rejection emails"
 
 @admin.register(BusinessSettings)
 class BusinessSettingsAdmin(admin.ModelAdmin):
