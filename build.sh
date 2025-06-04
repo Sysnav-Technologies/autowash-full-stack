@@ -1,4 +1,3 @@
-# Save as: build.sh (make executable: chmod +x build.sh)
 #!/usr/bin/env bash
 
 set -o errexit
@@ -6,9 +5,15 @@ set -o errexit
 echo "🚀 Autowash Render Deployment Starting..."
 
 # Install dependencies
+echo "📦 Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Use your existing deploy command
-python manage.py deploy
+# Collect static files BEFORE running deploy command
+echo "📂 Collecting static files..."
+python manage.py collectstatic --noinput
+
+# Use your existing deploy command (but skip static collection since we just did it)
+echo "🔧 Running deployment setup..."
+python manage.py deploy --skip-static
 
 echo "✅ Autowash deployed successfully!"

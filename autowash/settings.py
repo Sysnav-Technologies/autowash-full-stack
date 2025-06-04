@@ -11,25 +11,27 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
-RENDER = config('RENDER', default=True, cast=bool)
+RENDER = config('RENDER', default=False, cast=bool)  # Set to False by default
 
 # PRODUCTION DEBUGGING - Simple flag to enable verbose logging and relaxed security
 PRODUCTION_DEBUG = config('PRODUCTION_DEBUG', default=False, cast=bool)
 
 # SMART ALLOWED_HOSTS based on environment
-if DEBUG:
+if DEBUG and not RENDER:
     # Local development
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
     print("🏠 Running in LOCAL DEVELOPMENT mode")
-else:
-    # Production (CPanel)
+elif RENDER or not DEBUG:
+    # Production (Render or CPanel)
     ALLOWED_HOSTS = [
         'autowash.co.ke',
         'www.autowash.co.ke', 
         '*.autowash.co.ke',
         '.autowash.co.ke',
         'autowash-3jpr.onrender.com',
-        'www.autowash-3jpr.onrender.com'
+        'www.autowash-3jpr.onrender.com',
+        '*.onrender.com',
+        '.onrender.com'
     ]
     if PRODUCTION_DEBUG:
         print("🚀 Running in PRODUCTION mode with DEBUG ENABLED")
@@ -110,7 +112,7 @@ MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Must be after SecurityMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -219,62 +221,74 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# SMART STATIC FILES CONFIGURATION WITH WHITENOISE
-if DEBUG:
-    # Local development
-    STATIC_URL = '/static/'
-    STATIC_ROOT = BASE_DIR / 'staticfiles'
-    STATICFILES_DIRS = [BASE_DIR / 'static']
-    
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
-    print("📁 Using LOCAL static/media file paths")
-else:
-    # Production (CPanel) with WhiteNoise
-    STATIC_URL = '/static/'
-    STATIC_ROOT = BASE_DIR / 'staticfiles'
-    STATICFILES_DIRS = [BASE_DIR / 'static']
-    
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
-    
-    # WhiteNoise configuration for production
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-    
-    # WhiteNoise settings
-    WHITENOISE_USE_FINDERS = True
-    WHITENOISE_AUTOREFRESH = True
-    WHITENOISE_MTIME = None
-    WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
-    
-    # Serve media files through WhiteNoise (only if needed)
-    # Note: For large media files, consider using a CDN instead
-    WHITENOISE_MANIFEST_STRICT = False
-    
-    # Custom MIME types for WhiteNoise
-    WHITENOISE_MIMETYPES = {
-        '.js': 'application/javascript',
-        '.css': 'text/css',
-    }
-    
-    # Skip compression for these file types
-    WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
-    
-    print("📁 Using PRODUCTION (CPanel) static/media file paths with WhiteNoise")
+# STATIC FILES CONFIGURATION WITH WHITENOISE
+# Set static URL and root
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Create static directory if it doesn't exist (fixes the warning)
+
+# Static files directories
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+# Create static directory if it doesn't exist
 static_dir = BASE_DIR / 'static'
 if not static_dir.exists():
     static_dir.mkdir(exist_ok=True)
     print(f"📁 Created static directory: {static_dir}")
 
-# Ensure public_html directories exist in production
-# if not DEBUG:
-#     public_static = BASE_DIR / 'public_html' / 'static'
-#     public_media = BASE_DIR / 'public_html' / 'media'
-#     public_static.mkdir(parents=True, exist_ok=True)
-#     public_media.mkdir(parents=True, exist_ok=True)
-#     print(f"📁 Ensured public_html directories exist")
+# Create subdirectories for static files
+static_subdirs = ['css', 'js', 'img']
+for subdir in static_subdirs:
+    subdir_path = static_dir / subdir
+    if not subdir_path.exists():
+        subdir_path.mkdir(exist_ok=True)
+        print(f"📁 Created static subdirectory: {subdir_path}")
+
+# MEDIA FILES CONFIGURATION
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Ensure media directory exists
+media_dir = BASE_DIR / 'media'
+if not media_dir.exists():
+    media_dir.mkdir(exist_ok=True)
+    print(f"📁 Created media directory: {media_dir}")
+
+# WHITENOISE CONFIGURATION
+if not DEBUG or RENDER:
+    # Production settings with WhiteNoise
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    
+    # WhiteNoise settings optimized for Render
+    WHITENOISE_USE_FINDERS = True
+    WHITENOISE_AUTOREFRESH = True
+    WHITENOISE_MANIFEST_STRICT = False  # Don't fail if manifest is missing
+    WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
+    
+    # Skip compression for these file types to save space and time
+    WHITENOISE_SKIP_COMPRESS_EXTENSIONS = [
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico',
+        'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br',
+        'mp4', 'webm', 'mp3', 'wav', 'ogg'
+    ]
+    
+    # Custom MIME types
+    WHITENOISE_MIMETYPES = {
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+    }
+    
+    print("📁 Using WhiteNoise for static file serving")
+else:
+    print("📁 Using Django's development static file serving")\
+    
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -293,7 +307,7 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # SMART EMAIL CONFIGURATION
-if DEBUG:
+if DEBUG and not RENDER:
     # Local development - Gmail SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
@@ -319,7 +333,7 @@ SMS_API_KEY = config('SMS_API_KEY', default='')
 SMS_USERNAME = config('SMS_USERNAME', default='sandbox')
 
 # SMART M-PESA CONFIGURATION
-if DEBUG:
+if DEBUG and not RENDER:
     # Sandbox for development
     MPESA_ENVIRONMENT = 'sandbox'
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
@@ -375,7 +389,7 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-if DEBUG:
+if DEBUG and not RENDER:
     # Local development - relaxed security
     SECURE_HSTS_SECONDS = 0
     SECURE_SSL_REDIRECT = False
@@ -393,10 +407,10 @@ else:
         print("🔒 Using PRODUCTION security settings (RELAXED for debugging)")
     else:
         # Strict production security
-        SECURE_HSTS_SECONDS = 31536000
-        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-        SECURE_HSTS_PRELOAD = True
-        SECURE_SSL_REDIRECT = True
+        SECURE_HSTS_SECONDS = 31536000 if not RENDER else 0  # HSTS can be problematic on Render
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True if not RENDER else False
+        SECURE_HSTS_PRELOAD = True if not RENDER else False
+        SECURE_SSL_REDIRECT = True if not RENDER else False  # Render handles SSL
         SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
@@ -480,7 +494,7 @@ LOGGING = {
 }
 
 # SMART CORS CONFIGURATION
-if DEBUG:
+if DEBUG and not RENDER:
     # Local development - allow all
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
@@ -542,7 +556,7 @@ SUBSCRIPTION_PLANS = {
 }
 
 # Environment-specific startup message
-if DEBUG:
+if DEBUG and not RENDER:
     print("\n" + "="*60)
     print("🏠 AUTOWASH - LOCAL DEVELOPMENT ENVIRONMENT")
     print("="*60)
@@ -550,6 +564,23 @@ if DEBUG:
     print("📧 Using Gmail SMTP for emails")
     print("💰 Using M-Pesa sandbox")
     print("🔒 Security settings are relaxed")
+    print("="*60 + "\n")
+elif RENDER:
+    print("\n" + "="*60) 
+    print("🚀 AUTOWASH - RENDER PRODUCTION ENVIRONMENT")
+    print("="*60)
+    print("🌐 Tenant URLs will be: businessname.autowash-3jpr.onrender.com")
+    print("📧 Using domain email server")
+    print("💰 Using M-Pesa production")
+    print("📁 Static files served by WhiteNoise")
+    if PRODUCTION_DEBUG:
+        print("🔧 PRODUCTION DEBUG MODE ENABLED")
+        print("🔒 Security settings are relaxed for debugging")
+        print("📝 Enhanced logging enabled (check logs/debug.log)")
+    else:
+        print("🔒 Security settings optimized for Render")
+    print("🌐 PUBLIC_SCHEMA_URLCONF: autowash.urls_public")
+    print("🌐 ROOT_URLCONF: autowash.urls")
     print("="*60 + "\n")
 else:
     print("\n" + "="*60) 
