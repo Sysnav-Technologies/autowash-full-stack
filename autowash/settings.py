@@ -3,6 +3,7 @@ from pathlib import Path
 from decouple import config
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
+import dj_database_url
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -132,59 +133,30 @@ TEMPLATES = [
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 
-# SMART DATABASE CONFIGURATION
+# DATABASE CONFIGURATION - Always use DATABASE_URL
+database_url = config('DATABASE_URL')
+
+DATABASES = {
+    'default': dj_database_url.parse(
+        database_url,
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
+
+# Override engine for django-tenants
+DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
+
+# Add SSL requirement and search path for external database
+DATABASES['default']['OPTIONS'] = {
+    'sslmode': 'require',
+    'options': '-c search_path=public'
+}
+
 if DEBUG:
-    # Local PostgreSQL
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django_tenants.postgresql_backend',
-            'NAME': config('DB_NAME', default='autowash_db'),
-            'USER': config('DB_USER', default='postgres'),
-            'PASSWORD': config('DB_PASSWORD', default='password'),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
-            'OPTIONS': {
-                'options': '-c search_path=public'
-            }
-        }
-    }
-    print(f"📊 Using LOCAL PostgreSQL database: {config('DB_NAME', default='autowash_db')}")
+    print(f"📊 Using PostgreSQL database via DATABASE_URL (DEBUG MODE)")
 else:
-    # Production (CPanel) - Could be PostgreSQL or MySQL
-    db_engine = config('DB_ENGINE', default='postgresql')
-    if 'mysql' in db_engine.lower():
-        # CPanel MySQL
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.mysql',
-                'NAME': config('DB_NAME'),
-                'USER': config('DB_USER'),
-                'PASSWORD': config('DB_PASSWORD'),
-                'HOST': config('DB_HOST', default='localhost'),
-                'PORT': config('DB_PORT', default='3306'),
-                'OPTIONS': {
-                    'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-                    'charset': 'utf8mb4',
-                }
-            }
-        }
-        print(f"📊 Using PRODUCTION MySQL database: {config('DB_NAME')}")
-    else:
-        # CPanel PostgreSQL
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django_tenants.postgresql_backend',
-                'NAME': config('DB_NAME'),
-                'USER': config('DB_USER'),
-                'PASSWORD': config('DB_PASSWORD'),
-                'HOST': config('DB_HOST', default='localhost'),
-                'PORT': config('DB_PORT', default='5432'),
-                'OPTIONS': {
-                    'options': '-c search_path=public'
-                }
-            }
-        }
-        print(f"📊 Using PRODUCTION PostgreSQL database: {config('DB_NAME')}")
+    print(f"📊 Using PostgreSQL database via DATABASE_URL (PRODUCTION)")
 
 # Redis & Channels
 CHANNEL_LAYERS = {
@@ -447,15 +419,15 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
     print("🌐 Using PRODUCTION CORS settings (restricted)")
 
-# # Sentry Configuration (Production Error Tracking)
-# if not DEBUG and config('SENTRY_DSN', default=''):
-#     sentry_sdk.init(
-#         dsn=config('SENTRY_DSN'),
-#         integrations=[DjangoIntegration()],
-#         traces_sample_rate=1.0,
-#         send_default_pii=True
-#     )
-#     print("🐛 Sentry error tracking enabled")
+    # # Sentry Configuration (Production Error Tracking)
+    # if not DEBUG and config('SENTRY_DSN', default=''):
+    #     sentry_sdk.init(
+    #         dsn=config('SENTRY_DSN'),
+    #         integrations=[DjangoIntegration()],
+    #         traces_sample_rate=1.0,
+    #         send_default_pii=True
+    #     )
+    #     print("🐛 Sentry error tracking enabled")
 
 # Custom Settings
 BUSINESS_LOGO_UPLOAD_PATH = 'business_logos/'
