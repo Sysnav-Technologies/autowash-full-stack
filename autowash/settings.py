@@ -491,9 +491,7 @@ else:
         "https://autowash.co.ke",
         "https://www.autowash.co.ke",
         'https://www.autowash-3jpr.onrender.com',
-        'https://autowash-3jpr.onrender.com'
-'
-        
+        'https://autowash-3jpr.onrender.com'  
     ]
     CORS_ALLOWED_ORIGIN_REGEXES = [
         r"^https://.*\.autowash\.co\.ke$",
