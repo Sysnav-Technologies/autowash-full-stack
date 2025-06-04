@@ -89,6 +89,8 @@ TENANT_MODEL = "accounts.Business"
 TENANT_DOMAIN_MODEL = "accounts.Domain"
 PUBLIC_SCHEMA_URLCONF = 'autowash.urls_public'
 ROOT_URLCONF = 'autowash.urls'
+PUBLIC_SCHEMA_NAME = 'public'
+SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
 # Database routing
 DATABASE_ROUTERS = (
@@ -203,7 +205,7 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# SMART STATIC FILES CONFIGURATION
+# SMART STATIC FILES CONFIGURATION WITH WHITENOISE
 if DEBUG:
     # Local development
     STATIC_URL = '/static/'
@@ -214,14 +216,51 @@ if DEBUG:
     MEDIA_ROOT = BASE_DIR / 'media'
     print("📁 Using LOCAL static/media file paths")
 else:
-    # Production (CPanel)
+    # Production (CPanel) with WhiteNoise
     STATIC_URL = '/static/'
     STATIC_ROOT = BASE_DIR / 'public_html' / 'static'
     STATICFILES_DIRS = [BASE_DIR / 'static']
     
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'public_html' / 'media'
-    print("📁 Using PRODUCTION (CPanel) static/media file paths")
+    
+    # WhiteNoise configuration for production
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    
+    # WhiteNoise settings
+    WHITENOISE_USE_FINDERS = True
+    WHITENOISE_AUTOREFRESH = True
+    WHITENOISE_MTIME = None
+    WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
+    
+    # Serve media files through WhiteNoise (only if needed)
+    # Note: For large media files, consider using a CDN instead
+    WHITENOISE_MANIFEST_STRICT = False
+    
+    # Custom MIME types for WhiteNoise
+    WHITENOISE_MIMETYPES = {
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+    }
+    
+    # Skip compression for these file types
+    WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
+    
+    print("📁 Using PRODUCTION (CPanel) static/media file paths with WhiteNoise")
+
+# Create static directory if it doesn't exist (fixes the warning)
+static_dir = BASE_DIR / 'static'
+if not static_dir.exists():
+    static_dir.mkdir(exist_ok=True)
+    print(f"📁 Created static directory: {static_dir}")
+
+# Ensure public_html directories exist in production
+if not DEBUG:
+    public_static = BASE_DIR / 'public_html' / 'static'
+    public_media = BASE_DIR / 'public_html' / 'media'
+    public_static.mkdir(parents=True, exist_ok=True)
+    public_media.mkdir(parents=True, exist_ok=True)
+    print(f"📁 Ensured public_html directories exist")
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -311,11 +350,10 @@ LOGIN_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
-# AllAuth Configuration
-ACCOUNT_EMAIL_REQUIRED = True
+# AllAuth Configuration (Updated to new format)
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 
 # SMART SECURITY SETTINGS
@@ -395,6 +433,11 @@ LOGGING = {
         'apps': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django_tenants': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
     },
@@ -477,4 +520,6 @@ else:
     print("📧 Using domain email server")
     print("💰 Using M-Pesa production")
     print("🔒 Security settings are strict")
+    print("🌐 PUBLIC_SCHEMA_URLCONF: autowash.urls_public")
+    print("🌐 ROOT_URLCONF: autowash.urls")
     print("="*60 + "\n")
