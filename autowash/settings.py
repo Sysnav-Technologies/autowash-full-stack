@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
+RENDER = config('RENDER', default=True, cast=bool)
 
 # PRODUCTION DEBUGGING - Simple flag to enable verbose logging and relaxed security
 PRODUCTION_DEBUG = config('PRODUCTION_DEBUG', default=False, cast=bool)

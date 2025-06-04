@@ -253,6 +253,11 @@ def business_register_view(request):
                         # LOCAL DEVELOPMENT
                         domain_name = f"{business.slug}.localhost:8000"
                         print(f"Creating LOCAL domain: {domain_name}")
+                    elif settings.RENDER:
+                        # Render 
+                        domain_name = f"{business.slug}.autowash.co.ke"
+                        print(f"Creating PRODUCTION domain: {domain_name}")
+
                     else:
                         # PRODUCTION (CPanel)
                         domain_name = f"{business.slug}.autowash.co.ke"
