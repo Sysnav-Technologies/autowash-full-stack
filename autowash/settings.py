@@ -27,7 +27,9 @@ else:
         'autowash.co.ke',
         'www.autowash.co.ke', 
         '*.autowash.co.ke',
-        '.autowash.co.ke'
+        '.autowash.co.ke',
+        'autowash-3jpr.onrender.com',
+        'www.autowash-3jpr.onrender.com'
     ]
     if PRODUCTION_DEBUG:
         print("🚀 Running in PRODUCTION mode with DEBUG ENABLED")

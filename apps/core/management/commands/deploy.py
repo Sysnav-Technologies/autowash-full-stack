@@ -115,6 +115,12 @@ class Command(BaseCommand):
                 self.stdout.write('👤 Admin: http://localhost:8000/admin/')
                 self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
                 self.stdout.write('📋 Test business registration and check subdomains')
+            elif settings.RENDER:
+                self.stdout.write('🌐 Main site: https://autowash-3jpr.onrender.com')
+                self.stdout.write('👤 Admin: https://autowash-3jpr.onrender.com/admin/')
+                self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
+                self.stdout.write('📋 Test business registration and check subdomains')
+
             else:
                 self.stdout.write(
                     self.style.SUCCESS('\n🚀 PRODUCTION DEPLOYMENT COMPLETE')
@@ -215,17 +221,17 @@ class Command(BaseCommand):
                     ('localhost:8000', False),
                     
                 ]
-            if settings.RENDER:
+            else:
                 domains_to_create = [
                     ('autowash-3jpr.onrender.com', True),
                     ('www.autowash-3jpr.onrender.com', False),  
                 ]
-            else:
-                domains_to_create = [
-                    ('autowash.co.ke', True),
-                    ('www.autowash.co.ke', False),
+            # else:
+            #     domains_to_create = [
+            #         ('autowash.co.ke', True),
+            #         ('www.autowash.co.ke', False),
                     
-                ]
+            #     ]
 
             for domain_name, is_primary in domains_to_create:
                 domain, created = Domain.objects.get_or_create(
