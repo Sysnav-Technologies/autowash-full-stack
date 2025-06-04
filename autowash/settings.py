@@ -232,11 +232,11 @@ if DEBUG:
 else:
     # Production (CPanel) with WhiteNoise
     STATIC_URL = '/static/'
-    STATIC_ROOT = BASE_DIR / 'public_html' / 'static'
+    STATIC_ROOT = BASE_DIR / 'staticfiles'
     STATICFILES_DIRS = [BASE_DIR / 'static']
     
     MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'public_html' / 'media'
+    MEDIA_ROOT = BASE_DIR / 'media'
     
     # WhiteNoise configuration for production
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
@@ -269,12 +269,12 @@ if not static_dir.exists():
     print(f"📁 Created static directory: {static_dir}")
 
 # Ensure public_html directories exist in production
-if not DEBUG:
-    public_static = BASE_DIR / 'public_html' / 'static'
-    public_media = BASE_DIR / 'public_html' / 'media'
-    public_static.mkdir(parents=True, exist_ok=True)
-    public_media.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Ensured public_html directories exist")
+# if not DEBUG:
+#     public_static = BASE_DIR / 'public_html' / 'static'
+#     public_media = BASE_DIR / 'public_html' / 'media'
+#     public_static.mkdir(parents=True, exist_ok=True)
+#     public_media.mkdir(parents=True, exist_ok=True)
+#     print(f"📁 Ensured public_html directories exist")
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
