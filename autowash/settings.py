@@ -447,15 +447,15 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
     print("🌐 Using PRODUCTION CORS settings (restricted)")
 
-# Sentry Configuration (Production Error Tracking)
-if not DEBUG and config('SENTRY_DSN', default=''):
-    sentry_sdk.init(
-        dsn=config('SENTRY_DSN'),
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True
-    )
-    print("🐛 Sentry error tracking enabled")
+# # Sentry Configuration (Production Error Tracking)
+# if not DEBUG and config('SENTRY_DSN', default=''):
+#     sentry_sdk.init(
+#         dsn=config('SENTRY_DSN'),
+#         integrations=[DjangoIntegration()],
+#         traces_sample_rate=1.0,
+#         send_default_pii=True
+#     )
+#     print("🐛 Sentry error tracking enabled")
 
 # Custom Settings
 BUSINESS_LOGO_UPLOAD_PATH = 'business_logos/'
