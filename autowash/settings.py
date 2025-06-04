@@ -12,6 +12,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
+# PRODUCTION DEBUGGING - Simple flag to enable verbose logging and relaxed security
+PRODUCTION_DEBUG = config('PRODUCTION_DEBUG', default=False, cast=bool)
+
 # SMART ALLOWED_HOSTS based on environment
 if DEBUG:
     # Local development
@@ -25,7 +28,10 @@ else:
         '*.autowash.co.ke',
         '.autowash.co.ke'
     ]
-    print("🚀 Running in PRODUCTION mode")
+    if PRODUCTION_DEBUG:
+        print("🚀 Running in PRODUCTION mode with DEBUG ENABLED")
+    else:
+        print("🚀 Running in PRODUCTION mode")
 
 # Multi-tenant Apps Configuration
 SHARED_APPS = [
@@ -111,7 +117,7 @@ MIDDLEWARE = [
     'django_ratelimit.middleware.RatelimitMiddleware',
     'apps.core.middleware.BusinessContextMiddleware',
     'apps.core.middleware.TimezoneMiddleware',
-    'allauth.account.middleware.AccountMiddleware',  
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 TEMPLATES = [
@@ -374,15 +380,24 @@ if DEBUG:
     CSRF_COOKIE_SECURE = False
     print("🔒 Using LOCAL security settings (relaxed)")
 else:
-    # Production - strict security
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SECURE_SSL_REDIRECT = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    print("🔒 Using PRODUCTION security settings (strict)")
+    # Production security - but relaxed if debugging
+    if PRODUCTION_DEBUG:
+        # Relaxed security for production debugging
+        SECURE_HSTS_SECONDS = 0
+        SECURE_SSL_REDIRECT = False
+        SESSION_COOKIE_SECURE = False
+        CSRF_COOKIE_SECURE = False
+        print("🔒 Using PRODUCTION security settings (RELAXED for debugging)")
+    else:
+        # Strict production security
+        SECURE_HSTS_SECONDS = 31536000
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
+        SECURE_SSL_REDIRECT = True
+        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
+        print("🔒 Using PRODUCTION security settings (strict)")
 
 # Session Settings
 SESSION_COOKIE_AGE = 86400  # 24 hours
@@ -395,9 +410,12 @@ RATELIMIT_ENABLE = True
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
-# SMART LOGGING CONFIGURATION
+# SMART LOGGING CONFIGURATION - Enhanced for production debugging
 log_dir = BASE_DIR / 'logs'
 log_dir.mkdir(exist_ok=True)
+
+# Enhanced logging level when production debugging is enabled
+log_level = 'DEBUG' if (DEBUG or PRODUCTION_DEBUG) else 'INFO'
 
 LOGGING = {
     'version': 1,
@@ -411,23 +429,33 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
+        'debug': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
     },
     'handlers': {
         'file': {
-            'level': 'INFO',
+            'level': log_level,
             'class': 'logging.FileHandler',
             'filename': log_dir / 'django.log',
             'formatter': 'verbose',
         },
+        'debug_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': log_dir / 'debug.log',
+            'formatter': 'debug',
+        },
         'console': {
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': log_level,
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
     },
     'root': {
         'handlers': ['console', 'file'],
-        'level': 'DEBUG' if DEBUG else 'INFO',
+        'level': log_level,
     },
     'loggers': {
         'django': {
@@ -436,8 +464,13 @@ LOGGING = {
             'propagate': False,
         },
         'django_tenants': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'handlers': ['console', 'file', 'debug_file'] if (DEBUG or PRODUCTION_DEBUG) else ['console', 'file'],
+            'level': log_level,
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console', 'file', 'debug_file'] if (DEBUG or PRODUCTION_DEBUG) else ['console', 'file'],
+            'level': log_level,
             'propagate': False,
         },
     },
@@ -462,15 +495,15 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
     print("🌐 Using PRODUCTION CORS settings (restricted)")
 
-    # # Sentry Configuration (Production Error Tracking)
-    # if not DEBUG and config('SENTRY_DSN', default=''):
-    #     sentry_sdk.init(
-    #         dsn=config('SENTRY_DSN'),
-    #         integrations=[DjangoIntegration()],
-    #         traces_sample_rate=1.0,
-    #         send_default_pii=True
-    #     )
-    #     print("🐛 Sentry error tracking enabled")
+# Sentry Configuration (Production Error Tracking) - Disabled when debugging
+if not DEBUG and not PRODUCTION_DEBUG and config('SENTRY_DSN', default=''):
+    sentry_sdk.init(
+        dsn=config('SENTRY_DSN'),
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True
+    )
+    print("🐛 Sentry error tracking enabled")
 
 # Custom Settings
 BUSINESS_LOGO_UPLOAD_PATH = 'business_logos/'
@@ -519,7 +552,12 @@ else:
     print("🌐 Tenant URLs will be: businessname.autowash.co.ke")
     print("📧 Using domain email server")
     print("💰 Using M-Pesa production")
-    print("🔒 Security settings are strict")
+    if PRODUCTION_DEBUG:
+        print("🔧 PRODUCTION DEBUG MODE ENABLED")
+        print("🔒 Security settings are relaxed for debugging")
+        print("📝 Enhanced logging enabled (check logs/debug.log)")
+    else:
+        print("🔒 Security settings are strict")
     print("🌐 PUBLIC_SCHEMA_URLCONF: autowash.urls_public")
     print("🌐 ROOT_URLCONF: autowash.urls")
     print("="*60 + "\n")
