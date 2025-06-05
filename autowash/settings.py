@@ -22,14 +22,16 @@ if DEBUG:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
     print("🏠 Running in LOCAL DEVELOPMENT mode")
 else:
-    # Production (CPanel)
+    # Production (Render/CPanel)
     ALLOWED_HOSTS = [
         'autowash.co.ke',
         'www.autowash.co.ke', 
         '*.autowash.co.ke',
         '.autowash.co.ke',
         'autowash-3jpr.onrender.com',
-        'www.autowash-3jpr.onrender.com'
+        'www.autowash-3jpr.onrender.com',
+        '.onrender.com',  # Allow all Render domains
+        '*.onrender.com',
     ]
     if PRODUCTION_DEBUG:
         print("🚀 Running in PRODUCTION mode with DEBUG ENABLED")
@@ -48,6 +50,7 @@ SHARED_APPS = [
     'django.contrib.sites',
     
     # Third party apps
+    'compressor',  # Add Django Compressor
     'crispy_forms',
     'crispy_bootstrap5',
     'phonenumber_field',
@@ -110,7 +113,7 @@ MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Must be after SecurityMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -219,96 +222,93 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# Production (CPanel) with WhiteNoise
+# STATIC FILES CONFIGURATION - With Django Compressor
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Static files directories
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static')
+    BASE_DIR / 'static',
 ]
+
+# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# WhiteNoise configuration for production
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# StaticFiles finders - Include compressor finder
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+    'compressor.finders.CompressorFinder',  # Add compressor finder
+]
+
+# Django Compressor Configuration
+COMPRESS_ENABLED = not DEBUG  # Enable compression in production
+COMPRESS_OFFLINE = not DEBUG  # Compress offline in production
+COMPRESS_CSS_FILTERS = [
+    'compressor.filters.css_default.CssAbsoluteFilter',
+    'compressor.filters.cssmin.rCSSMinFilter',
+]
+COMPRESS_JS_FILTERS = [
+    'compressor.filters.jsmin.JSMinFilter',
+]
+
+# Compressor storage
+if DEBUG:
+    COMPRESS_STORAGE = 'compressor.storage.DefaultStorage'
+else:
+    COMPRESS_STORAGE = 'compressor.storage.GzipCompressorFileStorage'
+
+# Compressor cache backend
+COMPRESS_CACHE_BACKEND = 'default'
+
+# WhiteNoise configuration - Works with compressor
+if DEBUG:
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+else:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # WhiteNoise settings
 WHITENOISE_USE_FINDERS = True
-WHITENOISE_AUTOREFRESH = True
-WHITENOISE_MTIME = None
+WHITENOISE_AUTOREFRESH = True if DEBUG else False
 WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
-
-# Serve media files through WhiteNoise (only if needed)
-# Note: For large media files, consider using a CDN instead
 WHITENOISE_MANIFEST_STRICT = False
 
 # Custom MIME types for WhiteNoise
 WHITENOISE_MIMETYPES = {
     '.js': 'application/javascript',
     '.css': 'text/css',
+    '.json': 'application/json',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+    '.eot': 'application/vnd.ms-fontobject',
+    '.svg': 'image/svg+xml',
 }
 
 # Skip compression for these file types
-WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
+WHITENOISE_SKIP_COMPRESS_EXTENSIONS = [
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 
+    'bz2', 'tbz', 'xz', 'br', 'woff', 'woff2', 'ttf', 'eot'
+]
 
-print("📁 Using PRODUCTION (CPanel) static/media file paths with WhiteNoise")
+# Create required directories
+def ensure_directories():
+    """Ensure required directories exist"""
+    directories = [
+        BASE_DIR / 'static',
+        BASE_DIR / 'static' / 'css',
+        BASE_DIR / 'static' / 'js',
+        BASE_DIR / 'static' / 'img',
+        BASE_DIR / 'staticfiles',
+        BASE_DIR / 'media',
+        BASE_DIR / 'logs',
+    ]
+    for directory in directories:
+        directory.mkdir(exist_ok=True)
 
-
-# # SMART STATIC FILES CONFIGURATION WITH WHITENOISE
-# if DEBUG:
-#     # Local development
-#     STATIC_URL = '/static/'
-#     STATIC_ROOT = BASE_DIR / 'staticfiles'
-#     STATICFILES_DIRS = [BASE_DIR / 'static']
-    
-#     MEDIA_URL = '/media/'
-#     MEDIA_ROOT = BASE_DIR / 'media'
-#     print("📁 Using LOCAL static/media file paths")
-# else:
-#     # Production (CPanel) with WhiteNoise
-#     STATIC_URL = '/static/'
-#     STATIC_ROOT = BASE_DIR / 'staticfiles'
-#     STATICFILES_DIRS = [BASE_DIR / 'static']
-    
-#     MEDIA_URL = '/media/'
-#     MEDIA_ROOT = BASE_DIR / 'media'
-    
-#     # WhiteNoise configuration for production
-#     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-    
-#     # WhiteNoise settings
-#     WHITENOISE_USE_FINDERS = True
-#     WHITENOISE_AUTOREFRESH = True
-#     WHITENOISE_MTIME = None
-#     WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
-    
-#     # Serve media files through WhiteNoise (only if needed)
-#     # Note: For large media files, consider using a CDN instead
-#     WHITENOISE_MANIFEST_STRICT = False
-    
-#     # Custom MIME types for WhiteNoise
-#     WHITENOISE_MIMETYPES = {
-#         '.js': 'application/javascript',
-#         '.css': 'text/css',
-#     }
-    
-#     # Skip compression for these file types
-#     WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
-    
-#     print("📁 Using PRODUCTION (CPanel) static/media file paths with WhiteNoise")
-
-# Create static directory if it doesn't exist (fixes the warning)
-static_dir = BASE_DIR / 'static'
-if not static_dir.exists():
-    static_dir.mkdir(exist_ok=True)
-    print(f"📁 Created static directory: {static_dir}")
-
-# Ensure public_html directories exist in production
-# if not DEBUG:
-#     public_static = BASE_DIR / 'public_html' / 'static'
-#     public_media = BASE_DIR / 'public_html' / 'media'
-#     public_static.mkdir(parents=True, exist_ok=True)
-#     public_media.mkdir(parents=True, exist_ok=True)
-#     print(f"📁 Ensured public_html directories exist")
+ensure_directories()
+print("📁 Static files configuration with Django Compressor optimized for Render")
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -584,6 +584,7 @@ if DEBUG:
     print("📧 Using Gmail SMTP for emails")
     print("💰 Using M-Pesa sandbox")
     print("🔒 Security settings are relaxed")
+    print("🗜️  Compression disabled for development")
     print("="*60 + "\n")
 else:
     print("\n" + "="*60) 
@@ -598,6 +599,7 @@ else:
         print("📝 Enhanced logging enabled (check logs/debug.log)")
     else:
         print("🔒 Security settings are strict")
+    print("🗜️  Static file compression enabled")
     print("🌐 PUBLIC_SCHEMA_URLCONF: autowash.urls_public")
     print("🌐 ROOT_URLCONF: autowash.urls")
     print("="*60 + "\n")
