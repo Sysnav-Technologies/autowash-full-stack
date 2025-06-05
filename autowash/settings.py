@@ -1,3 +1,4 @@
+# Enhanced settings.py debug configuration
 import os
 from pathlib import Path
 from decouple import config
@@ -13,8 +14,14 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production'
 DEBUG = config('DEBUG', default=True, cast=bool)
 RENDER = config('RENDER', default=True, cast=bool)
 
-# PRODUCTION DEBUGGING - Simple flag to enable verbose logging and relaxed security
+# ENHANCED PRODUCTION DEBUGGING - More granular control
 PRODUCTION_DEBUG = config('PRODUCTION_DEBUG', default=False, cast=bool)
+PRODUCTION_DEBUG_LEVEL = config('PRODUCTION_DEBUG_LEVEL', default='INFO')  # DEBUG, INFO, WARNING, ERROR
+PRODUCTION_DEBUG_SQL = config('PRODUCTION_DEBUG_SQL', default=False, cast=bool)
+PRODUCTION_DEBUG_REQUESTS = config('PRODUCTION_DEBUG_REQUESTS', default=False, cast=bool)
+
+# Determine effective debug mode
+EFFECTIVE_DEBUG = DEBUG or PRODUCTION_DEBUG
 
 # SMART ALLOWED_HOSTS based on environment
 if DEBUG:
@@ -30,11 +37,15 @@ else:
         '.autowash.co.ke',
         'autowash-3jpr.onrender.com',
         'www.autowash-3jpr.onrender.com',
-        '.onrender.com',  # Allow all Render domains
+        '.onrender.com',
         '*.onrender.com',
     ]
     if PRODUCTION_DEBUG:
-        print("🚀 Running in PRODUCTION mode with DEBUG ENABLED")
+        print(f"🚀 Running in PRODUCTION mode with DEBUG ENABLED (Level: {PRODUCTION_DEBUG_LEVEL})")
+        if PRODUCTION_DEBUG_SQL:
+            print("🔍 SQL query logging enabled")
+        if PRODUCTION_DEBUG_REQUESTS:
+            print("🔍 Request/Response logging enabled")
     else:
         print("🚀 Running in PRODUCTION mode")
 
@@ -93,6 +104,10 @@ TENANT_APPS = [
     'apps.notification',
 ]
 
+# Add debug toolbar only when debugging
+if EFFECTIVE_DEBUG:
+    SHARED_APPS.append('debug_toolbar')
+
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
 # Tenant Configuration
@@ -108,12 +123,12 @@ DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
 
-# MIDDLEWARE - Render-optimized order
+# ENHANCED MIDDLEWARE - with debug toolbar support
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Must be after SecurityMiddleware
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -125,6 +140,23 @@ MIDDLEWARE = [
     'apps.core.middleware.TimezoneMiddleware',
     'allauth.account.middleware.AccountMiddleware',
 ]
+
+# Add debug toolbar middleware when debugging
+if EFFECTIVE_DEBUG:
+    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+
+# Debug Toolbar Configuration
+if EFFECTIVE_DEBUG:
+    INTERNAL_IPS = [
+        '127.0.0.1',
+        'localhost',
+    ]
+    
+    # Allow debug toolbar in production when PRODUCTION_DEBUG is True
+    if PRODUCTION_DEBUG and not DEBUG:
+        import socket
+        hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+        INTERNAL_IPS += [ip[: ip.rfind(".")] + ".1" for ip in ips]
 
 TEMPLATES = [
     {
@@ -147,7 +179,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 
-# DATABASE CONFIGURATION - Always use DATABASE_URL
+# DATABASE CONFIGURATION - Enhanced with debug logging
 database_url = config('DATABASE_URL')
 
 DATABASES = {
@@ -194,12 +226,12 @@ if redis_url and redis_url != '':
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': redis_url.replace('/1', '/2'),  # Use different Redis DB for cache
+            'LOCATION': redis_url.replace('/1', '/2'),
         }
     }
     print("💾 Using Redis cache")
 else:
-    # Fallback to database cache (common in CPanel)
+    # Fallback to database cache
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
@@ -222,21 +254,16 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# STATIC FILES CONFIGURATION - Render-optimized (simplified)
+# STATIC FILES CONFIGURATION
 STATIC_URL = '/static/'
-
-# Static files directories - ensure these exist
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
-
 if not DEBUG:
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-    
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 else:
-    # Development - use default storage
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Media files
@@ -259,7 +286,6 @@ def ensure_directories():
         directory.mkdir(exist_ok=True)
 
 ensure_directories()
-print("📁 Static files configuration optimized for Render deployment")
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -277,9 +303,8 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
-# SMART EMAIL CONFIGURATION
+# ENHANCED EMAIL CONFIGURATION
 if DEBUG:
-    # Local development - Gmail SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
     EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -289,7 +314,6 @@ if DEBUG:
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@localhost')
     print("📧 Using LOCAL email configuration (Gmail SMTP)")
 else:
-    # Production - Domain email
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='mail.autowash.co.ke')
     EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -297,15 +321,14 @@ else:
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='noreply@autowash.co.ke')
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Autowash <noreply@autowash.co.ke>')
-    print("📧 Using PRODUCTION email configuration (Domain email)")
+    print("📧 Using PRODUCTION email configuration")
 
 # SMS Configuration
 SMS_API_KEY = config('SMS_API_KEY', default='')
 SMS_USERNAME = config('SMS_USERNAME', default='sandbox')
 
-# SMART M-PESA CONFIGURATION
+# M-PESA CONFIGURATION
 if DEBUG:
-    # Sandbox for development
     MPESA_ENVIRONMENT = 'sandbox'
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
@@ -314,7 +337,6 @@ if DEBUG:
     MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='http://localhost:8000/api/mpesa/callback/')
     print("💰 Using SANDBOX M-Pesa configuration")
 else:
-    # Production
     MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='production')
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
@@ -349,13 +371,13 @@ LOGIN_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 
-# AllAuth Configuration (Updated to new format)
+# AllAuth Configuration
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 
-# SMART SECURITY SETTINGS
+# ENHANCED SECURITY SETTINGS
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
@@ -368,7 +390,6 @@ if DEBUG:
     CSRF_COOKIE_SECURE = False
     print("🔒 Using LOCAL security settings (relaxed)")
 else:
-    # Production security - but relaxed if debugging
     if PRODUCTION_DEBUG:
         # Relaxed security for production debugging
         SECURE_HSTS_SECONDS = 0
@@ -398,12 +419,17 @@ RATELIMIT_ENABLE = True
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
-# SMART LOGGING CONFIGURATION - Enhanced for production debugging
+# ENHANCED LOGGING CONFIGURATION
 log_dir = BASE_DIR / 'logs'
 log_dir.mkdir(exist_ok=True)
 
-# Enhanced logging level when production debugging is enabled
-log_level = 'DEBUG' if (DEBUG or PRODUCTION_DEBUG) else 'INFO'
+# Determine log level based on debug settings
+if DEBUG:
+    log_level = 'DEBUG'
+elif PRODUCTION_DEBUG:
+    log_level = PRODUCTION_DEBUG_LEVEL
+else:
+    log_level = 'INFO'
 
 LOGGING = {
     'version': 1,
@@ -421,6 +447,10 @@ LOGGING = {
             'format': '[{asctime}] {levelname} {name}: {message}',
             'style': '{',
         },
+        'request': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
     },
     'handlers': {
         'file': {
@@ -434,6 +464,18 @@ LOGGING = {
             'class': 'logging.FileHandler',
             'filename': log_dir / 'debug.log',
             'formatter': 'debug',
+        },
+        'request_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': log_dir / 'requests.log',
+            'formatter': 'request',
+        },
+        'sql_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': log_dir / 'sql.log',
+            'formatter': 'verbose',
         },
         'console': {
             'level': log_level,
@@ -451,27 +493,35 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'django.request': {
+            'handlers': ['console', 'request_file'] if PRODUCTION_DEBUG_REQUESTS else ['console'],
+            'level': 'DEBUG' if PRODUCTION_DEBUG_REQUESTS else 'INFO',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['sql_file'] if PRODUCTION_DEBUG_SQL else [],
+            'level': 'DEBUG' if PRODUCTION_DEBUG_SQL else 'INFO',
+            'propagate': False,
+        },
         'django_tenants': {
-            'handlers': ['console', 'file', 'debug_file'] if (DEBUG or PRODUCTION_DEBUG) else ['console', 'file'],
+            'handlers': ['console', 'file', 'debug_file'] if EFFECTIVE_DEBUG else ['console', 'file'],
             'level': log_level,
             'propagate': False,
         },
         'apps': {
-            'handlers': ['console', 'file', 'debug_file'] if (DEBUG or PRODUCTION_DEBUG) else ['console', 'file'],
+            'handlers': ['console', 'file', 'debug_file'] if EFFECTIVE_DEBUG else ['console', 'file'],
             'level': log_level,
             'propagate': False,
         },
     },
 }
 
-# SMART CORS CONFIGURATION
+# CORS CONFIGURATION
 if DEBUG:
-    # Local development - allow all
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
     print("🌐 Using LOCAL CORS settings (allow all)")
 else:
-    # Production - specific domains only
     CORS_ALLOWED_ORIGINS = [
         "https://autowash.co.ke",
         "https://www.autowash.co.ke",
@@ -486,7 +536,7 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
     print("🌐 Using PRODUCTION CORS settings (restricted)")
 
-# Sentry Configuration (Production Error Tracking) - Disabled when debugging
+# Sentry Configuration - Only enable when not debugging
 if not DEBUG and not PRODUCTION_DEBUG and config('SENTRY_DSN', default=''):
     sentry_sdk.init(
         dsn=config('SENTRY_DSN'),
@@ -495,6 +545,8 @@ if not DEBUG and not PRODUCTION_DEBUG and config('SENTRY_DSN', default=''):
         send_default_pii=True
     )
     print("🐛 Sentry error tracking enabled")
+else:
+    print("🐛 Sentry disabled (debugging enabled)")
 
 # Custom Settings
 BUSINESS_LOGO_UPLOAD_PATH = 'business_logos/'
@@ -505,23 +557,23 @@ CUSTOMER_PHOTO_UPLOAD_PATH = 'customer_photos/'
 SUBSCRIPTION_PLANS = {
     'basic': {
         'name': 'Basic Plan',
-        'price': 2000,  # KES
+        'price': 2000,
         'max_employees': 5,
         'max_customers': 100,
         'features': ['Basic reporting', 'SMS notifications', 'Customer management']
     },
     'professional': {
         'name': 'Professional Plan',
-        'price': 5000,  # KES
+        'price': 5000,
         'max_employees': 15,
         'max_customers': 500,
         'features': ['Advanced reporting', 'SMS & Email notifications', 'Inventory management', 'Employee management']
     },
     'enterprise': {
         'name': 'Enterprise Plan',
-        'price': 10000,  # KES
-        'max_employees': -1,  # Unlimited
-        'max_customers': -1,  # Unlimited
+        'price': 10000,
+        'max_employees': -1,
+        'max_customers': -1,
         'features': ['All features', 'API access', 'Custom integrations', 'Priority support']
     }
 }
@@ -535,6 +587,7 @@ if DEBUG:
     print("📧 Using Gmail SMTP for emails")
     print("💰 Using M-Pesa sandbox")
     print("🔒 Security settings are relaxed")
+    print("🐛 Debug toolbar enabled")
     print("="*60 + "\n")
 else:
     print("\n" + "="*60) 
@@ -545,11 +598,17 @@ else:
     print("💰 Using M-Pesa production")
     if PRODUCTION_DEBUG:
         print("🔧 PRODUCTION DEBUG MODE ENABLED")
+        print(f"📊 Debug level: {PRODUCTION_DEBUG_LEVEL}")
+        if PRODUCTION_DEBUG_SQL:
+            print("🔍 SQL logging enabled (check logs/sql.log)")
+        if PRODUCTION_DEBUG_REQUESTS:
+            print("🔍 Request logging enabled (check logs/requests.log)")
         print("🔒 Security settings are relaxed for debugging")
         print("📝 Enhanced logging enabled (check logs/debug.log)")
+        print("🐛 Debug toolbar enabled")
+        print("🐛 Sentry disabled for debugging")
     else:
         print("🔒 Security settings are strict")
+        print("🐛 Sentry enabled for error tracking")
     print("📁 Static files served via WhiteNoise")
-    print("🌐 PUBLIC_SCHEMA_URLCONF: autowash.urls_public")
-    print("🌐 ROOT_URLCONF: autowash.urls")
     print("="*60 + "\n")
