@@ -95,8 +95,12 @@ TENANT_APPS = [
     'apps.notification',
 ]
 
-# Add debug toolbar when debugging is enabled
-if DEBUG:
+# Add debug toolbar when debugging is enabled - BUT NOT ON RENDER ADMIN
+if DEBUG and not RENDER:
+    # Only in local development
+    SHARED_APPS.append('debug_toolbar')
+elif DEBUG and RENDER:
+    # On Render with debug - be selective
     SHARED_APPS.append('debug_toolbar')
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
@@ -132,8 +136,12 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
 ]
 
-# Add debug toolbar middleware when enabled
-if DEBUG:
+# Add debug toolbar middleware when enabled - WITH RENDER PROTECTION
+if DEBUG and not RENDER:
+    # Local development only
+    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+elif DEBUG and RENDER:
+    # Render with debug - add but with restrictions
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 
 # Debug Toolbar Configuration
@@ -155,15 +163,31 @@ if DEBUG:
         except Exception as e:
             print(f"⚠️ Could not determine Render IPs for debug toolbar: {e}")
         
-        # Render-specific debug toolbar settings
+        # RENDER-SPECIFIC: Disable debug toolbar on admin operations to prevent timeout
+        DEBUG_TOOLBAR_CONFIG = {
+            'SHOW_TOOLBAR_CALLBACK': lambda request: (
+                DEBUG and 
+                not request.path.startswith('/system-admin/') and 
+                not request.path.startswith('/admin/')
+            ),
+            'DISABLE_PANELS': [
+                'debug_toolbar.panels.sql.SQLPanel',  # Disable SQL panel for performance
+                'debug_toolbar.panels.staticfiles.StaticFilesPanel',  # Disable static files panel
+            ],
+            'SHOW_TEMPLATE_CONTEXT': False,  # Reduce memory usage
+            'ENABLE_STACKTRACES': False,  # Reduce processing time
+            'SHOW_COLLAPSED': True,
+            'JQUERY_URL': '//ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
+        }
+        print("🐛 Debug toolbar configured for Render (ADMIN DISABLED)")
+    else:
+        # Local development - full debug toolbar
         DEBUG_TOOLBAR_CONFIG = {
             'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
             'SHOW_TEMPLATE_CONTEXT': True,
             'ENABLE_STACKTRACES': True,
-            'SHOW_COLLAPSED': True,
-            'JQUERY_URL': '//ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
         }
-        print("🐛 Debug toolbar configured for Render")
+        print("🐛 Debug toolbar configured for local development")
 
 TEMPLATES = [
     {
@@ -209,12 +233,14 @@ if not RENDER:
     }
     print(f"📊 Using LOCAL PostgreSQL database (SSL disabled)")
 else:
-    # Production/Render - require SSL for external PostgreSQL
+    # Production/Render - require SSL for external PostgreSQL + timeout settings
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'require',
-        'options': '-c search_path=public'
+        'options': '-c search_path=public -c statement_timeout=300000 -c lock_timeout=300000'
     }
-    print(f"📊 Using RENDER PostgreSQL database (SSL required)")
+    # Optimize for Render performance during schema creation
+    DATABASES['default']['CONN_MAX_AGE'] = 0 if DEBUG else 600  # Disable persistent connections when debugging
+    print(f"📊 Using RENDER PostgreSQL database (SSL required, timeouts configured)")
 
 # Redis & Channels
 CHANNEL_LAYERS = {
