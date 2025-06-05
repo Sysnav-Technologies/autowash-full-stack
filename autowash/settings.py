@@ -222,8 +222,8 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# STATIC FILES CONFIGURATION - With Django Compressor
-STATIC_URL = '/static/'
+# STATIC FILES CONFIGURATION - Based on Three Stars setup
+STATIC_URL = config('STATIC_URL', default='/static/')
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Static files directories
@@ -232,47 +232,50 @@ STATICFILES_DIRS = [
 ]
 
 # Media files
-MEDIA_URL = '/media/'
+MEDIA_URL = config('MEDIA_URL', default='/media/')
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # StaticFiles finders - Include compressor finder
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-    'compressor.finders.CompressorFinder',  # Add compressor finder
+    'compressor.finders.CompressorFinder',
 ]
 
-# Django Compressor Configuration
-COMPRESS_ENABLED = not DEBUG  # Enable compression in production
+# Django Compressor Configuration - Improved setup
+COMPRESS_ENABLED = not DEBUG  # Enable compression in production only
 COMPRESS_OFFLINE = not DEBUG  # Compress offline in production
 COMPRESS_CSS_FILTERS = [
     'compressor.filters.css_default.CssAbsoluteFilter',
-    'compressor.filters.cssmin.rCSSMinFilter',
+    'compressor.filters.cssmin.CSSMinFilter',  # Use CSSMinFilter instead of rCSSMinFilter
 ]
 COMPRESS_JS_FILTERS = [
     'compressor.filters.jsmin.JSMinFilter',
 ]
 
-# Compressor storage
-if DEBUG:
-    COMPRESS_STORAGE = 'compressor.storage.DefaultStorage'
-else:
-    COMPRESS_STORAGE = 'compressor.storage.GzipCompressorFileStorage'
-
-# Compressor cache backend
+# Compressor storage and cache
+COMPRESS_STORAGE = 'compressor.storage.DefaultStorage'
 COMPRESS_CACHE_BACKEND = 'default'
+COMPRESS_URL = STATIC_URL
+COMPRESS_ROOT = STATIC_ROOT
 
-# WhiteNoise configuration - Works with compressor
+# Compressor debugging
 if DEBUG:
-    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
-else:
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    COMPRESS_PRECOMPILERS = ()
+    COMPRESS_DEBUG_TOGGLE = 'nocompress'
+
+# WhiteNoise configuration - Optimized for Render
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # WhiteNoise settings
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_AUTOREFRESH = True if DEBUG else False
 WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
 WHITENOISE_MANIFEST_STRICT = False
+WHITENOISE_SKIP_COMPRESS_EXTENSIONS = [
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 
+    'bz2', 'tbz', 'xz', 'br', 'woff', 'woff2', 'ttf', 'eot'
+]
 
 # Custom MIME types for WhiteNoise
 WHITENOISE_MIMETYPES = {
@@ -286,11 +289,10 @@ WHITENOISE_MIMETYPES = {
     '.svg': 'image/svg+xml',
 }
 
-# Skip compression for these file types
-WHITENOISE_SKIP_COMPRESS_EXTENSIONS = [
-    'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 
-    'bz2', 'tbz', 'xz', 'br', 'woff', 'woff2', 'ttf', 'eot'
-]
+# File Upload Settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+FILE_UPLOAD_PERMISSIONS = 0o644
 
 # Create required directories
 def ensure_directories():
