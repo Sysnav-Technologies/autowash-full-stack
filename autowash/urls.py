@@ -29,7 +29,18 @@ urlpatterns = [
     path('notifications/', include('apps.notification.urls')),
 ]
 
-# Serve media files in development
-if settings.DEBUG:
+# Debug Toolbar - Only when debugging is enabled
+if getattr(settings, 'EFFECTIVE_DEBUG', False) and (settings.DEBUG or getattr(settings, 'PRODUCTION_DEBUG_TOOLBAR', False)):
+    try:
+        import debug_toolbar
+        urlpatterns = [
+            path('__debug__/', include(debug_toolbar.urls)),
+        ] + urlpatterns
+        print("🐛 Debug toolbar URLs added to TENANT schema")
+    except ImportError:
+        print("⚠️ Debug toolbar not available (not installed)")
+
+# Serve media files in development and when debugging
+if settings.DEBUG or getattr(settings, 'PRODUCTION_DEBUG', False):
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

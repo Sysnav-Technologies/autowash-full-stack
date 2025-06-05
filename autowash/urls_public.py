@@ -12,7 +12,6 @@ urlpatterns = [
     path('auth/', include('apps.accounts.urls')),
     path('accounts/', include('allauth.urls')),
     
-    
     # Landing pages
     path('', TemplateView.as_view(template_name='public/landing.html'), name='landing'),
     path('pricing/', TemplateView.as_view(template_name='public/pricing.html'), name='pricing'),
@@ -22,13 +21,23 @@ urlpatterns = [
     # Subscriptions
     path('subscriptions/', include('apps.subscriptions.urls')),
     
-    # # API
+    # API
     # path('api/auth/', include('dj_rest_auth.urls')),
     # path('api/public/', include('apps.accounts.api_urls')),
 ]
 
-# Serve media files in development
-if settings.DEBUG:
+# Debug Toolbar - Only when debugging is enabled
+if getattr(settings, 'EFFECTIVE_DEBUG', False) and (settings.DEBUG or getattr(settings, 'PRODUCTION_DEBUG_TOOLBAR', False)):
+    try:
+        import debug_toolbar
+        urlpatterns = [
+            path('__debug__/', include(debug_toolbar.urls)),
+        ] + urlpatterns
+        print("🐛 Debug toolbar URLs added to PUBLIC schema")
+    except ImportError:
+        print("⚠️ Debug toolbar not available (not installed)")
+
+# Serve media files in development and when debugging
+if settings.DEBUG or getattr(settings, 'PRODUCTION_DEBUG', False):
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    
