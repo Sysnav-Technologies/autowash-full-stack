@@ -50,7 +50,6 @@ SHARED_APPS = [
     'django.contrib.sites',
     
     # Third party apps
-    'compressor',  # Add Django Compressor
     'crispy_forms',
     'crispy_bootstrap5',
     'phonenumber_field',
@@ -109,6 +108,7 @@ DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
 
+# MIDDLEWARE - Render-optimized order
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -222,77 +222,26 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# STATIC FILES CONFIGURATION - Based on Three Stars setup
-STATIC_URL = config('STATIC_URL', default='/static/')
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+# STATIC FILES CONFIGURATION - Render-optimized (simplified)
+STATIC_URL = '/static/'
 
-# Static files directories
+# Static files directories - ensure these exist
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    os.path.join(BASE_DIR, 'static'),
 ]
+
+
+if not DEBUG:
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+else:
+    # Development - use default storage
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Media files
-MEDIA_URL = config('MEDIA_URL', default='/media/')
-MEDIA_ROOT = BASE_DIR / 'media'
-
-# StaticFiles finders - Include compressor finder
-STATICFILES_FINDERS = [
-    'django.contrib.staticfiles.finders.FileSystemFinder',
-    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-    'compressor.finders.CompressorFinder',
-]
-
-# Django Compressor Configuration - Improved setup
-COMPRESS_ENABLED = not DEBUG  # Enable compression in production only
-COMPRESS_OFFLINE = not DEBUG  # Compress offline in production
-COMPRESS_CSS_FILTERS = [
-    'compressor.filters.css_default.CssAbsoluteFilter',
-    'compressor.filters.cssmin.CSSMinFilter',  # Use CSSMinFilter instead of rCSSMinFilter
-]
-COMPRESS_JS_FILTERS = [
-    'compressor.filters.jsmin.JSMinFilter',
-]
-
-# Compressor storage and cache
-COMPRESS_STORAGE = 'compressor.storage.DefaultStorage'
-COMPRESS_CACHE_BACKEND = 'default'
-COMPRESS_URL = STATIC_URL
-COMPRESS_ROOT = STATIC_ROOT
-
-# Compressor debugging
-if DEBUG:
-    COMPRESS_PRECOMPILERS = ()
-    COMPRESS_DEBUG_TOGGLE = 'nocompress'
-
-# WhiteNoise configuration - Optimized for Render
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-# WhiteNoise settings
-WHITENOISE_USE_FINDERS = True
-WHITENOISE_AUTOREFRESH = True if DEBUG else False
-WHITENOISE_MAX_AGE = 31536000  # 1 year cache for static files
-WHITENOISE_MANIFEST_STRICT = False
-WHITENOISE_SKIP_COMPRESS_EXTENSIONS = [
-    'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 
-    'bz2', 'tbz', 'xz', 'br', 'woff', 'woff2', 'ttf', 'eot'
-]
-
-# Custom MIME types for WhiteNoise
-WHITENOISE_MIMETYPES = {
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-    '.ttf': 'font/ttf',
-    '.eot': 'application/vnd.ms-fontobject',
-    '.svg': 'image/svg+xml',
-}
-
-# File Upload Settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
-FILE_UPLOAD_PERMISSIONS = 0o644
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Create required directories
 def ensure_directories():
@@ -310,7 +259,7 @@ def ensure_directories():
         directory.mkdir(exist_ok=True)
 
 ensure_directories()
-print("📁 Static files configuration with Django Compressor optimized for Render")
+print("📁 Static files configuration optimized for Render deployment")
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -586,7 +535,6 @@ if DEBUG:
     print("📧 Using Gmail SMTP for emails")
     print("💰 Using M-Pesa sandbox")
     print("🔒 Security settings are relaxed")
-    print("🗜️  Compression disabled for development")
     print("="*60 + "\n")
 else:
     print("\n" + "="*60) 
@@ -601,7 +549,7 @@ else:
         print("📝 Enhanced logging enabled (check logs/debug.log)")
     else:
         print("🔒 Security settings are strict")
-    print("🗜️  Static file compression enabled")
+    print("📁 Static files served via WhiteNoise")
     print("🌐 PUBLIC_SCHEMA_URLCONF: autowash.urls_public")
     print("🌐 ROOT_URLCONF: autowash.urls")
     print("="*60 + "\n")
