@@ -107,7 +107,7 @@ class Command(BaseCommand):
             )
             
             # Environment-specific instructions
-            if settings.DEBUG:
+            if not settings.RENDER:
                 self.stdout.write(
                     self.style.SUCCESS('\n🏠 LOCAL DEVELOPMENT SETUP COMPLETE')
                 )
@@ -115,24 +115,28 @@ class Command(BaseCommand):
                 self.stdout.write('👤 Admin: http://localhost:8000/admin/')
                 self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
                 self.stdout.write('📋 Test business registration and check subdomains')
-            elif settings.RENDER:
+                if settings.DEBUG:
+                    self.stdout.write('🐛 Debug mode: ENABLED')
+                else:
+                    self.stdout.write('🐛 Debug mode: DISABLED')
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS('\n🚀 RENDER DEPLOYMENT COMPLETE')
+                )
                 self.stdout.write('🌐 Main site: https://autowash-3jpr.onrender.com')
                 self.stdout.write('👤 Admin: https://autowash-3jpr.onrender.com/admin/')
                 self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
                 self.stdout.write('📋 Test business registration and check subdomains')
-
-            else:
-                self.stdout.write(
-                    self.style.SUCCESS('\n🚀 PRODUCTION DEPLOYMENT COMPLETE')
-                )
-                self.stdout.write('🌐 Main site: https://www.autowash.co.ke')
-                self.stdout.write('👤 Admin: https://www.autowash.co.ke/admin/')
-                self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
-                self.stdout.write('⚠️  Remember to:')
-                self.stdout.write('   - Set up wildcard subdomain in CPanel')
-                self.stdout.write('   - Install SSL certificate for *.autowash.co.ke')
-                self.stdout.write('   - Configure email: noreply@autowash.co.ke')
-                self.stdout.write('   - Set up M-Pesa production credentials')
+                if settings.DEBUG:
+                    self.stdout.write('🐛 Debug mode: ENABLED')
+                    self.stdout.write('   - Debug toolbar available')
+                    self.stdout.write('   - Enhanced logging active')
+                    self.stdout.write('   - Security settings relaxed')
+                else:
+                    self.stdout.write('🐛 Debug mode: DISABLED')
+                    self.stdout.write('   - Production security active')
+                    if getattr(settings, 'SENTRY_DSN', ''):
+                        self.stdout.write('   - Sentry monitoring enabled')
 
         except Exception as e:
             self.stdout.write(
@@ -214,24 +218,26 @@ class Command(BaseCommand):
                 )
                 self.stdout.write('Public tenant created with owner')
 
-            # Create domains for public tenant
-            if settings.DEBUG:
+            # Create domains for public tenant based on environment
+            if not settings.RENDER:
+                # Local development domains
                 domains_to_create = [
                     ('127.0.0.1:8000', True),
                     ('localhost:8000', False),
-                    
                 ]
             else:
+                # Render production domains
                 domains_to_create = [
                     ('autowash-3jpr.onrender.com', True),
-                    ('www.autowash-3jpr.onrender.com', False),  
+                    ('www.autowash-3jpr.onrender.com', False),
                 ]
-            # else:
-            #     domains_to_create = [
-            #         ('autowash.co.ke', True),
-            #         ('www.autowash.co.ke', False),
-                    
-            #     ]
+                
+                # Add custom domain if available
+                # Uncomment when custom domain is configured:
+                # domains_to_create.extend([
+                #     ('autowash.co.ke', False),
+                #     ('www.autowash.co.ke', False),
+                # ])
 
             for domain_name, is_primary in domains_to_create:
                 domain, created = Domain.objects.get_or_create(
@@ -283,7 +289,11 @@ class Command(BaseCommand):
     def run_health_checks(self):
         """Run Django health checks"""
         try:
-            call_command('check', '--deploy' if not settings.DEBUG else '', verbosity=0)
+            # Use deploy checks only on Render with debug disabled
+            if settings.RENDER and not settings.DEBUG:
+                call_command('check', '--deploy', verbosity=0)
+            else:
+                call_command('check', verbosity=0)
         except Exception as e:
             self.stdout.write(
                 self.style.WARNING(f'Health check warning: {e}')

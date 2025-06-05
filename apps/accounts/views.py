@@ -181,7 +181,8 @@ def business_register_view(request):
     print(f"BUSINESS REGISTER VIEW CALLED")
     print(f"Request method: {request.method}")
     print(f"User: {request.user}")
-    print(f"Environment: {'LOCAL' if settings.DEBUG else 'PRODUCTION'}")
+    print(f"Environment: {'LOCAL' if not settings.RENDER else 'RENDER'}")
+    print(f"Debug mode: {'ON' if settings.DEBUG else 'OFF'}")
     print(f"="*50)
     
     # Check if user already owns a business
@@ -239,9 +240,11 @@ def business_register_view(request):
                     
                     # Create domain record but don't activate schema yet
                     print("Creating domain record...")
-                    if settings.DEBUG:
+                    if not settings.RENDER:
+                        # Local development
                         domain_name = f"{business.slug}.localhost:8000"
                     else:
+                        # Production on Render
                         domain_name = f"{business.slug}.autowash-3jpr.onrender.com"
 
                     # Create domain but note that schema doesn't exist yet

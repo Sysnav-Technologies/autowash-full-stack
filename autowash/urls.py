@@ -30,7 +30,7 @@ urlpatterns = [
 ]
 
 # Debug Toolbar - Only when debugging is enabled
-if getattr(settings, 'EFFECTIVE_DEBUG', False) and (settings.DEBUG or getattr(settings, 'PRODUCTION_DEBUG_TOOLBAR', False)):
+if settings.DEBUG:
     try:
         import debug_toolbar
         urlpatterns = [
@@ -40,7 +40,7 @@ if getattr(settings, 'EFFECTIVE_DEBUG', False) and (settings.DEBUG or getattr(se
     except ImportError:
         print("⚠️ Debug toolbar not available (not installed)")
 
-# Serve media files in development and when debugging
-if settings.DEBUG or getattr(settings, 'PRODUCTION_DEBUG', False):
+# Serve media files when in local development or when debugging on Render
+if not getattr(settings, 'RENDER', True) or settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

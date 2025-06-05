@@ -1,4 +1,4 @@
-# Enhanced settings.py debug configuration
+# Enhanced settings.py with simple debug control
 import os
 from pathlib import Path
 from decouple import config
@@ -12,42 +12,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
-RENDER = config('RENDER', default=True, cast=bool)
+RENDER = config('RENDER', default=False, cast=bool)
 
-# ENHANCED PRODUCTION DEBUGGING - More granular control
-PRODUCTION_DEBUG = config('PRODUCTION_DEBUG', default=False, cast=bool)
-PRODUCTION_DEBUG_LEVEL = config('PRODUCTION_DEBUG_LEVEL', default='INFO')  # DEBUG, INFO, WARNING, ERROR
-PRODUCTION_DEBUG_SQL = config('PRODUCTION_DEBUG_SQL', default=False, cast=bool)
-PRODUCTION_DEBUG_REQUESTS = config('PRODUCTION_DEBUG_REQUESTS', default=False, cast=bool)
-
-# Determine effective debug mode
-EFFECTIVE_DEBUG = DEBUG or PRODUCTION_DEBUG
-
-# SMART ALLOWED_HOSTS based on environment
-if DEBUG:
+# SMART ALLOWED_HOSTS based on RENDER environment
+if not RENDER:
     # Local development
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
     print("🏠 Running in LOCAL DEVELOPMENT mode")
 else:
-    # Production (Render/CPanel)
+    # Production on Render
     ALLOWED_HOSTS = [
-        'autowash.co.ke',
-        'www.autowash.co.ke', 
-        '*.autowash.co.ke',
-        '.autowash.co.ke',
-        'autowash-3jpr.onrender.com',
-        'www.autowash-3jpr.onrender.com',
-        '.onrender.com',
-        '*.onrender.com',
+        '.onrender.com',                    # Covers ALL Render subdomains
+        'autowash-3jpr.onrender.com',       # Your specific Render service
+        'autowash.co.ke',                   # Custom domain
+        'www.autowash.co.ke',               # WWW version
+        '*.autowash.co.ke',                 # Subdomains
     ]
-    if PRODUCTION_DEBUG:
-        print(f"🚀 Running in PRODUCTION mode with DEBUG ENABLED (Level: {PRODUCTION_DEBUG_LEVEL})")
-        if PRODUCTION_DEBUG_SQL:
-            print("🔍 SQL query logging enabled")
-        if PRODUCTION_DEBUG_REQUESTS:
-            print("🔍 Request/Response logging enabled")
+    
+    # Render automatically sets this environment variable
+    render_external_hostname = config('RENDER_EXTERNAL_HOSTNAME', default='')
+    if render_external_hostname and render_external_hostname not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(render_external_hostname)
+        print(f"🚀 Added Render hostname: {render_external_hostname}")
+    
+    if DEBUG:
+        print("🚀 RENDER with DEBUG ENABLED")
     else:
-        print("🚀 Running in PRODUCTION mode")
+        print("🚀 RENDER PRODUCTION mode")
 
 # Multi-tenant Apps Configuration
 SHARED_APPS = [
@@ -104,8 +95,8 @@ TENANT_APPS = [
     'apps.notification',
 ]
 
-# Add debug toolbar only when debugging
-if EFFECTIVE_DEBUG:
+# Add debug toolbar when debugging is enabled
+if DEBUG:
     SHARED_APPS.append('debug_toolbar')
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
@@ -123,7 +114,7 @@ DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
 
-# ENHANCED MIDDLEWARE - with debug toolbar support
+# MIDDLEWARE
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -141,22 +132,38 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
 ]
 
-# Add debug toolbar middleware when debugging
-if EFFECTIVE_DEBUG:
+# Add debug toolbar middleware when enabled
+if DEBUG:
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 
 # Debug Toolbar Configuration
-if EFFECTIVE_DEBUG:
+if DEBUG:
     INTERNAL_IPS = [
         '127.0.0.1',
         'localhost',
     ]
     
-    # Allow debug toolbar in production when PRODUCTION_DEBUG is True
-    if PRODUCTION_DEBUG and not DEBUG:
+    # Configure debug toolbar for Render environment when debugging
+    if RENDER:
         import socket
-        hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
-        INTERNAL_IPS += [ip[: ip.rfind(".")] + ".1" for ip in ips]
+        try:
+            # Get container IP for Render
+            hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+            INTERNAL_IPS += [ip[: ip.rfind(".")] + ".1" for ip in ips]
+            INTERNAL_IPS += ips
+            
+        except Exception as e:
+            print(f"⚠️ Could not determine Render IPs for debug toolbar: {e}")
+        
+        # Render-specific debug toolbar settings
+        DEBUG_TOOLBAR_CONFIG = {
+            'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
+            'SHOW_TEMPLATE_CONTEXT': True,
+            'ENABLE_STACKTRACES': True,
+            'SHOW_COLLAPSED': True,
+            'JQUERY_URL': '//ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
+        }
+        print("🐛 Debug toolbar configured for Render")
 
 TEMPLATES = [
     {
@@ -179,7 +186,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 
-# DATABASE CONFIGURATION - Enhanced with debug logging
+# DATABASE CONFIGURATION
 database_url = config('DATABASE_URL')
 
 DATABASES = {
@@ -193,21 +200,21 @@ DATABASES = {
 # Override engine for django-tenants
 DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
 
-# Configure SSL based on environment
-if 'localhost' in database_url or '127.0.0.1' in database_url:
-    # Local database - disable SSL
+# Configure SSL based on RENDER environment variable
+if not RENDER:
+    # Local development - disable SSL for local PostgreSQL
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'disable',
         'options': '-c search_path=public'
     }
-    print(f"📊 Using LOCAL PostgreSQL database via DATABASE_URL (SSL disabled)")
+    print(f"📊 Using LOCAL PostgreSQL database (SSL disabled)")
 else:
-    # External database - require SSL
+    # Production/Render - require SSL for external PostgreSQL
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'require',
         'options': '-c search_path=public'
     }
-    print(f"📊 Using EXTERNAL PostgreSQL database via DATABASE_URL (SSL required)")
+    print(f"📊 Using RENDER PostgreSQL database (SSL required)")
 
 # Redis & Channels
 CHANNEL_LAYERS = {
@@ -219,10 +226,9 @@ CHANNEL_LAYERS = {
     },
 }
 
-# SMART CACHE CONFIGURATION
+# CACHE CONFIGURATION
 redis_url = config('REDIS_URL', default=None)
 if redis_url and redis_url != '':
-    # Redis available
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.redis.RedisCache',
@@ -231,14 +237,13 @@ if redis_url and redis_url != '':
     }
     print("💾 Using Redis cache")
 else:
-    # Fallback to database cache
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
             'LOCATION': 'cache_table',
         }
     }
-    print("💾 Using database cache (Redis not available)")
+    print("💾 Using database cache")
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -254,16 +259,21 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# STATIC FILES CONFIGURATION
+# STATIC FILES CONFIGURATION - Render optimized
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
-]
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
-if not DEBUG:
+if RENDER:
+    # Production on Render - use WhiteNoise
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    
+    # Render-specific static file optimizations
+    WHITENOISE_USE_FINDERS = True
+    WHITENOISE_AUTOREFRESH = DEBUG  # Only refresh when debugging
+    WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
 else:
+    # Local development
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Media files
@@ -272,15 +282,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Create required directories
 def ensure_directories():
-    """Ensure required directories exist"""
     directories = [
-        BASE_DIR / 'static',
-        BASE_DIR / 'static' / 'css',
-        BASE_DIR / 'static' / 'js',
-        BASE_DIR / 'static' / 'img',
-        BASE_DIR / 'staticfiles',
-        BASE_DIR / 'media',
-        BASE_DIR / 'logs',
+        BASE_DIR / 'static', BASE_DIR / 'static' / 'css', BASE_DIR / 'static' / 'js',
+        BASE_DIR / 'static' / 'img', BASE_DIR / 'staticfiles', BASE_DIR / 'media', BASE_DIR / 'logs',
     ]
     for directory in directories:
         directory.mkdir(exist_ok=True)
@@ -303,8 +307,9 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
-# ENHANCED EMAIL CONFIGURATION
-if DEBUG:
+# EMAIL CONFIGURATION based on RENDER environment
+if not RENDER:
+    # Local development - Gmail SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
     EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -314,6 +319,7 @@ if DEBUG:
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@localhost')
     print("📧 Using LOCAL email configuration (Gmail SMTP)")
 else:
+    # Production/Render - Domain email
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='mail.autowash.co.ke')
     EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -321,14 +327,15 @@ else:
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='noreply@autowash.co.ke')
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Autowash <noreply@autowash.co.ke>')
-    print("📧 Using PRODUCTION email configuration")
+    print("📧 Using PRODUCTION email configuration (Domain email)")
 
 # SMS Configuration
 SMS_API_KEY = config('SMS_API_KEY', default='')
 SMS_USERNAME = config('SMS_USERNAME', default='sandbox')
 
-# M-PESA CONFIGURATION
-if DEBUG:
+# M-PESA CONFIGURATION based on RENDER environment
+if not RENDER:
+    # Local development - Sandbox
     MPESA_ENVIRONMENT = 'sandbox'
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
@@ -337,6 +344,7 @@ if DEBUG:
     MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='http://localhost:8000/api/mpesa/callback/')
     print("💰 Using SANDBOX M-Pesa configuration")
 else:
+    # Production/Render - Production M-Pesa
     MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='production')
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
@@ -377,12 +385,12 @@ ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 
-# ENHANCED SECURITY SETTINGS
+# SMART SECURITY SETTINGS
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-if DEBUG:
+if not RENDER:
     # Local development - relaxed security
     SECURE_HSTS_SECONDS = 0
     SECURE_SSL_REDIRECT = False
@@ -390,8 +398,8 @@ if DEBUG:
     CSRF_COOKIE_SECURE = False
     print("🔒 Using LOCAL security settings (relaxed)")
 else:
-    if PRODUCTION_DEBUG:
-        # Relaxed security for production debugging
+    if DEBUG:
+        # Production with debugging - relaxed security for easier debugging
         SECURE_HSTS_SECONDS = 0
         SECURE_SSL_REDIRECT = False
         SESSION_COOKIE_SECURE = False
@@ -419,17 +427,9 @@ RATELIMIT_ENABLE = True
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
-# ENHANCED LOGGING CONFIGURATION
+# LOGGING CONFIGURATION
 log_dir = BASE_DIR / 'logs'
 log_dir.mkdir(exist_ok=True)
-
-# Determine log level based on debug settings
-if DEBUG:
-    log_level = 'DEBUG'
-elif PRODUCTION_DEBUG:
-    log_level = PRODUCTION_DEBUG_LEVEL
-else:
-    log_level = 'INFO'
 
 LOGGING = {
     'version': 1,
@@ -443,49 +443,23 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
-        'debug': {
-            'format': '[{asctime}] {levelname} {name}: {message}',
-            'style': '{',
-        },
-        'request': {
-            'format': '[{asctime}] {levelname} {name}: {message}',
-            'style': '{',
-        },
     },
     'handlers': {
         'file': {
-            'level': log_level,
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'class': 'logging.FileHandler',
             'filename': log_dir / 'django.log',
             'formatter': 'verbose',
         },
-        'debug_file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': log_dir / 'debug.log',
-            'formatter': 'debug',
-        },
-        'request_file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': log_dir / 'requests.log',
-            'formatter': 'request',
-        },
-        'sql_file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': log_dir / 'sql.log',
-            'formatter': 'verbose',
-        },
         'console': {
-            'level': log_level,
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
     },
     'root': {
         'handlers': ['console', 'file'],
-        'level': log_level,
+        'level': 'DEBUG' if DEBUG else 'INFO',
     },
     'loggers': {
         'django': {
@@ -493,51 +467,56 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'django.request': {
-            'handlers': ['console', 'request_file'] if PRODUCTION_DEBUG_REQUESTS else ['console'],
-            'level': 'DEBUG' if PRODUCTION_DEBUG_REQUESTS else 'INFO',
-            'propagate': False,
-        },
-        'django.db.backends': {
-            'handlers': ['sql_file'] if PRODUCTION_DEBUG_SQL else [],
-            'level': 'DEBUG' if PRODUCTION_DEBUG_SQL else 'INFO',
-            'propagate': False,
-        },
         'django_tenants': {
-            'handlers': ['console', 'file', 'debug_file'] if EFFECTIVE_DEBUG else ['console', 'file'],
-            'level': log_level,
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         'apps': {
-            'handlers': ['console', 'file', 'debug_file'] if EFFECTIVE_DEBUG else ['console', 'file'],
-            'level': log_level,
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
     },
 }
 
-# CORS CONFIGURATION
-if DEBUG:
+# CORS CONFIGURATION based on RENDER environment
+if not RENDER:
+    # Local development - allow all origins
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
     print("🌐 Using LOCAL CORS settings (allow all)")
 else:
+    # Production/Render - Render-optimized CORS
     CORS_ALLOWED_ORIGINS = [
+        # Primary custom domains
         "https://autowash.co.ke",
         "https://www.autowash.co.ke",
-        'https://www.autowash-3jpr.onrender.com',
-        'https://autowash-3jpr.onrender.com'  
+        # Render domains
+        'https://autowash-3jpr.onrender.com',
+        'https://www.autowash-3jpr.onrender.com'
     ]
+    
+    # Add Render external hostname if available
+    render_external_hostname = config('RENDER_EXTERNAL_HOSTNAME', default='')
+    if render_external_hostname:
+        CORS_ALLOWED_ORIGINS.append(f"https://{render_external_hostname}")
+    
     CORS_ALLOWED_ORIGIN_REGEXES = [
         r"^https://.*\.autowash\.co\.ke$",
         r"^https://.*\.autowash-3jpr\.onrender\.com$",
+        r"^https://.*\.onrender\.com$",  # Allow all Render subdomains
     ]
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_ALL_ORIGINS = False
-    print("🌐 Using PRODUCTION CORS settings (restricted)")
+    
+    # Render-specific CORS optimizations
+    CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight for 24 hours
+    
+    print("🌐 Using RENDER CORS settings (optimized for Render)")
 
-# Sentry Configuration - Only enable when not debugging
-if not DEBUG and not PRODUCTION_DEBUG and config('SENTRY_DSN', default=''):
+# Sentry Configuration - Only when not debugging
+if RENDER and not DEBUG and config('SENTRY_DSN', default=''):
     sentry_sdk.init(
         dsn=config('SENTRY_DSN'),
         integrations=[DjangoIntegration()],
@@ -545,8 +524,10 @@ if not DEBUG and not PRODUCTION_DEBUG and config('SENTRY_DSN', default=''):
         send_default_pii=True
     )
     print("🐛 Sentry error tracking enabled")
+elif DEBUG:
+    print("🐛 Sentry disabled (debug mode active)")
 else:
-    print("🐛 Sentry disabled (debugging enabled)")
+    print("🐛 Sentry disabled (local development or no DSN)")
 
 # Custom Settings
 BUSINESS_LOGO_UPLOAD_PATH = 'business_logos/'
@@ -578,37 +559,37 @@ SUBSCRIPTION_PLANS = {
     }
 }
 
-# Environment-specific startup message
-if DEBUG:
-    print("\n" + "="*60)
+# STARTUP MESSAGES based on RENDER environment
+if not RENDER:
+    print("\n" + "="*70)
     print("🏠 AUTOWASH - LOCAL DEVELOPMENT ENVIRONMENT")
-    print("="*60)
-    print("🌐 Tenant URLs will be: businessname.localhost:8000")
-    print("📧 Using Gmail SMTP for emails")
-    print("💰 Using M-Pesa sandbox")
-    print("🔒 Security settings are relaxed")
-    print("🐛 Debug toolbar enabled")
-    print("="*60 + "\n")
+    print("="*70)
+    print("🌐 URLs: businessname.localhost:8000")
+    print("📧 Email: Gmail SMTP")
+    print("💰 M-Pesa: Sandbox")
+    print("🔒 Security: Relaxed")
+    print(f"🐛 Debug mode: {'Enabled' if DEBUG else 'Disabled'}")
+    print("="*70 + "\n")
 else:
-    print("\n" + "="*60) 
-    print("🚀 AUTOWASH - PRODUCTION ENVIRONMENT")
-    print("="*60)
-    print("🌐 Tenant URLs will be: businessname.autowash.co.ke")
-    print("📧 Using domain email server")
-    print("💰 Using M-Pesa production")
-    if PRODUCTION_DEBUG:
-        print("🔧 PRODUCTION DEBUG MODE ENABLED")
-        print(f"📊 Debug level: {PRODUCTION_DEBUG_LEVEL}")
-        if PRODUCTION_DEBUG_SQL:
-            print("🔍 SQL logging enabled (check logs/sql.log)")
-        if PRODUCTION_DEBUG_REQUESTS:
-            print("🔍 Request logging enabled (check logs/requests.log)")
-        print("🔒 Security settings are relaxed for debugging")
-        print("📝 Enhanced logging enabled (check logs/debug.log)")
-        print("🐛 Debug toolbar enabled")
-        print("🐛 Sentry disabled for debugging")
+    print("\n" + "="*70) 
+    print("🚀 AUTOWASH - PRODUCTION ENVIRONMENT (RENDER)")
+    print("="*70)
+    print("🌐 URLs: businessname.autowash.co.ke")
+    print("📧 Email: Domain server")
+    print("💰 M-Pesa: Production")
+    
+    if DEBUG:
+        print("🔧 DEBUG MODE: Enabled")
+        print("🐛 Debug toolbar: Available")
+        print("📝 Enhanced logging: Enabled")
+        print("🔒 Security: Relaxed for debugging")
+        print("🐛 Sentry: Disabled")
     else:
-        print("🔒 Security settings are strict")
-        print("🐛 Sentry enabled for error tracking")
-    print("📁 Static files served via WhiteNoise")
-    print("="*60 + "\n")
+        print("🔒 Security: Strict production mode")
+        if config('SENTRY_DSN', default=''):
+            print("🐛 Sentry: Enabled")
+        else:
+            print("🐛 Sentry: No DSN configured")
+    
+    print("📁 Static files: WhiteNoise")
+    print("="*70 + "\n")
