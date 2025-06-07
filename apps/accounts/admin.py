@@ -1,4 +1,4 @@
-# apps/accounts/admin.py - Fixed to match actual model fields
+# apps/accounts/admin.py - Fixed FK constraint issues
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
@@ -106,7 +106,7 @@ class BusinessAdmin(admin.ModelAdmin):
     """Comprehensive Business admin - FIXED field references"""
     list_display = (
         'name', 'business_type', 'owner_link', 'verification_status',
-        'is_active', 'is_verified', 'schema_status',
+        'is_active', 'is_verified', 'schema_status', 'owner_employee_status',
         'created_at', 'domain_link'
     )
     list_filter = (
@@ -120,10 +120,9 @@ class BusinessAdmin(admin.ModelAdmin):
     )
     readonly_fields = (
         'slug', 'schema_name', 'created_at', 'updated_at',
-        'domain_link', 'schema_status'
+        'domain_link', 'schema_status', 'owner_employee_status'
     )
     
-    # FIXED: Only use fields that actually exist in the Business model
     fieldsets = (
         ('Basic Information', {
             'fields': (
@@ -161,7 +160,7 @@ class BusinessAdmin(admin.ModelAdmin):
         }),
         ('Technical Details', {
             'fields': (
-                'schema_name', 'schema_status', 'domain_link',
+                'schema_name', 'schema_status', 'owner_employee_status', 'domain_link',
                 'created_at', 'updated_at'
             ),
             'classes': ('collapse',)
@@ -170,7 +169,7 @@ class BusinessAdmin(admin.ModelAdmin):
     inlines = [DomainInline, BusinessSettingsInline, BusinessVerificationInline]
     actions = [
         'verify_businesses', 'deactivate_businesses', 'activate_businesses',
-        'export_businesses_csv', 'send_verification_reminder'
+        'export_businesses_csv', 'send_verification_reminder', 'create_owner_employees'
     ]
     
     def get_queryset(self, request):
@@ -218,6 +217,37 @@ class BusinessAdmin(admin.ModelAdmin):
             return format_html('<span style="color: red;">✗ Error</span>')
     schema_status.short_description = 'Schema'
     
+    def owner_employee_status(self, obj):
+        """Check if owner has employee record in tenant schema using user_id"""
+        if not obj.is_verified:
+            return format_html('<span style="color: gray;">N/A (Not Verified)</span>')
+            
+        try:
+            # Check if schema exists first
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
+                    [obj.schema_name]
+                )
+                if not cursor.fetchone():
+                    return format_html('<span style="color: red;">✗ No Schema</span>')
+            
+            # Check if owner employee exists using user_id
+            from django_tenants.utils import schema_context
+            with schema_context(obj.schema_name):
+                from apps.employees.models import Employee
+                try:
+                    employee = Employee.objects.get(user_id=obj.owner.id, is_active=True)
+                    return format_html('<span style="color: green;">✓ Employee ({} - {})</span>', 
+                                     employee.employee_id, employee.get_role_display())
+                except Employee.DoesNotExist:
+                    return format_html('<span style="color: red;">✗ No Employee Record</span>')
+                except Employee.MultipleObjectsReturned:
+                    return format_html('<span style="color: orange;">⚠ Multiple Records</span>')
+        except Exception as e:
+            return format_html('<span style="color: red;">✗ Error: {}</span>', str(e)[:30])
+    owner_employee_status.short_description = 'Owner Employee'
+    
     def domain_link(self, obj):
         domain = obj.domains.filter(is_primary=True).first()
         if domain:
@@ -226,6 +256,113 @@ class BusinessAdmin(admin.ModelAdmin):
             return format_html('<a href="{}" target="_blank">{}</a>', url, domain.domain)
         return 'No Domain'
     domain_link.short_description = 'Domain'
+    
+    # NEW ACTION: Create owner employees for verified businesses
+    def create_owner_employees(self, request, queryset):
+        """Create owner employee records for verified businesses that don't have them"""
+        count = 0
+        failed = 0
+        
+        verified_businesses = queryset.filter(is_verified=True)
+        
+        for business in verified_businesses:
+            try:
+                # Check if schema exists
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
+                        [business.schema_name]
+                    )
+                    if not cursor.fetchone():
+                        self.message_user(request, 
+                                        f'Schema does not exist for {business.name}. Create schema first.',
+                                        level=messages.WARNING)
+                        continue
+                
+                # Check if owner employee already exists
+                from django_tenants.utils import schema_context
+                with schema_context(business.schema_name):
+                    from apps.employees.models import Employee, Department
+                    
+                    # Check if owner already has employee record using user_id
+                    existing_employee = Employee.objects.filter(user_id=business.owner.id, is_active=True).first()
+                    if existing_employee:
+                        print(f"Owner employee already exists for {business.name}: {existing_employee.employee_id}")
+                        continue
+                    
+                    # Also check for employees with old user relationship that need conversion
+                    try:
+                        old_employee = Employee.objects.filter(user_id__isnull=True).first()
+                        if old_employee and hasattr(old_employee, 'user') and old_employee.user and old_employee.user.id == business.owner.id:
+                            # Convert old employee record
+                            old_employee.user_id = business.owner.id
+                            old_employee.save()
+                            print(f"Converted existing employee record for {business.name}: {old_employee.employee_id}")
+                            continue
+                    except Exception as convert_error:
+                        print(f"Error during conversion check: {convert_error}")
+                        pass
+                        print(f"Owner employee already exists for {business.name}: {existing_employee.employee_id}")
+                        continue
+                    
+                    # Create management department if it doesn't exist
+                    management_dept, created = Department.objects.get_or_create(
+                        name='Management',
+                        defaults={
+                            'description': 'Business management and administration',
+                            'is_active': True
+                        }
+                    )
+                    
+                    # Generate employee ID
+                    employee_count = Employee.objects.count()
+                    employee_id = f"EMP{business.schema_name.upper()[:3]}{employee_count + 1:04d}"
+                    
+                    # Get user profile for additional info from public schema
+                    user_profile = None
+                    try:
+                        with schema_context('public'):
+                            user_profile = business.owner.profile
+                    except:
+                        pass
+                    
+                    # Create owner as employee using user_id
+                    owner_employee = Employee.objects.create(
+                        user_id=business.owner.id,  # Use user_id instead of user object
+                        employee_id=employee_id,
+                        role='owner',
+                        employment_type='full_time',
+                        status='active',
+                        department=management_dept,
+                        hire_date=business.created_at.date(),
+                        is_active=True,
+                        can_login=True,
+                        receive_notifications=True,
+                        # REMOVED: email=business.owner.email,  # This causes the error
+                        phone=user_profile.phone if user_profile else None,
+                        # Default address info
+                        country='Kenya',
+                    )
+                    
+                    # Set department head if not already set
+                    if not management_dept.head:
+                        management_dept.head = owner_employee
+                        management_dept.save()
+                    
+                    print(f"Created owner employee for {business.name}: {owner_employee.employee_id}")
+                    count += 1
+                    
+            except Exception as e:
+                failed += 1
+                print(f"Failed to create owner employee for {business.name}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+        
+        if count > 0:
+            self.message_user(request, f'{count} owner employee record(s) created successfully.')
+        if failed > 0:
+            self.message_user(request, f'{failed} owner employee creation(s) failed.', level=messages.ERROR)
+    create_owner_employees.short_description = "👤 Create owner employee records"
     
     # Admin Actions
     def verify_businesses(self, request, queryset):
@@ -312,7 +449,7 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
     """Dedicated admin for business verification management"""
     list_display = (
         'business_link', 'status', 'submitted_at', 'verified_by', 'verified_at',
-        'has_documents', 'business_owner', 'schema_exists'
+        'has_documents', 'business_owner', 'schema_exists', 'owner_employee_exists'
     )
     list_filter = (
         'status', 'submitted_at', 'verified_at', 'verified_by'
@@ -321,10 +458,10 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
         'business__name', 'business__owner__username', 
         'business__owner__email', 'notes', 'rejection_reason'
     )
-    readonly_fields = ('submitted_at', 'business_owner', 'schema_exists')
+    readonly_fields = ('submitted_at', 'business_owner', 'schema_exists', 'owner_employee_exists')
     fieldsets = (
         ('Business Information', {
-            'fields': ('business', 'business_owner', 'status', 'schema_exists')
+            'fields': ('business', 'business_owner', 'status', 'schema_exists', 'owner_employee_exists')
         }),
         ('Verification Details', {
             'fields': (
@@ -384,9 +521,40 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
             return format_html('<span style="color: red;">✗ Error</span>')
     schema_exists.short_description = 'Schema Status'
     
-    # MAIN ADMIN ACTION for verification
+    def owner_employee_exists(self, obj):
+        """Check if owner employee exists in tenant schema using user_id"""
+        if obj.status != 'verified':
+            return format_html('<span style="color: gray;">N/A (Not Verified)</span>')
+            
+        try:
+            # Check if schema exists first
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
+                    [obj.business.schema_name]
+                )
+                if not cursor.fetchone():
+                    return format_html('<span style="color: red;">✗ No Schema</span>')
+            
+            # Check if owner employee exists using user_id
+            from django_tenants.utils import schema_context
+            with schema_context(obj.business.schema_name):
+                from apps.employees.models import Employee
+                try:
+                    employee = Employee.objects.get(user_id=obj.business.owner.id, is_active=True)
+                    return format_html('<span style="color: green;">✓ Employee Exists ({})</span>', 
+                                     employee.employee_id)
+                except Employee.DoesNotExist:
+                    return format_html('<span style="color: red;">✗ No Employee Record</span>')
+                except Employee.MultipleObjectsReturned:
+                    return format_html('<span style="color: orange;">⚠ Multiple Records</span>')
+        except Exception as e:
+            return format_html('<span style="color: red;">✗ Error</span>')
+    owner_employee_exists.short_description = 'Owner Employee'
+    
+    # ENHANCED MAIN ADMIN ACTION for verification with owner employee creation
     def approve_and_create_schema(self, request, queryset):
-        """Approve verifications and create tenant schemas - MAIN ACTION"""
+        """Approve verifications, create tenant schemas, and ensure owner employee exists"""
         count = 0
         failed = 0
         
@@ -410,7 +578,9 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
                             "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
                             [business.schema_name]
                         )
-                        if cursor.fetchone():
+                        schema_exists = cursor.fetchone()
+                        
+                        if schema_exists:
                             print(f"Schema already exists for: {business.name}")
                         else:
                             # Create the tenant schema
@@ -431,10 +601,64 @@ class BusinessVerificationAdmin(admin.ModelAdmin):
                             
                             print(f"Schema created successfully for: {business.name}")
                     
+                    # IMPORTANT: Create owner employee record using user_id
+                    from django_tenants.utils import schema_context
+                    with schema_context(business.schema_name):
+                        from apps.employees.models import Employee, Department
+                        
+                        # Check if owner employee already exists using user_id
+                        existing_employee = Employee.objects.filter(user_id=business.owner.id, is_active=True).first()
+                        if not existing_employee:
+                            # Create management department
+                            management_dept, created = Department.objects.get_or_create(
+                                name='Management',
+                                defaults={
+                                    'description': 'Business management and administration',
+                                    'is_active': True
+                                }
+                            )
+                            
+                            # Generate employee ID
+                            employee_count = Employee.objects.count()
+                            employee_id = f"EMP{business.schema_name.upper()[:3]}{employee_count + 1:04d}"
+                            
+                            # Get user profile for additional info from public schema
+                            user_profile = None
+                            try:
+                                with schema_context('public'):
+                                    user_profile = business.owner.profile
+                            except:
+                                pass
+                            
+                            # Create owner as employee using user_id directly
+                            owner_employee = Employee.objects.create(
+                                user_id=business.owner.id,  # Use user_id instead of user object
+                                employee_id=employee_id,
+                                role='owner',
+                                employment_type='full_time',
+                                status='active',
+                                department=management_dept,
+                                hire_date=business.created_at.date(),
+                                is_active=True,
+                                can_login=True,
+                                receive_notifications=True,
+                                # REMOVED: email=business.owner.email,  # This causes the error
+                                phone=user_profile.phone if user_profile else None,
+                                country='Kenya',
+                            )
+                            
+                            # Set department head
+                            management_dept.head = owner_employee
+                            management_dept.save()
+                            
+                            print(f"Created owner employee: {owner_employee.employee_id}")
+                        else:
+                            print(f"Owner employee already exists: {existing_employee.employee_id}")
+                    
                     # Send approval email
                     try:
                         domain = business.domains.filter(is_primary=True).first()
-                        dashboard_url = f"http{'s' if not settings.DEBUG else ''}://{domain.domain}/dashboard/" if domain else ""
+                        dashboard_url = f"http{'s' if not settings.DEBUG else ''}://{domain.domain}/" if domain else ""
                         
                         send_mail(
                             subject=f'🎉 {business.name} has been verified!',
@@ -471,11 +695,11 @@ The Autowash Team''',
                 verification.save()
         
         if count > 0:
-            self.message_user(request, f'{count} business(es) verified and schemas created successfully.')
+            self.message_user(request, f'{count} business(es) verified, schemas created, and owner employees set up successfully.')
         if failed > 0:
             self.message_user(request, f'{failed} business(es) failed to process.', level=messages.ERROR)
 
-    approve_and_create_schema.short_description = "🚀 Approve and create business schemas"
+    approve_and_create_schema.short_description = "🚀 Approve, create schema & owner employee"
     
     def approve_verifications(self, request, queryset):
         """Bulk approve verifications WITHOUT creating schemas"""

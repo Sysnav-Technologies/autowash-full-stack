@@ -1,7 +1,9 @@
+# apps/core/decorators.py - Fixed for path-based tenant routing
+
 from functools import wraps
 from django.http import HttpResponseForbidden, HttpResponseRedirect
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -12,7 +14,7 @@ def business_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
         if not hasattr(request, 'business') or not request.business:
             messages.error(request, 'You must be accessing from a business domain.')
-            return HttpResponseRedirect(reverse('landing'))
+            return redirect('/public/')
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 
@@ -23,9 +25,13 @@ def employee_required(roles=None):
         @login_required
         @business_required
         def _wrapped_view(request, *args, **kwargs):
+            if not request.user.is_authenticated or not request.user.id:
+                return redirect('/auth/login/')
+                
             try:
                 from apps.employees.models import Employee
-                employee = Employee.objects.get(user=request.user)
+                # FIX: Use user_id instead of user foreign key for cross-schema compatibility
+                employee = Employee.objects.get(user_id=request.user.id, is_active=True)
                 
                 if not employee.is_active:
                     raise PermissionDenied("Your account is not active.")
@@ -38,7 +44,8 @@ def employee_required(roles=None):
                 
             except Employee.DoesNotExist:
                 messages.error(request, 'You are not registered as an employee in this business.')
-                return HttpResponseRedirect(reverse('accounts:profile'))
+                # Redirect to public instead of accounts:profile
+                return redirect('/public/')
                 
         return _wrapped_view
     return decorator
@@ -62,7 +69,9 @@ def subscription_active_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
         if not request.business.subscription or not request.business.subscription.is_active:
             messages.warning(request, 'Your subscription is not active. Please renew to continue using the service.')
-            return HttpResponseRedirect(reverse('subscriptions:plans'))
+            # Construct proper business URL for path-based routing
+            business_slug = getattr(request, 'business_slug', request.business.slug)
+            return redirect(f'/business/{business_slug}/subscriptions/plans/')
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 
@@ -75,7 +84,8 @@ def feature_required(feature_name):
             subscription = request.business.subscription
             if not subscription.has_feature(feature_name):
                 messages.error(request, f'This feature ({feature_name}) is not available in your current plan.')
-                return HttpResponseRedirect(reverse('subscriptions:upgrade'))
+                business_slug = getattr(request, 'business_slug', request.business.slug)
+                return redirect(f'/business/{business_slug}/subscriptions/upgrade/')
             return view_func(request, *args, **kwargs)
         return _wrapped_view
     return decorator

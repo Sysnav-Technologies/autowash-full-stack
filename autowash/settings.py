@@ -1,4 +1,4 @@
-# Enhanced settings.py with simple debug control
+# Enhanced settings.py with path-based django-tenants routing
 import os
 from pathlib import Path
 from decouple import config
@@ -105,7 +105,7 @@ elif DEBUG and RENDER:
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
-# Tenant Configuration
+# Tenant Configuration - PATH-BASED ROUTING
 TENANT_MODEL = "accounts.Business"
 TENANT_DOMAIN_MODEL = "accounts.Domain"
 PUBLIC_SCHEMA_URLCONF = 'autowash.urls_public'
@@ -113,30 +113,59 @@ ROOT_URLCONF = 'autowash.urls'
 PUBLIC_SCHEMA_NAME = 'public'
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
-# Database routing
+# PATH-BASED TENANT ROUTING CONFIGURATION
+TENANT_ROUTING = {
+    'ROUTING_METHOD': 'path',  # Use path-based instead of subdomain
+    'TENANT_URL_PREFIX': 'business',  # URL prefix for tenant routes
+    'PUBLIC_TENANT_DOMAIN': 'localhost:8000' if not RENDER else 'autowash-3jpr.onrender.com',
+}
+
+# Enhanced Session Configuration for Multi-tenant setup
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Use database sessions
+SESSION_COOKIE_NAME = 'autowash_sessionid'  # Custom session name
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'  # Important for cross-schema navigation
+SESSION_SAVE_EVERY_REQUEST = False  # CHANGED: Don't save on every request
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session across browser tabs
+
+# CRITICAL: Session sharing across schemas
+SESSION_COOKIE_DOMAIN = None  # Use default domain
+SESSION_COOKIE_PATH = '/'  # Apply to all paths
+
+# Add these new settings for better session handling
+SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
+SESSION_CACHE_ALIAS = 'default'  # Use default cache for session caching
+
+# Database session table configuration
+# Make sure sessions are always stored in public schema
 DATABASE_ROUTERS = (
+    'autowash.routers.SessionRouter',  # Add this custom router
     'django_tenants.routers.TenantSyncRouter',
 )
 
-# MIDDLEWARE
+# Updated MIDDLEWARE configuration with session fix
 MIDDLEWARE = [
-    'django_tenants.middleware.main.TenantMainMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'apps.core.middleware.SimpleSessionFixMiddleware',  # NEW - Session persistence
+    'apps.core.middleware.PathBasedTenantMiddleware',  # BEFORE auth
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.core.middleware.SharedAuthenticationMiddleware',  # NEW - AFTER auth
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_ratelimit.middleware.RatelimitMiddleware',
     'apps.core.middleware.BusinessContextMiddleware',
     'apps.core.middleware.TimezoneMiddleware',
+    'apps.core.middleware.UserActivityMiddleware',
     'allauth.account.middleware.AccountMiddleware',
 ]
 
-# Add debug toolbar middleware when enabled - WITH RENDER PROTECTION
+# Add debug toolbar middleware when enabled
 if DEBUG and not RENDER:
     # Local development only
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
@@ -442,9 +471,7 @@ else:
         CSRF_COOKIE_SECURE = True
         print("🔒 Using PRODUCTION security settings (strict)")
 
-# Session Settings
-SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 
 # Rate Limiting
 RATELIMIT_ENABLE = True
@@ -588,9 +615,10 @@ SUBSCRIPTION_PLANS = {
 # STARTUP MESSAGES based on RENDER environment
 if not RENDER:
     print("\n" + "="*70)
-    print("🏠 AUTOWASH - LOCAL DEVELOPMENT ENVIRONMENT")
+    print("🏠 AUTOWASH - LOCAL DEVELOPMENT ENVIRONMENT (PATH-BASED)")
     print("="*70)
-    print("🌐 URLs: businessname.localhost:8000")
+    print("🌐 Main site: http://localhost:8000")
+    print("🏢 Business URLs: http://localhost:8000/business/{slug}/")
     print("📧 Email: Gmail SMTP")
     print("💰 M-Pesa: Sandbox")
     print("🔒 Security: Relaxed")
@@ -598,9 +626,10 @@ if not RENDER:
     print("="*70 + "\n")
 else:
     print("\n" + "="*70) 
-    print("🚀 AUTOWASH - PRODUCTION ENVIRONMENT (RENDER)")
+    print("🚀 AUTOWASH - PRODUCTION ENVIRONMENT (RENDER - PATH-BASED)")
     print("="*70)
-    print("🌐 URLs: businessname.autowash.co.ke")
+    print("🌐 Main site: https://autowash-3jpr.onrender.com")
+    print("🏢 Business URLs: https://autowash-3jpr.onrender.com/business/{slug}/")
     print("📧 Email: Domain server")
     print("💰 M-Pesa: Production")
     

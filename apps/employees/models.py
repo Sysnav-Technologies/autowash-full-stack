@@ -1,3 +1,5 @@
+# apps/employees/models.py - Fixed to avoid FK constraint to User
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -5,6 +7,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from apps.core.models import TimeStampedModel, SoftDeleteModel, Address, ContactInfo
 from apps.core.utils import upload_to_path
 from decimal import Decimal
+from django_tenants.utils import schema_context, get_public_schema_name
 
 class Department(TimeStampedModel):
     """Department model for organizing employees"""
@@ -50,7 +53,7 @@ class Position(TimeStampedModel):
         ordering = ['title']
 
 class Employee(SoftDeleteModel, Address, ContactInfo):
-    """Employee model with comprehensive information"""
+    """Employee model with comprehensive information - Fixed for django-tenants"""
     
     ROLE_CHOICES = [
         ('owner', 'Business Owner'),
@@ -76,8 +79,11 @@ class Employee(SoftDeleteModel, Address, ContactInfo):
         ('terminated', 'Terminated'),
     ]
     
+    # IMPORTANT: Use user_id instead of OneToOneField to avoid FK constraint
+    # Nullable initially to allow smooth migration, will be populated automatically
+    user_id = models.IntegerField(null=True, blank=True, unique=True)  # Store user ID from public schema
+    
     # Basic Information
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='employee_profile')
     employee_id = models.CharField(max_length=20, unique=True)
     photo = models.ImageField(upload_to='employee_photos/', blank=True, null=True)
     
@@ -162,11 +168,51 @@ class Employee(SoftDeleteModel, Address, ContactInfo):
     )
     
     def __str__(self):
-        return f"{self.user.get_full_name() or self.user.username} ({self.employee_id})"
+        return f"{self.full_name} ({self.employee_id})"
+    
+    def save(self, *args, **kwargs):
+        # Auto-populate user_id from user if not set
+        if hasattr(self, 'user') and self.user and not self.user_id:
+            self.user_id = self.user.id
+        super().save(*args, **kwargs)
+    
+    @property
+    def user(self):
+        """Get user object from public schema"""
+        if not self.user_id:
+            return None
+        try:
+            with schema_context(get_public_schema_name()):
+                return User.objects.get(id=self.user_id)
+        except User.DoesNotExist:
+            return None
     
     @property
     def full_name(self):
-        return self.user.get_full_name() or self.user.username
+        user = self.user
+        if user:
+            return user.get_full_name() or user.username
+        return f"User ID {self.user_id}"
+    
+    @property
+    def username(self):
+        user = self.user
+        return user.username if user else f"user_{self.user_id}"
+    
+    @property
+    def email(self):
+        user = self.user
+        return user.email if user else ""
+    
+    @property
+    def first_name(self):
+        user = self.user
+        return user.first_name if user else ""
+    
+    @property
+    def last_name(self):
+        user = self.user
+        return user.last_name if user else ""
     
     @property
     def age(self):
@@ -203,7 +249,7 @@ class Employee(SoftDeleteModel, Address, ContactInfo):
     class Meta:
         verbose_name = "Employee"
         verbose_name_plural = "Employees"
-        ordering = ['user__first_name', 'user__last_name']
+        ordering = ['employee_id']
 
 class EmployeeDocument(TimeStampedModel):
     """Employee document storage"""

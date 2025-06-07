@@ -1,16 +1,18 @@
-# apps/core/context_processors.py - Updated version
+# apps/core/context_processors.py - Updated for path-based routing
 
 from django.conf import settings
 from django.utils import timezone
 from apps.core.utils import get_business_performance_metrics
 
 def business_context(request):
-    """Add business context to templates"""
+    """Add business context to templates with path-based routing"""
     context = {
         'business': getattr(request, 'business', None),
+        'business_slug': getattr(request, 'business_slug', None),
         'current_year': timezone.now().year,
         'app_name': 'Autowash',
         'company_name': 'Autowash Technologies',
+        'is_tenant_context': hasattr(request, 'business') and request.business is not None,
     }
     
     # Add business-specific context if we're in a tenant schema
@@ -26,6 +28,7 @@ def business_context(request):
             'business_timezone': getattr(request.business, 'timezone', 'Africa/Nairobi'),
             'business_verified': is_verified,
             'business_slug': request.business.slug,
+            'business_url_prefix': f'/business/{request.business.slug}',
         })
         
         # Add verification status if not verified
@@ -41,6 +44,12 @@ def business_context(request):
                     'verification_status': 'pending',
                     'verification_submitted': None,
                 })
+    else:
+        # Public schema context
+        context.update({
+            'business_url_prefix': '/public',
+            'is_public_schema': True,
+        })
     
     return context
 
@@ -114,6 +123,7 @@ def verification_context(request):
                     'user_business': business,
                     'requires_verification': not business.is_verified,
                     'verification_complete': business.is_verified,
+                    'business_management_url': f'/business/{business.slug}' if business.is_verified else '/auth/verification-pending/',
                 })
                 
                 # Add verification details if business exists
@@ -169,5 +179,111 @@ def user_role_context(request):
             pass
         except:
             pass
+    
+    return context
+
+def navigation_context(request):
+    """Add navigation context for path-based routing"""
+    context = {
+        'nav_items': [],
+        'current_section': None,
+    }
+    
+    # Determine current section based on path
+    path = request.path_info
+    
+    if hasattr(request, 'business') and request.business:
+        # Business navigation
+        business_prefix = f'/business/{request.business.slug}'
+        
+        # Remove business prefix for section detection
+        if path.startswith(business_prefix):
+            section_path = path[len(business_prefix):]
+        else:
+            section_path = path
+            
+        # Determine current section
+        if section_path.startswith('/employees/'):
+            context['current_section'] = 'employees'
+        elif section_path.startswith('/customers/'):
+            context['current_section'] = 'customers'
+        elif section_path.startswith('/services/'):
+            context['current_section'] = 'services'
+        elif section_path.startswith('/inventory/'):
+            context['current_section'] = 'inventory'
+        elif section_path.startswith('/suppliers/'):
+            context['current_section'] = 'suppliers'
+        elif section_path.startswith('/payments/'):
+            context['current_section'] = 'payments'
+        elif section_path.startswith('/reports/'):
+            context['current_section'] = 'reports'
+        elif section_path.startswith('/notifications/'):
+            context['current_section'] = 'notifications'
+        elif section_path in ['/', '/dashboard/']:
+            context['current_section'] = 'dashboard'
+            
+        # Build navigation items based on user role
+        if request.user.is_authenticated:
+            try:
+                from apps.employees.models import Employee
+                employee = Employee.objects.get(user=request.user, is_active=True)
+                
+                nav_items = [
+                    {'name': 'Dashboard', 'url': f'{business_prefix}/', 'icon': 'fas fa-tachometer-alt', 'section': 'dashboard'},
+                ]
+                
+                if employee.role in ['owner', 'manager']:
+                    nav_items.extend([
+                        {'name': 'Team', 'url': f'{business_prefix}/employees/', 'icon': 'fas fa-users', 'section': 'employees'},
+                    ])
+                
+                nav_items.extend([
+                    {'name': 'Customers', 'url': f'{business_prefix}/customers/', 'icon': 'fas fa-user-friends', 'section': 'customers'},
+                    {'name': 'Services', 'url': f'{business_prefix}/services/', 'icon': 'fas fa-car-wash', 'section': 'services'},
+                ])
+                
+                if employee.role in ['owner', 'manager']:
+                    nav_items.extend([
+                        {'name': 'Inventory', 'url': f'{business_prefix}/inventory/', 'icon': 'fas fa-boxes', 'section': 'inventory'},
+                        {'name': 'Suppliers', 'url': f'{business_prefix}/suppliers/', 'icon': 'fas fa-truck', 'section': 'suppliers'},
+                    ])
+                
+                nav_items.extend([
+                    {'name': 'Payments', 'url': f'{business_prefix}/payments/', 'icon': 'fas fa-credit-card', 'section': 'payments'},
+                ])
+                
+                if employee.role in ['owner', 'manager']:
+                    nav_items.extend([
+                        {'name': 'Reports', 'url': f'{business_prefix}/reports/', 'icon': 'fas fa-chart-bar', 'section': 'reports'},
+                    ])
+                
+                context['nav_items'] = nav_items
+                
+            except Employee.DoesNotExist:
+                pass
+            except:
+                pass
+    else:
+        # Public navigation
+        if path.startswith('/public/'):
+            section_path = path[8:]  # Remove '/public/'
+        else:
+            section_path = path
+            
+        if section_path.startswith('pricing'):
+            context['current_section'] = 'pricing'
+        elif section_path.startswith('features'):
+            context['current_section'] = 'features'
+        elif section_path.startswith('contact'):
+            context['current_section'] = 'contact'
+        else:
+            context['current_section'] = 'home'
+            
+        context['nav_items'] = [
+            {'name': 'Home', 'url': '/public/', 'section': 'home'},
+            {'name': 'Features', 'url': '/public/features/', 'section': 'features'},
+            {'name': 'Pricing', 'url': '/public/pricing/', 'section': 'pricing'},
+            {'name': 'Contact', 'url': '/public/contact/', 'section': 'contact'},
+        ]
     
     return context

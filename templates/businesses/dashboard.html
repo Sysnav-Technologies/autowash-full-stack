@@ -38,6 +38,13 @@
                             <a href="{{ action.url }}" class="btn {% if forloop.first %}btn-light{% else %}btn-outline-light{% endif %} fw-semibold">
                                 <i class="fas fa-{{ action.icon }} me-2"></i>{{ action.title }}
                             </a>
+                            {% empty %}
+                            <a href="#" class="btn btn-light fw-semibold">
+                                <i class="fas fa-plus me-2"></i>New Service
+                            </a>
+                            <a href="#" class="btn btn-outline-light fw-semibold">
+                                <i class="fas fa-users me-2"></i>Add Customer
+                            </a>
                             {% endfor %}
                         </div>
                     </div>
@@ -146,7 +153,7 @@
                         <p class="text-muted mb-1 fw-semibold">Staff Attendance</p>
                         <h3 class="fw-bold text-warning mb-0">{{ quick_stats.employee_attendance|default:0|floatformat:0 }}%</h3>
                         <small class="text-muted">
-                            <i class="fas fa-clock text-warning me-1"></i>{{ today_metrics.employees_present|default:0 }} of {{ today_metrics.total_employees|default:0 }} present
+                            <i class="fas fa-clock text-warning me-1"></i>{{ today_metrics.total_employees_present|default:0 }} of {{ today_metrics.total_employees_present|add:today_metrics.total_employees_absent|default:0 }} present
                         </small>
                     </div>
                     <div class="bg-warning bg-opacity-10 rounded-circle p-3">
@@ -181,6 +188,7 @@
                             <div class="text-center">
                                 <i class="fas fa-chart-line text-muted mb-3" style="font-size: 3rem;"></i>
                                 <p class="text-muted">No revenue data available yet</p>
+                                <small class="text-muted">Start creating services to see revenue trends</small>
                             </div>
                         </div>
                     {% endif %}
@@ -205,10 +213,10 @@
                 <div class="mb-3 {% if not forloop.last %}border-bottom pb-3{% endif %}">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <h6 class="mb-1 fw-semibold">{{ goal.title }}</h6>
-                        <span class="badge bg-{{ goal.status_color }}">{{ goal.get_status_display }}</span>
+                        <span class="badge bg-primary">Active</span>
                     </div>
                     <div class="progress mb-2" style="height: 6px;">
-                        <div class="progress-bar bg-{{ goal.status_color }}" style="width: {{ goal.progress_percentage }}%"></div>
+                        <div class="progress-bar bg-primary" style="width: {{ goal.progress_percentage }}%"></div>
                     </div>
                     <div class="d-flex justify-content-between">
                         <small class="text-muted">{{ goal.current_value }} / {{ goal.target_value }}</small>
@@ -228,9 +236,25 @@
             <div class="card-body p-3">
                 <div class="d-grid gap-2">
                     {% for action in quick_actions %}
-                    <a href="{{ action.url }}" class="btn btn-{{ action.button_class|default:'primary' }}">
+                    <a href="{{ action.url }}" class="btn btn-primary">
                         <i class="fas fa-{{ action.icon }} me-2"></i>{{ action.title }}
                     </a>
+                    {% empty %}
+                    <!-- Default actions when no quick actions are configured -->
+                    <a href="#" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>New Service Order
+                    </a>
+                    <a href="#" class="btn btn-outline-primary">
+                        <i class="fas fa-user-plus me-2"></i>Add Customer
+                    </a>
+                    {% if employee.role == 'owner' or employee.role == 'manager' %}
+                    <a href="#" class="btn btn-outline-success">
+                        <i class="fas fa-user-tie me-2"></i>Add Employee
+                    </a>
+                    <a href="#" class="btn btn-outline-info">
+                        <i class="fas fa-chart-bar me-2"></i>View Reports
+                    </a>
+                    {% endif %}
                     {% endfor %}
                 </div>
             </div>
@@ -238,29 +262,63 @@
         
         <!-- Pending Items -->
         {% if pending_items %}
-        <div class="card border-0 shadow-sm" data-aos="fade-left" data-aos-delay="200">
+        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left" data-aos-delay="200">
             <div class="card-header bg-white border-bottom">
                 <h6 class="mb-0 fw-bold">Items Requiring Attention</h6>
             </div>
             <div class="card-body p-0">
                 {% for item in pending_items %}
-                <div class="d-flex align-items-start p-3 border-bottom">
-                    <div class="bg-{{ item.priority|default:'warning' }} bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
-                        <i class="fas fa-{{ item.icon|default:'exclamation-triangle' }} text-{{ item.priority|default:'warning' }}"></i>
+                <div class="d-flex align-items-start p-3 {% if not forloop.last %}border-bottom{% endif %}">
+                    <div class="bg-{{ item.type|default:'warning' }} bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                        <i class="fas fa-{{ item.icon|default:'exclamation-triangle' }} text-{{ item.type|default:'warning' }}"></i>
                     </div>
                     <div class="flex-grow-1">
                         <p class="mb-1 fw-semibold">{{ item.title }}</p>
-                        <p class="mb-1 text-muted small">{{ item.description }}</p>
                         <small class="text-muted">{{ item.created_at|timesince }} ago</small>
                     </div>
-                    <a href="{{ item.action_url }}" class="btn btn-sm btn-outline-{{ item.priority|default:'warning' }}">
-                        {{ item.action_text|default:'View' }}
+                    <a href="{{ item.url }}" class="btn btn-sm btn-outline-{{ item.type|default:'warning' }}">
+                        View
                     </a>
                 </div>
                 {% endfor %}
             </div>
         </div>
         {% endif %}
+        
+        <!-- Recent Notifications -->
+        <div class="card border-0 shadow-sm" data-aos="fade-left" data-aos-delay="300">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">Recent Activity</h6>
+                    <span class="badge bg-primary">{{ recent_notifications|length|default:0 }}</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_notifications %}
+                    {% for notification in recent_notifications %}
+                    <div class="d-flex align-items-start p-3 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div class="bg-{{ notification.type|default:'primary' }} bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                            <i class="fas fa-{{ notification.icon|default:'bell' }} text-{{ notification.type|default:'primary' }}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="mb-1 fw-semibold">{{ notification.title }}</p>
+                            <p class="mb-1 text-muted small">{{ notification.message }}</p>
+                            <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <div class="p-3 text-center border-top">
+                        <a href="#" class="btn btn-sm btn-outline-primary">View All Activity</a>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-bell-slash text-muted mb-2" style="font-size: 2rem;"></i>
+                        <p class="text-muted mb-0">No recent activity</p>
+                        <small class="text-muted">Activity will appear here as you use the system</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
 
@@ -277,7 +335,7 @@
                 <h6 class="mb-0 fw-bold">{{ widget.title }}</h6>
             </div>
             <div class="card-body">
-                {% include widget.template_path %}
+                <p class="text-muted">Widget content will appear here</p>
             </div>
         </div>
     </div>
@@ -285,9 +343,78 @@
 </div>
 {% endif %}
 
+<!-- Performance Chart Section (for owners/managers) -->
+{% if employee.role == 'owner' or employee.role == 'manager' %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm" data-aos="fade-up">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">Business Performance Overview</h5>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <input type="radio" class="btn-check" name="chartPeriod" id="week" checked>
+                        <label class="btn btn-outline-primary" for="week">7 Days</label>
+                        
+                        <input type="radio" class="btn-check" name="chartPeriod" id="month">
+                        <label class="btn btn-outline-primary" for="month">30 Days</label>
+                        
+                        <input type="radio" class="btn-check" name="chartPeriod" id="year">
+                        <label class="btn btn-outline-primary" for="year">12 Months</label>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div id="performanceChart" style="height: 300px;">
+                            <div class="d-flex align-items-center justify-content-center h-100">
+                                <div class="text-center">
+                                    <i class="fas fa-chart-line text-muted mb-3" style="font-size: 3rem;"></i>
+                                    <p class="text-muted">Performance chart will appear here</p>
+                                    <small class="text-muted">Charts will show as data becomes available</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <h6 class="fw-bold mb-3">Key Metrics</h6>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Total Revenue</span>
+                                    <span class="fw-semibold">KES {{ quick_stats.today_revenue|default:0|floatformat:0 }}</span>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Services Completed</span>
+                                    <span class="fw-semibold">{{ quick_stats.today_services|default:0 }}</span>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Customer Satisfaction</span>
+                                    <span class="fw-semibold">N/A</span>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Staff Efficiency</span>
+                                    <span class="fw-semibold">{{ quick_stats.employee_attendance|default:0|floatformat:0 }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
 // Revenue trend data from Django
-const revenueData = {{ revenue_trend|safe }};
+const revenueData = {{ revenue_trend|safe|default:"[]" }};
 
 document.addEventListener('DOMContentLoaded', function() {
     // Update current time every minute
@@ -298,7 +425,10 @@ document.addEventListener('DOMContentLoaded', function() {
             minute: '2-digit',
             hour12: true 
         });
-        document.getElementById('currentTime').textContent = timeString;
+        const timeElement = document.getElementById('currentTime');
+        if (timeElement) {
+            timeElement.textContent = timeString;
+        }
     }
     
     updateTime();
@@ -323,10 +453,22 @@ document.addEventListener('DOMContentLoaded', function() {
             loadRevenueData(period);
         });
     });
+    
+    // Initialize chart period handlers
+    const chartPeriodInputs = document.querySelectorAll('input[name="chartPeriod"]');
+    chartPeriodInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            console.log('Chart period changed to:', this.id);
+            // Implement chart update logic here
+        });
+    });
 });
 
 function initializeRevenueChart() {
-    const ctx = document.getElementById('revenueCanvas').getContext('2d');
+    const canvas = document.getElementById('revenueCanvas');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
     
     new Chart(ctx, {
         type: 'line',
@@ -400,7 +542,7 @@ function initializeRevenueChart() {
 
 function loadRevenueData(period) {
     // AJAX call to load revenue data for different periods
-    fetch(`/api/revenue-data/?period=${period}`)
+    fetch(`/api/dashboard-data/?period=${period}`)
         .then(response => response.json())
         .then(data => {
             // Update chart with new data
@@ -418,7 +560,7 @@ setInterval(function() {
 }, 300000);
 
 function refreshDashboardMetrics() {
-    fetch('/api/dashboard-metrics/')
+    fetch('/api/dashboard-data/')
         .then(response => response.json())
         .then(data => {
             // Update quick stats
@@ -432,11 +574,35 @@ function refreshDashboardMetrics() {
 function updateQuickStats(data) {
     // Update revenue
     if (data.today_revenue !== undefined) {
-        document.querySelector('.quick-stats h3.text-success').textContent = 
-            `KES ${data.today_revenue.toLocaleString()}`;
+        const revenueElement = document.querySelector('.quick-stats h3.text-success');
+        if (revenueElement) {
+            revenueElement.textContent = `KES ${data.today_revenue.toLocaleString()}`;
+        }
     }
     
-    // Update other metrics...
+    // Update services
+    if (data.today_services !== undefined) {
+        const servicesElement = document.querySelector('.quick-stats h3.text-primary');
+        if (servicesElement) {
+            servicesElement.textContent = data.today_services;
+        }
+    }
+    
+    // Update customers
+    if (data.today_customers !== undefined) {
+        const customersElement = document.querySelector('.quick-stats h3.text-info');
+        if (customersElement) {
+            customersElement.textContent = data.today_customers;
+        }
+    }
+    
+    // Update attendance
+    if (data.employee_attendance !== undefined) {
+        const attendanceElement = document.querySelector('.quick-stats h3.text-warning');
+        if (attendanceElement) {
+            attendanceElement.textContent = `${data.employee_attendance.toFixed(0)}%`;
+        }
+    }
 }
 </script>
 
@@ -481,6 +647,12 @@ function updateQuickStats(data) {
     color: white;
 }
 
+/* Status-specific badge colors */
+.bg-pending { background-color: #f59e0b !important; }
+.bg-in_progress { background-color: #3b82f6 !important; }
+.bg-completed { background-color: #10b981 !important; }
+.bg-cancelled { background-color: #ef4444 !important; }
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .card-body {
@@ -494,223 +666,33 @@ function updateQuickStats(data) {
     #revenueChart {
         height: 250px !important;
     }
-}
-</style>
-{% endblock %}old">{{ service.customer.full_name }}</div>
-                                                <small class="text-muted">{{ service.customer.phone }}</small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="fw-semibold">{{ service.service_type.name }}</div>
-                                        <small class="text-muted">{{ service.vehicle.make }} {{ service.vehicle.model }}</small>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-{{ service.status|default:'secondary' }}">
-                                            {{ service.get_status_display }}
-                                        </span>
-                                    </td>
-                                    <td class="fw-semibold">KES {{ service.total_amount|floatformat:0 }}</td>
-                                    <td class="text-muted">{{ service.created_at|timesince }} ago</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-car-wash text-muted mb-3" style="font-size: 3rem;"></i>
-                        <h6 class="text-muted">No recent services</h6>
-                        <p class="text-muted mb-3">Start by creating your first service order</p>
-                        <a href="{% url 'services:create_order' %}" class="btn btn-primary">
-                            <i class="fas fa-plus me-2"></i>Create Service Order
-                        </a>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
     
-    <!-- Quick Actions & Notifications -->
-    <div class="col-lg-4">
-        <!-- Quick Actions -->
-        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left">
-            <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0 fw-bold">Quick Actions</h6>
-            </div>
-            <div class="card-body p-3">
-                <div class="d-grid gap-2">
-                    <a href="{% url 'services:create_order' %}" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>New Service Order
-                    </a>
-                    <a href="{% url 'customers:create' %}" class="btn btn-outline-primary">
-                        <i class="fas fa-user-plus me-2"></i>Add Customer
-                    </a>
-                    {% if user_role in 'owner,manager' %}
-                    <a href="{% url 'employees:create' %}" class="btn btn-outline-success">
-                        <i class="fas fa-user-tie me-2"></i>Add Employee
-                    </a>
-                    <a href="{% url 'reports:dashboard' %}" class="btn btn-outline-info">
-                        <i class="fas fa-chart-bar me-2"></i>View Reports
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <!-- Recent Notifications -->
-        <div class="card border-0 shadow-sm" data-aos="fade-left" data-aos-delay="100">
-            <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold">Notifications</h6>
-                    {% if unread_notifications_count > 0 %}
-                    <span class="badge bg-danger">{{ unread_notifications_count }}</span>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="card-body p-0">
-                {% if recent_notifications %}
-                    {% for notification in recent_notifications %}
-                    <div class="d-flex align-items-start p-3 border-bottom">
-                        <div class="bg-{{ notification.type|default:'primary' }} bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
-                            <i class="fas fa-{{ notification.icon|default:'bell' }} text-{{ notification.type|default:'primary' }}"></i>
-                        </div>
-                        <div class="flex-grow-1">
-                            <p class="mb-1 fw-semibold">{{ notification.title }}</p>
-                            <p class="mb-1 text-muted small">{{ notification.message }}</p>
-                            <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    <div class="p-3 text-center">
-                        <a href="{% url 'notifications:list' %}" class="btn btn-sm btn-outline-primary">View All</a>
-                    </div>
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-bell-slash text-muted mb-2" style="font-size: 2rem;"></i>
-                        <p class="text-muted mb-0">No notifications</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Performance Chart Section (for owners/managers) -->
-{% if user_role in 'owner,manager' %}
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm" data-aos="fade-up">
-            <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">Revenue Overview</h5>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <input type="radio" class="btn-check" name="chartPeriod" id="week" checked>
-                        <label class="btn btn-outline-primary" for="week">7 Days</label>
-                        
-                        <input type="radio" class="btn-check" name="chartPeriod" id="month">
-                        <label class="btn btn-outline-primary" for="month">30 Days</label>
-                        
-                        <input type="radio" class="btn-check" name="chartPeriod" id="year">
-                        <label class="btn btn-outline-primary" for="year">12 Months</label>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="revenueChart" style="height: 300px;">
-                    <!-- Chart will be rendered here -->
-                    <div class="d-flex align-items-center justify-content-center h-100">
-                        <div class="text-center">
-                            <i class="fas fa-chart-line text-muted mb-3" style="font-size: 3rem;"></i>
-                            <p class="text-muted">Revenue chart will appear here</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Update current time every minute
-    function updateTime() {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-        });
-        document.getElementById('currentTime').textContent = timeString;
+    .quick-stats .card {
+        margin-bottom: 1rem;
     }
     
-    // Update time immediately and then every minute
-    updateTime();
-    setInterval(updateTime, 60000);
-    
-    // Auto-refresh stats every 5 minutes
-    setInterval(function() {
-        // You can implement AJAX refresh of stats here
-        console.log('Refreshing dashboard stats...');
-    }, 300000);
-    
-    // Initialize chart period handlers
-    const chartPeriodInputs = document.querySelectorAll('input[name="chartPeriod"]');
-    chartPeriodInputs.forEach(input => {
-        input.addEventListener('change', function() {
-            console.log('Chart period changed to:', this.id);
-            // Implement chart update logic here
-        });
-    });
-});
-</script>
-
-<style>
-.text-white-75 {
-    color: rgba(255, 255, 255, 0.75) !important;
-}
-
-.bg-gradient-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-}
-
-.card {
-    transition: all 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
-}
-
-.table tbody tr:hover {
-    background-color: rgba(0,0,0,0.02);
-}
-
-.badge {
-    font-size: 0.75rem;
-    padding: 6px 12px;
-}
-
-/* Status-specific badge colors */
-.bg-pending { background-color: #f59e0b !important; }
-.bg-in_progress { background-color: #3b82f6 !important; }
-.bg-completed { background-color: #10b981 !important; }
-.bg-cancelled { background-color: #ef4444 !important; }
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .card-body {
-        padding: 1.5rem;
-    }
-    
-    .table-responsive {
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
         font-size: 0.875rem;
     }
+}
+
+@media (max-width: 576px) {
+    .card-body {
+        padding: 1rem;
+    }
     
-    .d-flex.flex-wrap.gap-3 {
-        gap: 1rem !important;
+    .quick-stats h3 {
+        font-size: 1.5rem;
+    }
+    
+    .btn-group .btn {
+        padding: 0.375rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .welcome-section h2 {
+        font-size: 1.5rem;
     }
 }
 
@@ -722,6 +704,128 @@ document.addEventListener('DOMContentLoaded', function() {
 .quick-stats .card:hover {
     transform: translateY(-5px) scale(1.02);
     box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+/* Loading states */
+.loading-placeholder {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Chart container */
+#revenueChart, #performanceChart {
+    position: relative;
+}
+
+/* Custom scrollbar for notification area */
+.card-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.card-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 2px;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 2px;
+}
+
+.card-body::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Alert animations */
+.alert {
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Button loading state */
+.btn.loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn.loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Dark mode support (if implemented) */
+@media (prefers-color-scheme: dark) {
+    .card {
+        background-color: #1a1a1a;
+        border-color: #333;
+    }
+    
+    .text-muted {
+        color: #888 !important;
+    }
+    
+    .bg-white {
+        background-color: #1a1a1a !important;
+    }
+    
+    .border-bottom {
+        border-color: #333 !important;
+    }
+}
+
+/* Print styles */
+@media print {
+    .btn, .alert-dismissible .btn-close, 
+    .card:hover, .quick-stats .card:hover {
+        transform: none !important;
+        box-shadow: none !important;
+    }
+    
+    .bg-gradient-primary {
+        background: #6c757d !important;
+        color: white !important;
+    }
+    
+    .card {
+        break-inside: avoid;
+        margin-bottom: 1rem;
+    }
 }
 </style>
 {% endblock %}

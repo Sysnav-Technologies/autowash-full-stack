@@ -1,0 +1,213 @@
+<!-- templates/includes/business_layout.html -->
+<!-- Business Dashboard Layout for Authenticated Users in Tenant Schema -->
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-brand">
+            {% if business.logo %}
+                <img src="{{ business.logo.url }}" alt="{{ business.name }}" class="user-avatar me-3">
+            {% else %}
+                <div class="user-avatar placeholder me-3">
+                    {{ business.name|first|upper }}
+                </div>
+            {% endif %}
+            <div class="brand-text">
+                <h6 class="text-white mb-0 font-heading">{{ business.name }}</h6>
+                <small class="text-white-50">{{ business.business_type|title }}</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="sidebar-nav">
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{{ nav_dashboard_url }}">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+            </li>
+            
+            {% if is_owner or is_manager %}
+            <li class="nav-item">
+                <a class="nav-link {% if 'employees' in request.resolver_match.namespace %}active{% endif %}" href="{{ nav_employees_url }}">
+                    <i class="fas fa-users"></i>
+                    <span class="nav-text">Team</span>
+                </a>
+            </li>
+            {% endif %}
+            
+            <li class="nav-item">
+                <a class="nav-link {% if 'customers' in request.resolver_match.namespace %}active{% endif %}" href="{{ nav_customers_url }}">
+                    <i class="fas fa-user-friends"></i>
+                    <span class="nav-text">Customers</span>
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link {% if 'services' in request.resolver_match.namespace %}active{% endif %}" href="{{ nav_services_url }}">
+                    <i class="fas fa-car-wash"></i>
+                    <span class="nav-text">Services</span>
+                </a>
+            </li>
+            
+            {% if is_owner or is_manager %}
+            <li class="nav-item">
+                <a class="nav-link {% if 'inventory' in request.resolver_match.namespace %}active{% endif %}" href="{{ nav_inventory_url }}">
+                    <i class="fas fa-boxes"></i>
+                    <span class="nav-text">Inventory</span>
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link {% if 'suppliers' in request.resolver_match.namespace %}active{% endif %}" href="{{ nav_suppliers_url }}">
+                    <i class="fas fa-truck"></i>
+                    <span class="nav-text">Suppliers</span>
+                </a>
+            </li>
+            {% endif %}
+            
+            <li class="nav-item">
+                <a class="nav-link {% if 'payments' in request.resolver_match.namespace %}active{% endif %}" href="{{ nav_payments_url }}">
+                    <i class="fas fa-credit-card"></i>
+                    <span class="nav-text">Payments</span>
+                </a>
+            </li>
+            
+            {% if is_owner or is_manager %}
+            <li class="nav-item">
+                <a class="nav-link {% if 'reports' in request.resolver_match.namespace %}active{% endif %}" href="{{ nav_reports_url }}">
+                    <i class="fas fa-chart-bar"></i>
+                    <span class="nav-text">Reports</span>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+        
+        <div class="nav-section-title">Personal</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ nav_attendance_url }}">
+                    <i class="fas fa-clock"></i>
+                    <span class="nav-text">Attendance</span>
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link" href="{{ nav_leave_url }}">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span class="nav-text">Leave Requests</span>
+                </a>
+            </li>
+        </ul>
+        
+        {% if is_owner %}
+        <div class="nav-section-title">Settings</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ nav_settings_url }}">
+                    <i class="fas fa-cog"></i>
+                    <span class="nav-text">Business</span>
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link" href="{{ nav_profile_url }}">
+                    <i class="fas fa-user"></i>
+                    <span class="nav-text">Profile</span>
+                </a>
+            </li>
+        </ul>
+        {% endif %}
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main-content" id="main-content">
+    <!-- Top Bar -->
+    {% include 'includes/topbar.html' %}
+    
+    <!-- Page Content -->
+    <div class="content-wrapper">
+        <!-- Messages -->
+        {% include 'includes/messages.html' %}
+        
+        <!-- Main Content Block - This is where page content goes -->
+        {% block content %}
+            <!-- Default dashboard content if no specific content is provided -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h1 class="h3 mb-0">Welcome to {{ business.name }}</h1>
+                    <p class="text-muted">Manage your car wash business efficiently</p>
+                </div>
+            </div>
+            
+            <!-- Dashboard widgets would go here -->
+            <div class="row g-4">
+                <div class="col-lg-3 col-md-6">
+                    <div class="card stats-card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-white-50 mb-1">Today's Services</h6>
+                                    <h3 class="mb-0 text-white">12</h3>
+                                </div>
+                                <div class="stats-icon">
+                                    <i class="fas fa-car-wash fa-2x text-white-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-white-50 mb-1">Revenue Today</h6>
+                                    <h3 class="mb-0 text-white">KES 15,400</h3>
+                                </div>
+                                <div class="stats-icon">
+                                    <i class="fas fa-money-bill-wave fa-2x text-white-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-white-50 mb-1">Active Customers</h6>
+                                    <h3 class="mb-0 text-white">248</h3>
+                                </div>
+                                <div class="stats-icon">
+                                    <i class="fas fa-users fa-2x text-white-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-white-50 mb-1">Pending Orders</h6>
+                                    <h3 class="mb-0 text-white">3</h3>
+                                </div>
+                                <div class="stats-icon">
+                                    <i class="fas fa-clock fa-2x text-white-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endblock %}
+    </div>
+</main>

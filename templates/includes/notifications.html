@@ -1,0 +1,45 @@
+<!-- templates/includes/notifications.html -->
+<!-- Notifications Dropdown -->
+
+<div class="dropdown">
+    <button class="notification-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="fas fa-bell"></i>
+        {% if unread_notifications_count > 0 %}
+        <span class="notification-badge">{{ unread_notifications_count }}</span>
+        {% endif %}
+    </button>
+    <div class="dropdown-menu dropdown-menu-end" style="width: 320px; max-height: 400px; overflow-y: auto;">
+        <div class="dropdown-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Notifications</h6>
+            {% if unread_notifications_count > 0 %}
+            <small class="badge bg-primary">{{ unread_notifications_count }} new</small>
+            {% endif %}
+        </div>
+        {% for notification in recent_notifications %}
+        <a class="dropdown-item py-3" href="{{ notification.url }}">
+            <div class="d-flex align-items-start">
+                <div class="flex-shrink-0">
+                    <div class="rounded-circle bg-{{ notification.type }} bg-opacity-10 p-2">
+                        <i class="fas fa-{{ notification.icon }} text-{{ notification.type }}"></i>
+                    </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <p class="mb-1 fw-medium">{{ notification.message }}</p>
+                    <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <div class="dropdown-item-text text-center py-4">
+            <i class="fas fa-bell-slash text-muted mb-2" style="font-size: 2rem;"></i>
+            <p class="text-muted mb-0">No new notifications</p>
+        </div>
+        {% endfor %}
+        {% if recent_notifications %}
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item text-center fw-medium" href="{{ notifications_list_url }}">
+            View all notifications
+        </a>
+        {% endif %}
+    </div>
+</div>

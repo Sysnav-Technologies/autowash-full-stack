@@ -66,6 +66,25 @@
             font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
+        /* Path-based routing indicator */
+        .path-indicator {
+            background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--border-radius-sm);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Business context bar */
+        .business-context-bar {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+            padding: 0.5rem 0;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
         /* Scrollbar Styling */
         ::-webkit-scrollbar {
             width: 6px;
@@ -1105,15 +1124,15 @@
             <div class="sidebar-nav">
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'businesses:dashboard' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="/business/{{ request.tenant.slug }}/business/">
                             <i class="fas fa-tachometer-alt"></i>
                             <span class="nav-text">Dashboard</span>
                         </a>
                     </li>
                     
-                    {% if request.employee.role in 'owner,manager' %}
+                    {% if user_role and user_role in 'owner,manager' %}
                     <li class="nav-item">
-                        <a class="nav-link {% if 'employees' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'employees:list' %}">
+                        <a class="nav-link {% if 'employees' in request.resolver_match.namespace %}active{% endif %}" href="/business/{{ request.tenant.slug }}/employees/">
                             <i class="fas fa-users"></i>
                             <span class="nav-text">Team</span>
                         </a>
@@ -1121,29 +1140,29 @@
                     {% endif %}
                     
                     <li class="nav-item">
-                        <a class="nav-link {% if 'customers' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'customers:list' %}">
+                        <a class="nav-link {% if 'customers' in request.resolver_match.namespace %}active{% endif %}" href="/business/{{ request.tenant.slug }}/customers/">
                             <i class="fas fa-user-friends"></i>
                             <span class="nav-text">Customers</span>
                         </a>
                     </li>
                     
                     <li class="nav-item">
-                        <a class="nav-link {% if 'services' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'services:list' %}">
+                        <a class="nav-link {% if 'services' in request.resolver_match.namespace %}active{% endif %}" href="/business/{{ request.tenant.slug }}/services/">
                             <i class="fas fa-car-wash"></i>
                             <span class="nav-text">Services</span>
                         </a>
                     </li>
                     
-                    {% if request.employee.role in 'owner,manager' %}
+                    {% if user_role and user_role in 'owner,manager' %}
                     <li class="nav-item">
-                        <a class="nav-link {% if 'inventory' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'inventory:list' %}">
+                        <a class="nav-link {% if 'inventory' in request.resolver_match.namespace %}active{% endif %}" href="/business/{{ request.tenant.slug }}/inventory/">
                             <i class="fas fa-boxes"></i>
                             <span class="nav-text">Inventory</span>
                         </a>
                     </li>
                     
                     <li class="nav-item">
-                        <a class="nav-link {% if 'suppliers' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'suppliers:list' %}">
+                        <a class="nav-link {% if 'suppliers' in request.resolver_match.namespace %}active{% endif %}" href="/business/{{ request.tenant.slug }}/suppliers/">
                             <i class="fas fa-truck"></i>
                             <span class="nav-text">Suppliers</span>
                         </a>
@@ -1151,22 +1170,22 @@
                     {% endif %}
                     
                     <li class="nav-item">
-                        <a class="nav-link {% if 'payments' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'payments:list' %}">
+                        <a class="nav-link {% if 'payments' in request.resolver_match.namespace %}active{% endif %}" href="/business/{{ request.tenant.slug }}/payments/">
                             <i class="fas fa-credit-card"></i>
                             <span class="nav-text">Payments</span>
                         </a>
                     </li>
                     
-                    {% if request.employee.role in 'owner,manager' %}
+                    {% if user_role and user_role in 'owner,manager' %}
                     <li class="nav-item">
-                        <a class="nav-link {% if 'expenses' in request.resolver_match.namespace %}active{% endif %}" href="#"> <!-- {% url 'expenses:list' %} -->
+                        <a class="nav-link {% if 'expenses' in request.resolver_match.namespace %}active{% endif %}" href="#"> <!-- /business/{{ request.tenant.slug }}/expenses/ -->
                             <i class="fas fa-receipt"></i>
                             <span class="nav-text">Expenses</span>
                         </a>
                     </li>
                     
                     <li class="nav-item">
-                        <a class="nav-link {% if 'reports' in request.resolver_match.namespace %}active{% endif %}" href="{% url 'reports:dashboard' %}">
+                        <a class="nav-link {% if 'reports' in request.resolver_match.namespace %}active{% endif %}" href="/business/{{ request.tenant.slug }}/reports/">
                             <i class="fas fa-chart-bar"></i>
                             <span class="nav-text">Reports</span>
                         </a>
@@ -1177,32 +1196,32 @@
                 <div class="nav-section-title">Personal</div>
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'employees:attendance' %}">
+                        <a class="nav-link" href="/business/{{ request.tenant.slug }}/employees/attendance/">
                             <i class="fas fa-clock"></i>
                             <span class="nav-text">Attendance</span>
                         </a>
                     </li>
                     
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'employees:leave_list' %}">
+                        <a class="nav-link" href="/business/{{ request.tenant.slug }}/employees/leave/">
                             <i class="fas fa-calendar-alt"></i>
                             <span class="nav-text">Leave Requests</span>
                         </a>
                     </li>
                 </ul>
                 
-                {% if request.employee.role == 'owner' %}
+                {% if user_role == 'owner' %}
                 <div class="nav-section-title">Settings</div>
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'accounts:business_settings' %}">
+                        <a class="nav-link" href="/auth/business/settings/">
                             <i class="fas fa-cog"></i>
                             <span class="nav-text">Business</span>
                         </a>
                     </li>
                     
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'accounts:profile' %}">
+                        <a class="nav-link" href="/auth/profile/">
                             <i class="fas fa-user"></i>
                             <span class="nav-text">Profile</span>
                         </a>
@@ -1224,7 +1243,7 @@
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb mb-0">
                             {% block breadcrumbs %}
-                            <li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
+                            <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/dashboard/">Dashboard</a></li>
                             {% endblock %}
                         </ol>
                     </nav>
@@ -1237,14 +1256,14 @@
                             <i class="fas fa-plus me-1"></i> Quick Add
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'customers:create' %}">
+                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/create/">
                                 <i class="fas fa-user-plus"></i>New Customer
                             </a></li>
-                            <li><a class="dropdown-item" href="{% url 'services:create_order' %}">
+                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/create/">
                                 <i class="fas fa-plus-circle"></i>New Service
                             </a></li>
-                            {% if request.employee.role in 'owner,manager' %}
-                            <li><a class="dropdown-item" href="{% url 'employees:create' %}">
+                            {% if user_role and user_role in 'owner,manager' %}
+                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/employees/create/">
                                 <i class="fas fa-user-tie"></i>New Employee
                             </a></li>
                             {% endif %}
@@ -1288,7 +1307,7 @@
                             {% endfor %}
                             {% if recent_notifications %}
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item text-center fw-medium" href="{% url 'notifications:list' %}">
+                            <a class="dropdown-item text-center fw-medium" href="/business/{{ request.tenant.slug }}/notifications/">
                                 View all notifications
                             </a>
                             {% endif %}
@@ -1298,34 +1317,34 @@
                     <!-- User Menu -->
                     <div class="dropdown">
                         <div class="user-menu" data-bs-toggle="dropdown" aria-expanded="false">
-                            {% if request.employee.photo %}
-                                <img src="{{ request.employee.photo.url }}" alt="{{ request.employee.full_name }}" class="user-avatar">
+                            {% if employee and employee.photo %}
+                                <img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="user-avatar">
                             {% else %}
                                 <div class="user-avatar placeholder">
-                                    {{ request.employee.full_name|first|upper }}
+                                    {{ user.get_full_name|first|upper|default:user.username|first|upper }}
                                 </div>
                             {% endif %}
                             <div class="user-info">
-                                <div class="user-name">{{ request.employee.full_name }}</div>
-                                <div class="user-role">{{ request.employee.get_role_display }}</div>
+                                <div class="user-name">{{ employee.full_name|default:user.get_full_name|default:user.username }}</div>
+                                <div class="user-role">{{ employee.get_role_display|default:"User" }}</div>
                             </div>
                             <i class="fas fa-chevron-down text-muted" style="font-size: 0.8rem;"></i>
                         </div>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                            <li><a class="dropdown-item" href="/auth/profile/">
                                 <i class="fas fa-user"></i>My Profile
                             </a></li>
-                            <li><a class="dropdown-item" href="{% url 'employees:attendance' %}">
+                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/employees/attendance/">
                                 <i class="fas fa-clock"></i>My Attendance
                             </a></li>
-                            {% if request.employee.role == 'owner' %}
+                            {% if user_role == 'owner' %}
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'accounts:business_settings' %}">
+                            <li><a class="dropdown-item" href="/auth/business/settings/">
                                 <i class="fas fa-cog"></i>Business Settings
                             </a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}">
+                            <li><a class="dropdown-item text-danger" href="/auth/logout/">
                                 <i class="fas fa-sign-out-alt"></i>Logout
                             </a></li>
                         </ul>
@@ -1360,7 +1379,7 @@
         <!-- Public Layout -->
         <nav class="navbar navbar-expand-lg public-navbar fixed-top">
             <div class="container">
-                <a class="navbar-brand font-heading" href="{% url 'landing' %}">
+                <a class="navbar-brand font-heading" href="/public/">
                     <i class="fas fa-car-wash"></i>Autowash
                 </a>
                 
@@ -1371,37 +1390,37 @@
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link fw-medium" href="{% url 'landing' %}">Home</a>
+                            <a class="nav-link fw-medium" href="/public/">Home</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link fw-medium" href="{% url 'features' %}">Features</a>
+                            <a class="nav-link fw-medium" href="/public/features/">Features</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link fw-medium" href="{% url 'pricing' %}">Pricing</a>
+                            <a class="nav-link fw-medium" href="/public/pricing/">Pricing</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link fw-medium" href="{% url 'contact' %}">Contact</a>
+                            <a class="nav-link fw-medium" href="/public/contact/">Contact</a>
                         </li>
                     </ul>
                     
                     <ul class="navbar-nav">
                         {% if user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link fw-medium" href="{% url 'accounts:dashboard_redirect' %}">
+                            <a class="nav-link fw-medium" href="/auth/dashboard/">
                                 <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link fw-medium text-danger" href="{% url 'accounts:logout' %}">
+                            <a class="nav-link fw-medium text-danger" href="/auth/logout/">
                                 <i class="fas fa-sign-out-alt me-1"></i>Logout
                             </a>
                         </li>
                         {% else %}
                         <li class="nav-item">
-                            <a class="nav-link fw-medium" href="{% url 'accounts:login' %}">Login</a>
+                            <a class="nav-link fw-medium" href="/auth/login/">Login</a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-primary ms-2 px-4" href="{% url 'accounts:register' %}">
+                            <a class="btn btn-primary ms-2 px-4" href="/auth/register/">
                                 Get Started Free
                             </a>
                         </li>
@@ -1453,8 +1472,8 @@
                     <div class="col-lg-2 col-md-6 mb-4">
                         <h6 class="fw-bold mb-3">Product</h6>
                         <ul class="list-unstyled">
-                            <li><a href="{% url 'features' %}" class="text-light text-decoration-none">Features</a></li>
-                            <li><a href="{% url 'pricing' %}" class="text-light text-decoration-none">Pricing</a></li>
+                            <li><a href="/public/features/" class="text-light text-decoration-none">Features</a></li>
+                            <li><a href="/public/pricing/" class="text-light text-decoration-none">Pricing</a></li>
                             <li><a href="#" class="text-light text-decoration-none">Security</a></li>
                             <li><a href="#" class="text-light text-decoration-none">Updates</a></li>
                         </ul>
@@ -1465,7 +1484,7 @@
                             <li><a href="#" class="text-light text-decoration-none">About</a></li>
                             <li><a href="#" class="text-light text-decoration-none">Blog</a></li>
                             <li><a href="#" class="text-light text-decoration-none">Careers</a></li>
-                            <li><a href="{% url 'contact' %}" class="text-light text-decoration-none">Contact</a></li>
+                            <li><a href="/public/contact/" class="text-light text-decoration-none">Contact</a></li>
                         </ul>
                     </div>
                     <div class="col-lg-2 col-md-6 mb-4">
@@ -1559,165 +1578,6 @@
             var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
-            
-            // Smooth scrolling for anchor links
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    const target = document.querySelector(this.getAttribute('href'));
-                    if (target) {
-                        target.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start'
-                        });
-                    }
-                });
-            });
-            
-            // Add animation classes on scroll
-            const animateOnScroll = () => {
-                const elements = document.querySelectorAll('.animate-on-scroll');
-                elements.forEach(element => {
-                    const elementTop = element.getBoundingClientRect().top;
-                    const elementVisible = 150;
-                    
-                    if (elementTop < window.innerHeight - elementVisible) {
-                        element.classList.add('fade-in');
-                    }
-                });
-            };
-            
-            window.addEventListener('scroll', animateOnScroll);
-            
-            // Real-time form validation feedback
-            const addInputValidation = () => {
-                const inputs = document.querySelectorAll('.form-control, .form-select');
-                inputs.forEach(input => {
-                    input.addEventListener('blur', function() {
-                        if (this.checkValidity()) {
-                            this.classList.remove('is-invalid');
-                            this.classList.add('is-valid');
-                        } else {
-                            this.classList.remove('is-valid');
-                            this.classList.add('is-invalid');
-                        }
-                    });
-                    
-                    input.addEventListener('input', function() {
-                        if (this.classList.contains('is-invalid') && this.checkValidity()) {
-                            this.classList.remove('is-invalid');
-                            this.classList.add('is-valid');
-                        }
-                    });
-                });
-            };
-            
-            // Initialize validation
-            addInputValidation();
-            animateOnScroll();
-            
-            // Show/hide password functionality
-            $(document).on('click', '.toggle-password', function() {
-                const target = $($(this).data('target'));
-                const icon = $(this).find('i');
-                
-                if (target.attr('type') === 'password') {
-                    target.attr('type', 'text');
-                    icon.removeClass('fa-eye').addClass('fa-eye-slash');
-                } else {
-                    target.attr('type', 'password');
-                    icon.removeClass('fa-eye-slash').addClass('fa-eye');
-                }
-            });
-            
-            // Confirm deletion modals
-            $(document).on('click', '[data-confirm-delete]', function(e) {
-                e.preventDefault();
-                const message = $(this).data('confirm-delete') || 'Are you sure you want to delete this item?';
-                const url = $(this).attr('href') || $(this).data('url');
-                
-                if (confirm(message)) {
-                    if ($(this).data('method') === 'POST') {
-                        // Create and submit a form for POST requests
-                        $('<form>', {
-                            method: 'POST',
-                            action: url
-                        }).append($('<input>', {
-                            type: 'hidden',
-                            name: 'csrfmiddlewaretoken',
-                            value: $('[name=csrfmiddlewaretoken]').val()
-                        })).appendTo('body').submit();
-                    } else {
-                        window.location.href = url;
-                    }
-                }
-            });
-            
-            // Auto-resize textareas
-            $(document).on('input', 'textarea[data-auto-resize]', function() {
-                this.style.height = 'auto';
-                this.style.height = (this.scrollHeight) + 'px';
-            });
-            
-            // Copy to clipboard functionality
-            $(document).on('click', '[data-clipboard]', function() {
-                const text = $(this).data('clipboard');
-                navigator.clipboard.writeText(text).then(() => {
-                    const originalText = $(this).text();
-                    $(this).text('Copied!').addClass('btn-success');
-                    
-                    setTimeout(() => {
-                        $(this).text(originalText).removeClass('btn-success');
-                    }, 2000);
-                });
-            });
-            
-            // Number formatting
-            $('.format-currency').each(function() {
-                const value = parseFloat($(this).text());
-                if (!isNaN(value)) {
-                    $(this).text(new Intl.NumberFormat('en-KE', {
-                        style: 'currency',
-                        currency: 'KES'
-                    }).format(value));
-                }
-            });
-            
-            $('.format-number').each(function() {
-                const value = parseFloat($(this).text());
-                if (!isNaN(value)) {
-                    $(this).text(new Intl.NumberFormat('en-KE').format(value));
-                }
-            });
-            
-            // Search functionality with debounce
-            let searchTimeout;
-            $(document).on('input', '[data-search]', function() {
-                const searchTerm = $(this).val().toLowerCase();
-                const target = $(this).data('search');
-                
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
-                    $(target).each(function() {
-                        const text = $(this).text().toLowerCase();
-                        $(this).toggle(text.includes(searchTerm));
-                    });
-                }, 300);
-            });
-            
-            // File upload preview
-            $(document).on('change', 'input[type="file"][data-preview]', function() {
-                const file = this.files[0];
-                const previewTarget = $(this).data('preview');
-                
-                if (file && file.type.startsWith('image/')) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        $(previewTarget).attr('src', e.target.result).show();
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
         });
 
         // Dashboard specific functionality
@@ -1768,671 +1628,7 @@
             } catch (e) {
                 // localStorage not available
             }
-            
-            // Dashboard charts and widgets
-            initializeDashboardWidgets();
-            
-            // Real-time notifications
-            initializeNotifications();
-            
-            // Auto-refresh dashboard data
-            setInterval(refreshDashboardData, 300000); // 5 minutes
-            
-            // Quick actions
-            initializeQuickActions();
-            
-            // Handle window resize
-            $(window).on('resize', function() {
-                const sidebar = $('#sidebar');
-                const mainContent = $('#main-content');
-                
-                if (window.innerWidth > 768) {
-                    // Desktop: remove mobile classes
-                    sidebar.removeClass('mobile-open');
-                    
-                    // Restore collapsed state if it was set
-                    try {
-                        const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
-                        if (isCollapsed) {
-                            sidebar.addClass('collapsed');
-                            mainContent.addClass('expanded');
-                        }
-                    } catch (e) {
-                        // localStorage not available
-                    }
-                } else {
-                    // Mobile: remove desktop classes
-                    sidebar.removeClass('collapsed');
-                    mainContent.removeClass('expanded');
-                }
-            });
-            
-            // Request notification permission on page load
-            if ('Notification' in window && Notification.permission === 'default') {
-                Notification.requestPermission();
-            }
         });
-
-        // Initialize dashboard widgets
-        function initializeDashboardWidgets() {
-            // Stats cards animation
-            $('.stats-card').each(function(index) {
-                $(this).css('animation-delay', (index * 0.1) + 's');
-                $(this).addClass('fade-in');
-            });
-            
-            // Initialize charts if Chart.js is available
-            if (typeof Chart !== 'undefined') {
-                initializeCharts();
-            }
-            
-            // Initialize data tables
-            if ($.fn.DataTable) {
-                $('.data-table').DataTable({
-                    responsive: true,
-                    pageLength: 25,
-                    order: [[0, 'desc']],
-                    language: {
-                        search: "Search:",
-                        lengthMenu: "Show _MENU_ entries",
-                        info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                        infoEmpty: "No entries found",
-                        infoFiltered: "(filtered from _MAX_ total entries)",
-                        zeroRecords: "No matching records found",
-                        emptyTable: "No data available in table"
-                    }
-                });
-            }
-        }
-
-        // Initialize charts
-        function initializeCharts() {
-            // Revenue chart
-            const revenueCtx = document.getElementById('revenueChart');
-            if (revenueCtx) {
-                new Chart(revenueCtx, {
-                    type: 'line',
-                    data: {
-                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                        datasets: [{
-                            label: 'Revenue',
-                            data: [12000, 19000, 15000, 25000, 22000, 30000],
-                            borderColor: '#2563eb',
-                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function(value) {
-                                        return 'KES ' + value.toLocaleString();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-            
-            // Services chart
-            const servicesCtx = document.getElementById('servicesChart');
-            if (servicesCtx) {
-                new Chart(servicesCtx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Car Wash', 'Detailing', 'Waxing', 'Interior Cleaning'],
-                        datasets: [{
-                            data: [40, 25, 20, 15],
-                            backgroundColor: [
-                                '#2563eb',
-                                '#06b6d4',
-                                '#10b981',
-                                '#f59e0b'
-                            ],
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            }
-                        }
-                    }
-                });
-            }
-        }
-
-        // Initialize notifications
-        function initializeNotifications() {
-            // Mark notifications as read when dropdown is opened
-            $('.notification-btn').on('click', function() {
-                setTimeout(() => {
-                    markNotificationsAsRead();
-                }, 1000);
-            });
-            
-            // Check for new notifications periodically
-            setInterval(checkNewNotifications, 60000); // 1 minute
-        }
-
-        // Mark notifications as read
-        function markNotificationsAsRead() {
-            $.ajax({
-                url: '/notifications/mark-read/',
-                method: 'POST',
-                success: function(response) {
-                    if (response.success) {
-                        $('.notification-badge').fadeOut();
-                    }
-                },
-                error: function() {
-                    // Handle error silently
-                }
-            });
-        }
-
-        // Check for new notifications
-        function checkNewNotifications() {
-            $.ajax({
-                url: '/notifications/check-new/',
-                method: 'GET',
-                success: function(response) {
-                    if (response.count > 0) {
-                        $('.notification-badge').text(response.count).show();
-                        
-                        // Show browser notification if permission granted
-                        if (Notification.permission === 'granted') {
-                            new Notification('New Notification', {
-                                body: `You have ${response.count} new notification(s)`,
-                                icon: '/static/img/favicon.ico'
-                            });
-                        }
-                    }
-                },
-                error: function() {
-                    // Handle error silently
-                }
-            });
-        }
-
-        // Refresh dashboard data
-        function refreshDashboardData() {
-            $.ajax({
-                url: '/api/dashboard-data/',
-                method: 'GET',
-                success: function(response) {
-                    updateDashboardStats(response);
-                },
-                error: function() {
-                    // Handle error silently
-                }
-            });
-        }
-
-        // Update dashboard statistics
-        function updateDashboardStats(data) {
-            // Update stats cards
-            if (data.revenue) {
-                $('#total-revenue').text(new Intl.NumberFormat('en-KE', {
-                    style: 'currency',
-                    currency: 'KES'
-                }).format(data.revenue));
-            }
-            
-            if (data.customers) {
-                $('#total-customers').text(data.customers.toLocaleString());
-            }
-            
-            if (data.services_today) {
-                $('#services-today').text(data.services_today.toLocaleString());
-            }
-            
-            if (data.pending_orders) {
-                $('#pending-orders').text(data.pending_orders.toLocaleString());
-            }
-        }
-
-        // Initialize quick actions
-        function initializeQuickActions() {
-            // Quick customer add
-            $(document).on('submit', '#quick-customer-form', function(e) {
-                e.preventDefault();
-                
-                const formData = $(this).serialize();
-                
-                $.ajax({
-                    url: $(this).attr('action'),
-                    method: 'POST',
-                    data: formData,
-                    success: function(response) {
-                        if (response.success) {
-                            $('#quick-customer-modal').modal('hide');
-                            showAlert('success', 'Customer added successfully!');
-                            $(this)[0].reset();
-                        } else {
-                            showAlert('error', response.message || 'Error adding customer');
-                        }
-                    },
-                    error: function() {
-                        showAlert('error', 'Error adding customer');
-                    }
-                });
-            });
-            
-            // Quick service order
-            $(document).on('submit', '#quick-service-form', function(e) {
-                e.preventDefault();
-                
-                const formData = $(this).serialize();
-                
-                $.ajax({
-                    url: $(this).attr('action'),
-                    method: 'POST',
-                    data: formData,
-                    success: function(response) {
-                        if (response.success) {
-                            $('#quick-service-modal').modal('hide');
-                            showAlert('success', 'Service order created successfully!');
-                            $(this)[0].reset();
-                            refreshDashboardData();
-                        } else {
-                            showAlert('error', response.message || 'Error creating service order');
-                        }
-                    },
-                    error: function() {
-                        showAlert('error', 'Error creating service order');
-                    }
-                });
-            });
-        }
-
-        // Show alert function
-        function showAlert(type, message) {
-            const alertHtml = `
-                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
-                        <div class="flex-grow-1">${message}</div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                </div>
-            `;
-            
-            $('.content-wrapper').prepend(alertHtml);
-            
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                $('.alert').fadeOut('slow');
-            }, 5000);
-        }
-
-        // Export functions for global use
-        window.dashboardUtils = {
-            showAlert: showAlert,
-            refreshDashboardData: refreshDashboardData,
-            updateDashboardStats: updateDashboardStats
-        };
-
-        {% else %}
-        // Public page functionality
-        $(document).ready(function() {
-            // Navbar scroll effect
-            $(window).scroll(function() {
-                if ($(this).scrollTop() > 50) {
-                    $('.public-navbar').addClass('scrolled');
-                } else {
-                    $('.public-navbar').removeClass('scrolled');
-                }
-            });
-            
-            // Hero section animations
-            initializeHeroAnimations();
-            
-            // Feature cards hover effects
-            initializeFeatureCards();
-            
-            // Pricing cards interactions
-            initializePricingCards();
-            
-            // Contact form handling
-            initializeContactForm();
-            
-            // Newsletter subscription
-            initializeNewsletterForm();
-            
-            // Parallax effects
-            initializeParallaxEffects();
-            
-            // Counter animations
-            initializeCounterAnimations();
-            
-            // FAQ accordion
-            $('.faq-item .question').on('click', function() {
-                const item = $(this).closest('.faq-item');
-                const answer = item.find('.answer');
-                const icon = $(this).find('i');
-                
-                // Close other items
-                $('.faq-item').not(item).removeClass('active').find('.answer').slideUp();
-                $('.faq-item').not(item).find('.question i').removeClass('fa-minus').addClass('fa-plus');
-                
-                // Toggle current item
-                item.toggleClass('active');
-                answer.slideToggle();
-                icon.toggleClass('fa-plus fa-minus');
-            });
-            
-            // Back to top button
-            $(window).scroll(function() {
-                if ($(this).scrollTop() > 300) {
-                    $('#back-to-top').fadeIn();
-                } else {
-                    $('#back-to-top').fadeOut();
-                }
-            });
-            
-            $('#back-to-top').on('click', function() {
-                $('html, body').animate({ scrollTop: 0 }, 600);
-                return false;
-            });
-            
-            // Cookie consent
-            if (!localStorage.getItem('cookieConsent')) {
-                setTimeout(() => {
-                    showCookieConsent();
-                }, 2000);
-            }
-        });
-
-        // Initialize hero section animations
-        function initializeHeroAnimations() {
-            // Typing effect for hero title
-            const heroTitle = $('.hero-title');
-            if (heroTitle.length && heroTitle.data('typing')) {
-                const text = heroTitle.text();
-                heroTitle.text('');
-                
-                let i = 0;
-                const typeWriter = () => {
-                    if (i < text.length) {
-                        heroTitle.text(heroTitle.text() + text.charAt(i));
-                        i++;
-                        setTimeout(typeWriter, 50);
-                    }
-                };
-                
-                setTimeout(typeWriter, 1000);
-            }
-            
-            // Floating animation for hero elements
-            $('.hero-float').each(function(index) {
-                $(this).css({
-                    'animation-delay': (index * 0.2) + 's',
-                    'animation-duration': (3 + Math.random() * 2) + 's'
-                });
-            });
-        }
-
-        // Initialize feature cards
-        function initializeFeatureCards() {
-            $('.feature-card').hover(
-                function() {
-                    $(this).find('.feature-icon').addClass('animate__animated animate__pulse');
-                },
-                function() {
-                    $(this).find('.feature-icon').removeClass('animate__animated animate__pulse');
-                }
-            );
-            
-            // Intersection Observer for feature cards
-            if ('IntersectionObserver' in window) {
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach((entry, index) => {
-                        if (entry.isIntersecting) {
-                            setTimeout(() => {
-                                entry.target.classList.add('fade-in');
-                            }, index * 200);
-                        }
-                    });
-                }, { threshold: 0.1 });
-                
-                $('.feature-card').each(function() {
-                    observer.observe(this);
-                });
-            }
-        }
-
-        // Initialize pricing cards
-        function initializePricingCards() {
-            $('.pricing-card').hover(
-                function() {
-                    if (!$(this).hasClass('featured')) {
-                        $(this).addClass('shadow-lg').css('transform', 'translateY(-5px)');
-                    }
-                },
-                function() {
-                    if (!$(this).hasClass('featured')) {
-                        $(this).removeClass('shadow-lg').css('transform', 'translateY(0)');
-                    }
-                }
-            );
-            
-            // Pricing toggle (monthly/yearly)
-            $('.pricing-toggle input').on('change', function() {
-                const isYearly = $(this).is(':checked');
-                
-                $('.pricing-price').each(function() {
-                    const monthlyPrice = $(this).data('monthly');
-                    const yearlyPrice = $(this).data('yearly');
-                    
-                    if (monthlyPrice && yearlyPrice) {
-                        const price = isYearly ? yearlyPrice : monthlyPrice;
-                        const period = isYearly ? '/year' : '/month';
-                        
-                        $(this).find('.amount').text(price);
-                        $(this).find('.period').text(period);
-                    }
-                });
-                
-                // Show/hide discount badges
-                $('.discount-badge').toggle(isYearly);
-            });
-        }
-
-        // Initialize contact form
-        function initializeContactForm() {
-            $('#contact-form').on('submit', function(e) {
-                e.preventDefault();
-                
-                const form = $(this);
-                const submitBtn = form.find('button[type="submit"]');
-                const originalText = submitBtn.text();
-                
-                // Show loading state
-                submitBtn.prop('disabled', true)
-                         .html('<span class="spinner-border spinner-border-sm me-2"></span>Sending...');
-                
-                // Simulate form submission (replace with actual AJAX call)
-                $.ajax({
-                    url: form.attr('action') || '/contact/',
-                    method: 'POST',
-                    data: form.serialize(),
-                    success: function(response) {
-                        showNotification('success', 'Message sent successfully! We\'ll get back to you soon.');
-                        form[0].reset();
-                    },
-                    error: function() {
-                        showNotification('error', 'Error sending message. Please try again.');
-                    },
-                    complete: function() {
-                        submitBtn.prop('disabled', false).text(originalText);
-                    }
-                });
-            });
-        }
-
-        // Initialize newsletter form
-        function initializeNewsletterForm() {
-            $('.newsletter-form').on('submit', function(e) {
-                e.preventDefault();
-                
-                const email = $(this).find('input[type="email"]').val();
-                const form = $(this);
-                
-                $.ajax({
-                    url: '/newsletter/subscribe/',
-                    method: 'POST',
-                    data: { email: email },
-                    success: function(response) {
-                        showNotification('success', 'Successfully subscribed to newsletter!');
-                        form[0].reset();
-                    },
-                    error: function() {
-                        showNotification('error', 'Error subscribing. Please try again.');
-                    }
-                });
-            });
-        }
-
-        // Initialize parallax effects
-        function initializeParallaxEffects() {
-            if (window.innerWidth > 768) {
-                $(window).scroll(function() {
-                    const scrollTop = $(this).scrollTop();
-                    
-                    // Parallax for hero background
-                    $('.hero-section').css('transform', `translateY(${scrollTop * 0.5}px)`);
-                    
-                    // Parallax for floating elements
-                    $('.parallax-element').each(function() {
-                        const speed = $(this).data('speed') || 0.3;
-                        const yPos = -(scrollTop * speed);
-                        $(this).css('transform', `translateY(${yPos}px)`);
-                    });
-                });
-            }
-        }
-
-        // Initialize counter animations
-        function initializeCounterAnimations() {
-            const counters = $('.counter');
-            
-            if ('IntersectionObserver' in window) {
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            animateCounter(entry.target);
-                            observer.unobserve(entry.target);
-                        }
-                    });
-                }, { threshold: 0.5 });
-                
-                counters.each(function() {
-                    observer.observe(this);
-                });
-            } else {
-                // Fallback for browsers without IntersectionObserver
-                $(window).scroll(function() {
-                    counters.each(function() {
-                        if ($(this).offset().top < $(window).scrollTop() + $(window).height()) {
-                            animateCounter(this);
-                        }
-                    });
-                });
-            }
-        }
-
-        // Animate counter
-        function animateCounter(element) {
-            const $element = $(element);
-            const target = parseInt($element.data('target'));
-            const duration = $element.data('duration') || 2000;
-            const increment = target / (duration / 16); // 60fps
-            
-            let current = 0;
-            const timer = setInterval(() => {
-                current += increment;
-                if (current >= target) {
-                    current = target;
-                    clearInterval(timer);
-                }
-                $element.text(Math.floor(current).toLocaleString());
-            }, 16);
-        }
-
-        // Show notification
-        function showNotification(type, message) {
-            const notification = $(`
-                <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
-                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
-                        <div class="flex-grow-1">${message}</div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                </div>
-            `);
-            
-            $('body').append(notification);
-            
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                notification.fadeOut('slow', function() {
-                    $(this).remove();
-                });
-            }, 5000);
-        }
-
-        function showCookieConsent() {
-            const consent = $(`
-                <div id="cookie-consent" class="position-fixed bottom-0 start-0 end-0 bg-dark text-white p-3" style="z-index: 9999;">
-                    <div class="container">
-                        <div class="row align-items-center">
-                            <div class="col-md-8">
-                                <p class="mb-0">We use cookies to enhance your experience. By continuing to visit this site you agree to our use of cookies.</p>
-                            </div>
-                            <div class="col-md-4 text-md-end">
-                                <button class="btn btn-primary btn-sm me-2" onclick="acceptCookies()">Accept</button>
-                                <button class="btn btn-outline-light btn-sm" onclick="declineCookies()">Decline</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `);
-            
-            $('body').append(consent);
-        }
-
-        function acceptCookies() {
-            localStorage.setItem('cookieConsent', 'accepted');
-            $('#cookie-consent').fadeOut();
-        }
-
-        function declineCookies() {
-            localStorage.setItem('cookieConsent', 'declined');
-            $('#cookie-consent').fadeOut();
-        }
-
-        // Export functions for global use
-        window.publicUtils = {
-            showNotification: showNotification,
-            animateCounter: animateCounter
-        };
         {% endif %}
     </script>
     

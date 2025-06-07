@@ -1,11 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import User
-from apps.core.models import TimeStampedModel
+from apps.core.tenant_models import TenantTimeStampedModel  # Changed import
 from django.utils import timezone
 from decimal import Decimal
 
 
-class BusinessMetrics(TimeStampedModel):
+class BusinessMetrics(TenantTimeStampedModel):  # Changed base class
     """Daily business metrics tracking"""
     date = models.DateField(unique=True)
     
@@ -39,10 +39,10 @@ class BusinessMetrics(TimeStampedModel):
     # Inventory metrics
     low_stock_items = models.IntegerField(default=0)
     out_of_stock_items = models.IntegerField(default=0)
-    
-    # User fields
-    created_by = models.ForeignKey(User, related_name='business_metrics_created', on_delete=models.CASCADE)
-    updated_by = models.ForeignKey(User, related_name='business_metrics_updated', on_delete=models.CASCADE)
+
+    # REMOVED: Problematic FK fields that cause cross-schema constraints
+    # created_by = models.ForeignKey(User, related_name='business_metrics_created', on_delete=models.CASCADE)
+    # updated_by = models.ForeignKey(User, related_name='business_metrics_updated', on_delete=models.CASCADE)
 
     def __str__(self):
         return f"Metrics for {self.date}"
@@ -74,7 +74,7 @@ class BusinessMetrics(TimeStampedModel):
         verbose_name_plural = "Business Metrics"
         ordering = ['-date']
 
-class BusinessGoal(TimeStampedModel):
+class BusinessGoal(TenantTimeStampedModel):  # Changed base class
     """Business goals and targets"""
     
     GOAL_TYPES = [
@@ -146,7 +146,7 @@ class BusinessGoal(TimeStampedModel):
         verbose_name_plural = "Business Goals"
         ordering = ['-created_at']
 
-class BusinessAlert(TimeStampedModel):
+class BusinessAlert(TenantTimeStampedModel):  # Changed base class
     """Business alerts and notifications"""
     
     ALERT_TYPES = [
@@ -177,13 +177,8 @@ class BusinessAlert(TimeStampedModel):
     is_active = models.BooleanField(default=True)
     is_resolved = models.BooleanField(default=False)
     resolved_at = models.DateTimeField(null=True, blank=True)
-    resolved_by = models.ForeignKey(
-        'employees.Employee',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='resolved_alerts'
-    )
+    # Changed to use Employee ID instead of FK to avoid cross-schema issues
+    resolved_by_employee_id = models.IntegerField(null=True, blank=True)
     
     # Auto-expire
     expires_at = models.DateTimeField(null=True, blank=True)
@@ -198,12 +193,25 @@ class BusinessAlert(TimeStampedModel):
             return timezone.now() > self.expires_at
         return False
     
-    def resolve(self, user=None):
+    @property
+    def resolved_by(self):
+        """Get the Employee object that resolved this alert"""
+        if not self.resolved_by_employee_id:
+            return None
+        try:
+            from apps.employees.models import Employee
+            return Employee.objects.get(id=self.resolved_by_employee_id)
+        except Employee.DoesNotExist:
+            return None
+    
+    def resolve(self, user=None, employee=None):
         """Mark alert as resolved"""
         self.is_resolved = True
         self.resolved_at = timezone.now()
-        if user and hasattr(user, 'employee_profile'):
-            self.resolved_by = user.employee_profile
+        if employee:
+            self.resolved_by_employee_id = employee.id
+        elif user and hasattr(user, 'employee_profile'):
+            self.resolved_by_employee_id = user.employee_profile.id
         self.save()
     
     class Meta:
@@ -211,7 +219,7 @@ class BusinessAlert(TimeStampedModel):
         verbose_name_plural = "Business Alerts"
         ordering = ['-created_at']
 
-class QuickAction(TimeStampedModel):
+class QuickAction(TenantTimeStampedModel):  # Changed base class
     """Quick actions for dashboard"""
     
     ACTION_TYPES = [
@@ -269,7 +277,7 @@ class QuickAction(TimeStampedModel):
         verbose_name_plural = "Quick Actions"
         ordering = ['display_order', 'title']
 
-class DashboardWidget(TimeStampedModel):
+class DashboardWidget(TenantTimeStampedModel):  # Changed base class
     """Customizable dashboard widgets"""
     
     WIDGET_TYPES = [

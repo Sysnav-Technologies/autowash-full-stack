@@ -8,7 +8,7 @@ from django.db import connection
 from django.db.utils import IntegrityError
 
 class Command(BaseCommand):
-    help = 'Deploy Autowash application with initial setup'
+    help = 'Deploy Autowash application with path-based tenant routing'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -32,7 +32,7 @@ class Command(BaseCommand):
             self.style.SUCCESS('\n' + '='*70)
         )
         self.stdout.write(
-            self.style.SUCCESS('🚀 AUTOWASH DEPLOYMENT STARTING')
+            self.style.SUCCESS('🚀 AUTOWASH DEPLOYMENT STARTING (PATH-BASED ROUTING)')
         )
         self.stdout.write(
             self.style.SUCCESS('='*70 + '\n')
@@ -109,34 +109,47 @@ class Command(BaseCommand):
             # Environment-specific instructions
             if not settings.RENDER:
                 self.stdout.write(
-                    self.style.SUCCESS('\n🏠 LOCAL DEVELOPMENT SETUP COMPLETE')
+                    self.style.SUCCESS('\n🏠 LOCAL DEVELOPMENT SETUP COMPLETE (PATH-BASED)')
                 )
-                self.stdout.write('🌐 Main site: http://localhost:8000')
+                self.stdout.write('🌐 Main site: http://localhost:8000/public/')
                 self.stdout.write('👤 Admin: http://localhost:8000/admin/')
                 self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
-                self.stdout.write('📋 Test business registration and check subdomains')
+                self.stdout.write('🏢 Business URLs: http://localhost:8000/business/{slug}/')
+                self.stdout.write('📋 Register a business and access via path-based URLs')
                 if settings.DEBUG:
                     self.stdout.write('🐛 Debug mode: ENABLED')
                 else:
                     self.stdout.write('🐛 Debug mode: DISABLED')
             else:
                 self.stdout.write(
-                    self.style.SUCCESS('\n🚀 RENDER DEPLOYMENT COMPLETE')
+                    self.style.SUCCESS('\n🚀 RENDER DEPLOYMENT COMPLETE (PATH-BASED)')
                 )
-                self.stdout.write('🌐 Main site: https://autowash-3jpr.onrender.com')
+                self.stdout.write('🌐 Main site: https://autowash-3jpr.onrender.com/public/')
                 self.stdout.write('👤 Admin: https://autowash-3jpr.onrender.com/admin/')
                 self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
-                self.stdout.write('📋 Test business registration and check subdomains')
+                self.stdout.write('🏢 Business URLs: https://autowash-3jpr.onrender.com/business/{slug}/')
+                self.stdout.write('📋 Register a business and access via path-based URLs')
                 if settings.DEBUG:
-                    self.stdout.write('🐛 Debug mode: ENABLED')
+                    self.stdout.write('🔧 DEBUG MODE: Enabled')
                     self.stdout.write('   - Debug toolbar available')
                     self.stdout.write('   - Enhanced logging active')
                     self.stdout.write('   - Security settings relaxed')
+                    self.stdout.write('🐛 Sentry: Disabled')
                 else:
-                    self.stdout.write('🐛 Debug mode: DISABLED')
-                    self.stdout.write('   - Production security active')
+                    self.stdout.write('🔒 Security: Strict production mode')
                     if getattr(settings, 'SENTRY_DSN', ''):
-                        self.stdout.write('   - Sentry monitoring enabled')
+                        self.stdout.write('🐛 Sentry: Enabled')
+                    else:
+                        self.stdout.write('🐛 Sentry: No DSN configured')
+
+            self.stdout.write(
+                self.style.SUCCESS('\n📝 PATH-BASED ROUTING NOTES:')
+            )
+            self.stdout.write('   - Public pages: /public/')
+            self.stdout.write('   - Business management: /business/{slug}/')
+            self.stdout.write('   - Authentication: /auth/')
+            self.stdout.write('   - Admin: /admin/')
+            self.stdout.write('   - Each business gets its own schema via path routing')
 
         except Exception as e:
             self.stdout.write(
@@ -205,7 +218,7 @@ class Command(BaseCommand):
                     name='Autowash Public',
                     slug='public',
                     schema_name='public',
-                    description='Main public site',
+                    description='Main public site for path-based routing',
                     business_type='full_service',
                     owner=owner_user,  # THIS IS THE KEY FIX
                     # Optional: Set other required fields
@@ -220,16 +233,18 @@ class Command(BaseCommand):
 
             # Create domains for public tenant based on environment
             if not settings.RENDER:
-                # Local development domains
+                # Local development domains for path-based routing
                 domains_to_create = [
-                    ('127.0.0.1:8000', True),
-                    ('localhost:8000', False),
+                    ('localhost:8000', True),
+                    ('127.0.0.1:8000', False),
+                    ('public.path-based.local', False),
                 ]
             else:
-                # Render production domains
+                # Render production domains for path-based routing
                 domains_to_create = [
                     ('autowash-3jpr.onrender.com', True),
                     ('www.autowash-3jpr.onrender.com', False),
+                    ('public.path-based.autowash', False),
                 ]
                 
                 # Add custom domain if available

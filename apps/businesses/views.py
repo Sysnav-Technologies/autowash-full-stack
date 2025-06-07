@@ -17,7 +17,7 @@ def dashboard_view(request):
     business = request.business
     employee = request.employee
     
-    # Get today's metrics
+    # Get today's metrics - Use tenant-safe audit fields
     today_metrics, created = BusinessMetrics.objects.get_or_create(
         date=today,
         defaults={
@@ -30,9 +30,15 @@ def dashboard_view(request):
         }
     )
     
+    # Set audit fields safely for new records
+    if created:
+        today_metrics.set_created_by(request.user)
+        today_metrics.set_updated_by(request.user)
+        today_metrics.save()
+    
     # Update metrics with real-time data
     if created or True:  # Always update for real-time data
-        update_daily_metrics(today_metrics)
+        update_daily_metrics(today_metrics, request.user)  # Pass user for audit trail
     
     # Quick stats for cards
     quick_stats = {
@@ -162,7 +168,7 @@ def dashboard_view(request):
     
     return render(request, 'businesses/dashboard.html', context)
 
-def update_daily_metrics(metrics):
+def update_daily_metrics(metrics, user=None):
     """Update daily metrics with real-time data"""
     from apps.customers.models import Customer
     from apps.employees.models import Employee, Attendance
@@ -170,52 +176,62 @@ def update_daily_metrics(metrics):
     today = metrics.date
     
     # Customer metrics
-    new_customers_today = Customer.objects.filter(
-        created_at__date=today
-    ).count()
+    try:
+        new_customers_today = Customer.objects.filter(
+            created_at__date=today
+        ).count()
+        metrics.new_customers = new_customers_today
+    except:
+        pass  # Customer app might not be ready
     
     # Employee attendance
-    attendance_today = Attendance.objects.filter(date=today)
-    present_count = attendance_today.filter(status='present').count()
-    total_employees = Employee.objects.filter(is_active=True).count()
-    absent_count = total_employees - present_count
-    
-    # Update metrics
-    metrics.new_customers = new_customers_today
-    metrics.total_employees_present = present_count
-    metrics.total_employees_absent = absent_count
-    
-    # Calculate working hours
-    total_hours = 0
-    for attendance in attendance_today.filter(check_in_time__isnull=False):
-        total_hours += attendance.hours_worked
-    metrics.total_working_hours = total_hours
+    try:
+        attendance_today = Attendance.objects.filter(date=today)
+        present_count = attendance_today.filter(status='present').count()
+        total_employees = Employee.objects.filter(is_active=True).count()
+        absent_count = total_employees - present_count
+        
+        metrics.total_employees_present = present_count
+        metrics.total_employees_absent = absent_count
+        
+        # Calculate working hours
+        total_hours = 0
+        for attendance in attendance_today.filter(check_in_time__isnull=False):
+            total_hours += attendance.hours_worked
+        metrics.total_working_hours = total_hours
+    except:
+        pass  # Some fields might not exist yet
     
     # Additional metrics would be calculated here from other apps
     # This will be completed when services and payments apps are ready
     
+    # Set updated_by safely when saving
+    if user:
+        metrics.set_updated_by(user)
     metrics.save()
 
 def get_pending_dashboard_items(employee):
     """Get pending items that need attention"""
-    from apps.employees.models import Leave
-    from apps.inventory.models import InventoryItem
-    
     pending_items = []
     
     # Pending leave requests (for managers and owners)
     if employee.role in ['owner', 'manager']:
-        pending_leaves = Leave.objects.filter(status='pending').count()
-        if pending_leaves > 0:
-            pending_items.append({
-                'title': f'{pending_leaves} Pending Leave Request{"s" if pending_leaves > 1 else ""}',
-                'url': '/employees/leave/pending/',
-                'icon': 'fas fa-calendar-alt',
-                'type': 'warning'
-            })
+        try:
+            from apps.employees.models import Leave
+            pending_leaves = Leave.objects.filter(status='pending').count()
+            if pending_leaves > 0:
+                pending_items.append({
+                    'title': f'{pending_leaves} Pending Leave Request{"s" if pending_leaves > 1 else ""}',
+                    'url': '/employees/leave/pending/',
+                    'icon': 'fas fa-calendar-alt',
+                    'type': 'warning'
+                })
+        except:
+            pass  # Leave model might not be ready
     
     # Low stock items
     try:
+        from apps.inventory.models import InventoryItem
         low_stock_count = InventoryItem.objects.filter(
             current_stock__lte=F('minimum_stock_level')
         ).count()
@@ -230,19 +246,22 @@ def get_pending_dashboard_items(employee):
         pass  # Inventory app might not be ready
     
     # Overdue goals
-    overdue_goals = BusinessGoal.objects.filter(
-        is_active=True,
-        end_date__lt=timezone.now().date(),
-        is_achieved=False
-    ).count()
-    
-    if overdue_goals > 0:
-        pending_items.append({
-            'title': f'{overdue_goals} Overdue Goal{"s" if overdue_goals > 1 else ""}',
-            'url': '/business/goals/',
-            'icon': 'fas fa-target',
-            'type': 'warning'
-        })
+    try:
+        overdue_goals = BusinessGoal.objects.filter(
+            is_active=True,
+            end_date__lt=timezone.now().date(),
+            is_achieved=False
+        ).count()
+        
+        if overdue_goals > 0:
+            pending_items.append({
+                'title': f'{overdue_goals} Overdue Goal{"s" if overdue_goals > 1 else ""}',
+                'url': '/business/goals/',
+                'icon': 'fas fa-target',
+                'type': 'warning'
+            })
+    except:
+        pass  # BusinessGoal might not be ready
     
     return pending_items
 
@@ -365,11 +384,14 @@ def calculate_goal_progress(goal):
         return metrics.aggregate(total=Sum('gross_revenue'))['total'] or 0
     
     elif goal.goal_type == 'customers':
-        from apps.customers.models import Customer
-        return Customer.objects.filter(
-            created_at__date__gte=goal.start_date,
-            created_at__date__lte=min(goal.end_date, timezone.now().date())
-        ).count()
+        try:
+            from apps.customers.models import Customer
+            return Customer.objects.filter(
+                created_at__date__gte=goal.start_date,
+                created_at__date__lte=min(goal.end_date, timezone.now().date())
+            ).count()
+        except:
+            return 0
     
     elif goal.goal_type == 'services':
         metrics = BusinessMetrics.objects.filter(
@@ -422,14 +444,18 @@ def resolve_alert(request, alert_id):
 def api_dashboard_data(request):
     """API endpoint for dashboard data (for AJAX updates)"""
     today = timezone.now().date()
+    employee = request.employee
     
-    # Get today's key metrics
+    # Get today's key metrics - Use tenant-safe audit approach
     try:
         today_metrics = BusinessMetrics.objects.get(date=today)
-        update_daily_metrics(today_metrics)
+        update_daily_metrics(today_metrics, request.user)
     except BusinessMetrics.DoesNotExist:
         today_metrics = BusinessMetrics.objects.create(date=today)
-        update_daily_metrics(today_metrics)
+        today_metrics.set_created_by(request.user)
+        today_metrics.set_updated_by(request.user)
+        today_metrics.save()
+        update_daily_metrics(today_metrics, request.user)
     
     data = {
         'today_revenue': float(today_metrics.gross_revenue),
