@@ -1,0 +1,835 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="order-management">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <h1 class="page-title">
+                <i class="fas fa-clipboard-list text-primary"></i>
+                Service Orders
+            </h1>
+            <p class="page-description">Manage and track all service orders</p>
+        </div>
+        <div class="page-actions">
+            <a href="/business/{{ request.tenant.slug }}/services/orders/quick/" class="btn btn-success">
+                <i class="fas fa-bolt"></i>
+                Quick Order
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/services/orders/create/" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                New Order
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card pending">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats.pending_orders }}</div>
+                <div class="stat-label">Pending Orders</div>
+            </div>
+        </div>
+        <div class="stat-card in-progress">
+            <div class="stat-icon">
+                <i class="fas fa-cog fa-spin"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats.in_progress_orders }}</div>
+                <div class="stat-label">In Progress</div>
+            </div>
+        </div>
+        <div class="stat-card completed">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats.completed_today }}</div>
+                <div class="stat-label">Completed Today</div>
+            </div>
+        </div>
+        <div class="stat-card total">
+            <div class="stat-icon">
+                <i class="fas fa-list"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats.total_orders }}</div>
+                <div class="stat-label">Total Orders</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="filters-section">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="filter-form">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="search">Search Orders</label>
+                                <input type="text" 
+                                       id="search" 
+                                       name="search" 
+                                       class="form-control"
+                                       placeholder="Order number, customer, vehicle..."
+                                       value="{{ current_filters.search }}">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="status">Status</label>
+                                <select id="status" name="status" class="form-select">
+                                    <option value="">All Statuses</option>
+                                    {% for value, label in status_choices %}
+                                    <option value="{{ value }}" 
+                                            {% if current_filters.status == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="attendant">Attendant</label>
+                                <select id="attendant" name="attendant" class="form-select">
+                                    <option value="">All Attendants</option>
+                                    {% for attendant in attendants %}
+                                    <option value="{{ attendant.id }}" 
+                                            {% if current_filters.attendant == attendant.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ attendant.full_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="date_from">From Date</label>
+                                <input type="date" 
+                                       id="date_from" 
+                                       name="date_from" 
+                                       class="form-control"
+                                       value="{{ current_filters.date_from }}">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="date_to">To Date</label>
+                                <input type="date" 
+                                       id="date_to" 
+                                       name="date_to" 
+                                       class="form-control"
+                                       value="{{ current_filters.date_to }}">
+                            </div>
+                        </div>
+                        <div class="col-md-1">
+                            <div class="form-group">
+                                <label>&nbsp;</label>
+                                <div class="d-flex flex-column gap-2">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                    <a href="/business/{{ request.tenant.slug }}/services/orders/" class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-times"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="orders-table-section">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-list"></i>
+                    Orders List
+                </h5>
+                <div class="card-actions">
+                    <button class="btn btn-outline-primary btn-sm" onclick="refreshOrders()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Customer</th>
+                                <th>Vehicle</th>
+                                <th>Services</th>
+                                <th>Attendant</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Amount</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr class="order-row" data-order-id="{{ order.id }}">
+                                <td>
+                                    <div class="order-number">
+                                        <strong>{{ order.order_number }}</strong>
+                                        {% if order.queue_entry %}
+                                            <div class="queue-info">
+                                                <span class="queue-badge">Q{{ order.queue_entry.queue_number }}</span>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="customer-info">
+                                        <div class="customer-name">{{ order.customer.display_name }}</div>
+                                        <div class="customer-phone">{{ order.customer.phone }}</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="vehicle-info">
+                                        <div class="vehicle-reg">{{ order.vehicle.registration_number }}</div>
+                                        <div class="vehicle-details">{{ order.vehicle.make }} {{ order.vehicle.model }}</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="services-list">
+                                        {% for item in order.order_items.all %}
+                                            <div class="service-item">
+                                                <span class="service-name">{{ item.service.name }}</span>
+                                                {% if item.quantity > 1 %}
+                                                    <span class="service-qty">x{{ item.quantity }}</span>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if order.assigned_attendant %}
+                                        <div class="attendant-info">
+                                            <div class="attendant-name">{{ order.assigned_attendant.full_name }}</div>
+                                            <div class="attendant-role">{{ order.assigned_attendant.get_role_display }}</div>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Not assigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ order.status }}">
+                                        {{ order.get_status_display }}
+                                    </span>
+                                    {% if order.is_overdue %}
+                                        <div class="overdue-indicator">
+                                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                                            Overdue
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="priority-badge priority-{{ order.priority }}">
+                                        {{ order.get_priority_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="amount-info">
+                                        <div class="total-amount">KES {{ order.total_amount }}</div>
+                                        <div class="payment-status payment-{{ order.payment_status }}">
+                                            {{ order.get_payment_status_display }}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="date-info">
+                                        <div class="created-date">{{ order.created_at|date:"M d, Y" }}</div>
+                                        <div class="created-time">{{ order.created_at|time:"H:i" }}</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if order.status == 'confirmed' %}
+                                            <button class="btn btn-success btn-sm" 
+                                                    onclick="startService('{{ order.id }}')">
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                        {% elif order.status == 'in_progress' %}
+                                            <button class="btn btn-warning btn-sm" 
+                                                    onclick="completeService('{{ order.id }}')">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        {% endif %}
+                                        <div class="dropdown">
+                                            <button class="btn btn-outline-secondary btn-sm" 
+                                                    type="button" 
+                                                    data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li>
+                                                    <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/">
+                                                        <i class="fas fa-eye"></i>
+                                                        View Details
+                                                    </a>
+                                                </li>
+                                                {% if order.can_be_cancelled %}
+                                                <li>
+                                                    <a class="dropdown-item text-danger" 
+                                                       href="#" 
+                                                       onclick="cancelOrder('{{ order.id }}')">
+                                                        <i class="fas fa-times"></i>
+                                                        Cancel Order
+                                                    </a>
+                                                </li>
+                                                {% endif %}
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item" href="#">
+                                                        <i class="fas fa-print"></i>
+                                                        Print Receipt
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <h3>No Orders Found</h3>
+                    <p>{% if current_filters.search or current_filters.status %}No orders match your current filters.{% else %}No service orders have been created yet.{% endif %}</p>
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/quick/" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        Create First Order
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if orders.has_other_pages %}
+    <div class="pagination-section">
+        <nav aria-label="Orders pagination">
+            <ul class="pagination justify-content-center">
+                {% if orders.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ orders.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                {% endif %}
+                
+                {% for num in orders.paginator.page_range %}
+                    {% if num == orders.number %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% elif num > orders.number|add:'-3' and num < orders.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if orders.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ orders.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ orders.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Order Management Styles */
+.order-management {
+    padding: 0;
+}
+
+/* Stats Cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all var(--transition-fast);
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.stat-card.pending .stat-icon { background: linear-gradient(135deg, var(--warning-600), var(--warning-500)); }
+.stat-card.in-progress .stat-icon { background: linear-gradient(135deg, var(--primary-600), var(--primary-500)); }
+.stat-card.completed .stat-icon { background: linear-gradient(135deg, var(--success-600), var(--success-500)); }
+.stat-card.total .stat-icon { background: linear-gradient(135deg, var(--info-600), var(--info-500)); }
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+}
+
+.stat-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1;
+}
+
+.stat-label {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Filters */
+.filters-section {
+    margin-bottom: 2rem;
+}
+
+.filter-form .row {
+    align-items: end;
+}
+
+/* Orders Table */
+.orders-table-section .card {
+    box-shadow: var(--shadow-sm);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.card-title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.order-row:hover {
+    background-color: var(--gray-50);
+}
+
+.order-number {
+    font-weight: 600;
+}
+
+.queue-badge {
+    background: var(--info-100);
+    color: var(--info-700);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.customer-info, .vehicle-info, .attendant-info {
+    line-height: 1.3;
+}
+
+.customer-name, .vehicle-reg, .attendant-name {
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.customer-phone, .vehicle-details, .attendant-role {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.services-list {
+    max-width: 200px;
+}
+
+.service-item {
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.service-name {
+    color: var(--gray-700);
+}
+
+.service-qty {
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+/* Status Badges */
+.status-badge, .priority-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.status-pending { background: var(--warning-100); color: var(--warning-700); }
+.status-confirmed { background: var(--info-100); color: var(--info-700); }
+.status-in_progress { background: var(--primary-100); color: var(--primary-700); }
+.status-completed { background: var(--success-100); color: var(--success-700); }
+.status-cancelled { background: var(--danger-100); color: var(--danger-700); }
+.status-no_show { background: var(--gray-100); color: var(--gray-700); }
+
+.priority-low { background: var(--gray-100); color: var(--gray-600); }
+.priority-normal { background: var(--info-100); color: var(--info-700); }
+.priority-high { background: var(--warning-100); color: var(--warning-700); }
+.priority-urgent { background: var(--danger-100); color: var(--danger-700); }
+
+.overdue-indicator {
+    font-size: 0.75rem;
+    color: var(--warning-600);
+    margin-top: 0.25rem;
+}
+
+.amount-info {
+    text-align: right;
+}
+
+.total-amount {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.payment-status {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.payment-pending { color: var(--warning-600); }
+.payment-partial { color: var(--info-600); }
+.payment-paid { color: var(--success-600); }
+.payment-refunded { color: var(--danger-600); }
+
+.date-info {
+    font-size: 0.875rem;
+}
+
+.created-date {
+    color: var(--gray-700);
+}
+
+.created-time {
+    color: var(--gray-500);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: var(--gray-300);
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--gray-500);
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .page-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .services-list {
+        max-width: 150px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        gap: 0.125rem;
+    }
+}
+</style>
+
+<script>
+function refreshOrders() {
+    window.location.reload();
+}
+
+function startService(orderId) {
+    if (confirm('Start service for this order?')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/start/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                showToast('Service started successfully', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast('Error starting service', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error starting service', 'error');
+        });
+    }
+}
+
+function completeService(orderId) {
+    if (confirm('Mark service as completed?')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/complete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                showToast('Service completed successfully', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast('Error completing service', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error completing service', 'error');
+        });
+    }
+}
+
+function cancelOrder(orderId) {
+    if (confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                showToast('Order cancelled successfully', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast('Error cancelling order', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error cancelling order', 'error');
+        });
+    }
+}
+
+function getCsrfToken() {
+    const token = document.querySelector('[name=csrfmiddlewaretoken]');
+    return token ? token.value : '';
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+// Auto-refresh orders every 30 seconds
+setInterval(function() {
+    // Only refresh if page is visible
+    if (!document.hidden) {
+        const currentTime = new Date().getTime();
+        const lastRefresh = localStorage.getItem('lastOrderRefresh') || 0;
+        
+        // Refresh every 30 seconds
+        if (currentTime - lastRefresh > 30000) {
+            localStorage.setItem('lastOrderRefresh', currentTime);
+            // Silently refresh order statuses via AJAX instead of full page reload
+            refreshOrderStatuses();
+        }
+    }
+}, 30000);
+
+function refreshOrderStatuses() {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/order-statuses/`)
+        .then(response => response.json())
+        .then(data => {
+            // Update order statuses in the table
+            data.orders.forEach(order => {
+                const row = document.querySelector(`[data-order-id="${order.id}"]`);
+                if (row) {
+                    const statusBadge = row.querySelector('.status-badge');
+                    if (statusBadge) {
+                        statusBadge.className = `status-badge status-${order.status}`;
+                        statusBadge.textContent = order.status_display;
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.log('Error refreshing order statuses:', error);
+        });
+}
+</script>
+
+<!-- Toast Notification Styles -->
+<style>
+.toast-notification {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 9999;
+    min-width: 300px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast-notification.toast-success {
+    border-left: 4px solid var(--success-500);
+}
+
+.toast-notification.toast-error {
+    border-left: 4px solid var(--danger-500);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.toast-success .toast-content i {
+    color: var(--success-500);
+}
+
+.toast-error .toast-content i {
+    color: var(--danger-500);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .toast-notification {
+        top: 1rem;
+        right: 1rem;
+        left: 1rem;
+        min-width: auto;
+    }
+}
+</style>
+{% endblock %}

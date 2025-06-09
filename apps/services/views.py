@@ -3,8 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods, require_POST
-from django.db import transaction
-from django.db.models import Q, Count, Sum, Avg, F
+from django.db import transaction, models  # Added models import here
+from django.db.models import Q, Count, Sum, Avg, F, Case, When, Value, IntegerField  # Added missing imports
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
@@ -160,13 +160,13 @@ def order_list_view(request):
     
     # Sort by priority and creation date
     orders = orders.order_by(
-        models.Case(
-            models.When(priority='urgent', then=models.Value(1)),
-            models.When(priority='high', then=models.Value(2)),
-            models.When(priority='normal', then=models.Value(3)),
-            models.When(priority='low', then=models.Value(4)),
-            default=models.Value(3),
-            output_field=models.IntegerField(),
+        Case(
+            When(priority='urgent', then=Value(1)),
+            When(priority='high', then=Value(2)),
+            When(priority='normal', then=Value(3)),
+            When(priority='low', then=Value(4)),
+            default=Value(3),
+            output_field=IntegerField(),
         ),
         '-created_at'
     )
@@ -377,8 +377,8 @@ def order_detail_view(request, pk):
     # Get queue entry if exists
     queue_entry = getattr(order, 'queue_entry', None)
     
-    # Get available service bays
-    available_bays = ServiceBay.objects.filter(is_available=True)
+    # Get available service bays (filter by actual fields, not the property)
+    available_bays = ServiceBay.objects.filter(is_active=True, is_occupied=False)
     
     # Get available attendants
     from apps.employees.models import Employee
@@ -497,17 +497,29 @@ def queue_view(request):
     # Get available service bays
     service_bays = ServiceBay.objects.all().order_by('bay_number')
     
+    # Calculate average wait time manually
+    completed_entries = ServiceQueue.objects.filter(
+        status='in_service',
+        actual_start_time__isnull=False
+    )
+    
+    total_wait_time = 0
+    wait_time_count = 0
+    
+    for entry in completed_entries:
+        if entry.actual_start_time and entry.created_at:
+            wait_time = (entry.actual_start_time - entry.created_at).total_seconds() / 60
+            total_wait_time += wait_time
+            wait_time_count += 1
+    
+    avg_wait_time = total_wait_time / wait_time_count if wait_time_count > 0 else 0
+    
     # Queue statistics
     stats = {
         'waiting_count': queue_entries.filter(status='waiting').count(),
         'in_service_count': queue_entries.filter(status='in_service').count(),
-        'avg_wait_time': queue_entries.filter(
-            status='in_service',
-            actual_start_time__isnull=False
-        ).extra(
-            select={'wait_time': 'EXTRACT(EPOCH FROM (actual_start_time - created_at))/60'}
-        ).aggregate(avg=Avg('wait_time'))['avg'] or 0,
-        'available_bays': service_bays.filter(is_available=True).count(),
+        'avg_wait_time': avg_wait_time,
+        'available_bays': service_bays.filter(is_active=True, is_occupied=False).count(),
     }
     
     context = {
