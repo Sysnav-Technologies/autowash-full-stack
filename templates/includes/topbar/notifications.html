@@ -1,0 +1,218 @@
+<!-- Notifications -->
+<div class="dropdown">
+    <button class="notification-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="fas fa-bell"></i>
+        {% if unread_notifications_count > 0 %}
+        <span class="notification-badge">{{ unread_notifications_count }}</span>
+        {% endif %}
+    </button>
+    <div class="dropdown-menu dropdown-menu-end notification-dropdown">
+        <div class="notification-header">
+            <h6 class="mb-0">Notifications</h6>
+            {% if unread_notifications_count > 0 %}
+            <small class="badge bg-primary">{{ unread_notifications_count }} new</small>
+            {% endif %}
+        </div>
+        
+        <div class="notification-body">
+            {% for notification in recent_notifications %}
+            <a class="notification-item {% if not notification.is_read %}unread{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/notifications/{{ notification.id }}/redirect/">
+                <div class="notification-icon">
+                    <i class="fas fa-{{ notification.icon }} text-{{ notification.type }}"></i>
+                </div>
+                <div class="notification-content">
+                    <p class="notification-message">{{ notification.message }}</p>
+                    <small class="notification-time">{{ notification.created_at|timesince }} ago</small>
+                </div>
+                {% if not notification.is_read %}
+                <div class="notification-indicator"></div>
+                {% endif %}
+            </a>
+            {% empty %}
+            <div class="notification-empty">
+                <i class="fas fa-bell-slash text-muted mb-2"></i>
+                <p class="text-muted mb-0">No new notifications</p>
+            </div>
+            {% endfor %}
+        </div>
+        
+        {% if recent_notifications %}
+        <div class="notification-footer">
+            <a href="/business/{{ request.tenant.slug }}/notifications/" class="btn btn-sm btn-outline-primary w-100">
+                View all notifications
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+/* Notification Button */
+.notification-btn {
+    position: relative;
+    background: none;
+    border: none;
+    color: var(--gray-600);
+    font-size: 1.125rem;
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
+.notification-btn:hover {
+    background: var(--gray-100);
+    color: var(--gray-900);
+}
+
+.notification-badge {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    background: var(--danger-500);
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    line-height: 1;
+}
+
+/* Notification Dropdown */
+.notification-dropdown {
+    width: 380px;
+    max-height: 500px;
+    padding: 0;
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-xl);
+    border-radius: var(--radius-lg);
+}
+
+.notification-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--gray-50);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.notification-header h6 {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.notification-body {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--gray-100);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    text-decoration: none;
+    color: var(--gray-700);
+    transition: all var(--transition-fast);
+    position: relative;
+}
+
+.notification-item:hover {
+    background: var(--gray-50);
+    color: var(--gray-900);
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-item.unread {
+    background: var(--primary-50);
+    border-left: 3px solid var(--primary-500);
+}
+
+.notification-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--gray-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notification-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-message {
+    margin: 0;
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    color: var(--gray-900);
+}
+
+.notification-time {
+    color: var(--gray-500);
+    font-size: 0.75rem;
+}
+
+.notification-indicator {
+    width: 8px;
+    height: 8px;
+    background: var(--primary-500);
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 0.25rem;
+}
+
+.notification-empty {
+    padding: 3rem 1.5rem;
+    text-align: center;
+}
+
+.notification-empty i {
+    font-size: 2rem;
+    color: var(--gray-400);
+}
+
+.notification-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Mobile Responsive */
+@media (max-width: 576px) {
+    .notification-dropdown {
+        width: 320px;
+    }
+    
+    .notification-item {
+        padding: 0.75rem 1rem;
+    }
+    
+    .notification-header,
+    .notification-footer {
+        padding: 0.75rem 1rem;
+    }
+}
+</style>

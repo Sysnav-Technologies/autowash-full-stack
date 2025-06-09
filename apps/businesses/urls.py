@@ -20,4 +20,7 @@ urlpatterns = [
     
     # API Endpoints
     path('api/dashboard-data/', views.api_dashboard_data, name='api_dashboard_data'),
+    # Debug endpoints (for troubleshooting user role issues)
+    path('debug/user-context/', views.debug_user_context, name='debug_user_context'),
+    path('debug/fix-employee/', views.fix_user_employee_record, name='fix_user_employee'),
 ]

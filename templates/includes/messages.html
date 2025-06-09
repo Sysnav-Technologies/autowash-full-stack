@@ -1,18 +1,145 @@
-<!-- templates/includes/messages.html -->
-<!-- Django Messages Display -->
-
+<!-- Messages -->
 {% if messages %}
-<div class="row mb-4">
-    <div class="col-12">
-        {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
-                <div class="flex-grow-1">{{ message }}</div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show message-alert" role="alert">
+        <div class="d-flex align-items-start">
+            <div class="message-icon">
+                {% if message.tags == 'success' %}
+                    <i class="fas fa-check-circle"></i>
+                {% elif message.tags == 'error' or message.tags == 'danger' %}
+                    <i class="fas fa-exclamation-triangle"></i>
+                {% elif message.tags == 'warning' %}
+                    <i class="fas fa-exclamation-circle"></i>
+                {% elif message.tags == 'info' %}
+                    <i class="fas fa-info-circle"></i>
+                {% else %}
+                    <i class="fas fa-bell"></i>
+                {% endif %}
             </div>
+            <div class="message-content">
+                {{ message }}
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-        {% endfor %}
     </div>
+    {% endfor %}
 </div>
 {% endif %}
+
+<style>
+/* Messages */
+.messages-container {
+    margin-bottom: 2rem;
+}
+
+.message-alert {
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid;
+    animation: slideInDown 0.3s ease-out;
+}
+
+.message-alert.alert-success {
+    background: var(--success-50);
+    color: var(--success-800);
+    border-left-color: var(--success-500);
+}
+
+.message-alert.alert-danger,
+.message-alert.alert-error {
+    background: var(--danger-50);
+    color: var(--danger-800);
+    border-left-color: var(--danger-500);
+}
+
+.message-alert.alert-warning {
+    background: var(--warning-50);
+    color: var(--warning-800);
+    border-left-color: var(--warning-500);
+}
+
+.message-alert.alert-info {
+    background: var(--info-50);
+    color: var(--info-800);
+    border-left-color: var(--info-500);
+}
+
+.message-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+    font-size: 1.125rem;
+}
+
+.message-content {
+    flex: 1;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.btn-close {
+    margin-left: 1rem;
+    padding: 0.5rem;
+    opacity: 0.6;
+    transition: opacity var(--transition-fast);
+}
+
+.btn-close:hover {
+    opacity: 1;
+}
+
+/* Animation */
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Auto-hide animation */
+.message-alert.fade-out {
+    animation: fadeOut 0.5s ease-out forwards;
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+        height: 0;
+        margin: 0;
+        padding: 0;
+    }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .message-alert {
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .message-icon {
+        font-size: 1rem;
+        margin-right: 0.5rem;
+    }
+    
+    .message-content {
+        font-size: 0.875rem;
+    }
+}
+</style>

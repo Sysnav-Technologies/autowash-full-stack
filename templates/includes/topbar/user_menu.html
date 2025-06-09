@@ -1,0 +1,280 @@
+<!-- User Menu -->
+<div class="dropdown">
+    <div class="user-menu" data-bs-toggle="dropdown" aria-expanded="false">
+        {% if employee and employee.photo %}
+            <img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="user-avatar">
+        {% else %}
+            <div class="user-avatar">
+                {{ user.get_full_name|first|upper|default:user.username|first|upper }}
+            </div>
+        {% endif %}
+        <div class="user-info d-none d-md-block">
+            <div class="user-name">{{ employee.full_name|default:user.get_full_name|default:user.username }}</div>
+            <div class="user-role">{{ employee.get_role_display|default:"User" }}</div>
+        </div>
+        <i class="fas fa-chevron-down text-muted ms-2" style="font-size: 0.75rem;"></i>
+    </div>
+    <ul class="dropdown-menu dropdown-menu-end user-dropdown">
+        <li class="dropdown-header">
+            <div class="d-flex align-items-center gap-3">
+                {% if employee and employee.photo %}
+                    <img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="dropdown-user-avatar">
+                {% else %}
+                    <div class="dropdown-user-avatar">
+                        {{ user.get_full_name|first|upper|default:user.username|first|upper }}
+                    </div>
+                {% endif %}
+                <div>
+                    <div class="fw-semibold">{{ employee.full_name|default:user.get_full_name|default:user.username }}</div>
+                    <small class="text-muted">{{ employee.get_role_display|default:"User" }}</small>
+                </div>
+            </div>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        
+        <!-- Profile Section -->
+        <li>
+            <a class="dropdown-item" href="/auth/profile/">
+                <i class="fas fa-user"></i>
+                My Profile
+            </a>
+        </li>
+        
+        <!-- Personal Actions -->
+        <li>
+            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/employees/attendance/">
+                <i class="fas fa-clock"></i>
+                My Attendance
+            </a>
+        </li>
+        
+        <li>
+            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/employees/leave/request/">
+                <i class="fas fa-calendar-plus"></i>
+                Request Leave
+            </a>
+        </li>
+        
+        <li>
+            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/notifications/">
+                <i class="fas fa-bell"></i>
+                Notifications
+                {% if unread_notifications_count > 0 %}
+                <span class="badge bg-danger ms-auto">{{ unread_notifications_count }}</span>
+                {% endif %}
+            </a>
+        </li>
+        
+        <!-- Owner/Manager Actions -->
+        {% if user_role == 'owner' %}
+        <li><hr class="dropdown-divider"></li>
+        <li class="dropdown-header">
+            <small class="text-muted">BUSINESS MANAGEMENT</small>
+        </li>
+        <li>
+            <a class="dropdown-item" href="/auth/business/settings/">
+                <i class="fas fa-cog"></i>
+                Business Settings
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/reports/">
+                <i class="fas fa-chart-bar"></i>
+                Reports & Analytics
+            </a>
+        </li>
+        {% endif %}
+        
+        <!-- Theme Toggle -->
+        <li><hr class="dropdown-divider"></li>
+        <li>
+            <a class="dropdown-item" href="#" onclick="toggleTheme()">
+                <i class="fas fa-moon" id="theme-icon"></i>
+                <span id="theme-text">Dark Mode</span>
+            </a>
+        </li>
+        
+        <!-- Help & Support -->
+        <li>
+            <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#helpModal">
+                <i class="fas fa-question-circle"></i>
+                Help & Support
+            </a>
+        </li>
+        
+        <!-- Logout -->
+        <li><hr class="dropdown-divider"></li>
+        <li>
+            <a class="dropdown-item text-danger" href="/auth/logout/">
+                <i class="fas fa-sign-out-alt"></i>
+                Sign Out
+            </a>
+        </li>
+    </ul>
+</div>
+
+<style>
+/* User Menu */
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    border: 1px solid var(--gray-200);
+    min-width: 0;
+}
+
+.user-menu:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+    border: 2px solid var(--gray-200);
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.user-info {
+    text-align: left;
+    min-width: 0;
+    flex: 1;
+}
+
+.user-name {
+    font-weight: 600;
+    color: var(--gray-900);
+    font-size: 0.875rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-role {
+    color: var(--gray-500);
+    font-size: 0.75rem;
+    text-transform: capitalize;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* User Dropdown */
+.user-dropdown {
+    width: 280px;
+    padding: 0;
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-xl);
+    border-radius: var(--radius-lg);
+}
+
+.dropdown-header {
+    padding: 1rem 1.5rem;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.dropdown-user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.dropdown-user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.dropdown-item {
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--gray-700);
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.dropdown-item:hover {
+    background: var(--gray-50);
+    color: var(--gray-900);
+}
+
+.dropdown-item.text-danger:hover {
+    background: var(--danger-50);
+    color: var(--danger-600);
+}
+
+.dropdown-item i {
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.dropdown-divider {
+    margin: 0.5rem 0;
+    border-color: var(--gray-200);
+}
+
+/* Theme Toggle */
+#theme-icon {
+    transition: transform var(--transition-fast);
+}
+
+.dropdown-item:hover #theme-icon {
+    transform: rotate(180deg);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .user-menu {
+        padding: 0.5rem;
+        min-width: 44px;
+    }
+    
+    .user-dropdown {
+        width: 260px;
+    }
+    
+    .dropdown-item {
+        padding: 0.75rem 1rem;
+    }
+    
+    .dropdown-header {
+        padding: 1rem;
+    }
+}
+</style>

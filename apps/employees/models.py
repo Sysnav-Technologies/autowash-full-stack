@@ -8,6 +8,7 @@ from apps.core.models import TimeStampedModel, SoftDeleteModel, Address, Contact
 from apps.core.utils import upload_to_path
 from decimal import Decimal
 from django_tenants.utils import schema_context, get_public_schema_name
+from django.utils import timezone
 
 class Department(TimeStampedModel):
     """Department model for organizing employees"""
@@ -311,6 +312,7 @@ class Attendance(TimeStampedModel):
     break_duration = models.DurationField(null=True, blank=True)
     overtime_hours = models.DecimalField(max_digits=4, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
+    
     approved_by = models.ForeignKey(
         Employee, 
         on_delete=models.SET_NULL, 
@@ -318,10 +320,23 @@ class Attendance(TimeStampedModel):
         blank=True,
         related_name='approved_attendance'
     )
-    
+    break_start_time = models.DateTimeField(
+        null=True, 
+        blank=True, 
+        help_text="Time when break started"
+    )
+    break_end_time = models.DateTimeField(
+        null=True, 
+        blank=True, 
+        help_text="Time when break ended"
+    )
+    total_break_duration = models.DurationField(
+        null=True, 
+        blank=True, 
+        help_text="Total break duration"
+    )
     def __str__(self):
         return f"{self.employee.full_name} - {self.date} ({self.get_status_display()})"
-    
     @property
     def hours_worked(self):
         if self.check_in_time and self.check_out_time:
@@ -347,6 +362,25 @@ class Attendance(TimeStampedModel):
             # TODO: Get from business settings
             return self.check_in_time > expected_time
         return False
+    @property
+    def is_on_break(self):
+        """Check if employee is currently on break"""
+        return (
+            self.break_start_time and 
+            not self.break_end_time
+        )
+    
+    @property
+    def break_duration_minutes(self):
+        """Get break duration in minutes"""
+        if self.break_start_time and self.break_end_time:
+            duration = self.break_end_time - self.break_start_time
+            return int(duration.total_seconds() / 60)
+        elif self.break_start_time and not self.break_end_time:
+            # Currently on break
+            duration = timezone.now() - self.break_start_time
+            return int(duration.total_seconds() / 60)
+        return 0
     
     class Meta:
         verbose_name = "Attendance"

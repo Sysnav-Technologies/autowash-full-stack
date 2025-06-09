@@ -1,3 +1,5 @@
+import json
+from django.db import connection
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -5,8 +7,11 @@ from django.http import JsonResponse
 from django.db.models import Sum, Count, Avg, Q, F
 from django.utils import timezone
 from datetime import datetime, timedelta
+import traceback
+from django.views.decorators.http import require_http_methods
 from apps.core.decorators import employee_required, business_required
 from apps.core.utils import get_business_performance_metrics
+from apps.employees.models import Department, Employee
 from .models import BusinessMetrics, BusinessGoal, BusinessAlert, QuickAction, DashboardWidget
 
 @login_required
@@ -466,3 +471,320 @@ def api_dashboard_data(request):
     }
     
     return JsonResponse(data)
+
+
+
+# Replace the debug_user_context function in apps/businesses/views.py with this fixed version:
+
+@login_required
+def debug_user_context(request):
+    """
+    Debug view to show user context and help diagnose role issues
+    Access via: /business/your-business-slug/debug/user-context/
+    FIXED: Handle cross-schema User access properly
+    """
+    context = {
+        'debug_mode': True,
+        'debug_info': {},
+        'title': 'User Context Debug'
+    }
+    
+    # Basic user info
+    context['debug_info']['user'] = {
+        'id': request.user.id,
+        'username': request.user.username,
+        'email': request.user.email,
+        'full_name': request.user.get_full_name(),
+        'is_authenticated': request.user.is_authenticated,
+        'is_superuser': request.user.is_superuser,
+        'is_staff': request.user.is_staff,
+    }
+    
+    # Add current business info if available
+    if hasattr(request, 'business') and request.business:
+        business = request.business
+        
+        # FIXED: Get owner info from public schema safely
+        try:
+            from django_tenants.utils import schema_context, get_public_schema_name
+            with schema_context(get_public_schema_name()):
+                # Get owner info from public schema
+                owner_id = business.owner_id  # Use the FK field directly
+                owner = business.owner  # This should work now
+                owner_username = owner.username
+                owner_email = owner.email
+                is_current_user_owner = owner.id == request.user.id
+        except Exception as e:
+            print(f"Error getting owner info: {e}")
+            # Fallback values
+            owner_id = getattr(business, 'owner_id', 'Unknown')
+            owner_username = 'Error accessing owner'
+            owner_email = 'Error accessing owner'
+            is_current_user_owner = False
+        
+        context['debug_info']['business'] = {
+            'name': business.name,
+            'id': business.id,
+            'slug': business.slug,
+            'schema_name': business.schema_name,
+            'is_verified': business.is_verified,
+            'is_active': business.is_active,
+            'owner_id': owner_id,
+            'owner_username': owner_username,
+            'owner_email': owner_email,
+            'current_user_id': request.user.id,
+            'is_current_user_owner': is_current_user_owner,
+        }
+        
+        # Check schema existence
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
+                    [business.schema_name]
+                )
+                schema_exists = bool(cursor.fetchone())
+                context['debug_info']['schema_exists'] = schema_exists
+        except Exception as e:
+            context['debug_info']['schema_exists'] = False
+            context['debug_info']['schema_error'] = str(e)
+        
+        # Check if employee record exists in current tenant schema
+        try:
+            employee = Employee.objects.get(user_id=request.user.id, is_active=True)
+            context['debug_info']['employee'] = {
+                'exists': True,
+                'employee_id': employee.employee_id,
+                'role': employee.role,
+                'role_display': employee.get_role_display(),
+                'user_id': employee.user_id,
+                'department': employee.department.name if employee.department else None,
+                'is_active': employee.is_active,
+                'can_login': employee.can_login,
+                'employment_type': employee.employment_type,
+                'status': employee.status,
+                'hire_date': employee.hire_date.strftime('%Y-%m-%d') if employee.hire_date else None,
+            }
+        except Employee.DoesNotExist:
+            context['debug_info']['employee'] = {
+                'exists': False,
+                'error': 'No employee record found for this user in this business',
+                'user_id_searched': request.user.id,
+                'business_schema': business.schema_name,
+            }
+            
+            # Check if there are any employees in this business
+            try:
+                all_employees = Employee.objects.filter(is_active=True).values(
+                    'id', 'employee_id', 'user_id', 'role'
+                )
+                context['debug_info']['similar_employees'] = list(all_employees)
+            except Exception as e:
+                context['debug_info']['similar_employees_error'] = str(e)
+            
+        except Employee.MultipleObjectsReturned:
+            context['debug_info']['employee'] = {
+                'exists': True,
+                'error': 'Multiple employee records found (this should not happen)',
+                'multiple_records': True,
+            }
+            
+            # Get all matching employees
+            try:
+                multiple_employees = Employee.objects.filter(
+                    user_id=request.user.id, is_active=True
+                ).values('id', 'employee_id', 'role', 'department__name')
+                context['debug_info']['multiple_employee_records'] = list(multiple_employees)
+            except Exception as e:
+                context['debug_info']['multiple_employees_error'] = str(e)
+                
+        except Exception as e:
+            context['debug_info']['employee'] = {
+                'exists': False,
+                'error': f'Error checking employee: {str(e)}',
+                'exception_type': type(e).__name__,
+            }
+        
+        # Get all employees in this business for reference
+        try:
+            all_employees = Employee.objects.filter(is_active=True).values(
+                'employee_id', 'user_id', 'role', 'department__name'
+            )
+            context['debug_info']['all_employees'] = list(all_employees)
+            context['debug_info']['total_employees'] = len(context['debug_info']['all_employees'])
+        except Exception as e:
+            context['debug_info']['all_employees_error'] = str(e)
+            context['debug_info']['all_employees'] = []
+            context['debug_info']['total_employees'] = 0
+        
+        # Check departments
+        try:
+            departments = Department.objects.filter(is_active=True).values(
+                'name', 'head__employee_id', 'head__user_id', 'employee_count'
+            )
+            context['debug_info']['departments'] = list(departments)
+        except Exception as e:
+            context['debug_info']['departments_error'] = str(e)
+            context['debug_info']['departments'] = []
+    else:
+        context['debug_info']['business'] = {
+            'error': 'No business context available',
+            'request_has_business': hasattr(request, 'business'),
+            'business_value': str(getattr(request, 'business', None)),
+            'request_path': request.path,
+        }
+    
+    # Get context processor values for comparison
+    try:
+        from apps.core.context_processors import user_role_context
+        role_context = user_role_context(request)
+        context['debug_info']['context_processor_output'] = role_context
+    except Exception as e:
+        context['debug_info']['context_processor_error'] = str(e)
+        context['debug_info']['context_processor_output'] = {}
+    
+    # Additional debug info
+    context['debug_info']['request_info'] = {
+        'path': request.path,
+        'path_info': request.path_info,
+        'method': request.method,
+        'user_agent': request.META.get('HTTP_USER_AGENT', 'Unknown')[:100],
+        'session_key': request.session.session_key if hasattr(request, 'session') else None,
+        'csrf_token': request.META.get('CSRF_COOKIE', 'Not available'),
+    }
+    
+    # Schema info
+    context['debug_info']['schema_info'] = {
+        'current_schema': connection.get_schema(),
+        'public_schema': get_public_schema_name(),
+        'is_tenant_schema': hasattr(request, 'business') and request.business is not None,
+    }
+    
+    return render(request, 'debug_user_context.html', context)
+
+# Keep the same fix_user_employee_record function, just make sure it's also properly handling cross-schema access:
+
+@login_required
+@require_http_methods(["POST"])
+def fix_user_employee_record(request):
+    """
+    AJAX endpoint to fix missing employee record
+    Called from the debug page when user clicks "Fix Employee Record"
+    FIXED: Handle cross-schema business owner access
+    """
+    try:
+        # Parse JSON data
+        data = json.loads(request.body)
+        force_recreate = data.get('force_recreate', False)
+        
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    
+    if not (hasattr(request, 'business') and request.business):
+        return JsonResponse({'error': 'No business context available'}, status=400)
+    
+    business = request.business
+    user = request.user
+    
+    try:
+        # Check if employee already exists
+        existing_employee = Employee.objects.filter(user_id=user.id, is_active=True).first()
+        if existing_employee and not force_recreate:
+            return JsonResponse({
+                'success': True,
+                'message': f'Employee record already exists: {existing_employee.employee_id}',
+                'employee_id': existing_employee.employee_id,
+                'role': existing_employee.role,
+                'role_display': existing_employee.get_role_display(),
+                'already_existed': True
+            })
+        
+        if existing_employee and force_recreate:
+            # Deactivate existing record
+            existing_employee.is_active = False
+            existing_employee.save()
+        
+        # Create or get management department
+        management_dept, dept_created = Department.objects.get_or_create(
+            name='Management',
+            defaults={
+                'description': 'Business management and administration',
+                'is_active': True
+            }
+        )
+        
+        # Generate unique employee ID
+        employee_count = Employee.objects.count()
+        employee_id = f"EMP{business.schema_name.upper()[:3]}{employee_count + 1:04d}"
+        
+        # Ensure uniqueness
+        while Employee.objects.filter(employee_id=employee_id).exists():
+            employee_count += 1
+            employee_id = f"EMP{business.schema_name.upper()[:3]}{employee_count + 1:04d}"
+        
+        # Get user profile for additional info from public schema
+        user_profile = None
+        try:
+            from django_tenants.utils import schema_context, get_public_schema_name
+            with schema_context(get_public_schema_name()):
+                user_profile = user.profile
+        except Exception as profile_error:
+            print(f"Could not get user profile: {profile_error}")
+        
+        # FIXED: Determine role based on business ownership using proper cross-schema check
+        try:
+            with schema_context(get_public_schema_name()):
+                is_business_owner = business.owner.id == user.id
+        except Exception:
+            # Fallback check using owner_id field
+            is_business_owner = getattr(business, 'owner_id', None) == user.id
+        
+        role = 'owner' if is_business_owner else 'manager'
+        
+        # Create employee record
+        employee = Employee.objects.create(
+            user_id=user.id,
+            employee_id=employee_id,
+            role=role,
+            employment_type='full_time',
+            status='active',
+            department=management_dept,
+            hire_date=business.created_at.date(),
+            is_active=True,
+            can_login=True,
+            receive_notifications=True,
+            phone=user_profile.phone if user_profile else None,
+            country='Kenya',  # Default country
+        )
+        
+        # Set department head if this is owner and no head exists
+        if role == 'owner' and not management_dept.head:
+            management_dept.head = employee
+            management_dept.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Employee record created successfully!',
+            'employee_id': employee.employee_id,
+            'role': employee.role,
+            'role_display': employee.get_role_display(),
+            'department': management_dept.name,
+            'department_created': dept_created,
+            'is_department_head': management_dept.head == employee,
+            'created_new': True,
+            'user_id': employee.user_id,
+            'is_business_owner': is_business_owner,
+        })
+        
+    except Exception as e:
+        error_details = {
+            'success': False,
+            'error': str(e),
+            'error_type': type(e).__name__,
+            'traceback': traceback.format_exc() if request.user.is_superuser else None
+        }
+        
+        print(f"Error creating employee record: {e}")
+        print(traceback.format_exc())
+        
+        return JsonResponse(error_details, status=500)

@@ -94,7 +94,7 @@ urlpatterns = [
     # path('dashboard/', include('apps.businesses.urls')),  # If you have separate dashboard URLs
     # path('settings/', include('apps.businesses.settings_urls')),  # If you have settings URLs
     
-    # API endpoints (if needed in tenant context)
+    # API endpoints (if needed in tenant context)   
     # path('api/', include('apps.core.api_urls')),
     
     # Root path for business dashboard - this handles /business/slug/ -> /

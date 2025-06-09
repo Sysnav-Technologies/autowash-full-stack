@@ -217,6 +217,7 @@ if DEBUG:
             'ENABLE_STACKTRACES': True,
         }
         print("🐛 Debug toolbar configured for local development")
+# TEMPLATES section for settings.py - Updated context processors
 
 TEMPLATES = [
     {
@@ -229,13 +230,17 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'apps.core.context_processors.business_context',
-                'apps.core.context_processors.notifications_context',
+                # Custom context processors - ORDER IS IMPORTANT!
+                'apps.core.context_processors.business_context',         # First - sets up business context
+                'apps.core.context_processors.user_role_context',        # Second - determines user role
+                'apps.core.context_processors.navigation_context',       # Third - builds navigation based on role
+                'apps.core.context_processors.notifications_context',    # Fourth - notifications (existing)
+                'apps.core.context_processors.performance_context',      # Fifth - performance metrics
+                'apps.core.context_processors.verification_context',     # Last - verification status
             ],
         },
     },
 ]
-
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 

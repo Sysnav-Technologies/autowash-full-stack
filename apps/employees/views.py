@@ -446,3 +446,152 @@ def get_employee_data(request, pk):
     }
     
     return JsonResponse(data)
+
+
+
+@login_required
+@employee_required()
+@require_POST
+@ajax_required
+def take_break_view(request):
+    """Start employee break"""
+    employee = request.employee
+    today = timezone.now().date()
+    current_time = timezone.now()
+    
+    try:
+        # Get today's attendance record
+        attendance = Attendance.objects.get(employee=employee, date=today)
+        
+        # Check if employee is checked in
+        if not attendance.check_in_time:
+            return JsonResponse({
+                'success': False,
+                'message': 'Please check in first before taking a break.'
+            }, status=400)
+        
+        # Check if employee is already on break
+        if hasattr(attendance, 'break_start_time') and attendance.break_start_time and not getattr(attendance, 'break_end_time', None):
+            return JsonResponse({
+                'success': False,
+                'message': 'You are already on break.'
+            }, status=400)
+        
+        # Start break (you might need to add these fields to your Attendance model)
+        attendance.break_start_time = current_time
+        attendance.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Break started at {current_time.strftime("%H:%M")}',
+            'break_start_time': current_time.strftime("%H:%M")
+        })
+        
+    except Attendance.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Please check in first.'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error starting break: {str(e)}'
+        }, status=500)
+
+@login_required
+@employee_required()
+@require_POST
+@ajax_required
+def end_break_view(request):
+    """End employee break"""
+    employee = request.employee
+    today = timezone.now().date()
+    current_time = timezone.now()
+    
+    try:
+        # Get today's attendance record
+        attendance = Attendance.objects.get(employee=employee, date=today)
+        
+        # Check if employee is on break
+        if not hasattr(attendance, 'break_start_time') or not attendance.break_start_time:
+            return JsonResponse({
+                'success': False,
+                'message': 'You are not currently on break.'
+            }, status=400)
+        
+        if hasattr(attendance, 'break_end_time') and attendance.break_end_time:
+            return JsonResponse({
+                'success': False,
+                'message': 'Break has already been ended.'
+            }, status=400)
+        
+        # End break
+        attendance.break_end_time = current_time
+        
+        # Calculate break duration
+        break_duration = current_time - attendance.break_start_time
+        if hasattr(attendance, 'total_break_duration'):
+            attendance.total_break_duration = break_duration
+        
+        attendance.save()
+        
+        # Format break duration for display
+        duration_minutes = int(break_duration.total_seconds() / 60)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Break ended at {current_time.strftime("%H:%M")}. Duration: {duration_minutes} minutes',
+            'break_end_time': current_time.strftime("%H:%M"),
+            'break_duration': duration_minutes
+        })
+        
+    except Attendance.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Please check in first.'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error ending break: {str(e)}'
+        }, status=500)
+
+@login_required
+@employee_required()
+@ajax_required
+def break_status_view(request):
+    """Get current break status"""
+    employee = request.employee
+    today = timezone.now().date()
+    
+    try:
+        attendance = Attendance.objects.get(employee=employee, date=today)
+        
+        # Check break status
+        on_break = False
+        break_start_time = None
+        break_duration = 0
+        
+        if hasattr(attendance, 'break_start_time') and attendance.break_start_time:
+            if not hasattr(attendance, 'break_end_time') or not attendance.break_end_time:
+                on_break = True
+                break_start_time = attendance.break_start_time.strftime("%H:%M")
+                break_duration = int((timezone.now() - attendance.break_start_time).total_seconds() / 60)
+        
+        return JsonResponse({
+            'success': True,
+            'on_break': on_break,
+            'break_start_time': break_start_time,
+            'break_duration': break_duration
+        })
+        
+    except Attendance.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'No attendance record found for today.'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error getting break status: {str(e)}'
+        }, status=500)

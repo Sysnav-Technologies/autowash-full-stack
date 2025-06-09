@@ -1,3 +1,5 @@
+# Add these URLs to your existing urlpatterns in urls.py
+
 from django.urls import path
 from . import views
 
@@ -15,8 +17,13 @@ urlpatterns = [
     
     # Attendance
     path('attendance/', views.attendance_view, name='attendance'),
-    path('attendance/checkin/', views.check_in_view, name='check_in'),
-    path('attendance/checkout/', views.check_out_view, name='check_out'),
+    path('attendance/checkin/', views.check_in_view, name='clock_in'),
+    path('attendance/checkout/', views.check_out_view, name='clock_out'),
+    
+    # Break Management - ADD THESE LINES
+    path('attendance/take-break/', views.take_break_view, name='take_break'),
+    path('attendance/end-break/', views.end_break_view, name='end_break'),
+    path('attendance/break-status/', views.break_status_view, name='break_status'),
     
     # Leave Management
     path('leave/request/', views.leave_request_view, name='leave_request'),
