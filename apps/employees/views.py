@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django_tenants.utils import schema_context, get_public_schema_name
 from apps.core.decorators import employee_required, manager_required, owner_required, ajax_required
 from apps.core.utils import generate_unique_code, send_email_notification, send_sms_notification
 from .models import (
@@ -22,6 +23,7 @@ from .forms import (
 )
 from datetime import datetime, timedelta
 import json
+import uuid
 
 @login_required
 @employee_required()
@@ -80,10 +82,11 @@ def dashboard_view(request):
 @login_required
 @manager_required
 def employee_list_view(request):
-    """List all employees"""
-    employees = Employee.objects.all().select_related(
-        'user', 'department', 'position', 'supervisor'
-    )
+    """List all employees - FIXED to remove user select_related"""
+    # FIXED: Remove 'user' from select_related since we use user_id
+    employees = Employee.objects.select_related(
+        'department', 'position', 'supervisor'
+    ).all()
     
     # Filters
     department_id = request.GET.get('department')
@@ -98,12 +101,32 @@ def employee_list_view(request):
     if status:
         employees = employees.filter(status=status)
     if search:
+        # FIXED: Search by employee fields and user_id
         employees = employees.filter(
-            Q(user__first_name__icontains=search) |
-            Q(user__last_name__icontains=search) |
-            Q(user__email__icontains=search) |
-            Q(employee_id__icontains=search)
+            Q(employee_id__icontains=search) |
+            Q(email__icontains=search) |
+            Q(phone__icontains=search)
         )
+        
+        # Also search by user fields if search contains names
+        if search:
+            # Get user IDs that match the search criteria
+            with schema_context(get_public_schema_name()):
+                matching_users = User.objects.filter(
+                    Q(first_name__icontains=search) |
+                    Q(last_name__icontains=search) |
+                    Q(email__icontains=search) |
+                    Q(username__icontains=search)
+                ).values_list('id', flat=True)
+            
+            # Add employees with matching user IDs
+            if matching_users:
+                employees = employees.filter(
+                    Q(user_id__in=matching_users) |
+                    Q(employee_id__icontains=search) |
+                    Q(email__icontains=search) |
+                    Q(phone__icontains=search)
+                ).distinct()
     
     # Pagination
     paginator = Paginator(employees, 20)
@@ -133,27 +156,33 @@ def employee_list_view(request):
 @login_required
 @manager_required
 def employee_create_view(request):
-    """Create new employee"""
+    """Create new employee - FIXED for user_id approach"""
     if request.method == 'POST':
         form = EmployeeForm(request.POST, request.FILES)
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    # Create user account
+                    # Create user account in public schema
                     user_data = form.cleaned_data
-                    user = User.objects.create_user(
-                        username=user_data['username'],
-                        email=user_data['email'],
-                        first_name=user_data['first_name'],
-                        last_name=user_data['last_name'],
-                        password=user_data['password']
-                    )
                     
-                    # Create employee profile
+                    with schema_context(get_public_schema_name()):
+                        user = User.objects.create_user(
+                            username=user_data['username'],
+                            email=user_data['email'],
+                            first_name=user_data['first_name'],
+                            last_name=user_data['last_name'],
+                            password=user_data['password']
+                        )
+                    
+                    # Create employee profile in tenant schema
                     employee = form.save(commit=False)
-                    employee.user = user
+                    employee.user_id = user.id  # FIXED: Set user_id instead of user
                     employee.employee_id = generate_unique_code('EMP', 6)
-                    employee.created_by = request.user
+                    
+                    # Ensure unique employee_id
+                    while Employee.objects.filter(employee_id=employee.employee_id).exists():
+                        employee.employee_id = generate_unique_code('EMP', 6)
+                    
                     employee.save()
                     
                     # Send welcome email/SMS
@@ -216,32 +245,59 @@ def employee_detail_view(request, pk):
 @login_required
 @manager_required
 def employee_edit_view(request, pk):
-    """Edit employee"""
+    """Edit employee - FIXED for user_id approach"""
     employee = get_object_or_404(Employee, pk=pk)
     
     if request.method == 'POST':
         form = EmployeeForm(request.POST, request.FILES, instance=employee)
         if form.is_valid():
-            employee = form.save(commit=False)
-            employee.updated_by = request.user
-            employee.save()
-            
-            # Update user information
-            user = employee.user
-            user.first_name = form.cleaned_data['first_name']
-            user.last_name = form.cleaned_data['last_name']
-            user.email = form.cleaned_data['email']
-            user.save()
-            
-            messages.success(request, f'Employee {employee.full_name} updated successfully!')
-            return redirect('employees:detail', pk=employee.pk)
+            try:
+                with transaction.atomic():
+                    employee = form.save(commit=False)
+                    
+                    # Update user information in public schema
+                    if employee.user_id:
+                        with schema_context(get_public_schema_name()):
+                            try:
+                                user = User.objects.get(id=employee.user_id)
+                                user.first_name = form.cleaned_data['first_name']
+                                user.last_name = form.cleaned_data['last_name']
+                                user.email = form.cleaned_data['email']
+                                
+                                # Update username if provided
+                                if form.cleaned_data.get('username'):
+                                    user.username = form.cleaned_data['username']
+                                
+                                # Update password if provided
+                                if form.cleaned_data.get('password'):
+                                    user.set_password(form.cleaned_data['password'])
+                                
+                                user.save()
+                            except User.DoesNotExist:
+                                messages.warning(request, 'Associated user account not found.')
+                    
+                    employee.save()
+                    
+                    messages.success(request, f'Employee {employee.full_name} updated successfully!')
+                    return redirect('employees:detail', pk=employee.pk)
+            except Exception as e:
+                messages.error(request, f'Error updating employee: {str(e)}')
     else:
         # Pre-populate form with user data
-        initial_data = {
-            'first_name': employee.user.first_name,
-            'last_name': employee.user.last_name,
-            'email': employee.user.email,
-        }
+        initial_data = {}
+        if employee.user_id:
+            with schema_context(get_public_schema_name()):
+                try:
+                    user = User.objects.get(id=employee.user_id)
+                    initial_data = {
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                        'email': user.email,
+                        'username': user.username,
+                    }
+                except User.DoesNotExist:
+                    pass
+        
         form = EmployeeForm(instance=employee, initial=initial_data)
     
     context = {
@@ -351,11 +407,18 @@ def leave_request_view(request):
             
             # Notify supervisor/manager
             if request.employee.supervisor:
-                send_email_notification(
-                    subject='New Leave Request',
-                    message=f'{request.employee.full_name} has submitted a leave request.',
-                    recipient_list=[request.employee.supervisor.email]
-                )
+                # Get supervisor user email
+                if request.employee.supervisor.user_id:
+                    with schema_context(get_public_schema_name()):
+                        try:
+                            supervisor_user = User.objects.get(id=request.employee.supervisor.user_id)
+                            send_email_notification(
+                                subject='New Leave Request',
+                                message=f'{request.employee.full_name} has submitted a leave request.',
+                                recipient_list=[supervisor_user.email]
+                            )
+                        except User.DoesNotExist:
+                            pass
             
             messages.success(request, 'Leave request submitted successfully!')
             return redirect('employees:leave_list')
@@ -406,9 +469,7 @@ def department_create_view(request):
     if request.method == 'POST':
         form = DepartmentForm(request.POST)
         if form.is_valid():
-            department = form.save(commit=False)
-            department.created_by = request.user
-            department.save()
+            department = form.save()
             
             messages.success(request, f'Department {department.name} created successfully!')
             return redirect('employees:department_list')
@@ -432,7 +493,7 @@ def get_employee_data(request, pk):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     data = {
-        'id': employee.id,
+        'id': str(employee.id),
         'name': employee.full_name,
         'employee_id': employee.employee_id,
         'email': employee.email,
@@ -446,8 +507,6 @@ def get_employee_data(request, pk):
     }
     
     return JsonResponse(data)
-
-
 
 @login_required
 @employee_required()
@@ -477,7 +536,7 @@ def take_break_view(request):
                 'message': 'You are already on break.'
             }, status=400)
         
-        # Start break (you might need to add these fields to your Attendance model)
+        # Start break
         attendance.break_start_time = current_time
         attendance.save()
         
