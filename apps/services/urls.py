@@ -9,7 +9,7 @@ urlpatterns = [
     path('create/', views.service_create_view, name='create'),
     path('<uuid:pk>/', views.service_detail_view, name='detail'),
     path('<uuid:pk>/edit/', views.service_edit_view, name='edit'),
-    path('<uuid:pk>/delete/', views.seravice_delete_view, name='delete'),
+    path('<uuid:pk>/delete/', views.service_delete_view, name='delete'),
     
     # Service Categories
     path('categories/', views.category_list_view, name='category_list'),
