@@ -1,0 +1,823 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if category %}Edit Category - {{ category.name }}{% else %}Create Category{% endif %} - {{ block.super }}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-{% if category %}edit{% else %}plus{% endif %} text-primary"></i>
+            {% if category %}Edit Category{% else %}Create Category{% endif %}
+        </h1>
+        <p class="page-description">
+            {% if category %}
+                Update the details for "{{ category.name }}" category
+            {% else %}
+                Create a new service category to organize your services
+            {% endif %}
+        </p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/services/categories/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Categories
+        </a>
+        {% if category %}
+        <a href="/business/{{ request.tenant.slug }}/services/?category={{ category.id }}" class="btn btn-outline-primary">
+            <i class="fas fa-eye"></i>
+            View Services
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    {% if category %}Edit{% else %}Create{% endif %} Category Details
+                </h5>
+            </div>
+            
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="category-form">
+                    {% csrf_token %}
+                    
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-info-circle"></i>
+                            Basic Information
+                        </h6>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">
+                                Category Name <span class="text-danger">*</span>
+                            </label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.name.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                Choose a clear, descriptive name for this category
+                            </small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">
+                                Description
+                            </label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.description.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                Provide a brief description of what services this category includes
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Visual Settings -->
+                    <div class="form-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-palette"></i>
+                            Visual Settings
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.icon.id_for_label }}" class="form-label">
+                                        Icon Class
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.icon }}
+                                        <button type="button" class="btn btn-outline-secondary" onclick="showIconPicker()">
+                                            <i class="fas fa-icons"></i>
+                                        </button>
+                                    </div>
+                                    {% if form.icon.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.icon.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">
+                                        FontAwesome icon class (e.g., fas fa-car-wash)
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.color.id_for_label }}" class="form-label">
+                                        Category Color
+                                    </label>
+                                    {{ form.color }}
+                                    {% if form.color.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.color.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">
+                                        Choose a color to represent this category
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Preview -->
+                        <div class="category-preview">
+                            <h6>Preview:</h6>
+                            <div class="preview-card">
+                                <div class="preview-icon" id="preview-icon">
+                                    <i class="fas fa-tag"></i>
+                                </div>
+                                <div class="preview-content">
+                                    <h6 id="preview-name">Category Name</h6>
+                                    <p id="preview-description">Category description will appear here...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Display Settings -->
+                    <div class="form-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-cog"></i>
+                            Display Settings
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.display_order.id_for_label }}" class="form-label">
+                                        Display Order
+                                    </label>
+                                    {{ form.display_order }}
+                                    {% if form.display_order.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.display_order.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">
+                                        Lower numbers appear first (1, 2, 3...)
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <div class="form-check form-switch">
+                                        {{ form.is_active }}
+                                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                            Active Category
+                                        </label>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        Only active categories are shown to customers
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Form Actions -->
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save"></i>
+                            {% if category %}Update Category{% else %}Create Category{% endif %}
+                        </button>
+                        <a href="/business/{{ request.tenant.slug }}/services/categories/" class="btn btn-secondary btn-lg">
+                            <i class="fas fa-times"></i>
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Help Card -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-question-circle"></i>
+                    Tips & Guidelines
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="help-section">
+                    <h6>Category Naming</h6>
+                    <ul class="help-list">
+                        <li>Use clear, descriptive names</li>
+                        <li>Keep names short and memorable</li>
+                        <li>Examples: "Exterior Wash", "Interior Care", "Detailing"</li>
+                    </ul>
+                </div>
+                
+                <div class="help-section">
+                    <h6>Icon Selection</h6>
+                    <ul class="help-list">
+                        <li>Use FontAwesome icons for consistency</li>
+                        <li>Choose icons that represent the service type</li>
+                        <li>Common examples: fas fa-car-wash, fas fa-spray-can</li>
+                    </ul>
+                </div>
+                
+                <div class="help-section">
+                    <h6>Color Guidelines</h6>
+                    <ul class="help-list">
+                        <li>Use distinct colors for each category</li>
+                        <li>Consider color psychology (blue for trust, green for eco-friendly)</li>
+                        <li>Ensure good contrast for readability</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        {% if category %}
+        <!-- Category Statistics -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Category Statistics
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="stat-row">
+                    <span class="stat-label">Total Services:</span>
+                    <span class="stat-value">{{ category.service_count|default:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Active Services:</span>
+                    <span class="stat-value">{{ category.active_services_count|default:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Created:</span>
+                    <span class="stat-value">{{ category.created_at|date:"M d, Y" }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Status:</span>
+                    <span class="stat-value">
+                        <span class="badge badge-{% if category.is_active %}success{% else %}warning{% endif %}">
+                            {% if category.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </span>
+                </div>
+                
+                <hr>
+                
+                <div class="text-center">
+                    <a href="/business/{{ request.tenant.slug }}/services/?category={{ category.id }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-eye"></i>
+                        View Services in Category
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Icon Picker Modal -->
+<div class="modal fade" id="iconPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Choose an Icon</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="icon-search mb-3">
+                    <input type="text" id="icon-search" class="form-control" placeholder="Search icons...">
+                </div>
+                <div class="icons-grid" id="icons-grid">
+                    <!-- Icons will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    color: var(--gray-700);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.text-danger {
+    color: var(--danger-600) !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-400);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+}
+
+.category-preview {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.preview-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: var(--gray-50);
+}
+
+.preview-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+    background-color: #6c757d;
+    transition: all var(--transition-fast);
+}
+
+.preview-content h6 {
+    margin: 0 0 0.25rem 0;
+    color: var(--gray-900);
+}
+
+.preview-content p {
+    margin: 0;
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    padding: 2rem 0 1rem;
+    border-top: 1px solid var(--gray-200);
+    margin-top: 2rem;
+}
+
+.help-section {
+    margin-bottom: 1.5rem;
+}
+
+.help-section h6 {
+    color: var(--gray-700);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.help-list {
+    padding-left: 1rem;
+    margin-bottom: 0;
+}
+
+.help-list li {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.stat-value {
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.icons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.icon-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    background: white;
+}
+
+.icon-option:hover {
+    border-color: var(--primary-300);
+    background: var(--primary-50);
+}
+
+.icon-option.selected {
+    border-color: var(--primary-500);
+    background: var(--primary-100);
+}
+
+.icon-option i {
+    font-size: 1.5rem;
+    color: var(--gray-600);
+}
+
+.icon-search {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+@media (max-width: 768px) {
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .preview-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .icons-grid {
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Common FontAwesome icons for car wash services
+const commonIcons = [
+    'fas fa-car-wash', 'fas fa-spray-can', 'fas fa-hand-sparkles', 
+    'fas fa-soap', 'fas fa-tint', 'fas fa-star', 'fas fa-gem',
+    'fas fa-car', 'fas fa-truck', 'fas fa-motorcycle',
+    'fas fa-tools', 'fas fa-wrench', 'fas fa-cog',
+    'fas fa-shield-alt', 'fas fa-certificate', 'fas fa-award',
+    'fas fa-leaf', 'fas fa-recycle', 'fas fa-wind',
+    'fas fa-clock', 'fas fa-bolt', 'fas fa-fire',
+    'fas fa-snowflake', 'fas fa-sun', 'fas fa-moon'
+];
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeForm();
+    setupPreview();
+});
+
+function initializeForm() {
+    // Form validation
+    const form = document.getElementById('category-form');
+    const requiredFields = form.querySelectorAll('[required]');
+    
+    requiredFields.forEach(field => {
+        field.addEventListener('blur', validateField);
+        field.addEventListener('input', clearValidationError);
+    });
+    
+    // Set default values if creating new category
+    const displayOrderField = document.querySelector('[name="display_order"]');
+    if (displayOrderField && !displayOrderField.value) {
+        displayOrderField.value = 1;
+    }
+    
+    const colorField = document.querySelector('[name="color"]');
+    if (colorField && !colorField.value) {
+        colorField.value = '#6c757d';
+    }
+    
+    const iconField = document.querySelector('[name="icon"]');
+    if (iconField && !iconField.value) {
+        iconField.value = 'fas fa-tag';
+    }
+}
+
+function setupPreview() {
+    const nameField = document.querySelector('[name="name"]');
+    const descriptionField = document.querySelector('[name="description"]');
+    const iconField = document.querySelector('[name="icon"]');
+    const colorField = document.querySelector('[name="color"]');
+    
+    const previewName = document.getElementById('preview-name');
+    const previewDescription = document.getElementById('preview-description');
+    const previewIcon = document.getElementById('preview-icon');
+    
+    // Update preview when fields change
+    nameField?.addEventListener('input', function() {
+        previewName.textContent = this.value || 'Category Name';
+    });
+    
+    descriptionField?.addEventListener('input', function() {
+        previewDescription.textContent = this.value || 'Category description will appear here...';
+    });
+    
+    iconField?.addEventListener('input', function() {
+        updatePreviewIcon(this.value);
+    });
+    
+    colorField?.addEventListener('input', function() {
+        updatePreviewColor(this.value);
+    });
+    
+    // Initialize preview
+    if (nameField?.value) previewName.textContent = nameField.value;
+    if (descriptionField?.value) previewDescription.textContent = descriptionField.value;
+    if (iconField?.value) updatePreviewIcon(iconField.value);
+    if (colorField?.value) updatePreviewColor(colorField.value);
+}
+
+function updatePreviewIcon(iconClass) {
+    const previewIcon = document.getElementById('preview-icon');
+    const iconElement = previewIcon.querySelector('i');
+    
+    if (iconClass && iconClass.trim()) {
+        iconElement.className = iconClass;
+    } else {
+        iconElement.className = 'fas fa-tag';
+    }
+}
+
+function updatePreviewColor(color) {
+    const previewIcon = document.getElementById('preview-icon');
+    if (color && color.trim()) {
+        previewIcon.style.backgroundColor = color;
+    } else {
+        previewIcon.style.backgroundColor = '#6c757d';
+    }
+}
+
+function showIconPicker() {
+    populateIconGrid();
+    new bootstrap.Modal(document.getElementById('iconPickerModal')).show();
+}
+
+function populateIconGrid() {
+    const grid = document.getElementById('icons-grid');
+    grid.innerHTML = '';
+    
+    const currentIcon = document.querySelector('[name="icon"]').value;
+    
+    commonIcons.forEach(iconClass => {
+        const iconOption = document.createElement('div');
+        iconOption.className = 'icon-option';
+        if (iconClass === currentIcon) {
+            iconOption.classList.add('selected');
+        }
+        
+        iconOption.innerHTML = `<i class="${iconClass}"></i>`;
+        iconOption.onclick = () => selectIcon(iconClass, iconOption);
+        
+        grid.appendChild(iconOption);
+    });
+    
+    // Setup search
+    const searchInput = document.getElementById('icon-search');
+    searchInput.addEventListener('input', filterIcons);
+}
+
+function selectIcon(iconClass, element) {
+    // Remove previous selection
+    document.querySelectorAll('.icon-option').forEach(el => {
+        el.classList.remove('selected');
+    });
+    
+    // Add selection to clicked element
+    element.classList.add('selected');
+    
+    // Update form field
+    document.querySelector('[name="icon"]').value = iconClass;
+    
+    // Update preview
+    updatePreviewIcon(iconClass);
+    
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('iconPickerModal')).hide();
+}
+
+function filterIcons() {
+    const searchTerm = document.getElementById('icon-search').value.toLowerCase();
+    const iconOptions = document.querySelectorAll('.icon-option');
+    
+    iconOptions.forEach(option => {
+        const iconClass = option.querySelector('i').className.toLowerCase();
+        if (iconClass.includes(searchTerm)) {
+            option.style.display = 'flex';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+}
+
+function validateField(event) {
+    const field = event.target;
+    const value = field.value.trim();
+    
+    clearValidationError(event);
+    
+    if (field.hasAttribute('required') && !value) {
+        showFieldError(field, 'This field is required');
+        return false;
+    }
+    
+    // Specific validation
+    switch (field.name) {
+        case 'name':
+            if (value.length > 50) {
+                showFieldError(field, 'Category name must be 50 characters or less');
+                return false;
+            }
+            break;
+        case 'display_order':
+            if (value && (isNaN(value) || parseInt(value) < 1)) {
+                showFieldError(field, 'Display order must be a positive number');
+                return false;
+            }
+            break;
+        case 'color':
+            if (value && !/^#[0-9A-Fa-f]{6}$/i.test(value)) {
+                showFieldError(field, 'Please enter a valid hex color code');
+                return false;
+            }
+            break;
+    }
+    
+    return true;
+}
+
+function showFieldError(field, message) {
+    field.classList.add('is-invalid');
+    
+    let errorDiv = field.parentNode.querySelector('.invalid-feedback');
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'invalid-feedback';
+        field.parentNode.appendChild(errorDiv);
+    }
+    errorDiv.textContent = message;
+}
+
+function clearValidationError(event) {
+    const field = event.target;
+    field.classList.remove('is-invalid');
+    
+    const errorDiv = field.parentNode.querySelector('.invalid-feedback');
+    if (errorDiv && !errorDiv.classList.contains('d-block')) {
+        errorDiv.remove();
+    }
+}
+
+// Form submission
+document.getElementById('category-form').addEventListener('submit', function(e) {
+    const form = e.target;
+    const requiredFields = form.querySelectorAll('[required]');
+    let isValid = true;
+    
+    requiredFields.forEach(field => {
+        if (!validateField({ target: field })) {
+            isValid = false;
+        }
+    });
+    
+    if (!isValid) {
+        e.preventDefault();
+        showErrorToast('Please fix the errors in the form');
+    }
+});
+
+function showErrorToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-error';
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+</script>
+
+<!-- Toast Styles for Form -->
+<style>
+.toast {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 9999;
+    min-width: 300px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast.toast-error {
+    border-left: 4px solid var(--danger-500);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.toast-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+</style>
+{% endblock %}

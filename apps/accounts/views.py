@@ -123,9 +123,9 @@ def dashboard_redirect(request):
     print(f"Request META HOST: {request.META.get('HTTP_HOST')}")
     print(f"="*50)
     
-    # Check if user owns a business
+    # First check if user owns a business
     business = request.user.owned_businesses.first()
-    print(f"User business: {business}")
+    print(f"User owned business: {business}")
     
     if business:
         print(f"Business found: {business.name}")
@@ -143,11 +143,119 @@ def dashboard_redirect(request):
         print(f"Redirecting to business dashboard: {business_url}")
         return redirect(business_url)
     
-    # No business found - redirect to business registration
-    print("No business found, redirecting to business registration")
-    messages.info(request, 'Welcome! Please register your business to get started.')
+    # User doesn't own a business - check if they're an employee
+    print("No owned business found, checking for employee records...")
+    
+    # Search across all verified businesses for this user's employee record
+    try:
+        from django_tenants.utils import get_tenant_model, schema_context
+        
+        tenant_model = get_tenant_model()
+        verified_businesses = tenant_model.objects.filter(is_verified=True, is_active=True)
+        
+        employee_business = None
+        
+        for biz in verified_businesses:
+            try:
+                # Switch to the business schema to check for employee record
+                with schema_context(biz.schema_name):
+                    from apps.employees.models import Employee
+                    
+                    # Check if user has an employee record in this business
+                    employee = Employee.objects.filter(
+                        user_id=request.user.id, 
+                        is_active=True
+                    ).first()
+                    
+                    if employee:
+                        employee_business = biz
+                        print(f"Found employee record in business: {biz.name}")
+                        print(f"Employee ID: {employee.employee_id}")
+                        print(f"Employee role: {employee.role}")
+                        break
+                        
+            except Exception as e:
+                # Skip businesses where we can't check (maybe schema doesn't exist yet)
+                print(f"Could not check business {biz.name}: {e}")
+                continue
+        
+        if employee_business:
+            # User is an employee - redirect to their business dashboard
+            business_url = f'/business/{employee_business.slug}/'
+            print(f"Redirecting employee to business dashboard: {business_url}")
+            messages.success(request, f'Welcome back! Redirecting to {employee_business.name} dashboard.')
+            return redirect(business_url)
+        
+    except Exception as e:
+        print(f"Error checking employee records: {e}")
+    
+    # User is neither a business owner nor an employee
+    print("User is neither business owner nor employee")
+    
+    # Check if user has multiple business access options
+    try:
+        from django_tenants.utils import get_tenant_model
+        tenant_model = get_tenant_model()
+        
+        # Get all businesses where user might have access
+        all_businesses = []
+        
+        # Add owned businesses (even unverified ones)
+        owned_businesses = request.user.owned_businesses.all()
+        for biz in owned_businesses:
+            all_businesses.append({
+                'business': biz,
+                'access_type': 'owner',
+                'verified': biz.is_verified
+            })
+        
+        # Add employee businesses
+        verified_businesses = tenant_model.objects.filter(is_verified=True, is_active=True)
+        for biz in verified_businesses:
+            try:
+                with schema_context(biz.schema_name):
+                    from apps.employees.models import Employee
+                    employee = Employee.objects.filter(
+                        user_id=request.user.id, 
+                        is_active=True
+                    ).first()
+                    
+                    if employee:
+                        all_businesses.append({
+                            'business': biz,
+                            'access_type': 'employee',
+                            'verified': True,
+                            'employee': employee
+                        })
+            except:
+                continue
+        
+        if len(all_businesses) > 1:
+            # User has multiple business access - show selection page
+            print(f"User has access to {len(all_businesses)} businesses")
+            return redirect('/auth/switch-business/')
+        
+        elif len(all_businesses) == 1:
+            # User has access to one business
+            business_access = all_businesses[0]
+            biz = business_access['business']
+            
+            if not business_access['verified']:
+                # Unverified business (must be owned)
+                messages.info(request, 'Your business is pending verification.')
+                return redirect('/auth/verification-pending/')
+            else:
+                # Verified business access
+                business_url = f'/business/{biz.slug}/'
+                return redirect(business_url)
+    
+    except Exception as e:
+        print(f"Error checking business access: {e}")
+    
+    # No business access found - redirect to business registration
+    print("No business access found, redirecting to business registration")
+    messages.info(request, 'Welcome! Please register your business to get started, or contact your employer for access.')
     return redirect('/auth/business/register/')
-
 @login_required
 def business_register_view(request):
     """Business registration - NO schema/employee creation during registration"""

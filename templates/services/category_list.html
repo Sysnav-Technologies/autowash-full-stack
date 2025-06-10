@@ -1,0 +1,542 @@
+
+<!-- templates/services/category_list.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Service Categories - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-tags text-primary"></i>
+            Service Categories
+        </h1>
+        <p class="page-description">Organize your services into categories</p>
+    </div>
+    
+    <div class="page-actions">
+        {% if user_role in 'owner,manager' %}
+        <a href="/business/{{ request.tenant.slug }}/services/categories/create/" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            Add Category
+        </a>
+        {% endif %}
+        <a href="/business/{{ request.tenant.slug }}/services/" class="btn btn-outline-secondary">
+            <i class="fas fa-cogs"></i>
+            View Services
+        </a>
+    </div>
+</div>
+
+<!-- Categories Grid -->
+<div class="categories-grid">
+    {% for category in categories %}
+    <div class="category-card" data-category-id="{{ category.id }}">
+        <div class="category-header">
+            <div class="category-icon" style="background-color: {{ category.color|default:'#6c757d' }};">
+                <i class="{{ category.icon|default:'fas fa-tag' }}"></i>
+            </div>
+            <div class="category-info">
+                <h5 class="category-name">{{ category.name }}</h5>
+                <p class="category-stats">
+                    <span class="service-count">{{ category.service_count }}</span>
+                    service{{ category.service_count|pluralize }}
+                </p>
+            </div>
+            {% if user_role in 'owner,manager' %}
+            <div class="category-actions">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/categories/{{ category.pk }}/edit/">
+                            <i class="fas fa-edit"></i> Edit Category
+                        </a></li>
+                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/?category={{ category.id }}">
+                            <i class="fas fa-eye"></i> View Services
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-warning" href="#" onclick="toggleCategoryStatus('{{ category.id }}', {{ category.is_active|yesno:'false,true' }})">
+                            <i class="fas fa-{% if category.is_active %}pause{% else %}play{% endif %}"></i> 
+                            {% if category.is_active %}Deactivate{% else %}Activate{% endif %}
+                        </a></li>
+                        {% if category.service_count == 0 %}
+                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteCategory('{{ category.id }}', '{{ category.name }}')">
+                            <i class="fas fa-trash"></i> Delete Category
+                        </a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="category-body">
+            {% if category.description %}
+            <p class="category-description">{{ category.description|truncatewords:15 }}</p>
+            {% else %}
+            <p class="category-description text-muted">No description available</p>
+            {% endif %}
+            
+            <div class="category-meta">
+                <small class="text-muted">
+                    Order: {{ category.display_order }}
+                    {% if not category.is_active %}
+                    <span class="badge badge-warning badge-sm">Inactive</span>
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+        
+        <div class="category-footer">
+            <a href="/business/{{ request.tenant.slug }}/services/?category={{ category.id }}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-eye"></i>
+                View Services
+            </a>
+            {% if user_role in 'owner,manager' %}
+            <a href="/business/{{ request.tenant.slug }}/services/categories/{{ category.pk }}/edit/" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-edit"></i>
+                Edit
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state col-12">
+        <div class="empty-state-icon">
+            <i class="fas fa-tags"></i>
+        </div>
+        <h5>No Categories Found</h5>
+        <p>Create your first service category to organize your services.</p>
+        {% if user_role in 'owner,manager' %}
+        <a href="/business/{{ request.tenant.slug }}/services/categories/create/" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            Create First Category
+        </a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Quick Stats -->
+{% if categories %}
+<div class="content-card mt-4">
+    <div class="card-header">
+        <h5 class="card-title">Category Overview</h5>
+    </div>
+    <div class="card-body">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-icon bg-primary">
+                    <i class="fas fa-tags"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ categories.count }}</h3>
+                    <p>Total Categories</p>
+                </div>
+            </div>
+            
+            <div class="stat-item">
+                <div class="stat-icon bg-success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ categories|length }}</h3>
+                    <p>Active Categories</p>
+                </div>
+            </div>
+            
+            <div class="stat-item">
+                <div class="stat-icon bg-info">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ categories|length }}</h3>
+                    <p>Total Services</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteCategoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone.
+                </div>
+                <p>Are you sure you want to delete the category "<span id="category-name-display"></span>"?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDeleteCategory()">
+                    <i class="fas fa-trash"></i>
+                    Delete Category
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.category-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+    overflow: hidden;
+}
+
+.category-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--gray-100);
+    position: relative;
+}
+
+.category-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.category-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.category-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0 0 0.25rem 0;
+}
+
+.category-stats {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.service-count {
+    font-weight: 600;
+    color: var(--primary-600);
+}
+
+.category-actions {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+.category-body {
+    padding: 1rem 1.5rem;
+}
+
+.category-description {
+    color: var(--gray-700);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    margin-bottom: 0.75rem;
+}
+
+.category-meta {
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--gray-100);
+}
+
+.category-footer {
+    padding: 1rem 1.5rem;
+    background: var(--gray-50);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+.stat-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+}
+
+.stat-content h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.stat-content p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    color: var(--gray-300);
+    margin-bottom: 1rem;
+}
+
+.empty-state h5 {
+    color: var(--gray-600);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--gray-500);
+    margin-bottom: 1.5rem;
+}
+
+.badge-sm {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.375rem;
+}
+
+@media (max-width: 768px) {
+    .categories-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .category-header {
+        padding: 1rem;
+    }
+    
+    .category-body {
+        padding: 0.75rem 1rem;
+    }
+    
+    .category-footer {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+    }
+    
+    .category-footer .btn {
+        width: 100%;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentCategoryId = null;
+
+function toggleCategoryStatus(categoryId, newStatus) {
+    if (confirm(`Are you sure you want to ${newStatus ? 'activate' : 'deactivate'} this category?`)) {
+        fetch(`/business/{{ request.tenant.slug }}/services/categories/${categoryId}/toggle-status/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ is_active: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessToast(`Category ${newStatus ? 'activated' : 'deactivated'} successfully`);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showErrorToast(data.message || 'Error updating category status');
+            }
+        })
+        .catch(error => {
+            showErrorToast('Error updating category status');
+        });
+    }
+}
+
+function deleteCategory(categoryId, categoryName) {
+    currentCategoryId = categoryId;
+    document.getElementById('category-name-display').textContent = categoryName;
+    new bootstrap.Modal(document.getElementById('deleteCategoryModal')).show();
+}
+
+function confirmDeleteCategory() {
+    if (!currentCategoryId) return;
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/categories/${currentCategoryId}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccessToast('Category deleted successfully');
+            bootstrap.Modal.getInstance(document.getElementById('deleteCategoryModal')).hide();
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showErrorToast(data.message || 'Error deleting category');
+        }
+    })
+    .catch(error => {
+        showErrorToast('Error deleting category');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showSuccessToast(message) {
+    showToast(message, 'success');
+}
+
+function showErrorToast(message) {
+    showToast(message, 'error');
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 4000);
+}
+</script>
+
+<!-- Toast Styles -->
+<style>
+.toast {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 9999;
+    min-width: 300px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast.toast-success {
+    border-left: 4px solid var(--success-500);
+}
+
+.toast.toast-error {
+    border-left: 4px solid var(--danger-500);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.toast-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+</style>
+{% endblock %}

@@ -1,8 +1,12 @@
+# COMPLETE FIX: Update your Service and ServiceCategory models
+# apps/services/models.py
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from apps.core.models import TimeStampedModel, SoftDeleteModel
 from apps.core.utils import generate_unique_code, upload_to_path
+from django_tenants.utils import schema_context, get_public_schema_name
 from decimal import Decimal
 import uuid
 
@@ -15,12 +19,34 @@ class ServiceCategory(TimeStampedModel):
     is_active = models.BooleanField(default=True)
     display_order = models.IntegerField(default=0)
     
+    # ADDED: Cross-schema user tracking
+    created_by_id = models.IntegerField(null=True, blank=True, help_text="User ID from public schema")
+    
     def __str__(self):
         return self.name
     
     @property
     def service_count(self):
         return self.services.filter(is_active=True).count()
+    
+    @property
+    def created_by(self):
+        """Get the user who created this category from public schema"""
+        if not self.created_by_id:
+            return None
+        try:
+            with schema_context(get_public_schema_name()):
+                return User.objects.get(id=self.created_by_id)
+        except User.DoesNotExist:
+            return None
+    
+    @created_by.setter
+    def created_by(self, user):
+        """Set the user who created this category"""
+        if user:
+            self.created_by_id = user.id
+        else:
+            self.created_by_id = None
     
     class Meta:
         verbose_name = "Service Category"
@@ -72,8 +98,30 @@ class Service(SoftDeleteModel):
     image = models.ImageField(upload_to='service_images/', blank=True, null=True)
     display_order = models.IntegerField(default=0)
     
+    # ADDED: Cross-schema user tracking
+    created_by_id = models.IntegerField(null=True, blank=True, help_text="User ID from public schema")
+    
     def __str__(self):
         return f"{self.name} - KES {self.base_price}"
+    
+    @property
+    def created_by(self):
+        """Get the user who created this service from public schema"""
+        if not self.created_by_id:
+            return None
+        try:
+            with schema_context(get_public_schema_name()):
+                return User.objects.get(id=self.created_by_id)
+        except User.DoesNotExist:
+            return None
+    
+    @created_by.setter
+    def created_by(self, user):
+        """Set the user who created this service"""
+        if user:
+            self.created_by_id = user.id
+        else:
+            self.created_by_id = None
     
     @property
     def average_rating(self):
@@ -97,6 +145,9 @@ class Service(SoftDeleteModel):
         verbose_name = "Service"
         verbose_name_plural = "Services"
         ordering = ['category', 'display_order', 'name']
+
+# Keep all your other models unchanged (ServicePackage, ServiceOrder, etc.)
+# They remain exactly as they are in your current file...
 
 class ServicePackage(SoftDeleteModel):
     """Service packages (bundles of services)"""
@@ -250,8 +301,30 @@ class ServiceOrder(TimeStampedModel):
     )
     customer_feedback = models.TextField(blank=True)
     
+    # ADDED: Cross-schema user tracking for order creation
+    created_by_id = models.IntegerField(null=True, blank=True, help_text="User ID from public schema")
+    
     def __str__(self):
         return f"Order {self.order_number} - {self.customer.display_name}"
+    
+    @property
+    def created_by(self):
+        """Get the user who created this order from public schema"""
+        if not self.created_by_id:
+            return None
+        try:
+            with schema_context(get_public_schema_name()):
+                return User.objects.get(id=self.created_by_id)
+        except User.DoesNotExist:
+            return None
+    
+    @created_by.setter
+    def created_by(self, user):
+        """Set the user who created this order"""
+        if user:
+            self.created_by_id = user.id
+        else:
+            self.created_by_id = None
     
     def save(self, *args, **kwargs):
         if not self.order_number:

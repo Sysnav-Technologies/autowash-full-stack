@@ -1,0 +1,759 @@
+<!-- templates/services/quick_customer_register.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Quick Customer Registration - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-user-plus text-success"></i>
+            Quick Customer Registration
+        </h1>
+        <p class="page-description">Register new walk-in customers quickly</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.business.slug }}/services/orders/quick/" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Quick Order
+        </a>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="card-header">
+        <h5 class="card-title">Customer & Vehicle Information</h5>
+        <div class="card-actions">
+            <span class="badge badge-info">
+                <i class="fas fa-clock"></i>
+                Quick Registration
+            </span>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        <form method="POST" id="quick-registration-form">
+            {% csrf_token %}
+            
+            <!-- Customer Information Section -->
+            <div class="form-section">
+                <h6 class="section-title">
+                    <i class="fas fa-user"></i>
+                    Customer Information
+                </h6>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="first_name">First Name <span class="text-danger">*</span></label>
+                            <input type="text" name="first_name" id="first_name" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="last_name">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" name="last_name" id="last_name" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="phone">Phone Number <span class="text-danger">*</span></label>
+                            <input type="tel" name="phone" id="phone" class="form-control" 
+                                   placeholder="+254701234567 or 0701234567" required>
+                            <small class="form-text text-muted">Enter valid Kenyan phone number</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="email">Email (Optional)</label>
+                            <input type="email" name="email" id="email" class="form-control" 
+                                   placeholder="customer@example.com">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vehicle Information Section -->
+            <div class="form-section">
+                <h6 class="section-title">
+                    <i class="fas fa-car"></i>
+                    Vehicle Information
+                </h6>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="registration_number">Registration Number <span class="text-danger">*</span></label>
+                            <input type="text" name="registration_number" id="registration_number" 
+                                   class="form-control text-uppercase" 
+                                   placeholder="KCX 123Y" required>
+                            <small class="form-text text-muted">Will be converted to uppercase</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="make">Make <span class="text-danger">*</span></label>
+                            <input type="text" name="make" id="make" class="form-control" 
+                                   placeholder="Toyota, Nissan, Honda..." required>
+                            <datalist id="make-suggestions">
+                                <option value="Toyota">
+                                <option value="Nissan">
+                                <option value="Honda">
+                                <option value="Mazda">
+                                <option value="Mitsubishi">
+                                <option value="Subaru">
+                                <option value="Mercedes-Benz">
+                                <option value="BMW">
+                                <option value="Volkswagen">
+                                <option value="Hyundai">
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="model">Model <span class="text-danger">*</span></label>
+                            <input type="text" name="model" id="model" class="form-control" 
+                                   placeholder="Vitz, Demio, Fit..." required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="color">Color <span class="text-danger">*</span></label>
+                            <select name="color" id="color" class="form-select" required>
+                                <option value="">Select Color</option>
+                                <option value="White">White</option>
+                                <option value="Black">Black</option>
+                                <option value="Silver">Silver</option>
+                                <option value="Gray">Gray</option>
+                                <option value="Red">Red</option>
+                                <option value="Blue">Blue</option>
+                                <option value="Green">Green</option>
+                                <option value="Yellow">Yellow</option>
+                                <option value="Orange">Orange</option>
+                                <option value="Brown">Brown</option>
+                                <option value="Gold">Gold</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="vehicle_type">Vehicle Type <span class="text-danger">*</span></label>
+                            <select name="vehicle_type" id="vehicle_type" class="form-select" required>
+                                <option value="sedan">Sedan</option>
+                                <option value="hatchback">Hatchback</option>
+                                <option value="suv">SUV</option>
+                                <option value="pickup">Pickup</option>
+                                <option value="van">Van</option>
+                                <option value="wagon">Station Wagon</option>
+                                <option value="coupe">Coupe</option>
+                                <option value="convertible">Convertible</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="year">Year <span class="text-danger">*</span></label>
+                            <select name="year" id="year" class="form-select" required>
+                                <option value="">Select Year</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Information Section -->
+            <div class="form-section">
+                <h6 class="section-title">
+                    <i class="fas fa-info-circle"></i>
+                    Additional Information (Optional)
+                </h6>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="id_number">ID Number</label>
+                            <input type="text" name="id_number" id="id_number" class="form-control" 
+                                   placeholder="12345678">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="location">Location/Area</label>
+                            <input type="text" name="location" id="location" class="form-control" 
+                                   placeholder="Westlands, Karen, etc.">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notes">Notes</label>
+                    <textarea name="notes" id="notes" class="form-control" rows="2" 
+                              placeholder="Any additional information about the customer or vehicle..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fas fa-user-plus"></i>
+                    Register Customer & Vehicle
+                </button>
+                <a href="/business/{{ request.business.slug }}/services/orders/quick/" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Registration Success Modal -->
+<div class="modal fade" id="registrationSuccessModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-check-circle"></i>
+                    Registration Successful
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <div class="success-icon mb-3">
+                        <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                    </div>
+                    <h6>Customer and vehicle registered successfully!</h6>
+                    <p class="text-muted">What would you like to do next?</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="createQuickOrder()">
+                    <i class="fas fa-bolt"></i>
+                    Create Quick Order
+                </button>
+                <button type="button" class="btn btn-success" onclick="registerAnother()">
+                    <i class="fas fa-plus"></i>
+                    Register Another
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Duplicate Check Modal -->
+<div class="modal fade" id="duplicateCheckModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Duplicate Found
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div id="duplicate-info"></div>
+                <p>Would you like to proceed with the existing customer or register as new?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="useExisting()">
+                    Use Existing
+                </button>
+                <button type="button" class="btn btn-warning" onclick="registerNew()">
+                    Register New
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    color: var(--gray-700);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.text-danger {
+    color: var(--danger-600) !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-400);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    padding: 2rem 0 1rem;
+    border-top: 1px solid var(--gray-200);
+    margin-top: 2rem;
+}
+
+.text-uppercase {
+    text-transform: uppercase;
+}
+
+.success-icon {
+    animation: successPulse 1s ease-in-out;
+}
+
+@keyframes successPulse {
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.duplicate-warning {
+    background: var(--warning-100);
+    border: 1px solid var(--warning-300);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    background: white;
+    padding: 2rem;
+    border-radius: var(--radius-lg);
+    text-align: center;
+}
+
+.form-validation-error {
+    border-color: var(--danger-400) !important;
+    box-shadow: 0 0 0 0.2rem rgba(var(--danger-rgb), 0.25) !important;
+}
+
+.validation-message {
+    color: var(--danger-600);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 768px) {
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-section {
+        padding: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initializeForm();
+    populateYearOptions();
+    setupFormValidation();
+    setupAutoComplete();
+});
+
+function initializeForm() {
+    const form = document.getElementById('quick-registration-form');
+    
+    // Auto-uppercase registration number
+    const regInput = document.getElementById('registration_number');
+    regInput.addEventListener('input', function() {
+        this.value = this.value.toUpperCase();
+    });
+    
+    // Phone number formatting
+    const phoneInput = document.getElementById('phone');
+    phoneInput.addEventListener('input', function() {
+        let value = this.value.replace(/\D/g, '');
+        
+        if (value.startsWith('254')) {
+            this.value = '+' + value;
+        } else if (value.startsWith('0')) {
+            this.value = value;
+        }
+    });
+    
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitRegistration();
+    });
+}
+
+function populateYearOptions() {
+    const yearSelect = document.getElementById('year');
+    const currentYear = new Date().getFullYear();
+    
+    for (let year = currentYear; year >= 1990; year--) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        if (year === 2020) option.selected = true;
+        yearSelect.appendChild(option);
+    }
+}
+
+function setupFormValidation() {
+    const requiredFields = document.querySelectorAll('[required]');
+    
+    requiredFields.forEach(field => {
+        field.addEventListener('blur', validateField);
+        field.addEventListener('input', clearValidationError);
+    });
+}
+
+function validateField(event) {
+    const field = event.target;
+    const value = field.value.trim();
+    
+    clearValidationError(event);
+    
+    if (!value) {
+        showFieldError(field, 'This field is required');
+        return false;
+    }
+    
+    // Specific validation
+    switch (field.name) {
+        case 'phone':
+            if (!isValidKenyanPhone(value)) {
+                showFieldError(field, 'Please enter a valid Kenyan phone number');
+                return false;
+            }
+            break;
+        case 'email':
+            if (value && !isValidEmail(value)) {
+                showFieldError(field, 'Please enter a valid email address');
+                return false;
+            }
+            break;
+        case 'registration_number':
+            if (value.length < 6) {
+                showFieldError(field, 'Registration number should be at least 6 characters');
+                return false;
+            }
+            checkDuplicateRegistration(value);
+            break;
+    }
+    
+    return true;
+}
+
+function showFieldError(field, message) {
+    field.classList.add('form-validation-error');
+    
+    let errorDiv = field.parentNode.querySelector('.validation-message');
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'validation-message';
+        field.parentNode.appendChild(errorDiv);
+    }
+    errorDiv.textContent = message;
+}
+
+function clearValidationError(event) {
+    const field = event.target;
+    field.classList.remove('form-validation-error');
+    
+    const errorDiv = field.parentNode.querySelector('.validation-message');
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+}
+
+function isValidKenyanPhone(phone) {
+    const kenyanPhoneRegex = /^(\+254|254|0)?[17]\d{8}$/;
+    return kenyanPhoneRegex.test(phone.replace(/\s/g, ''));
+}
+
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+function checkDuplicateRegistration(regNumber) {
+    if (regNumber.length < 6) return;
+    
+    fetch(`/business/{{ request.business.slug }}/services/ajax/check-registration/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ registration_number: regNumber })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.exists) {
+            showDuplicateWarning(data.vehicle);
+        }
+    })
+    .catch(error => console.error('Error checking registration:', error));
+}
+
+function showDuplicateWarning(vehicle) {
+    const regField = document.getElementById('registration_number');
+    const duplicateInfo = `
+        <div class="duplicate-warning">
+            <strong>Vehicle Found:</strong> ${vehicle.registration_number}<br>
+            <strong>Owner:</strong> ${vehicle.customer_name}<br>
+            <strong>Vehicle:</strong> ${vehicle.make} ${vehicle.model} (${vehicle.color})
+        </div>
+    `;
+    
+    document.getElementById('duplicate-info').innerHTML = duplicateInfo;
+    new bootstrap.Modal(document.getElementById('duplicateCheckModal')).show();
+}
+
+function setupAutoComplete() {
+    const makeInput = document.getElementById('make');
+    makeInput.setAttribute('list', 'make-suggestions');
+}
+
+function submitRegistration() {
+    const form = document.getElementById('quick-registration-form');
+    const formData = new FormData(form);
+    
+    // Validate all required fields
+    const requiredFields = form.querySelectorAll('[required]');
+    let isValid = true;
+    
+    requiredFields.forEach(field => {
+        if (!validateField({ target: field })) {
+            isValid = false;
+        }
+    });
+    
+    if (!isValid) {
+        showErrorToast('Please fix the errors in the form');
+        return;
+    }
+    
+    showLoadingOverlay();
+    
+    fetch(form.action || window.location.href, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoadingOverlay();
+        
+        if (data.success) {
+            // Store customer data for quick order
+            sessionStorage.setItem('newCustomer', JSON.stringify({
+                customer: data.customer,
+                vehicle: data.vehicle
+            }));
+            
+            showRegistrationSuccess();
+        } else {
+            showErrorToast(data.error || 'Registration failed');
+        }
+    })
+    .catch(error => {
+        hideLoadingOverlay();
+        showErrorToast('Error during registration');
+        console.error('Registration error:', error);
+    });
+}
+
+function showRegistrationSuccess() {
+    new bootstrap.Modal(document.getElementById('registrationSuccessModal')).show();
+}
+
+function createQuickOrder() {
+    window.location.href = `/business/{{ request.business.slug }}/services/orders/quick/`;
+}
+
+function registerAnother() {
+    document.getElementById('quick-registration-form').reset();
+    bootstrap.Modal.getInstance(document.getElementById('registrationSuccessModal')).hide();
+    document.getElementById('first_name').focus();
+}
+
+function useExisting() {
+    bootstrap.Modal.getInstance(document.getElementById('duplicateCheckModal')).hide();
+    createQuickOrder();
+}
+
+function registerNew() {
+    bootstrap.Modal.getInstance(document.getElementById('duplicateCheckModal')).hide();
+    // Continue with registration
+}
+
+function showLoadingOverlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'loading-overlay';
+    overlay.innerHTML = `
+        <div class="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Registering customer...</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.querySelector('.loading-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+function showErrorToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-error';
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Auto-focus first field
+document.getElementById('first_name').focus();
+</script>
+
+<!-- Toast Styles -->
+<style>
+.toast {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 9999;
+    min-width: 300px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast.toast-error {
+    border-left: 4px solid var(--danger-500);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.toast-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+</style>
+{% endblock %}

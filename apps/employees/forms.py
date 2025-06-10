@@ -5,6 +5,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column, Field, HTML, Div
 from crispy_forms.bootstrap import FormActions
 from phonenumber_field.formfields import PhoneNumberField
+from django_tenants.utils import get_public_schema_name, schema_context  
 from .models import (
     Employee, Department, Position, Attendance, Leave, 
     PerformanceReview, Training, TrainingParticipant, Payroll, EmployeeDocument
@@ -138,18 +139,44 @@ class EmployeeForm(forms.ModelForm):
     
     def clean_username(self):
         username = self.cleaned_data.get('username')
-        if username and User.objects.filter(username=username).exclude(
-            pk=self.instance.user.pk if self.instance.pk and hasattr(self.instance, 'user') else None
-        ).exists():
-            raise ValidationError("Username already exists.")
+        if username:
+            # Get the user_id to exclude from the check
+            exclude_user_id = None
+            
+            # For existing employees, get their user_id
+            if self.instance.pk and self.instance.user_id:
+                exclude_user_id = self.instance.user_id
+            
+            # Check if username already exists in User model (public schema)
+            with schema_context(get_public_schema_name()):
+                existing_user = User.objects.filter(username=username)
+                if exclude_user_id:
+                    existing_user = existing_user.exclude(pk=exclude_user_id)
+                
+                if existing_user.exists():
+                    raise ValidationError("Username already exists.")
+        
         return username
     
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and User.objects.filter(email=email).exclude(
-            pk=self.instance.user.pk if self.instance.pk and hasattr(self.instance, 'user') else None
-        ).exists():
-            raise ValidationError("Email already exists.")
+        if email:
+            # Get the user_id to exclude from the check
+            exclude_user_id = None
+            
+            # For existing employees, get their user_id
+            if self.instance.pk and self.instance.user_id:
+                exclude_user_id = self.instance.user_id
+            
+            # Check if email already exists in User model (public schema)
+            with schema_context(get_public_schema_name()):
+                existing_user = User.objects.filter(email=email)
+                if exclude_user_id:
+                    existing_user = existing_user.exclude(pk=exclude_user_id)
+                
+                if existing_user.exists():
+                    raise ValidationError("Email already exists.")
+            
         return email
 
 class DepartmentForm(forms.ModelForm):

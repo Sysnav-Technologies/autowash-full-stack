@@ -1,534 +1,534 @@
+<!-- templates/services/service_form.html -->
 {% extends 'base/base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}{{ title }}{% endblock %}
+{% block title %}{% if service %}Edit Service{% else %}Create Service{% endif %} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-car-wash text-primary"></i>
+            {% if service %}Edit Service{% else %}Create New Service{% endif %}
+        </h1>
+        <p class="page-description">
+            {% if service %}Update service details and pricing{% else %}Add a new service to your business{% endif %}
+        </p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/services/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Services
+        </a>
+        {% if service %}
+        <a href="/business/{{ request.tenant.slug }}/services/{{ service.pk }}/" class="btn btn-outline-primary">
+            <i class="fas fa-eye"></i>
+            View Service
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    {% if service %}Service Information{% else %}New Service Details{% endif %}
+                </h5>
+            </div>
+            
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" class="service-form">
+                    {% csrf_token %}
+                    
+                    {% crispy form %}
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Service Preview -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-eye"></i>
+                    Preview
+                </h6>
+            </div>
+            
+            <div class="card-body">
+                <div class="service-preview" id="service-preview">
+                    <div class="preview-image">
+                        <div class="image-placeholder" id="preview-image">
+                            <i class="fas fa-car-wash"></i>
+                            <span>Service Image</span>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-content">
+                        <div class="preview-category" id="preview-category">
+                            <i class="fas fa-tag"></i>
+                            <span>Select Category</span>
+                        </div>
+                        
+                        <h6 class="preview-name" id="preview-name">Service Name</h6>
+                        <p class="preview-description" id="preview-description">Service description will appear here...</p>
+                        
+                        <div class="preview-price" id="preview-price">
+                            <strong>KES 0.00</strong>
+                        </div>
+                        
+                        <div class="preview-duration" id="preview-duration">
+                            <i class="fas fa-clock"></i>
+                            <span>0 minutes</span>
+                        </div>
+                        
+                        <div class="preview-badges" id="preview-badges">
+                            <!-- Badges will be added dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tips -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-lightbulb"></i>
+                    Tips
+                </h6>
+            </div>
+            
+            <div class="card-body">
+                <div class="tips-list">
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Use clear, descriptive service names</span>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Set competitive pricing based on market research</span>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Provide accurate duration estimates</span>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Include high-quality service images</span>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Mark popular services to highlight them</span>
+                    </div>
+                    
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <span>Specify vehicle compatibility clearly</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if service %}
+        <!-- Service Stats -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-chart-line"></i>
+                    Service Statistics
+                </h6>
+            </div>
+            
+            <div class="card-body">
+                <div class="stat-row">
+                    <span class="stat-label">Total Orders</span>
+                    <span class="stat-value">{{ service.total_orders }}</span>
+                </div>
+                
+                <div class="stat-row">
+                    <span class="stat-label">Average Rating</span>
+                    <span class="stat-value">
+                        {% if service.average_rating > 0 %}
+                        {{ service.average_rating|floatformat:1 }}
+                        <i class="fas fa-star text-warning"></i>
+                        {% else %}
+                        No ratings yet
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="stat-row">
+                    <span class="stat-label">Last Ordered</span>
+                    <span class="stat-value">
+                        {% if service.order_items.last %}
+                        {{ service.order_items.last.created_at|date:"M d, Y" }}
+                        {% else %}
+                        Never
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="stat-row">
+                    <span class="stat-label">Status</span>
+                    <span class="stat-value">
+                        {% if service.is_active %}
+                        <span class="badge badge-success">Active</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Inactive</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
 
 {% block extra_css %}
 <style>
-/* Service Form Styles */
-.service-form-container {
-    max-width: 900px;
-    margin: 0 auto;
-}
-
-.form-section {
-    background: white;
-    border-radius: var(--radius-lg);
-    padding: 2rem;
+.service-form .form-section {
     margin-bottom: 2rem;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--gray-200);
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--gray-200);
 }
 
-.section-title {
-    font-size: 1.25rem;
+.service-form .form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.service-form .form-section h5 {
+    color: var(--gray-700);
     font-weight: 600;
-    color: var(--gray-900);
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--primary-100);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
 }
 
-.section-icon {
-    width: 32px;
-    height: 32px;
-    background: var(--primary-100);
+.service-preview {
+    border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
+    overflow: hidden;
+    background: white;
+}
+
+.preview-image {
+    height: 120px;
+    background: var(--gray-100);
+    position: relative;
+    overflow: hidden;
+}
+
+.image-placeholder {
+    height: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: var(--primary-600);
+    color: var(--gray-400);
+    font-size: 2rem;
 }
 
-.image-preview {
-    max-width: 200px;
-    max-height: 200px;
-    border-radius: var(--radius-lg);
-    margin-top: 1rem;
-    box-shadow: var(--shadow-sm);
+.image-placeholder span {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
 }
 
-.form-help-text {
-    background: var(--info-50);
-    border: 1px solid var(--info-200);
-    border-radius: var(--radius-md);
+.preview-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.preview-content {
     padding: 1rem;
-    margin-bottom: 1.5rem;
 }
 
-.help-icon {
-    color: var(--info-600);
-    margin-right: 0.5rem;
-}
-
-.price-input-group {
-    position: relative;
-}
-
-.price-input-group::before {
-    content: 'KES';
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--gray-500);
-    font-weight: 500;
-    z-index: 10;
-}
-
-.price-input-group input {
-    padding-left: 3rem;
-}
-
-.duration-input-group {
-    position: relative;
-}
-
-.duration-input-group::after {
-    content: 'min';
-    position: absolute;
-    right: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--gray-500);
-    font-weight: 500;
-}
-
-.duration-input-group input {
-    padding-right: 3rem;
-}
-
-.checkbox-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.checkbox-item {
+.preview-category {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    margin-bottom: 0.5rem;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
+    gap: 0.25rem;
 }
 
-.checkbox-item:hover {
-    background: var(--gray-50);
-    border-color: var(--primary-300);
+.preview-name {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
 }
 
-.checkbox-item input:checked + label {
+.preview-description {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
+.preview-price {
+    font-size: 1.125rem;
     color: var(--primary-600);
-    font-weight: 500;
+    margin-bottom: 0.5rem;
 }
 
-.form-actions {
-    background: white;
-    border-radius: var(--radius-lg);
-    padding: 2rem;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--gray-200);
+.preview-duration {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.preview-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.tips-list {
+    space-y: 0.75rem;
+}
+
+.tip-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+}
+
+.tip-item i {
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+}
+
+.stat-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: sticky;
-    bottom: 2rem;
-    z-index: 100;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-100);
 }
 
-.btn-group {
-    display: flex;
-    gap: 1rem;
+.stat-row:last-child {
+    border-bottom: none;
 }
 
-/* Responsive Design */
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.stat-value {
+    font-weight: 600;
+    color: var(--gray-900);
+    font-size: 0.875rem;
+}
+
+/* Form styling enhancements */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-300);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+}
+
+.form-check-input:checked {
+    background-color: var(--primary-600);
+    border-color: var(--primary-600);
+}
+
+.btn-primary {
+    background-color: var(--primary-600);
+    border-color: var(--primary-600);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-700);
+    border-color: var(--primary-700);
+}
+
 @media (max-width: 768px) {
-    .service-form-container {
-        margin: 0;
-    }
-    
-    .form-section {
-        margin: 0 0 1rem 0;
-        padding: 1.5rem;
-        border-radius: var(--radius-md);
-    }
-    
-    .form-actions {
+    .page-actions {
         flex-direction: column;
-        gap: 1rem;
-        position: static;
-        margin-top: 2rem;
+        gap: 0.5rem;
     }
     
-    .btn-group {
+    .page-actions .btn {
         width: 100%;
-        justify-content: center;
     }
 }
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="service-form-container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <div class="page-header-content">
-            <h1 class="page-title">
-                <i class="fas fa-plus-circle text-primary"></i>
-                {{ title }}
-            </h1>
-            <p class="page-description">Configure service details, pricing, and requirements</p>
-        </div>
-    </div>
-
-    <form method="post" enctype="multipart/form-data" id="serviceForm">
-        {% csrf_token %}
-        
-        <!-- Basic Information -->
-        <div class="form-section">
-            <h3 class="section-title">
-                <div class="section-icon">
-                    <i class="fas fa-info-circle"></i>
-                </div>
-                Basic Information
-            </h3>
-            
-            <div class="form-help-text">
-                <i class="fas fa-lightbulb help-icon"></i>
-                <strong>Tip:</strong> Use clear, descriptive names and detailed descriptions to help customers understand your services.
-            </div>
-            
-            <div class="row">
-                <div class="col-md-8">
-                    {{ form.name|as_crispy_field }}
-                </div>
-                <div class="col-md-4">
-                    {{ form.category|as_crispy_field }}
-                </div>
-            </div>
-            
-            {{ form.description|as_crispy_field }}
-            
-            <div class="row">
-                <div class="col-md-6">
-                    {{ form.image|as_crispy_field }}
-                    <div id="imagePreview" style="display: none;">
-                        <img id="previewImg" class="image-preview" src="" alt="Service Image Preview">
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    {{ form.display_order|as_crispy_field }}
-                </div>
-            </div>
-        </div>
-
-        <!-- Pricing Configuration -->
-        <div class="form-section">
-            <h3 class="section-title">
-                <div class="section-icon">
-                    <i class="fas fa-money-bill-wave"></i>
-                </div>
-                Pricing Configuration
-            </h3>
-            
-            <div class="form-help-text">
-                <i class="fas fa-calculator help-icon"></i>
-                <strong>Pricing Guide:</strong> Set a base price and optional min/max ranges for flexible pricing based on vehicle size or condition.
-            </div>
-            
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="form-group">
-                        <label for="{{ form.base_price.id_for_label }}" class="form-label">{{ form.base_price.label }}</label>
-                        <div class="price-input-group">
-                            {{ form.base_price }}
-                        </div>
-                        {% if form.base_price.help_text %}
-                            <div class="form-text">{{ form.base_price.help_text }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-group">
-                        <label for="{{ form.min_price.id_for_label }}" class="form-label">{{ form.min_price.label }}</label>
-                        <div class="price-input-group">
-                            {{ form.min_price }}
-                        </div>
-                        {% if form.min_price.help_text %}
-                            <div class="form-text">{{ form.min_price.help_text }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-group">
-                        <label for="{{ form.max_price.id_for_label }}" class="form-label">{{ form.max_price.label }}</label>
-                        <div class="price-input-group">
-                            {{ form.max_price }}
-                        </div>
-                        {% if form.max_price.help_text %}
-                            <div class="form-text">{{ form.max_price.help_text }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Duration Settings -->
-        <div class="form-section">
-            <h3 class="section-title">
-                <div class="section-icon">
-                    <i class="fas fa-clock"></i>
-                </div>
-                Duration Settings
-            </h3>
-            
-            <div class="form-help-text">
-                <i class="fas fa-stopwatch help-icon"></i>
-                <strong>Time Management:</strong> Accurate duration estimates help with scheduling and customer expectations.
-            </div>
-            
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="form-group">
-                        <label for="{{ form.estimated_duration.id_for_label }}" class="form-label">{{ form.estimated_duration.label }}</label>
-                        <div class="duration-input-group">
-                            {{ form.estimated_duration }}
-                        </div>
-                        {% if form.estimated_duration.help_text %}
-                            <div class="form-text">{{ form.estimated_duration.help_text }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-group">
-                        <label for="{{ form.min_duration.id_for_label }}" class="form-label">{{ form.min_duration.label }}</label>
-                        <div class="duration-input-group">
-                            {{ form.min_duration }}
-                        </div>
-                        {% if form.min_duration.help_text %}
-                            <div class="form-text">{{ form.min_duration.help_text }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-group">
-                        <label for="{{ form.max_duration.id_for_label }}" class="form-label">{{ form.max_duration.label }}</label>
-                        <div class="duration-input-group">
-                            {{ form.max_duration }}
-                        </div>
-                        {% if form.max_duration.help_text %}
-                            <div class="form-text">{{ form.max_duration.help_text }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Requirements & Compatibility -->
-        <div class="form-section">
-            <h3 class="section-title">
-                <div class="section-icon">
-                    <i class="fas fa-cogs"></i>
-                </div>
-                Requirements & Compatibility
-            </h3>
-            
-            <div class="form-help-text">
-                <i class="fas fa-car help-icon"></i>
-                <strong>Compatibility:</strong> Specify which vehicle types this service works with and required skill level.
-            </div>
-            
-            <div class="row">
-                <div class="col-md-6">
-                    {{ form.required_skill_level|as_crispy_field }}
-                </div>
-                <div class="col-md-6">
-                    {{ form.compatible_vehicle_types|as_crispy_field }}
-                    <div class="form-text">
-                        <strong>Examples:</strong> sedan, suv, hatchback, pickup, van, truck
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Service Settings -->
-        <div class="form-section">
-            <h3 class="section-title">
-                <div class="section-icon">
-                    <i class="fas fa-sliders-h"></i>
-                </div>
-                Service Settings
-            </h3>
-            
-            <div class="checkbox-grid">
-                <div class="checkbox-item">
-                    {{ form.requires_booking }}
-                    <label for="{{ form.requires_booking.id_for_label }}">{{ form.requires_booking.label }}</label>
-                </div>
-                <div class="checkbox-item">
-                    {{ form.is_popular }}
-                    <label for="{{ form.is_popular.id_for_label }}">{{ form.is_popular.label }}</label>
-                </div>
-                <div class="checkbox-item">
-                    {{ form.is_premium }}
-                    <label for="{{ form.is_premium.id_for_label }}">{{ form.is_premium.label }}</label>
-                </div>
-                <div class="checkbox-item">
-                    {{ form.is_active }}
-                    <label for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Form Actions -->
-        <div class="form-actions">
-            <div class="form-info">
-                <i class="fas fa-info-circle text-muted"></i>
-                <span class="text-muted">All fields marked with * are required</span>
-            </div>
-            <div class="btn-group">
-                <a href="/business/{{ request.tenant.slug }}/services/" class="btn btn-outline-secondary">
-                    <i class="fas fa-times"></i>
-                    Cancel
-                </a>
-                <button type="submit" class="btn btn-primary" id="submitBtn">
-                    <i class="fas fa-save"></i>
-                    Save Service
-                </button>
-            </div>
-        </div>
-    </form>
-</div>
-
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Image preview functionality
-    const imageInput = document.getElementById('{{ form.image.id_for_label }}');
-    const imagePreview = document.getElementById('imagePreview');
-    const previewImg = document.getElementById('previewImg');
+    // Form field references
+    const nameField = document.getElementById('id_name');
+    const categoryField = document.getElementById('id_category');
+    const descriptionField = document.getElementById('id_description');
+    const priceField = document.getElementById('id_base_price');
+    const durationField = document.getElementById('id_estimated_duration');
+    const imageField = document.getElementById('id_image');
+    const popularField = document.getElementById('id_is_popular');
+    const premiumField = document.getElementById('id_is_premium');
     
-    if (imageInput) {
-        imageInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    previewImg.src = e.target.result;
-                    imagePreview.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            } else {
-                imagePreview.style.display = 'none';
-            }
-        });
+    // Preview elements
+    const previewName = document.getElementById('preview-name');
+    const previewCategory = document.getElementById('preview-category');
+    const previewDescription = document.getElementById('preview-description');
+    const previewPrice = document.getElementById('preview-price');
+    const previewDuration = document.getElementById('preview-duration');
+    const previewImage = document.getElementById('preview-image');
+    const previewBadges = document.getElementById('preview-badges');
+    
+    // Update preview functions
+    function updatePreviewName() {
+        const name = nameField.value.trim();
+        previewName.textContent = name || 'Service Name';
     }
+    
+    function updatePreviewCategory() {
+        const categorySelect = categoryField;
+        const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+        const categoryText = selectedOption ? selectedOption.text : 'Select Category';
+        previewCategory.innerHTML = `<i class="fas fa-tag"></i><span>${categoryText}</span>`;
+    }
+    
+    function updatePreviewDescription() {
+        const description = descriptionField.value.trim();
+        previewDescription.textContent = description || 'Service description will appear here...';
+    }
+    
+    function updatePreviewPrice() {
+        const price = parseFloat(priceField.value) || 0;
+        previewPrice.innerHTML = `<strong>KES ${price.toFixed(2)}</strong>`;
+    }
+    
+    function updatePreviewDuration() {
+        const duration = parseInt(durationField.value) || 0;
+        previewDuration.innerHTML = `<i class="fas fa-clock"></i><span>${duration} minutes</span>`;
+    }
+    
+    function updatePreviewImage() {
+        if (imageField.files && imageField.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.innerHTML = `<img src="${e.target.result}" alt="Service Image">`;
+            };
+            reader.readAsDataURL(imageField.files[0]);
+        }
+    }
+    
+    function updatePreviewBadges() {
+        let badges = '';
+        
+        if (popularField.checked) {
+            badges += '<span class="badge badge-warning">Popular</span>';
+        }
+        
+        if (premiumField.checked) {
+            badges += '<span class="badge badge-info">Premium</span>';
+        }
+        
+        previewBadges.innerHTML = badges;
+    }
+    
+    // Event listeners
+    if (nameField) nameField.addEventListener('input', updatePreviewName);
+    if (categoryField) categoryField.addEventListener('change', updatePreviewCategory);
+    if (descriptionField) descriptionField.addEventListener('input', updatePreviewDescription);
+    if (priceField) priceField.addEventListener('input', updatePreviewPrice);
+    if (durationField) durationField.addEventListener('input', updatePreviewDuration);
+    if (imageField) imageField.addEventListener('change', updatePreviewImage);
+    if (popularField) popularField.addEventListener('change', updatePreviewBadges);
+    if (premiumField) premiumField.addEventListener('change', updatePreviewBadges);
+    
+    // Initialize preview with existing values
+    updatePreviewName();
+    updatePreviewCategory();
+    updatePreviewDescription();
+    updatePreviewPrice();
+    updatePreviewDuration();
+    updatePreviewBadges();
     
     // Form validation
-    const form = document.getElementById('serviceForm');
-    const submitBtn = document.getElementById('submitBtn');
-    
+    const form = document.querySelector('.service-form');
     form.addEventListener('submit', function(e) {
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-        submitBtn.disabled = true;
-    });
-    
-    // Price validation
-    const basePrice = document.getElementById('{{ form.base_price.id_for_label }}');
-    const minPrice = document.getElementById('{{ form.min_price.id_for_label }}');
-    const maxPrice = document.getElementById('{{ form.max_price.id_for_label }}');
-    
-    function validatePrices() {
-        const base = parseFloat(basePrice.value) || 0;
-        const min = parseFloat(minPrice.value) || 0;
-        const max = parseFloat(maxPrice.value) || 0;
+        let isValid = true;
+        const errors = [];
         
-        if (min > 0 && min > base) {
-            showFieldError(minPrice, 'Minimum price cannot be greater than base price');
-            return false;
+        // Required fields validation
+        if (!nameField.value.trim()) {
+            errors.push('Service name is required');
+            isValid = false;
         }
         
-        if (max > 0 && max < base) {
-            showFieldError(maxPrice, 'Maximum price cannot be less than base price');
-            return false;
+        if (!descriptionField.value.trim()) {
+            errors.push('Service description is required');
+            isValid = false;
         }
         
-        if (min > 0 && max > 0 && min > max) {
-            showFieldError(maxPrice, 'Maximum price cannot be less than minimum price');
-            return false;
+        const price = parseFloat(priceField.value);
+        if (!price || price <= 0) {
+            errors.push('Valid price is required');
+            isValid = false;
         }
         
-        clearFieldErrors([basePrice, minPrice, maxPrice]);
-        return true;
-    }
-    
-    [basePrice, minPrice, maxPrice].forEach(field => {
-        if (field) {
-            field.addEventListener('blur', validatePrices);
+        const duration = parseInt(durationField.value);
+        if (!duration || duration <= 0) {
+            errors.push('Valid duration is required');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+            alert('Please fix the following errors:\n' + errors.join('\n'));
         }
     });
     
-    // Duration validation
-    const estimatedDuration = document.getElementById('{{ form.estimated_duration.id_for_label }}');
-    const minDuration = document.getElementById('{{ form.min_duration.id_for_label }}');
-    const maxDuration = document.getElementById('{{ form.max_duration.id_for_label }}');
-    
-    function validateDurations() {
-        const estimated = parseInt(estimatedDuration.value) || 0;
-        const min = parseInt(minDuration.value) || 0;
-        const max = parseInt(maxDuration.value) || 0;
+    // Auto-calculate duration ranges
+    durationField.addEventListener('input', function() {
+        const baseDuration = parseInt(this.value) || 0;
+        const minDurationField = document.getElementById('id_min_duration');
+        const maxDurationField = document.getElementById('id_max_duration');
         
-        if (min > 0 && min > estimated) {
-            showFieldError(minDuration, 'Minimum duration cannot be greater than estimated duration');
-            return false;
+        if (minDurationField && !minDurationField.value) {
+            minDurationField.value = Math.max(1, baseDuration - 10);
         }
         
-        if (max > 0 && max < estimated) {
-            showFieldError(maxDuration, 'Maximum duration cannot be less than estimated duration');
-            return false;
-        }
-        
-        if (min > 0 && max > 0 && min > max) {
-            showFieldError(maxDuration, 'Maximum duration cannot be less than minimum duration');
-            return false;
-        }
-        
-        clearFieldErrors([estimatedDuration, minDuration, maxDuration]);
-        return true;
-    }
-    
-    [estimatedDuration, minDuration, maxDuration].forEach(field => {
-        if (field) {
-            field.addEventListener('blur', validateDurations);
+        if (maxDurationField && !maxDurationField.value) {
+            maxDurationField.value = baseDuration + 15;
         }
     });
     
-    function showFieldError(field, message) {
-        clearFieldErrors([field]);
-        field.classList.add('is-invalid');
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'invalid-feedback';
-        errorDiv.textContent = message;
-        field.parentNode.appendChild(errorDiv);
-    }
-    
-    function clearFieldErrors(fields) {
-        fields.forEach(field => {
-            if (field) {
-                field.classList.remove('is-invalid');
-                const errorDiv = field.parentNode.querySelector('.invalid-feedback');
-                if (errorDiv) {
-                    errorDiv.remove();
-                }
-            }
-        });
-    }
+    // Auto-calculate price ranges
+    priceField.addEventListener('input', function() {
+        const basePrice = parseFloat(this.value) || 0;
+        const minPriceField = document.getElementById('id_min_price');
+        const maxPriceField = document.getElementById('id_max_price');
+        
+        if (minPriceField && !minPriceField.value) {
+            minPriceField.value = Math.max(0, basePrice - 100).toFixed(2);
+        }
+        
+        if (maxPriceField && !maxPriceField.value) {
+            maxPriceField.value = (basePrice + 200).toFixed(2);
+        }
+    });
 });
 </script>
 {% endblock %}

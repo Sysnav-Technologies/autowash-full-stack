@@ -1,0 +1,773 @@
+<!-- templates/customers/customer_detail.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ customer.display_name }} - Customer Details - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-user text-primary"></i>
+            {{ customer.display_name }}
+            {% if customer.is_vip %}
+            <span class="badge badge-warning">
+                <i class="fas fa-crown"></i> VIP
+            </span>
+            {% endif %}
+        </h1>
+        <p class="page-description">Customer ID: {{ customer.customer_id }}</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.business.slug }}/customers/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Customers
+        </a>
+        {% if user_role in 'owner,manager,supervisor' %}
+        <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/edit/" class="btn btn-outline-primary">
+            <i class="fas fa-edit"></i>
+            Edit Customer
+        </a>
+        {% endif %}
+        <a href="/business/{{ request.business.slug }}/services/orders/create/?customer={{ customer.pk }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            Create Order
+        </a>
+        
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-ellipsis-h"></i>
+                More Actions
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/vehicles/create/">
+                    <i class="fas fa-car"></i> Add Vehicle
+                </a></li>
+                <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/notes/create/">
+                    <i class="fas fa-sticky-note"></i> Add Note
+                </a></li>
+                <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/documents/">
+                    <i class="fas fa-file"></i> Manage Documents
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                {% if user_role in 'owner,manager' %}
+                <li><a class="dropdown-item" href="#" onclick="toggleVIPStatus()">
+                    <i class="fas fa-crown"></i> 
+                    {% if customer.is_vip %}Remove VIP Status{% else %}Make VIP{% endif %}
+                </a></li>
+                {% if customer.is_active %}
+                <li><a class="dropdown-item text-warning" href="#" onclick="deactivateCustomer()">
+                    <i class="fas fa-user-times"></i> Deactivate Customer
+                </a></li>
+                {% endif %}
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Customer Information -->
+    <div class="col-lg-8">
+        <!-- Basic Information -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-user-circle"></i>
+                    Customer Information
+                </h5>
+                <div class="card-actions">
+                    {% if not customer.is_active %}
+                    <span class="badge badge-warning">Inactive</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-group">
+                            <label>Full Name</label>
+                            <p>{{ customer.display_name }}</p>
+                        </div>
+                        
+                        {% if customer.customer_type == 'business' and customer.company_name %}
+                        <div class="info-group">
+                            <label>Company Name</label>
+                            <p>{{ customer.company_name }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="info-group">
+                            <label>Customer Type</label>
+                            <p>
+                                <span class="badge badge-{{ customer.customer_type|yesno:'info,primary' }}">
+                                    {{ customer.get_customer_type_display }}
+                                </span>
+                            </p>
+                        </div>
+                        
+                        {% if customer.date_of_birth %}
+                        <div class="info-group">
+                            <label>Date of Birth</label>
+                            <p>{{ customer.date_of_birth|date:"F d, Y" }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if customer.gender %}
+                        <div class="info-group">
+                            <label>Gender</label>
+                            <p>{{ customer.get_gender_display }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="info-group">
+                            <label>Phone Number</label>
+                            <p>
+                                {% if customer.phone %}
+                                <a href="tel:{{ customer.phone }}" class="contact-link">
+                                    <i class="fas fa-phone"></i> {{ customer.phone }}
+                                </a>
+                                {% else %}
+                                <span class="text-muted">Not provided</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="info-group">
+                            <label>Email Address</label>
+                            <p>
+                                {% if customer.email %}
+                                <a href="mailto:{{ customer.email }}" class="contact-link">
+                                    <i class="fas fa-envelope"></i> {{ customer.email }}
+                                </a>
+                                {% else %}
+                                <span class="text-muted">Not provided</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="info-group">
+                            <label>Address</label>
+                            <p>
+                                {% if customer.street_address %}
+                                {{ customer.street_address }}<br>
+                                {% endif %}
+                                {% if customer.city %}{{ customer.city }}{% endif %}
+                                {% if customer.state %}, {{ customer.state }}{% endif %}
+                                {% if customer.postal_code %} {{ customer.postal_code }}{% endif %}
+                                {% if not customer.street_address and not customer.city %}
+                                <span class="text-muted">Not provided</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="info-group">
+                            <label>Customer Since</label>
+                            <p>{{ customer.created_at|date:"F d, Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Vehicles -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-car"></i>
+                    Vehicles ({{ vehicles.count }})
+                </h5>
+                <div class="card-actions">
+                    <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/vehicles/create/" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i>
+                        Add Vehicle
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if vehicles %}
+                <div class="vehicles-grid">
+                    {% for vehicle in vehicles %}
+                    <div class="vehicle-card">
+                        <div class="vehicle-header">
+                            <h6 class="vehicle-registration">{{ vehicle.registration_number }}</h6>
+                            <div class="vehicle-actions">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/vehicles/{{ vehicle.pk }}/edit/">
+                                            <i class="fas fa-edit"></i> Edit Vehicle
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/services/orders/create/?vehicle={{ vehicle.pk }}">
+                                            <i class="fas fa-plus-circle"></i> Create Order
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="vehicle-details">
+                            <p><strong>{{ vehicle.make }} {{ vehicle.model }}</strong></p>
+                            <p>{{ vehicle.year }} • {{ vehicle.color }}</p>
+                            <p class="vehicle-type">
+                                <span class="badge badge-secondary">{{ vehicle.get_vehicle_type_display }}</span>
+                            </p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state-sm">
+                    <i class="fas fa-car text-muted"></i>
+                    <p>No vehicles registered</p>
+                    <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/vehicles/create/" class="btn btn-sm btn-primary">
+                        Add First Vehicle
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Recent Orders -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-shopping-cart"></i>
+                    Recent Orders
+                </h5>
+                <div class="card-actions">
+                    <a href="/business/{{ request.business.slug }}/services/orders/?customer={{ customer.pk }}" class="btn btn-sm btn-outline-primary">
+                        View All Orders
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if recent_orders %}
+                <div class="orders-list">
+                    {% for order in recent_orders %}
+                    <div class="order-item">
+                        <div class="order-header">
+                            <div class="order-info">
+                                <h6 class="order-number">
+                                    <a href="/business/{{ request.business.slug }}/services/orders/{{ order.pk }}/">
+                                        {{ order.order_number }}
+                                    </a>
+                                </h6>
+                                <p class="order-date">{{ order.created_at|date:"M d, Y" }}</p>
+                            </div>
+                            <div class="order-status">
+                                <span class="badge badge-{{ order.status|yesno:'success,warning,danger,info,secondary,dark' }}">
+                                    {{ order.get_status_display }}
+                                </span>
+                            </div>
+                            <div class="order-amount">
+                                <strong>KES {{ order.total_amount }}</strong>
+                            </div>
+                        </div>
+                        <div class="order-details">
+                            <p class="order-vehicle">
+                                <i class="fas fa-car text-muted"></i>
+                                {{ order.vehicle.registration_number }}
+                            </p>
+                            <p class="order-services">
+                                {% for item in order.order_items.all|slice:":2" %}
+                                {{ item.service.name }}{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                                {% if order.order_items.count > 2 %}
+                                +{{ order.order_items.count|add:"-2" }} more
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state-sm">
+                    <i class="fas fa-shopping-cart text-muted"></i>
+                    <p>No orders yet</p>
+                    <a href="/business/{{ request.business.slug }}/services/orders/create/?customer={{ customer.pk }}" class="btn btn-sm btn-primary">
+                        Create First Order
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Customer Notes -->
+        {% if notes %}
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-sticky-note"></i>
+                    Recent Notes
+                </h5>
+                <div class="card-actions">
+                    <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/notes/create/" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i>
+                        Add Note
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="notes-list">
+                    {% for note in notes %}
+                    <div class="note-item">
+                        <div class="note-header">
+                            <strong>{{ note.title }}</strong>
+                            <span class="note-date">{{ note.created_at|date:"M d, Y" }}</span>
+                        </div>
+                        <p class="note-content">{{ note.content|truncatewords:20 }}</p>
+                        <small class="text-muted">by {{ note.created_by.get_full_name|default:note.created_by.username }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Customer Statistics -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Customer Statistics
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="stat-item">
+                    <div class="stat-label">Total Orders</div>
+                    <div class="stat-value">{{ order_stats.total_orders|default:0 }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Total Spent</div>
+                    <div class="stat-value">KES {{ order_stats.total_spent|floatformat:0|default:0 }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Average Order</div>
+                    <div class="stat-value">KES {{ order_stats.avg_order_value|floatformat:0|default:0 }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Loyalty Points</div>
+                    <div class="stat-value">{{ customer.loyalty_points|default:0 }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Vehicles Registered</div>
+                    <div class="stat-value">{{ vehicles.count }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loyalty Program -->
+        {% if loyalty_program %}
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-star"></i>
+                    Loyalty Program
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="loyalty-tier">
+                    <div class="tier-badge">
+                        <span class="badge badge-{{ customer_tier|yesno:'warning,info,success,danger' }}">
+                            {{ customer_tier|title }} Tier
+                        </span>
+                    </div>
+                    <div class="loyalty-points">
+                        <strong>{{ customer.loyalty_points|default:0 }}</strong> points
+                    </div>
+                </div>
+                
+                <div class="loyalty-progress">
+                    {% comment %} Add progress bar for next tier {% endcomment %}
+                    <small class="text-muted">
+                        Keep shopping to earn more points and unlock better rewards!
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Quick Actions -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-bolt"></i>
+                    Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="quick-actions">
+                    <a href="/business/{{ request.business.slug }}/services/orders/create/?customer={{ customer.pk }}" class="btn btn-primary btn-sm btn-block mb-2">
+                        <i class="fas fa-plus-circle"></i>
+                        Create New Order
+                    </a>
+                    
+                    <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/vehicles/create/" class="btn btn-outline-primary btn-sm btn-block mb-2">
+                        <i class="fas fa-car"></i>
+                        Add New Vehicle
+                    </a>
+                    
+                    <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/notes/create/" class="btn btn-outline-secondary btn-sm btn-block mb-2">
+                        <i class="fas fa-sticky-note"></i>
+                        Add Note
+                    </a>
+                    
+                    {% if customer.phone %}
+                    <a href="tel:{{ customer.phone }}" class="btn btn-outline-success btn-sm btn-block mb-2">
+                        <i class="fas fa-phone"></i>
+                        Call Customer
+                    </a>
+                    {% endif %}
+                    
+                    {% if customer.email %}
+                    <a href="mailto:{{ customer.email }}" class="btn btn-outline-info btn-sm btn-block mb-2">
+                        <i class="fas fa-envelope"></i>
+                        Send Email
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Customer Preferences -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-cog"></i>
+                    Preferences
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="preference-item">
+                    <div class="preference-label">SMS Notifications</div>
+                    <div class="preference-value">
+                        {% if customer.receive_sms_notifications %}
+                        <span class="badge badge-success">Enabled</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Disabled</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div class="preference-label">Email Notifications</div>
+                    <div class="preference-value">
+                        {% if customer.receive_email_notifications %}
+                        <span class="badge badge-success">Enabled</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Disabled</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="preference-item">
+                    <div class="preference-label">Service Reminders</div>
+                    <div class="preference-value">
+                        {% if customer.receive_service_reminders %}
+                        <span class="badge badge-success">Enabled</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Disabled</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.info-group {
+    margin-bottom: 1.5rem;
+}
+
+.info-group label {
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.info-group p {
+    margin: 0;
+    color: var(--gray-900);
+}
+
+.contact-link {
+    color: var(--primary-600);
+    text-decoration: none;
+}
+
+.contact-link:hover {
+    color: var(--primary-700);
+    text-decoration: underline;
+}
+
+.vehicles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.vehicle-card {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    background: var(--gray-50);
+}
+
+.vehicle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.vehicle-registration {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.vehicle-details p {
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+}
+
+.orders-list {
+    space-y: 1rem;
+}
+
+.order-item {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.order-number a {
+    color: var(--primary-600);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.order-number a:hover {
+    text-decoration: underline;
+}
+
+.order-date {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin: 0;
+}
+
+.order-details p {
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+}
+
+.notes-list {
+    space-y: 1rem;
+}
+
+.note-item {
+    border-left: 3px solid var(--primary-200);
+    padding-left: 1rem;
+    margin-bottom: 1rem;
+}
+
+.note-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.note-date {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.note-content {
+    margin: 0.5rem 0;
+    color: var(--gray-700);
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.stat-value {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.loyalty-tier {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.tier-badge {
+    margin-bottom: 0.5rem;
+}
+
+.loyalty-points {
+    font-size: 1.25rem;
+    color: var(--warning-600);
+}
+
+.quick-actions .btn-block {
+    width: 100%;
+    text-align: left;
+}
+
+.preference-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.preference-item:last-child {
+    border-bottom: none;
+}
+
+.preference-label {
+    font-size: 0.875rem;
+    color: var(--gray-700);
+}
+
+.empty-state-sm {
+    text-align: center;
+    padding: 2rem 1rem;
+}
+
+.empty-state-sm i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-sm p {
+    color: var(--gray-500);
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+    .vehicles-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .order-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .note-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleVIPStatus() {
+    const isVIP = {{ customer.is_vip|yesno:'true,false' }};
+    const action = isVIP ? 'remove VIP status from' : 'make VIP';
+    
+    if (confirm(`Are you sure you want to ${action} {{ customer.display_name }}?`)) {
+        fetch(`/business/{{ request.business.slug }}/customers/{{ customer.pk }}/toggle-vip/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error updating VIP status');
+            }
+        })
+        .catch(error => {
+            alert('Error updating VIP status');
+        });
+    }
+}
+
+function deactivateCustomer() {
+    if (confirm('Are you sure you want to deactivate {{ customer.display_name }}? They will no longer be able to make bookings.')) {
+        fetch(`/business/{{ request.business.slug }}/customers/{{ customer.pk }}/deactivate/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error deactivating customer');
+            }
+        })
+        .catch(error => {
+            alert('Error deactivating customer');
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

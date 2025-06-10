@@ -15,6 +15,8 @@ urlpatterns = [
     path('categories/', views.category_list_view, name='category_list'),
     path('categories/create/', views.category_create_view, name='category_create'),
     path('categories/<uuid:pk>/edit/', views.category_edit_view, name='category_edit'),
+    path('categories/<uuid:pk>/toggle-status/', views.category_toggle_status, name='category_toggle_status'),
+    path('categories/<uuid:pk>/delete/', views.category_delete, name='category_delete'),
     
     # Service Orders
     path('orders/', views.order_list_view, name='order_list'),

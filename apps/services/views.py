@@ -1213,16 +1213,25 @@ def service_delete_view(request, pk):
     return render(request, 'services/service_confirm_delete.html', context)
 
 # Category Management Views
+# Complete fixed category views for services/views.py
+
 @login_required
 @employee_required(['owner', 'manager'])
 def category_list_view(request):
     """List service categories"""
     categories = ServiceCategory.objects.filter(is_active=True).annotate(
-        service_count=Count('services', filter=Q(services__is_active=True))
+        total_services=Count('services', filter=Q(services__is_active=True)),
+        active_services_count=Count('services', filter=Q(services__is_active=True))
     ).order_by('display_order', 'name')
+    
+    # Calculate overall statistics
+    total_categories = categories.count()
+    total_services = Service.objects.filter(is_active=True, category__in=categories).count()
     
     context = {
         'categories': categories,
+        'total_categories': total_categories,
+        'total_services': total_services,
         'title': 'Service Categories'
     }
     return render(request, 'services/category_list.html', context)
@@ -1234,7 +1243,9 @@ def category_create_view(request):
     if request.method == 'POST':
         form = ServiceCategoryForm(request.POST)
         if form.is_valid():
-            category = form.save()
+            category = form.save(commit=False)
+            category.created_by = request.user
+            category.save()
             messages.success(request, f'Category "{category.name}" created successfully!')
             return redirect('services:category_list')
     else:
@@ -1261,6 +1272,10 @@ def category_edit_view(request, pk):
     else:
         form = ServiceCategoryForm(instance=category)
     
+    # Get category statistics
+    category.total_services = category.services.filter(is_active=True).count()
+    category.active_services_count = category.services.filter(is_active=True).count()
+    
     context = {
         'form': form,
         'category': category,
@@ -1268,6 +1283,57 @@ def category_edit_view(request, pk):
     }
     return render(request, 'services/category_form.html', context)
 
+@login_required
+@employee_required(['owner', 'manager'])
+@require_POST
+@ajax_required
+def category_toggle_status(request, pk):
+    """Toggle category active status"""
+    category = get_object_or_404(ServiceCategory, pk=pk)
+    
+    try:
+        data = json.loads(request.body)
+        category.is_active = data.get('is_active', not category.is_active)
+        category.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Category {"activated" if category.is_active else "deactivated"} successfully'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        })
+
+@login_required
+@employee_required(['owner', 'manager'])
+@require_POST
+@ajax_required
+def category_delete(request, pk):
+    """Delete service category (only if no services)"""
+    category = get_object_or_404(ServiceCategory, pk=pk)
+    
+    # Check if category has services
+    if category.services.exists():
+        return JsonResponse({
+            'success': False,
+            'message': 'Cannot delete category with existing services'
+        })
+    
+    try:
+        category_name = category.name
+        category.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Category "{category_name}" deleted successfully'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        })
 # Order Management Views
 @login_required
 @employee_required()

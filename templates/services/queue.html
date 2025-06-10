@@ -1,344 +1,422 @@
+<!-- templates/services/queue.html -->
 {% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}{{ title }}{% endblock %}
+{% block title %}Service Queue - {{ block.super }}{% endblock %}
 
 {% block content %}
-<div class="queue-management">
-    <!-- Page Header -->
-    <div class="page-header">
-        <div class="page-header-content">
-            <h1 class="page-title">
-                <i class="fas fa-tasks text-primary"></i>
-                Service Queue
-            </h1>
-            <p class="page-description">Monitor and manage the service queue in real-time</p>
-        </div>
-        <div class="page-actions">
-            <button class="btn btn-outline-primary" onclick="refreshQueue()">
-                <i class="fas fa-sync-alt"></i>
-                Refresh Queue
-            </button>
-            <button class="btn btn-primary" onclick="toggleAutoRefresh()" id="autoRefreshBtn">
-                <i class="fas fa-play"></i>
-                Auto Refresh
-            </button>
-        </div>
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-tasks text-primary"></i>
+            Service Queue Management
+        </h1>
+        <p class="page-description">Monitor and manage the service queue in real-time</p>
     </div>
-
-    <!-- Queue Statistics -->
-    <div class="stats-grid">
-        <div class="stat-card waiting">
-            <div class="stat-icon">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-number">{{ stats.waiting_count }}</div>
-                <div class="stat-label">Waiting in Queue</div>
-            </div>
-        </div>
-        <div class="stat-card in-service">
-            <div class="stat-icon">
-                <i class="fas fa-cog fa-spin"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-number">{{ stats.in_service_count }}</div>
-                <div class="stat-label">Currently in Service</div>
-            </div>
-        </div>
-        <div class="stat-card avg-wait">
-            <div class="stat-icon">
-                <i class="fas fa-stopwatch"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-number">{{ stats.avg_wait_time|floatformat:0 }}</div>
-                <div class="stat-label">Avg Wait Time (min)</div>
-            </div>
-        </div>
-        <div class="stat-card available-bays">
-            <div class="stat-icon">
-                <i class="fas fa-car"></i>
-            </div>
-            <div class="stat-content">
-                <div class="stat-number">{{ stats.available_bays }}</div>
-                <div class="stat-label">Available Bays</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Queue Display -->
-        <div class="col-lg-8">
-            <div class="queue-section">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title">
-                            <i class="fas fa-list-ol"></i>
-                            Current Queue
-                        </h5>
-                        <div class="queue-time">
-                            Last updated: <span id="lastUpdated">{{ "now"|date:"H:i:s" }}</span>
-                        </div>
-                    </div>
-                    <div class="card-body p-0">
-                        {% if queue_entries %}
-                        <div class="queue-list" id="queueList">
-                            {% for entry in queue_entries %}
-                            <div class="queue-entry {% if entry.status == 'in_service' %}in-service{% endif %}" 
-                                 data-queue-id="{{ entry.id }}">
-                                <div class="queue-number">
-                                    <div class="number-badge">{{ entry.queue_number }}</div>
-                                    <div class="queue-status">
-                                        <span class="status-badge status-{{ entry.status }}">
-                                            {% if entry.status == 'waiting' %}
-                                                <i class="fas fa-clock"></i>
-                                                Waiting
-                                            {% elif entry.status == 'in_service' %}
-                                                <i class="fas fa-cog fa-spin"></i>
-                                                In Service
-                                            {% endif %}
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                <div class="queue-info">
-                                    <div class="customer-info">
-                                        <div class="customer-name">{{ entry.order.customer.display_name }}</div>
-                                        <div class="order-number">{{ entry.order.order_number }}</div>
-                                    </div>
-                                    <div class="vehicle-info">
-                                        <div class="vehicle-reg">{{ entry.order.vehicle.registration_number }}</div>
-                                        <div class="vehicle-details">{{ entry.order.vehicle.make }} {{ entry.order.vehicle.model }}</div>
-                                    </div>
-                                    <div class="service-info">
-                                        <div class="service-count">
-                                            {{ entry.order.order_items.count }} service{{ entry.order.order_items.count|pluralize }}
-                                        </div>
-                                        <div class="service-list">
-                                            {% for item in entry.order.order_items.all %}
-                                                <span class="service-tag">{{ item.service.name }}</span>
-                                            {% endfor %}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="queue-timing">
-                                    {% if entry.status == 'waiting' %}
-                                        <div class="timing-item">
-                            <i class="fas fa-play text-info"></i>
-                            <span class="timing-label">Est. Start:</span>
-                            <span class="timing-value">{{ entry.estimated_start_time|date:"H:i" }}</span>
-                        </div>
-                    {% elif entry.status == 'in_service' %}
-                        <div class="timing-item">
-                            <i class="fas fa-play text-success"></i>
-                            <span class="timing-label">Started:</span>
-                            <span class="timing-value">{{ entry.actual_start_time|date:"H:i" }}</span>
-                        </div>
-                        <div class="timing-item">
-                            <i class="fas fa-flag-checkered text-info"></i>
-                            <span class="timing-label">Est. End:</span>
-                            <span class="timing-value">{{ entry.estimated_end_time|date:"H:i" }}</span>
-                        </div>
-                    {% endif %}
-                </div>
-                
-                <div class="queue-actions">
-                    {% if entry.status == 'waiting' %}
-                        <button class="btn btn-success btn-sm" onclick="startQueueService('{{ entry.id }}')">
-                            <i class="fas fa-play"></i>
-                            Start
-                        </button>
-                    {% elif entry.status == 'in_service' %}
-                        <button class="btn btn-warning btn-sm" onclick="completeQueueService('{{ entry.id }}')">
-                            <i class="fas fa-check"></i>
-                            Complete
-                        </button>
-                    {% endif %}
-                    <div class="dropdown">
-                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li>
-                                <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/orders/{{ entry.order.pk }}/">
-                                    <i class="fas fa-eye"></i>
-                                    View Order
-                                </a>
-                            </li>
-                            {% if entry.service_bay %}
-                            <li>
-                                <a class="dropdown-item" href="#" onclick="changeBay('{{ entry.id }}')">
-                                    <i class="fas fa-exchange-alt"></i>
-                                    Change Bay
-                                </a>
-                            </li>
-                            {% else %}
-                            <li>
-                                <a class="dropdown-item" href="#" onclick="assignBay('{{ entry.id }}')">
-                                    <i class="fas fa-car"></i>
-                                    Assign Bay
-                                </a>
-                            </li>
-                            {% endif %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="#" onclick="removeFromQueue('{{ entry.id }}')">
-                                    <i class="fas fa-times"></i>
-                                    Remove from Queue
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-                
-                {% if entry.service_bay %}
-                <div class="bay-assignment">
-                    <i class="fas fa-car"></i>
-                    <span>{{ entry.service_bay.name }}</span>
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-queue">
-            <div class="empty-icon">
-                <i class="fas fa-list-ol"></i>
-            </div>
-            <h3>Queue is Empty</h3>
-            <p>No orders are currently waiting in the service queue.</p>
-            <a href="/business/{{ request.tenant.slug }}/services/orders/quick/" class="btn btn-primary">
-                <i class="fas fa-plus"></i>
-                Add Quick Order
-            </a>
-        </div>
+    
+    <div class="page-actions">
+        <button class="btn btn-success" onclick="refreshQueue()">
+            <i class="fas fa-sync-alt"></i>
+            Refresh Queue
+        </button>
+        {% if user_role in 'owner,manager,supervisor' %}
+        <button class="btn btn-primary" onclick="openQueueSettings()">
+            <i class="fas fa-cog"></i>
+            Queue Settings
+        </button>
         {% endif %}
     </div>
 </div>
+
+<!-- Queue Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon bg-warning">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div class="stat-content">
+            <h3>{{ stats.waiting_count }}</h3>
+            <p>Waiting in Queue</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon bg-primary">
+            <i class="fas fa-cog"></i>
+        </div>
+        <div class="stat-content">
+            <h3>{{ stats.in_service_count }}</h3>
+            <p>Currently Being Served</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon bg-info">
+            <i class="fas fa-stopwatch"></i>
+        </div>
+        <div class="stat-content">
+            <h3>{{ stats.avg_wait_time|floatformat:0 }} min</h3>
+            <p>Average Wait Time</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon bg-success">
+            <i class="fas fa-car"></i>
+        </div>
+        <div class="stat-content">
+            <h3>{{ stats.available_bays }}</h3>
+            <p>Available Service Bays</p>
+        </div>
+    </div>
 </div>
 
-<!-- Service Bays -->
-<div class="col-lg-4">
-    <div class="bays-section">
-        <div class="card">
+<div class="row">
+    <!-- Queue List -->
+    <div class="col-lg-8">
+        <div class="content-card">
             <div class="card-header">
                 <h5 class="card-title">
+                    <i class="fas fa-list-ol"></i>
+                    Current Queue
+                </h5>
+                <div class="card-actions">
+                    <div class="queue-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="auto-refresh" checked>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Auto Refresh</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                {% if queue_entries %}
+                <div class="queue-container" id="queue-container">
+                    {% for entry in queue_entries %}
+                    <div class="queue-entry" data-queue-id="{{ entry.id }}" data-order-id="{{ entry.order.id }}">
+                        <div class="queue-entry-header">
+                            <div class="queue-position">
+                                <span class="position-badge">{{ entry.queue_number }}</span>
+                                <div class="position-controls">
+                                    {% if user_role in 'owner,manager,supervisor' %}
+                                    <button class="btn-queue-control" onclick="moveUp('{{ entry.id }}')" title="Move Up">
+                                        <i class="fas fa-chevron-up"></i>
+                                    </button>
+                                    <button class="btn-queue-control" onclick="moveDown('{{ entry.id }}')" title="Move Down">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="queue-info">
+                                <div class="queue-order-number">
+                                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ entry.order.pk }}/">
+                                        {{ entry.order.order_number }}
+                                    </a>
+                                </div>
+                                <div class="queue-status">
+                                    <span class="status-badge status-{{ entry.status }}">
+                                        {{ entry.get_status_display }}
+                                    </span>
+                                    {% if entry.order.priority != 'normal' %}
+                                    <span class="priority-badge priority-{{ entry.order.priority }}">
+                                        {{ entry.order.get_priority_display }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="queue-timing">
+                                {% if entry.status == 'waiting' %}
+                                <div class="wait-time">
+                                    <i class="fas fa-clock"></i>
+                                    <span class="time-value">{{ entry.estimated_wait_time }} min wait</span>
+                                </div>
+                                {% elif entry.status == 'in_service' %}
+                                <div class="service-time" data-start-time="{{ entry.actual_start_time.isoformat }}">
+                                    <i class="fas fa-cog fa-spin"></i>
+                                    <span class="time-value">In progress: <span class="elapsed-time">--:--</span></span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="queue-entry-details">
+                            <div class="customer-vehicle-info">
+                                <div class="customer-info">
+                                    <strong>{{ entry.order.customer.full_name }}</strong>
+                                    <br><small>{{ entry.order.customer.phone }}</small>
+                                </div>
+                                <div class="vehicle-info">
+                                    <strong>{{ entry.order.vehicle.registration_number }}</strong>
+                                    <br><small>{{ entry.order.vehicle.make }} {{ entry.order.vehicle.model }}</small>
+                                </div>
+                            </div>
+                            
+                            <div class="services-summary">
+                                {% for item in entry.order.order_items.all %}
+                                <span class="service-chip">{{ item.service.name }}{% if item.quantity > 1 %} x{{ item.quantity }}{% endif %}</span>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="order-details">
+                                <div class="order-total">KES {{ entry.order.total_amount }}</div>
+                                <div class="order-duration">{{ entry.order.estimated_duration }} min</div>
+                                {% if entry.order.assigned_attendant %}
+                                <div class="assigned-attendant">
+                                    <i class="fas fa-user"></i>
+                                    {{ entry.order.assigned_attendant.full_name }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="queue-entry-actions">
+                            {% if entry.status == 'waiting' %}
+                            <button class="btn btn-sm btn-success" onclick="startService('{{ entry.order.id }}')">
+                                <i class="fas fa-play"></i>
+                                Start Service
+                            </button>
+                            {% elif entry.status == 'in_service' %}
+                            <button class="btn btn-sm btn-primary" onclick="completeService('{{ entry.order.id }}')">
+                                <i class="fas fa-check"></i>
+                                Complete
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="pauseService('{{ entry.order.id }}')">
+                                <i class="fas fa-pause"></i>
+                                Pause
+                            </button>
+                            {% endif %}
+                            
+                            {% if entry.service_bay %}
+                            <div class="bay-assignment">
+                                <i class="fas fa-car"></i>
+                                Bay {{ entry.service_bay.bay_number }}
+                            </div>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary" onclick="assignBay('{{ entry.id }}')">
+                                <i class="fas fa-car"></i>
+                                Assign Bay
+                            </button>
+                            {% endif %}
+                            
+                            {% if user_role in 'owner,manager,supervisor' %}
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-h"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" onclick="changePriority('{{ entry.order.id }}')">
+                                        <i class="fas fa-exclamation"></i> Change Priority
+                                    </a></li>
+                                    <li><a class="dropdown-item" onclick="reassignAttendant('{{ entry.order.id }}')">
+                                        <i class="fas fa-user-edit"></i> Reassign Attendant
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" onclick="removeFromQueue('{{ entry.id }}')">
+                                        <i class="fas fa-times"></i> Remove from Queue
+                                    </a></li>
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if entry.order.special_instructions %}
+                        <div class="queue-entry-notes">
+                            <i class="fas fa-sticky-note"></i>
+                            <strong>Instructions:</strong> {{ entry.order.special_instructions }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-queue">
+                    <div class="empty-queue-icon">
+                        <i class="fas fa-list-ol"></i>
+                    </div>
+                    <h6>No Orders in Queue</h6>
+                    <p>The service queue is currently empty.</p>
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/quick/" class="btn btn-success">
+                        <i class="fas fa-bolt"></i>
+                        Create Quick Order
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Service Bays & Controls -->
+    <div class="col-lg-4">
+        <!-- Service Bays Status -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
                     <i class="fas fa-car"></i>
                     Service Bays
-                </h5>
+                </h6>
+                <div class="card-actions">
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshBayStatus()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
             </div>
+            
             <div class="card-body">
-                <div class="bays-grid">
+                <div class="service-bays-grid" id="service-bays">
                     {% for bay in service_bays %}
-                    <div class="bay-card {% if bay.is_occupied %}occupied{% else %}available{% endif %}">
+                    <div class="bay-card {% if bay.is_occupied %}bay-occupied{% else %}bay-available{% endif %}" data-bay-id="{{ bay.id }}">
                         <div class="bay-header">
                             <div class="bay-number">{{ bay.bay_number }}</div>
                             <div class="bay-status">
                                 {% if bay.is_occupied %}
-                                    <span class="status-occupied">
-                                        <i class="fas fa-car"></i>
-                                        Occupied
-                                    </span>
+                                <span class="status-occupied">
+                                    <i class="fas fa-car"></i>
+                                    Occupied
+                                </span>
                                 {% else %}
-                                    <span class="status-available">
-                                        <i class="fas fa-check-circle"></i>
-                                        Available
-                                    </span>
+                                <span class="status-available">
+                                    <i class="fas fa-check-circle"></i>
+                                    Available
+                                </span>
                                 {% endif %}
                             </div>
                         </div>
+                        
                         <div class="bay-name">{{ bay.name }}</div>
+                        
                         {% if bay.current_order %}
-                            <div class="bay-order">
-                                <div class="order-info">
-                                    <strong>{{ bay.current_order.order_number }}</strong>
-                                    <div class="customer-name">{{ bay.current_order.customer.display_name }}</div>
-                                    <div class="vehicle-reg">{{ bay.current_order.vehicle.registration_number }}</div>
-                                </div>
-                            </div>
+                        <div class="bay-order-info">
+                            <div class="bay-order-number">{{ bay.current_order.order_number }}</div>
+                            <div class="bay-customer">{{ bay.current_order.customer.full_name }}</div>
+                            <div class="bay-vehicle">{{ bay.current_order.vehicle.registration_number }}</div>
+                        </div>
                         {% else %}
-                            <div class="bay-features">
-                                {% if bay.has_pressure_washer %}
-                                    <span class="feature-tag">
-                                        <i class="fas fa-tint"></i>
-                                        Pressure Washer
-                                    </span>
-                                {% endif %}
-                                {% if bay.has_vacuum %}
-                                    <span class="feature-tag">
-                                        <i class="fas fa-wind"></i>
-                                        Vacuum
-                                    </span>
-                                {% endif %}
-                                {% if bay.has_lift %}
-                                    <span class="feature-tag">
-                                        <i class="fas fa-arrow-up"></i>
-                                        Lift
-                                    </span>
-                                {% endif %}
-                            </div>
+                        <div class="bay-features">
+                            {% if bay.has_pressure_washer %}<i class="fas fa-spray-can" title="Pressure Washer"></i>{% endif %}
+                            {% if bay.has_vacuum %}<i class="fas fa-wind" title="Vacuum"></i>{% endif %}
+                            {% if bay.has_lift %}<i class="fas fa-arrow-up" title="Lift"></i>{% endif %}
+                        </div>
                         {% endif %}
                     </div>
                     {% endfor %}
                 </div>
             </div>
         </div>
-    </div>
-    
-    <!-- Queue Controls -->
-    <div class="controls-section">
-        <div class="card">
+        
+        <!-- Queue Controls -->
+        {% if user_role in 'owner,manager,supervisor' %}
+        <div class="content-card mt-4">
             <div class="card-header">
-                <h5 class="card-title">
-                    <i class="fas fa-cogs"></i>
+                <h6 class="card-title">
+                    <i class="fas fa-sliders-h"></i>
                     Queue Controls
-                </h5>
+                </h6>
             </div>
+            
             <div class="card-body">
-                <div class="control-buttons">
-                    <button class="btn btn-success btn-block" onclick="startNextService()">
-                        <i class="fas fa-play"></i>
-                        Start Next Service
-                    </button>
-                    <button class="btn btn-warning btn-block" onclick="pauseQueue()">
+                <div class="queue-controls-grid">
+                    <button class="control-btn" onclick="pauseQueue()">
                         <i class="fas fa-pause"></i>
-                        Pause Queue
+                        <span>Pause Queue</span>
                     </button>
-                    <button class="btn btn-info btn-block" onclick="reorderQueue()">
+                    
+                    <button class="control-btn" onclick="resumeQueue()">
+                        <i class="fas fa-play"></i>
+                        <span>Resume Queue</span>
+                    </button>
+                    
+                    <button class="control-btn" onclick="reorderQueue()">
                         <i class="fas fa-sort"></i>
-                        Reorder Queue
+                        <span>Auto Reorder</span>
                     </button>
-                    <button class="btn btn-outline-primary btn-block" onclick="exportQueue()">
-                        <i class="fas fa-download"></i>
-                        Export Queue Data
+                    
+                    <button class="control-btn" onclick="clearCompleted()">
+                        <i class="fas fa-trash"></i>
+                        <span>Clear Completed</span>
                     </button>
                 </div>
-                
-                <div class="queue-settings mt-4">
-                    <h6>Settings</h6>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="autoAssignBays" checked>
-                        <label class="form-check-label" for="autoAssignBays">
-                            Auto-assign available bays
-                        </label>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Quick Actions -->
+        <div class="content-card mt-4">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-bolt"></i>
+                    Quick Actions
+                </h6>
+            </div>
+            
+            <div class="card-body">
+                <div class="quick-actions-list">
+                    <button class="quick-action-item" onclick="addWalkInCustomer()">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Add Walk-in Customer</span>
+                    </button>
+                    
+                    <button class="quick-action-item" onclick="processPayment()">
+                        <i class="fas fa-credit-card"></i>
+                        <span>Process Payment</span>
+                    </button>
+                    
+                    <button class="quick-action-item" onclick="printQueue()">
+                        <i class="fas fa-print"></i>
+                        <span>Print Queue List</span>
+                    </button>
+                    
+                    <button class="quick-action-item" onclick="sendNotifications()">
+                        <i class="fas fa-bell"></i>
+                        <span>Send Notifications</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Queue Statistics -->
+        <div class="content-card mt-4">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Today's Statistics
+                </h6>
+            </div>
+            
+            <div class="card-body">
+                <div class="queue-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Total Processed</div>
+                        <div class="stat-value" id="total-processed">0</div>
                     </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="sendNotifications" checked>
-                        <label class="form-check-label" for="sendNotifications">
-                            Send customer notifications
-                        </label>
+                    
+                    <div class="stat-item">
+                        <div class="stat-label">Average Wait Time</div>
+                        <div class="stat-value" id="avg-wait-time">0 min</div>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <div class="stat-label">Service Efficiency</div>
+                        <div class="stat-value" id="efficiency">0%</div>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <div class="stat-label">Customer Satisfaction</div>
+                        <div class="stat-value" id="satisfaction">N/A</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-</div>
-</div>
 
-<!-- Bay Assignment Modal -->
-<div class="modal fade" id="bayAssignmentModal" tabindex="-1">
+<!-- Modals -->
+<!-- Assign Bay Modal -->
+<div class="modal fade" id="assignBayModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -346,35 +424,66 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="bayAssignmentForm">
-                    <div class="form-group">
-                        <label for="baySelect">Select Bay:</label>
-                        <select id="baySelect" class="form-select">
-                            <option value="">Choose a bay...</option>
-                            {% for bay in service_bays %}
-                                {% if bay.is_active and not bay.is_occupied %}
-                                <option value="{{ bay.id }}">{{ bay.name }} (Bay {{ bay.bay_number }})</option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="confirmBayAssignment()">Assign Bay</button>
+                <div class="available-bays" id="available-bays-list">
+                    <!-- Will be populated by JavaScript -->
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-/* Queue Management Styles */
-.queue-management {
-    padding: 0;
-}
+<!-- Change Priority Modal -->
+<div class="modal fade" id="priorityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Priority</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="priorityForm">
+                    <div class="mb-3">
+                        <label class="form-label">Select Priority Level</label>
+                        <div class="priority-options">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="priority" value="low" id="priority-low">
+                                <label class="form-check-label" for="priority-low">
+                                    <span class="priority-badge priority-low">Low</span>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="priority" value="normal" id="priority-normal" checked>
+                                <label class="form-check-label" for="priority-normal">
+                                    <span class="priority-badge priority-normal">Normal</span>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="priority" value="high" id="priority-high">
+                                <label class="form-check-label" for="priority-high">
+                                    <span class="priority-badge priority-high">High</span>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="priority" value="urgent" id="priority-urgent">
+                                <label class="form-check-label" for="priority-urgent">
+                                    <span class="priority-badge priority-urgent">Urgent</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="savePriority()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-/* Stats Grid */
+{% block extra_css %}
+<style>
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -384,29 +493,18 @@
 
 .stat-card {
     background: white;
+    border: 1px solid var(--gray-200);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--gray-200);
     display: flex;
     align-items: center;
     gap: 1rem;
-    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-sm);
 }
-
-.stat-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-}
-
-.stat-card.waiting .stat-icon { background: linear-gradient(135deg, var(--warning-600), var(--warning-500)); }
-.stat-card.in-service .stat-icon { background: linear-gradient(135deg, var(--primary-600), var(--primary-500)); }
-.stat-card.avg-wait .stat-icon { background: linear-gradient(135deg, var(--info-600), var(--info-500)); }
-.stat-card.available-bays .stat-icon { background: linear-gradient(135deg, var(--success-600), var(--success-500)); }
 
 .stat-icon {
-    width: 48px;
-    height: 48px;
+    width: 3rem;
+    height: 3rem;
     border-radius: var(--radius-lg);
     display: flex;
     align-items: center;
@@ -415,392 +513,540 @@
     font-size: 1.25rem;
 }
 
-.stat-number {
-    font-size: 1.75rem;
+.stat-content h3 {
+    margin: 0;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--gray-900);
-    line-height: 1;
 }
 
-.stat-label {
-    color: var(--gray-600);
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-/* Queue Section */
-.queue-section .card {
-    box-shadow: var(--shadow-sm);
-}
-
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: white;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.card-title {
+.stat-content p {
     margin: 0;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.queue-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.toggle-switch {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-}
-
-.queue-time {
     font-size: 0.875rem;
-    color: var(--gray-600);
+    cursor: pointer;
 }
 
-/* Queue List */
-.queue-list {
-    display: flex;
-    flex-direction: column;
+.toggle-switch input {
+    position: relative;
+    width: 3rem;
+    height: 1.5rem;
+    appearance: none;
+    background: var(--gray-300);
+    border-radius: 1rem;
+    transition: background var(--transition-fast);
+}
+
+.toggle-switch input:checked {
+    background: var(--success-500);
+}
+
+.toggle-switch input::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1.25rem;
+    height: 1.25rem;
+    background: white;
+    border-radius: 50%;
+    transition: transform var(--transition-fast);
+}
+
+.toggle-switch input:checked::before {
+    transform: translateX(1.5rem);
+}
+
+.queue-container {
+    space-y: 1rem;
 }
 
 .queue-entry {
-    display: grid;
-    grid-template-columns: auto 1fr auto auto;
-    gap: 1.5rem;
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--gray-200);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    background: white;
+    overflow: hidden;
     transition: all var(--transition-fast);
-    position: relative;
-}
-
-.queue-entry:last-child {
-    border-bottom: none;
 }
 
 .queue-entry:hover {
-    background-color: var(--gray-50);
+    box-shadow: var(--shadow-md);
 }
 
-.queue-entry.in-service {
-    background: linear-gradient(90deg, var(--primary-50), transparent);
-    border-left: 4px solid var(--primary-500);
-}
-
-.queue-number {
+.queue-entry-header {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.queue-position {
+    display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-right: 1rem;
 }
 
-.number-badge {
-    width: 48px;
-    height: 48px;
-    background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
+.position-badge {
+    background: var(--primary-600);
     color: white;
     border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
-    font-weight: 700;
-}
-
-.queue-status .status-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius-md);
-    font-size: 0.75rem;
     font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
 }
 
-.status-waiting { background: var(--warning-100); color: var(--warning-700); }
-.status-in_service { background: var(--primary-100); color: var(--primary-700); }
-
-.queue-info {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 1rem;
-}
-
-.customer-info, .vehicle-info, .service-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.customer-name, .vehicle-reg {
-    font-weight: 600;
-    color: var(--gray-900);
-}
-
-.order-number, .vehicle-details, .service-count {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-}
-
-.vehicle-reg {
-    font-family: monospace;
-    background: var(--primary-100);
-    color: var(--primary-700);
-    padding: 0.125rem 0.375rem;
-    border-radius: var(--radius-sm);
-    width: fit-content;
-}
-
-.service-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-top: 0.25rem;
-}
-
-.service-tag {
-    background: var(--info-100);
-    color: var(--info-700);
-    padding: 0.125rem 0.375rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.queue-timing {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    min-width: 120px;
-}
-
-.timing-item {
+.position-controls {
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
-    font-size: 0.875rem;
 }
 
-.timing-label {
-    color: var(--gray-500);
-    font-size: 0.75rem;
-}
-
-.timing-value {
-    color: var(--gray-900);
-    font-weight: 500;
-}
-
-.queue-actions {
+.btn-queue-control {
+    background: var(--gray-200);
+    border: none;
+    border-radius: var(--radius-sm);
+    width: 1.5rem;
+    height: 1.5rem;
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: flex-end;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
 }
 
-.bay-assignment {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    background: var(--success-100);
-    color: var(--success-700);
+.btn-queue-control:hover {
+    background: var(--primary-100);
+    color: var(--primary-600);
+}
+
+.queue-info {
+    flex: 1;
+}
+
+.queue-order-number a {
+    font-weight: 600;
+    color: var(--primary-600);
+    text-decoration: none;
+    font-size: 1.125rem;
+}
+
+.queue-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.status-badge {
+    font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
     border-radius: var(--radius-sm);
-    font-size: 0.75rem;
     font-weight: 500;
+}
+
+.status-waiting { background: var(--warning-100); color: var(--warning-800); }
+.status-in_service { background: var(--primary-100); color: var(--primary-800); }
+.status-completed { background: var(--success-100); color: var(--success-800); }
+
+.priority-badge {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.priority-low { background: var(--gray-100); color: var(--gray-700); }
+.priority-normal { background: var(--blue-100); color: var(--blue-700); }
+.priority-high { background: var(--orange-100); color: var(--orange-700); }
+.priority-urgent { background: var(--red-100); color: var(--red-700); }
+
+.queue-timing {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    text-align: right;
+}
+
+.wait-time,
+.service-time {
     display: flex;
     align-items: center;
     gap: 0.25rem;
 }
 
-/* Empty Queue */
-.empty-queue {
-    text-align: center;
-    padding: 4rem 2rem;
+.queue-entry-details {
+    padding: 1rem;
 }
 
-.empty-icon {
+.customer-vehicle-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.customer-info,
+.vehicle-info {
+    font-size: 0.875rem;
+}
+
+.services-summary {
+    margin-bottom: 1rem;
+}
+
+.service-chip {
+    display: inline-block;
+    background: var(--info-100);
+    color: var(--info-700);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    margin: 0.125rem;
+}
+
+.order-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.order-total {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.assigned-attendant {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--gray-600);
+}
+
+.queue-entry-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem 1rem;
+    flex-wrap: wrap;
+}
+
+.bay-assignment {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--success-600);
+    background: var(--success-50);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+
+.queue-entry-notes {
+    background: var(--yellow-50);
+    border: 1px solid var(--yellow-200);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    margin: 0 1rem 1rem;
+    font-size: 0.875rem;
+    color: var(--yellow-800);
+}
+
+.empty-queue {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-queue-icon {
     font-size: 4rem;
     color: var(--gray-300);
     margin-bottom: 1rem;
 }
 
-.empty-queue h3 {
-    color: var(--gray-700);
-    margin-bottom: 0.5rem;
-}
-
-.empty-queue p {
-    color: var(--gray-500);
-    margin-bottom: 1.5rem;
-}
-
-/* Service Bays */
-.bays-grid {
+.service-bays-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 1rem;
 }
 
 .bay-card {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
     padding: 1rem;
-    border-radius: var(--radius-lg);
-    border: 2px solid;
+    text-align: center;
     transition: all var(--transition-fast);
 }
 
-.bay-card.available {
-    border-color: var(--success-300);
+.bay-available {
     background: var(--success-50);
+    border-color: var(--success-200);
 }
 
-.bay-card.occupied {
-    border-color: var(--warning-300);
+.bay-occupied {
     background: var(--warning-50);
+    border-color: var(--warning-200);
 }
 
 .bay-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 .bay-number {
-    width: 32px;
-    height: 32px;
-    background: var(--gray-600);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-}
-
-.bay-status {
-    font-size: 0.75rem;
     font-weight: 600;
+    font-size: 1.125rem;
+    color: var(--gray-900);
 }
 
 .status-available {
     color: var(--success-600);
+    font-size: 0.75rem;
 }
 
 .status-occupied {
     color: var(--warning-600);
+    font-size: 0.75rem;
 }
 
 .bay-name {
-    font-weight: 600;
-    color: var(--gray-900);
+    font-size: 0.875rem;
+    color: var(--gray-600);
     margin-bottom: 0.5rem;
 }
 
-.bay-order {
-    background: white;
-    border-radius: var(--radius-md);
-    padding: 0.75rem;
-    border: 1px solid var(--gray-200);
+.bay-order-info {
+    font-size: 0.75rem;
+}
+
+.bay-order-number {
+    font-weight: 600;
+    color: var(--primary-600);
 }
 
 .bay-features {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--gray-500);
 }
 
-.feature-tag {
-    background: var(--info-100);
-    color: var(--info-700);
-    padding: 0.125rem 0.375rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-/* Controls Section */
-.control-buttons {
-    display: flex;
-    flex-direction: column;
+.queue-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
 }
 
-.btn-block {
-    width: 100%;
-    justify-content: center;
+.control-btn {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.queue-settings {
-    border-top: 1px solid var(--gray-200);
-    padding-top: 1rem;
+.control-btn:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-200);
 }
 
-.queue-settings h6 {
-    margin-bottom: 0.75rem;
+.control-btn i {
+    font-size: 1.25rem;
+    color: var(--primary-600);
+}
+
+.control-btn span {
+    font-size: 0.75rem;
+    font-weight: 500;
     color: var(--gray-700);
 }
 
-.form-check {
-    margin-bottom: 0.5rem;
+.quick-actions-list {
+    space-y: 0.5rem;
 }
 
-/* Responsive Design */
+.quick-action-item {
+    width: 100%;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.quick-action-item:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-200);
+}
+
+.quick-action-item i {
+    color: var(--primary-600);
+    width: 1rem;
+}
+
+.quick-action-item span {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.queue-stats {
+    space-y: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.stat-value {
+    font-weight: 600;
+    color: var(--gray-900);
+    font-size: 0.875rem;
+}
+
+.priority-options {
+    space-y: 0.75rem;
+}
+
+.priority-options .form-check-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
 @media (max-width: 768px) {
-    .page-header {
-        flex-direction: column;
-        gap: 1rem;
-    }
-    
-    .page-actions {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
     .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(2, 1fr);
     }
     
-    .queue-entry {
+    .queue-entry-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .customer-vehicle-info {
         grid-template-columns: 1fr;
-        gap: 1rem;
+        gap: 0.5rem;
     }
     
-    .queue-info {
+    .order-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .queue-entry-actions {
+        justify-content: center;
+    }
+    
+    .service-bays-grid {
         grid-template-columns: 1fr;
     }
     
-    .queue-actions {
-        flex-direction: row;
-        justify-content: space-between;
-    }
-    
-    .bays-grid {
+    .queue-controls-grid {
         grid-template-columns: 1fr;
     }
 }
 </style>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-let autoRefreshInterval = null;
-let isAutoRefreshEnabled = false;
-let currentBayAssignmentQueueId = null;
+// Global variables
+let autoRefreshInterval;
+let currentQueueEntryId = null;
+let currentOrderId = null;
 
-// Auto-refresh functionality
-function toggleAutoRefresh() {
-    const btn = document.getElementById('autoRefreshBtn');
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    initializeQueue();
+    updateElapsedTimes();
+    loadQueueStatistics();
     
-    if (isAutoRefreshEnabled) {
+    // Set up auto-refresh
+    const autoRefreshToggle = document.getElementById('auto-refresh');
+    if (autoRefreshToggle.checked) {
+        startAutoRefresh();
+    }
+    
+    autoRefreshToggle.addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+    
+    // Update elapsed times every minute
+    setInterval(updateElapsedTimes, 60000);
+    setInterval(loadQueueStatistics, 30000);
+});
+
+function initializeQueue() {
+    // Make queue sortable for managers/owners
+    {% if user_role in 'owner,manager,supervisor' %}
+    // Add drag and drop functionality here if needed
+    {% endif %}
+}
+
+function startAutoRefresh() {
+    autoRefreshInterval = setInterval(function() {
+        refreshQueue();
+    }, 15000); // Refresh every 15 seconds
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
         clearInterval(autoRefreshInterval);
-        btn.innerHTML = '<i class="fas fa-play"></i> Auto Refresh';
-        btn.classList.remove('btn-success');
-        btn.classList.add('btn-primary');
-        isAutoRefreshEnabled = false;
-    } else {
-        autoRefreshInterval = setInterval(refreshQueue, 10000); // Refresh every 10 seconds
-        btn.innerHTML = '<i class="fas fa-pause"></i> Auto Refresh ON';
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-success');
-        isAutoRefreshEnabled = true;
     }
 }
 
@@ -808,217 +1054,518 @@ function refreshQueue() {
     fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/status/`)
         .then(response => response.json())
         .then(data => {
-            updateQueueDisplay(data);
-            updateLastUpdated();
+            updateQueueDisplay(data.queue);
+            updateQueueStatistics(data.stats);
         })
         .catch(error => {
             console.error('Error refreshing queue:', error);
         });
 }
 
-function updateQueueDisplay(data) {
-    // Update queue entries
-    // This would update the queue display based on the response
-    // For now, we'll just update the timestamp
-    console.log('Queue updated:', data);
-}
-
-function updateLastUpdated() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-GB', { 
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    document.getElementById('lastUpdated').textContent = timeString;
-}
-
-// Queue management functions
-function startQueueService(queueId) {
-    if (confirm('Start service for this queue entry?')) {
-        fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/${queueId}/start/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCsrfToken(),
-                'Content-Type': 'application/json'
+function updateQueueDisplay(queueData) {
+    // Update queue entries without full page reload
+    queueData.forEach(entry => {
+        const queueElement = document.querySelector(`[data-queue-id="${entry.id}"]`);
+        if (queueElement) {
+            // Update status and timing
+            const statusBadge = queueElement.querySelector('.status-badge');
+            statusBadge.className = `status-badge status-${entry.status}`;
+            statusBadge.textContent = entry.status_display;
+            
+            // Update timing information
+            const timingElement = queueElement.querySelector('.queue-timing');
+            if (entry.status === 'waiting') {
+                timingElement.innerHTML = `
+                    <div class="wait-time">
+                        <i class="fas fa-clock"></i>
+                        <span class="time-value">${entry.estimated_wait_time} min wait</span>
+                    </div>
+                `;
+            } else if (entry.status === 'in_service') {
+                timingElement.innerHTML = `
+                    <div class="service-time" data-start-time="${entry.actual_start_time}">
+                        <i class="fas fa-cog fa-spin"></i>
+                        <span class="time-value">In progress: <span class="elapsed-time">--:--</span></span>
+                    </div>
+                `;
             }
-        })
-        .then(response => {
-            if (response.ok) {
-                showToast('Service started successfully', 'success');
-                setTimeout(() => window.location.reload(), 1000);
-            } else {
-                showToast('Error starting service', 'error');
-            }
-        })
-        .catch(error => {
-            showToast('Error starting service', 'error');
-        });
-    }
-}
-
-function completeQueueService(queueId) {
-    if (confirm('Mark service as completed?')) {
-        fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/${queueId}/complete/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCsrfToken(),
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                showToast('Service completed successfully', 'success');
-                setTimeout(() => window.location.reload(), 1000);
-            } else {
-                showToast('Error completing service', 'error');
-            }
-        })
-        .catch(error => {
-            showToast('Error completing service', 'error');
-        });
-    }
-}
-
-function removeFromQueue(queueId) {
-    if (confirm('Remove this entry from the queue?')) {
-        fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/${queueId}/remove/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCsrfToken(),
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                showToast('Entry removed from queue', 'success');
-                setTimeout(() => window.location.reload(), 1000);
-            } else {
-                showToast('Error removing from queue', 'error');
-            }
-        })
-        .catch(error => {
-            showToast('Error removing from queue', 'error');
-        });
-    }
-}
-
-function assignBay(queueId) {
-    currentBayAssignmentQueueId = queueId;
-    const modal = new bootstrap.Modal(document.getElementById('bayAssignmentModal'));
-    modal.show();
-}
-
-function changeBay(queueId) {
-    assignBay(queueId);
-}
-
-function confirmBayAssignment() {
-    const bayId = document.getElementById('baySelect').value;
-    
-    if (!bayId) {
-        alert('Please select a bay');
-        return;
-    }
-    
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/${currentBayAssignmentQueueId}/assign-bay/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCsrfToken(),
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ bay_id: bayId })
-    })
-    .then(response => {
-        if (response.ok) {
-            showToast('Bay assigned successfully', 'success');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('bayAssignmentModal'));
-            modal.hide();
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            showToast('Error assigning bay', 'error');
         }
-    })
-    .catch(error => {
-        showToast('Error assigning bay', 'error');
+    });
+    
+    updateElapsedTimes();
+}
+
+function updateElapsedTimes() {
+    document.querySelectorAll('.service-time').forEach(element => {
+        const startTime = new Date(element.dataset.startTime);
+        const now = new Date();
+        const elapsed = Math.floor((now - startTime) / 1000 / 60); // minutes
+        
+        const hours = Math.floor(elapsed / 60);
+        const minutes = elapsed % 60;
+        const timeString = `${hours}:${minutes.toString().padStart(2, '0')}`;
+        
+        const elapsedSpan = element.querySelector('.elapsed-time');
+        if (elapsedSpan) {
+            elapsedSpan.textContent = timeString;
+        }
     });
 }
 
-// Control functions
-function startNextService() {
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/start-next/`, {
+function loadQueueStatistics() {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/statistics/`)
+        .then(response => response.json())
+        .then(data => {
+            updateQueueStatistics(data);
+        })
+        .catch(error => {
+            console.error('Error loading queue statistics:', error);
+        });
+}
+
+function updateQueueStatistics(stats) {
+    document.getElementById('total-processed').textContent = stats.total_processed || 0;
+    document.getElementById('avg-wait-time').textContent = `${stats.avg_wait_time || 0} min`;
+    document.getElementById('efficiency').textContent = `${stats.efficiency || 0}%`;
+    document.getElementById('satisfaction').textContent = stats.satisfaction || 'N/A';
+}
+
+// Service management functions
+function startService(orderId) {
+    if (confirm('Are you sure you want to start this service?')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/start/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessToast('Service started successfully');
+                refreshQueue();
+            } else {
+                showErrorToast(data.message || 'Error starting service');
+            }
+        })
+        .catch(error => {
+            showErrorToast('Error starting service');
+        });
+    }
+}
+
+function pauseService(orderId) {
+    fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/pause/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': getCsrfToken(),
-            'Content-Type': 'application/json'
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
         }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showToast('Next service started', 'success');
-            setTimeout(() => window.location.reload(), 1000);
+            showSuccessToast('Service paused');
+            refreshQueue();
         } else {
-            showToast(data.message || 'No services in queue', 'info');
+            showErrorToast(data.message || 'Error pausing service');
         }
     })
     .catch(error => {
-        showToast('Error starting next service', 'error');
+        showErrorToast('Error pausing service');
     });
 }
 
+function completeService(orderId) {
+    if (confirm('Are you sure you want to complete this service?')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/complete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessToast('Service completed successfully');
+                refreshQueue();
+            } else {
+                showErrorToast(data.message || 'Error completing service');
+            }
+        })
+        .catch(error => {
+            showErrorToast('Error completing service');
+        });
+    }
+}
+
+// Queue management functions
+function moveUp(queueId) {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/move-up/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ queue_id: queueId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            refreshQueue();
+        } else {
+            showErrorToast(data.message || 'Error moving queue entry');
+        }
+    })
+    .catch(error => {
+        showErrorToast('Error moving queue entry');
+    });
+}
+
+function moveDown(queueId) {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/move-down/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ queue_id: queueId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            refreshQueue();
+        } else {
+            showErrorToast(data.message || 'Error moving queue entry');
+        }
+    })
+    .catch(error => {
+        showErrorToast('Error moving queue entry');
+    });
+}
+
+function assignBay(queueId) {
+    currentQueueEntryId = queueId;
+    
+    // Load available bays
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/available-bays/`)
+        .then(response => response.json())
+        .then(data => {
+            const baysList = document.getElementById('available-bays-list');
+            baysList.innerHTML = data.bays.map(bay => `
+                <div class="bay-option" onclick="selectBay('${bay.id}')">
+                    <div class="bay-info">
+                        <strong>Bay ${bay.bay_number} - ${bay.name}</strong>
+                        <div class="bay-features">
+                            ${bay.features.map(feature => `<i class="fas fa-${feature.icon}" title="${feature.name}"></i>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            const modal = new bootstrap.Modal(document.getElementById('assignBayModal'));
+            modal.show();
+        })
+        .catch(error => {
+            showErrorToast('Error loading available bays');
+        });
+}
+
+function selectBay(bayId) {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/assign-bay/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+            queue_id: currentQueueEntryId,
+            bay_id: bayId 
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccessToast('Bay assigned successfully');
+            bootstrap.Modal.getInstance(document.getElementById('assignBayModal')).hide();
+            refreshQueue();
+            refreshBayStatus();
+        } else {
+            showErrorToast(data.message || 'Error assigning bay');
+        }
+    })
+    .catch(error => {
+        showErrorToast('Error assigning bay');
+    });
+}
+
+function changePriority(orderId) {
+    currentOrderId = orderId;
+    const modal = new bootstrap.Modal(document.getElementById('priorityModal'));
+    modal.show();
+}
+
+function savePriority() {
+    const priority = document.querySelector('input[name="priority"]:checked').value;
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/orders/${currentOrderId}/priority/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ priority: priority })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccessToast('Priority updated successfully');
+            bootstrap.Modal.getInstance(document.getElementById('priorityModal')).hide();
+            refreshQueue();
+        } else {
+            showErrorToast(data.message || 'Error updating priority');
+        }
+    })
+    .catch(error => {
+        showErrorToast('Error updating priority');
+    });
+}
+
+function removeFromQueue(queueId) {
+    if (confirm('Are you sure you want to remove this order from the queue?')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/remove/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ queue_id: queueId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessToast('Order removed from queue');
+                refreshQueue();
+            } else {
+                showErrorToast(data.message || 'Error removing from queue');
+            }
+        })
+        .catch(error => {
+            showErrorToast('Error removing from queue');
+        });
+    }
+}
+
+function refreshBayStatus() {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/bay/status/`)
+        .then(response => response.json())
+        .then(data => {
+            updateBayDisplay(data.bays);
+        })
+        .catch(error => {
+            console.error('Error refreshing bay status:', error);
+        });
+}
+
+function updateBayDisplay(baysData) {
+    baysData.forEach(bay => {
+        const bayElement = document.querySelector(`[data-bay-id="${bay.id}"]`);
+        if (bayElement) {
+            bayElement.className = `bay-card ${bay.is_occupied ? 'bay-occupied' : 'bay-available'}`;
+            
+            // Update bay content based on occupancy
+            if (bay.is_occupied && bay.current_order) {
+                bayElement.innerHTML = `
+                    <div class="bay-header">
+                        <div class="bay-number">${bay.bay_number}</div>
+                        <div class="bay-status">
+                            <span class="status-occupied">
+                                <i class="fas fa-car"></i>
+                                Occupied
+                            </span>
+                        </div>
+                    </div>
+                    <div class="bay-name">${bay.name}</div>
+                    <div class="bay-order-info">
+                        <div class="bay-order-number">${bay.current_order.order_number}</div>
+                        <div class="bay-customer">${bay.current_order.customer_name}</div>
+                        <div class="bay-vehicle">${bay.current_order.vehicle_registration}</div>
+                    </div>
+                `;
+            } else {
+                bayElement.innerHTML = `
+                    <div class="bay-header">
+                        <div class="bay-number">${bay.bay_number}</div>
+                        <div class="bay-status">
+                            <span class="status-available">
+                                <i class="fas fa-check-circle"></i>
+                                Available
+                            </span>
+                        </div>
+                    </div>
+                    <div class="bay-name">${bay.name}</div>
+                    <div class="bay-features">
+                        ${bay.features.map(feature => `<i class="fas fa-${feature}" title="${feature}"></i>`).join('')}
+                    </div>
+                `;
+            }
+        }
+    });
+}
+
+// Queue control functions
 function pauseQueue() {
-    // Implement queue pause functionality
-    showToast('Queue pause functionality not implemented yet', 'info');
+    if (confirm('Are you sure you want to pause the queue?')) {
+        showInfoToast('Queue pause functionality coming soon');
+    }
+}
+
+function resumeQueue() {
+    showInfoToast('Queue resume functionality coming soon');
 }
 
 function reorderQueue() {
-    // Implement queue reordering functionality
-    showToast('Queue reordering functionality not implemented yet', 'info');
+    if (confirm('Are you sure you want to automatically reorder the queue by priority?')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/reorder/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessToast('Queue reordered successfully');
+                refreshQueue();
+            } else {
+                showErrorToast(data.message || 'Error reordering queue');
+            }
+        })
+        .catch(error => {
+            showErrorToast('Error reordering queue');
+        });
+    }
 }
 
-function exportQueue() {
-    // Implement queue export functionality
-    window.open(`/business/{{ request.tenant.slug }}/services/queue/export/`, '_blank');
+function clearCompleted() {
+    if (confirm('Are you sure you want to clear all completed orders from the queue?')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/clear-completed/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessToast('Completed orders cleared');
+                refreshQueue();
+            } else {
+                showErrorToast(data.message || 'Error clearing completed orders');
+            }
+        })
+        .catch(error => {
+            showErrorToast('Error clearing completed orders');
+        });
+    }
+}
+
+// Quick action functions
+function addWalkInCustomer() {
+    window.location.href = '/business/{{ request.tenant.slug }}/services/quick/customer-register/';
+}
+
+function processPayment() {
+    window.location.href = '/business/{{ request.tenant.slug }}/payments/create/';
+}
+
+function printQueue() {
+    window.print();
+}
+
+function sendNotifications() {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/send-queue-notifications/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccessToast(`Notifications sent to ${data.sent_count} customers`);
+        } else {
+            showErrorToast(data.message || 'Error sending notifications');
+        }
+    })
+    .catch(error => {
+        showErrorToast('Error sending notifications');
+    });
+}
+
+function openQueueSettings() {
+    showInfoToast('Queue settings functionality coming soon');
 }
 
 // Utility functions
-function getCsrfToken() {
-    const token = document.querySelector('[name=csrfmiddlewaretoken]');
-    return token ? token.value : '';
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showSuccessToast(message) {
+    showToast(message, 'success');
+}
+
+function showErrorToast(message) {
+    showToast(message, 'error');
+}
+
+function showInfoToast(message) {
+    showToast(message, 'info');
 }
 
 function showToast(message, type) {
     const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
+    toast.className = `toast toast-${type}`;
     toast.innerHTML = `
         <div class="toast-content">
             <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
             <span>${message}</span>
         </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
     `;
     
     document.body.appendChild(toast);
     
     setTimeout(() => {
-        toast.remove();
-    }, 3000);
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 4000);
 }
-
-// Initialize page
-document.addEventListener('DOMContentLoaded', function() {
-    // Start auto-refresh by default
-    toggleAutoRefresh();
-    
-    // Update timestamp every second
-    setInterval(updateLastUpdated, 1000);
-});
 </script>
 
-<!-- Toast Notification Styles -->
+<!-- Toast Styles -->
 <style>
-.toast-notification {
+.toast {
     position: fixed;
     top: 2rem;
     right: 2rem;
@@ -1032,17 +1579,9 @@ document.addEventListener('DOMContentLoaded', function() {
     animation: slideInRight 0.3s ease-out;
 }
 
-.toast-notification.toast-success {
-    border-left: 4px solid var(--success-500);
-}
-
-.toast-notification.toast-error {
-    border-left: 4px solid var(--danger-500);
-}
-
-.toast-notification.toast-info {
-    border-left: 4px solid var(--info-500);
-}
+.toast.toast-success { border-left: 4px solid var(--success-500); }
+.toast.toast-error { border-left: 4px solid var(--danger-500); }
+.toast.toast-info { border-left: 4px solid var(--info-500); }
 
 .toast-content {
     display: flex;
@@ -1050,37 +1589,46 @@ document.addEventListener('DOMContentLoaded', function() {
     gap: 0.75rem;
 }
 
-.toast-success .toast-content i {
-    color: var(--success-500);
-}
-
-.toast-error .toast-content i {
-    color: var(--danger-500);
-}
-
-.toast-info .toast-content i {
-    color: var(--info-500);
+.toast-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
 }
 
 @keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
-@media (max-width: 768px) {
-    .toast-notification {
-        top: 1rem;
-        right: 1rem;
-        left: 1rem;
-        min-width: auto;
-    }
+.bay-option {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.bay-option:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-200);
+}
+
+.bay-info strong {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.bay-features {
+    display: flex;
+    gap: 0.5rem;
+    color: var(--gray-500);
 }
 </style>
 {% endblock %}
-                                           

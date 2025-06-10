@@ -1,0 +1,1439 @@
+<!-- templates/customers/customer_form.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if customer %}Edit Customer - {{ customer.display_name }}{% else %}Add New Customer{% endif %} - {{ block.super }}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-{% if customer %}user-edit{% else %}user-plus{% endif %} text-primary"></i>
+            {% if customer %}Edit Customer{% else %}Add New Customer{% endif %}
+        </h1>
+        <p class="page-description">
+            {% if customer %}
+                Update customer information for {{ customer.display_name }}
+            {% else %}
+                Register a new customer and optionally add their vehicle
+            {% endif %}
+        </p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.business.slug }}/customers/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Customers
+        </a>
+        {% if customer %}
+        <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/" class="btn btn-outline-primary">
+            <i class="fas fa-eye"></i>
+            View Customer
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <form method="POST" enctype="multipart/form-data" id="customer-form">
+            {% csrf_token %}
+            
+            <!-- Customer Information -->
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-user"></i>
+                        Customer Information
+                    </h5>
+                    {% if customer %}
+                    <div class="card-actions">
+                        <span class="badge badge-{{ customer.customer_type|yesno:'info,primary' }}">
+                            {{ customer.get_customer_type_display }}
+                        </span>
+                        {% if customer.is_vip %}
+                        <span class="badge badge-warning">
+                            <i class="fas fa-crown"></i> VIP
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-user-circle"></i>
+                            Basic Information
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="id_first_name" class="form-label">
+                                        First Name <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text" name="first_name" id="id_first_name" 
+                                           class="form-control" maxlength="50" required
+                                           value="{{ customer_form.first_name.value|default:'' }}"
+                                           placeholder="Enter first name">
+                                    {% if customer_form.first_name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.first_name.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="id_last_name" class="form-label">
+                                        Last Name <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text" name="last_name" id="id_last_name" 
+                                           class="form-control" maxlength="50" required
+                                           value="{{ customer_form.last_name.value|default:'' }}"
+                                           placeholder="Enter last name">
+                                    {% if customer_form.last_name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.last_name.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="id_customer_type" class="form-label">
+                                        Customer Type <span class="text-danger">*</span>
+                                    </label>
+                                    <select name="customer_type" id="id_customer_type" class="form-select" required>
+                                        <option value="">Select customer type</option>
+                                        <option value="individual" {% if customer_form.customer_type.value == 'individual' %}selected{% endif %}>Individual</option>
+                                        <option value="business" {% if customer_form.customer_type.value == 'business' %}selected{% endif %}>Business</option>
+                                    </select>
+                                    {% if customer_form.customer_type.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.customer_type.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6" id="company-name-field" style="display: {% if customer_form.customer_type.value == 'business' %}block{% else %}none{% endif %};">
+                                <div class="form-group">
+                                    <label for="id_company_name" class="form-label">
+                                        Company Name <span class="text-danger company-required">*</span>
+                                    </label>
+                                    <input type="text" name="company_name" id="id_company_name" 
+                                           class="form-control" maxlength="100"
+                                           value="{{ customer_form.company_name.value|default:'' }}"
+                                           placeholder="Enter company name">
+                                    {% if customer_form.company_name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.company_name.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="id_phone" class="form-label">
+                                        Phone Number <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="tel" name="phone" id="id_phone" 
+                                           class="form-control" required
+                                           value="{{ customer_form.phone.value|default:'' }}"
+                                           placeholder="+254701234567 or 0701234567">
+                                    {% if customer_form.phone.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.phone.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">
+                                        Format: +254701234567 or 0701234567
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="id_email" class="form-label">
+                                        Email Address
+                                    </label>
+                                    <input type="email" name="email" id="id_email" 
+                                           class="form-control"
+                                           value="{{ customer_form.email.value|default:'' }}"
+                                           placeholder="customer@example.com">
+                                    {% if customer_form.email.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.email.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_date_of_birth" class="form-label">
+                                        Date of Birth
+                                    </label>
+                                    <input type="date" name="date_of_birth" id="id_date_of_birth" 
+                                           class="form-control"
+                                           value="{{ customer_form.date_of_birth.value|default:'' }}">
+                                    {% if customer_form.date_of_birth.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.date_of_birth.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_gender" class="form-label">
+                                        Gender
+                                    </label>
+                                    <select name="gender" id="id_gender" class="form-select">
+                                        <option value="">Select gender</option>
+                                        <option value="male" {% if customer_form.gender.value == 'male' %}selected{% endif %}>Male</option>
+                                        <option value="female" {% if customer_form.gender.value == 'female' %}selected{% endif %}>Female</option>
+                                        <option value="other" {% if customer_form.gender.value == 'other' %}selected{% endif %}>Other</option>
+                                    </select>
+                                    {% if customer_form.gender.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.gender.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_national_id" class="form-label">
+                                        National ID
+                                    </label>
+                                    <input type="text" name="national_id" id="id_national_id" 
+                                           class="form-control" maxlength="20"
+                                           value="{{ customer_form.national_id.value|default:'' }}"
+                                           placeholder="12345678">
+                                    {% if customer_form.national_id.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.national_id.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Address Information -->
+                    <div class="form-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-map-marker-alt"></i>
+                            Address Information
+                        </h6>
+                        
+                        <div class="form-group">
+                            <label for="id_street_address" class="form-label">
+                                Street Address
+                            </label>
+                            <input type="text" name="street_address" id="id_street_address" 
+                                   class="form-control" maxlength="200"
+                                   value="{{ customer_form.street_address.value|default:'' }}"
+                                   placeholder="123 Main Street, Building Name">
+                            {% if customer_form.street_address.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ customer_form.street_address.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_city" class="form-label">
+                                        City
+                                    </label>
+                                    <input type="text" name="city" id="id_city" 
+                                           class="form-control" maxlength="50"
+                                           value="{{ customer_form.city.value|default:'' }}"
+                                           placeholder="Nairobi">
+                                    {% if customer_form.city.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.city.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_state" class="form-label">
+                                        County/State
+                                    </label>
+                                    <input type="text" name="state" id="id_state" 
+                                           class="form-control" maxlength="50"
+                                           value="{{ customer_form.state.value|default:'' }}"
+                                           placeholder="Nairobi County">
+                                    {% if customer_form.state.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.state.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_postal_code" class="form-label">
+                                        Postal Code
+                                    </label>
+                                    <input type="text" name="postal_code" id="id_postal_code" 
+                                           class="form-control" maxlength="10"
+                                           value="{{ customer_form.postal_code.value|default:'' }}"
+                                           placeholder="00100">
+                                    {% if customer_form.postal_code.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ customer_form.postal_code.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Communication Preferences -->
+                    <div class="form-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-bell"></i>
+                            Communication Preferences
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="receive_sms_notifications" 
+                                           id="id_receive_sms_notifications" class="form-check-input"
+                                           {% if customer_form.receive_sms_notifications.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="id_receive_sms_notifications">
+                                        SMS Notifications
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        Receive SMS updates about services
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="receive_email_notifications" 
+                                           id="id_receive_email_notifications" class="form-check-input"
+                                           {% if customer_form.receive_email_notifications.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="id_receive_email_notifications">
+                                        Email Notifications
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        Receive email updates and receipts
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="receive_service_reminders" 
+                                           id="id_receive_service_reminders" class="form-check-input"
+                                           {% if customer_form.receive_service_reminders.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="id_receive_service_reminders">
+                                        Service Reminders
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        Remind about regular services
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if not customer %}
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="send_welcome_message" 
+                                           id="send_welcome_message" class="form-check-input" checked>
+                                    <label class="form-check-label" for="send_welcome_message">
+                                        Send Welcome SMS
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        Send welcome message with customer ID
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Customer Status (Edit mode only) -->
+                    {% if customer and user_role in 'owner,manager' %}
+                    <div class="form-section">
+                        <h6 class="section-title">
+                            <i class="fas fa-cog"></i>
+                            Customer Status
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="is_vip" 
+                                           id="id_is_vip" class="form-check-input"
+                                           {% if customer.is_vip %}checked{% endif %}>
+                                    <label class="form-check-label" for="id_is_vip">
+                                        VIP Customer
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        Provides special privileges and discounts
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="is_active" 
+                                           id="id_is_active" class="form-check-input"
+                                           {% if customer.is_active %}checked{% endif %}>
+                                    <label class="form-check-label" for="id_is_active">
+                                        Active Customer
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        Can make bookings and receive services
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Vehicle Information (Create mode only) -->
+            {% if not customer %}
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-car"></i>
+                        Vehicle Information (Optional)
+                    </h5>
+                    <div class="card-actions">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" name="add_vehicle" id="add_vehicle" class="form-check-input">
+                            <label class="form-check-label" for="add_vehicle">
+                                Add Vehicle Now
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body" id="vehicle-section" style="display: none;">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Optional:</strong> You can add the customer's vehicle now or later from their profile.
+                    </div>
+                    
+                    <div class="form-section">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_registration_number" class="form-label">
+                                        Registration Number <span class="text-danger vehicle-required">*</span>
+                                    </label>
+                                    <input type="text" name="registration_number" id="id_registration_number" 
+                                           class="form-control text-uppercase" maxlength="20"
+                                           placeholder="KCX 123Y">
+                                    {% if vehicle_form.registration_number.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ vehicle_form.registration_number.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_make" class="form-label">
+                                        Make <span class="text-danger vehicle-required">*</span>
+                                    </label>
+                                    <input type="text" name="make" id="id_make" 
+                                           class="form-control" maxlength="50"
+                                           placeholder="Toyota, Nissan, Honda..."
+                                           list="make-suggestions">
+                                    <datalist id="make-suggestions">
+                                        <option value="Toyota">
+                                        <option value="Nissan">
+                                        <option value="Honda">
+                                        <option value="Mazda">
+                                        <option value="Mitsubishi">
+                                        <option value="Subaru">
+                                        <option value="Mercedes-Benz">
+                                        <option value="BMW">
+                                        <option value="Volkswagen">
+                                        <option value="Hyundai">
+                                        <option value="Suzuki">
+                                        <option value="Isuzu">
+                                    </datalist>
+                                    {% if vehicle_form.make.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ vehicle_form.make.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id_model" class="form-label">
+                                        Model <span class="text-danger vehicle-required">*</span>
+                                    </label>
+                                    <input type="text" name="model" id="id_model" 
+                                           class="form-control" maxlength="50"
+                                           placeholder="Vitz, Demio, Fit...">
+                                    {% if vehicle_form.model.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ vehicle_form.model.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="id_year" class="form-label">
+                                        Year
+                                    </label>
+                                    <select name="year" id="id_year" class="form-select">
+                                        <option value="">Select year</option>
+                                        <!-- Years will be populated by JavaScript -->
+                                    </select>
+                                    {% if vehicle_form.year.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ vehicle_form.year.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="id_color" class="form-label">
+                                        Color
+                                    </label>
+                                    <select name="color" id="id_color" class="form-select">
+                                        <option value="">Select color</option>
+                                        <option value="White">White</option>
+                                        <option value="Black">Black</option>
+                                        <option value="Silver">Silver</option>
+                                        <option value="Gray">Gray</option>
+                                        <option value="Red">Red</option>
+                                        <option value="Blue">Blue</option>
+                                        <option value="Green">Green</option>
+                                        <option value="Yellow">Yellow</option>
+                                        <option value="Orange">Orange</option>
+                                        <option value="Brown">Brown</option>
+                                        <option value="Gold">Gold</option>
+                                        <option value="Maroon">Maroon</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    {% if vehicle_form.color.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ vehicle_form.color.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="id_vehicle_type" class="form-label">
+                                        Vehicle Type
+                                    </label>
+                                    <select name="vehicle_type" id="id_vehicle_type" class="form-select">
+                                        <option value="sedan">Sedan</option>
+                                        <option value="hatchback">Hatchback</option>
+                                        <option value="suv">SUV</option>
+                                        <option value="pickup">Pickup</option>
+                                        <option value="van">Van</option>
+                                        <option value="wagon">Station Wagon</option>
+                                        <option value="coupe">Coupe</option>
+                                        <option value="convertible">Convertible</option>
+                                    </select>
+                                    {% if vehicle_form.vehicle_type.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ vehicle_form.vehicle_type.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="id_fuel_type" class="form-label">
+                                        Fuel Type
+                                    </label>
+                                    <select name="fuel_type" id="id_fuel_type" class="form-select">
+                                        <option value="petrol">Petrol</option>
+                                        <option value="diesel">Diesel</option>
+                                        <option value="hybrid">Hybrid</option>
+                                        <option value="electric">Electric</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                    {% if vehicle_form.fuel_type.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ vehicle_form.fuel_type.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="id_vehicle_notes" class="form-label">
+                                Vehicle Notes
+                            </label>
+                            <textarea name="vehicle_notes" id="id_vehicle_notes" 
+                                      class="form-control" rows="3"
+                                      placeholder="Any special notes about this vehicle (damage, modifications, etc.)"></textarea>
+                            <small class="form-text text-muted">
+                                Any special notes about this vehicle that staff should know
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-save"></i>
+                    {% if customer %}Update Customer{% else %}Save Customer{% endif %}
+                </button>
+                
+                {% if not customer %}
+                <button type="submit" name="create_another" value="1" class="btn btn-success btn-lg">
+                    <i class="fas fa-plus"></i>
+                    Save & Add Another
+                </button>
+                {% endif %}
+                
+                <a href="/business/{{ request.business.slug }}/customers/{% if customer %}{{ customer.pk }}/{% endif %}" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Form Tips -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-lightbulb"></i>
+                    {% if customer %}Editing Tips{% else %}Registration Tips{% endif %}
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="tip-item">
+                    <h6><i class="fas fa-phone text-primary"></i> Phone Number</h6>
+                    <p>Always collect a valid phone number for SMS notifications and service reminders. Use Kenyan format (+254 or 07...).</p>
+                </div>
+                
+                <div class="tip-item">
+                    <h6><i class="fas fa-building text-info"></i> Customer Type</h6>
+                    <p>Individual customers are private persons, while Business customers are companies that may need invoicing.</p>
+                </div>
+                
+                <div class="tip-item">
+                    <h6><i class="fas fa-car text-success"></i> Vehicle Information</h6>
+                    <p>Adding vehicle details {% if customer %}makes{% else %}now saves{% endif %} time when creating service orders later.</p>
+                </div>
+                
+                <div class="tip-item">
+                    <h6><i class="fas fa-bell text-warning"></i> Communication Preferences</h6>
+                    <p>Respect customer preferences for notifications to maintain good relationships and comply with privacy laws.</p>
+                </div>
+                
+                {% if customer and user_role in 'owner,manager' %}
+                <div class="tip-item">
+                    <h6><i class="fas fa-crown text-warning"></i> VIP Status</h6>
+                    <p>VIP customers receive special privileges, discounts, and priority service. Use this feature for your best customers.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Keyboard Shortcuts -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-keyboard"></i>
+                    Keyboard Shortcuts
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="shortcut-item">
+                    <div class="shortcut-keys">
+                        <kbd>Ctrl</kbd> + <kbd>S</kbd>
+                    </div>
+                    <span>Save Customer</span>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-keys">
+                        <kbd>Esc</kbd>
+                    </div>
+                    <span>Cancel & Go Back</span>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-keys">
+                        <kbd>Tab</kbd>
+                    </div>
+                    <span>Next Field</span>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-keys">
+                        <kbd>Shift</kbd> + <kbd>Tab</kbd>
+                    </div>
+                    <span>Previous Field</span>
+                </div>
+            </div>
+        </div>
+        
+        {% if customer %}
+        <!-- Customer Statistics -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Customer Statistics
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="stat-item">
+                    <div class="stat-label">Customer Since</div>
+                    <div class="stat-value">{{ customer.created_at|date:"M Y" }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Total Orders</div>
+                    <div class="stat-value">{{ customer.total_orders|default:0 }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Total Spent</div>
+                    <div class="stat-value">KES {{ customer.total_spent|floatformat:0|default:0 }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Loyalty Points</div>
+                    <div class="stat-value">{{ customer.loyalty_points|default:0 }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Vehicles</div>
+                    <div class="stat-value">{{ customer.vehicles.count }}</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Last Visit</div>
+                    <div class="stat-value">
+                        {% if customer.last_visit %}
+                        {{ customer.last_visit|date:"M d, Y" }}
+                        {% else %}
+                        Never
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Quick Actions -->
+        {% if customer %}
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-bolt"></i>
+                    Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="quick-actions">
+                    <a href="/business/{{ request.business.slug }}/services/orders/create/?customer={{ customer.pk }}" 
+                       class="btn btn-primary btn-sm btn-block mb-2">
+                        <i class="fas fa-plus-circle"></i>
+                        Create New Order
+                    </a>
+                    
+                    <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/vehicles/create/" 
+                       class="btn btn-outline-primary btn-sm btn-block mb-2">
+                        <i class="fas fa-car"></i>
+                        Add New Vehicle
+                    </a>
+                    
+                    <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/notes/create/" 
+                       class="btn btn-outline-secondary btn-sm btn-block mb-2">
+                        <i class="fas fa-sticky-note"></i>
+                        Add Note
+                    </a>
+                    
+                    {% if customer.phone %}
+                    <a href="tel:{{ customer.phone }}" 
+                       class="btn btn-outline-success btn-sm btn-block mb-2">
+                        <i class="fas fa-phone"></i>
+                        Call Customer
+                    </a>
+                    {% endif %}
+                    
+                    {% if customer.email %}
+                    <a href="mailto:{{ customer.email }}" 
+                       class="btn btn-outline-info btn-sm btn-block mb-2">
+                        <i class="fas fa-envelope"></i>
+                        Send Email
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    color: var(--gray-700);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.text-danger {
+    color: var(--danger-600) !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-400);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+}
+
+.form-check-input:focus {
+    border-color: var(--primary-400);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    padding: 2rem 0 1rem;
+    border-top: 1px solid var(--gray-200);
+    margin-top: 2rem;
+}
+
+.tip-item {
+    margin-bottom: 1.5rem;
+}
+
+.tip-item h6 {
+    color: var(--gray-700);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tip-item p {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.shortcut-item:last-child {
+    border-bottom: none;
+}
+
+.shortcut-keys {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.shortcut-item kbd {
+    background-color: var(--gray-100);
+    color: var(--gray-700);
+    font-size: 0.75rem;
+    padding: 0.125rem 0.25rem;
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+}
+
+.shortcut-item span {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.stat-value {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.quick-actions .btn-block {
+    width: 100%;
+    text-align: left;
+}
+
+.text-uppercase {
+    text-transform: uppercase;
+}
+
+.is-invalid {
+    border-color: var(--danger-400) !important;
+    box-shadow: 0 0 0 0.2rem rgba(var(--danger-rgb), 0.25) !important;
+}
+
+.invalid-feedback {
+    color: var(--danger-600);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.company-required,
+.vehicle-required {
+    display: none;
+}
+
+.company-required.show,
+.vehicle-required.show {
+    display: inline;
+}
+
+@media (max-width: 768px) {
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-section {
+        padding: 1rem;
+    }
+    
+    .shortcut-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+}
+
+/* Form validation states */
+.was-validated .form-control:invalid,
+.was-validated .form-select:invalid {
+    border-color: var(--danger-400);
+    box-shadow: 0 0 0 0.2rem rgba(var(--danger-rgb), 0.25);
+}
+
+.was-validated .form-control:valid,
+.was-validated .form-select:valid {
+    border-color: var(--success-400);
+    box-shadow: 0 0 0 0.2rem rgba(var(--success-rgb), 0.25);
+}
+
+/* Loading state */
+.form-loading {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.form-loading .btn {
+    position: relative;
+}
+
+.form-loading .btn::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCustomerForm();
+    populateYearOptions();
+    setupFormValidation();
+    setupKeyboardShortcuts();
+});
+
+function initializeCustomerForm() {
+    // Customer type change handler
+    const customerTypeField = document.getElementById('id_customer_type');
+    const companyNameField = document.getElementById('company-name-field');
+    const companyNameInput = document.getElementById('id_company_name');
+    const companyRequired = document.querySelector('.company-required');
+    
+    if (customerTypeField && companyNameField) {
+        customerTypeField.addEventListener('change', function() {
+            if (this.value === 'business') {
+                companyNameField.style.display = 'block';
+                companyNameInput.required = true;
+                if (companyRequired) companyRequired.classList.add('show');
+            } else {
+                companyNameField.style.display = 'none';
+                companyNameInput.required = false;
+                if (companyRequired) companyRequired.classList.remove('show');
+            }
+        });
+        
+        // Initialize on page load
+        if (customerTypeField.value === 'business') {
+            companyNameField.style.display = 'block';
+            companyNameInput.required = true;
+            if (companyRequired) companyRequired.classList.add('show');
+        }
+    }
+    
+    // Add vehicle toggle (only in create mode)
+    const addVehicleCheckbox = document.getElementById('add_vehicle');
+    const vehicleSection = document.getElementById('vehicle-section');
+    
+    if (addVehicleCheckbox && vehicleSection) {
+        addVehicleCheckbox.addEventListener('change', function() {
+            const vehicleRequiredElements = document.querySelectorAll('.vehicle-required');
+            const vehicleRequiredFields = vehicleSection.querySelectorAll('#id_registration_number, #id_make, #id_model');
+            
+            if (this.checked) {
+                vehicleSection.style.display = 'block';
+                // Make vehicle fields required
+                vehicleRequiredFields.forEach(field => {
+                    field.required = true;
+                });
+                vehicleRequiredElements.forEach(el => el.classList.add('show'));
+            } else {
+                vehicleSection.style.display = 'none';
+                // Make vehicle fields optional
+                vehicleRequiredFields.forEach(field => {
+                    field.required = false;
+                    field.classList.remove('is-invalid');
+                });
+                vehicleRequiredElements.forEach(el => el.classList.remove('show'));
+            }
+        });
+    }
+    
+    // Phone number formatting
+    const phoneField = document.getElementById('id_phone');
+    if (phoneField) {
+        phoneField.addEventListener('input', function() {
+            let value = this.value.replace(/\D/g, '');
+            
+            if (value.startsWith('254')) {
+                this.value = '+' + value;
+            } else if (value.startsWith('0')) {
+                this.value = value;
+            }
+        });
+    }
+    
+    // Registration number formatting
+    const regField = document.getElementById('id_registration_number');
+    if (regField) {
+        regField.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+    }
+}
+
+function populateYearOptions() {
+    const yearSelect = document.getElementById('id_year');
+    if (!yearSelect) return;
+    
+    const currentYear = new Date().getFullYear();
+    
+    for (let year = currentYear; year >= 1990; year--) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        if (year === 2020) option.selected = true; // Default to 2020
+        yearSelect.appendChild(option);
+    }
+}
+
+function setupFormValidation() {
+    const form = document.getElementById('customer-form');
+    const requiredFields = form.querySelectorAll('[required]');
+    
+    requiredFields.forEach(field => {
+        field.addEventListener('blur', validateField);
+        field.addEventListener('input', clearValidationError);
+    });
+    
+    // Form submission validation
+    form.addEventListener('submit', function(e) {
+        let isValid = true;
+        
+        requiredFields.forEach(field => {
+            if (!validateField({ target: field })) {
+                isValid = false;
+            }
+        });
+        
+        if (!isValid) {
+            e.preventDefault();
+            showErrorToast('Please fix the errors in the form');
+            
+            // Scroll to first error
+            const firstError = form.querySelector('.is-invalid');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstError.focus();
+            }
+            return false;
+        }
+        
+        // Show loading state
+        showFormLoading();
+    });
+}
+
+function validateField(event) {
+    const field = event.target;
+    const value = field.value.trim();
+    
+    clearValidationError(event);
+    
+    // Check if field is required and empty
+    if (field.hasAttribute('required') && !value) {
+        showFieldError(field, 'This field is required');
+        return false;
+    }
+    
+    // Skip validation if field is empty and not required
+    if (!value && !field.hasAttribute('required')) {
+        return true;
+    }
+    
+    // Specific field validation
+    switch (field.name) {
+        case 'first_name':
+        case 'last_name':
+            if (value.length < 2) {
+                showFieldError(field, 'Name must be at least 2 characters long');
+                return false;
+            }
+            if (!/^[a-zA-Z\s'-]+$/.test(value)) {
+                showFieldError(field, 'Name can only contain letters, spaces, apostrophes, and hyphens');
+                return false;
+            }
+            break;
+            
+        case 'phone':
+            if (!isValidKenyanPhone(value)) {
+                showFieldError(field, 'Please enter a valid Kenyan phone number (+254701234567 or 0701234567)');
+                return false;
+            }
+            break;
+            
+        case 'email':
+            if (!isValidEmail(value)) {
+                showFieldError(field, 'Please enter a valid email address');
+                return false;
+            }
+            break;
+            
+        case 'national_id':
+            if (value && (!/^\d{8}$/.test(value) && !/^\d{7,8}$/.test(value))) {
+                showFieldError(field, 'National ID should be 7-8 digits');
+                return false;
+            }
+            break;
+            
+        case 'registration_number':
+            if (value && value.length < 6) {
+                showFieldError(field, 'Registration number should be at least 6 characters');
+                return false;
+            }
+            break;
+            
+        case 'date_of_birth':
+            if (value) {
+                const birthDate = new Date(value);
+                const today = new Date();
+                const age = Math.floor((today - birthDate) / (365.25 * 24 * 60 * 60 * 1000));
+                
+                if (birthDate > today) {
+                    showFieldError(field, 'Birth date cannot be in the future');
+                    return false;
+                }
+                if (age > 120) {
+                    showFieldError(field, 'Please enter a valid birth date');
+                    return false;
+                }
+            }
+            break;
+    }
+    
+    return true;
+}
+
+function showFieldError(field, message) {
+    field.classList.add('is-invalid');
+    
+    let errorDiv = field.parentNode.querySelector('.invalid-feedback');
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'invalid-feedback d-block';
+        field.parentNode.appendChild(errorDiv);
+    }
+    errorDiv.textContent = message;
+}
+
+function clearValidationError(event) {
+    const field = event.target;
+    field.classList.remove('is-invalid');
+    
+    const errorDiv = field.parentNode.querySelector('.invalid-feedback');
+    if (errorDiv && !errorDiv.classList.contains('d-block')) {
+        errorDiv.remove();
+    }
+}
+
+function isValidKenyanPhone(phone) {
+    // Remove all non-digit characters
+    const cleaned = phone.replace(/\D/g, '');
+    
+    // Check various Kenyan phone number formats
+    const patterns = [
+        /^254[17]\d{8}$/, // +254701234567 (without +)
+        /^0[17]\d{8}$/,   // 0701234567
+        /^[17]\d{8}$/     // 701234567
+    ];
+    
+    return patterns.some(pattern => pattern.test(cleaned));
+}
+
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+S to save
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            document.getElementById('customer-form').submit();
+        }
+        
+        // Escape to go back
+        if (e.key === 'Escape') {
+            if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+                const backUrl = '{% if customer %}/business/{{ request.business.slug }}/customers/{{ customer.pk }}/{% else %}/business/{{ request.business.slug }}/customers/{% endif %}';
+                window.location.href = backUrl;
+            }
+        }
+    });
+}
+
+function showFormLoading() {
+    const form = document.getElementById('customer-form');
+    form.classList.add('form-loading');
+    
+    const submitButtons = form.querySelectorAll('button[type="submit"]');
+    submitButtons.forEach(button => {
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + 
+                          (button.name === 'create_another' ? 'Saving...' : 'Saving...');
+    });
+}
+
+function showErrorToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-error';
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+// Auto-save draft (optional feature)
+function enableAutoSave() {
+    const form = document.getElementById('customer-form');
+    const formData = new FormData(form);
+    let lastSave = Date.now();
+    
+    // Save form data to localStorage every 30 seconds
+    setInterval(() => {
+        if (Date.now() - lastSave > 30000) {
+            const currentData = new FormData(form);
+            const dataObj = {};
+            
+            for (let [key, value] of currentData.entries()) {
+                dataObj[key] = value;
+            }
+            
+            localStorage.setItem('customer_form_draft', JSON.stringify(dataObj));
+            lastSave = Date.now();
+        }
+    }, 5000);
+    
+    // Clear draft on successful submission
+    form.addEventListener('submit', () => {
+        localStorage.removeItem('customer_form_draft');
+    });
+}
+
+// Uncomment to enable auto-save
+// enableAutoSave();
+</script>
+
+<!-- Toast Styles -->
+<style>
+.toast {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 9999;
+    min-width: 300px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast.toast-error {
+    border-left: 4px solid var(--danger-500);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.toast-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+</style>
+{% endblock %}
