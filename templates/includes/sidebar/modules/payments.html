@@ -1,4 +1,4 @@
-<!-- Payments Module -->
+<!-- includes/sidebar/modules/payments.html -->
 <li class="nav-item nav-dropdown" id="payments-dropdown">
     <a class="nav-link nav-dropdown-toggle {% if 'payments' in request.resolver_match.namespace %}active{% endif %}" 
        href="#" onclick="toggleDropdown('payments-dropdown')">
@@ -13,6 +13,7 @@
                 <span class="nav-text">Dashboard</span>
             </a>
         </li>
+        
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/payments/list/">
@@ -20,13 +21,43 @@
                 <span class="nav-text">All Payments</span>
             </a>
         </li>
+        
         <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
+            <a class="nav-link nav-link-featured {% if request.resolver_match.url_name == 'create' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/payments/create/">
                 <i class="nav-icon fas fa-plus-circle"></i>
                 <span class="nav-text">Process Payment</span>
+                <span class="nav-badge nav-badge-primary">QUICK</span>
             </a>
         </li>
+        
+        <!-- Quick Actions for Attendants -->
+        {% if user_role == 'attendant' %}
+        <li class="nav-divider">
+            <span class="nav-divider-text">Quick Actions</span>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link nav-link-action" href="#" onclick="openPaymentQuickProcess()">
+                <i class="nav-icon fas fa-cash-register"></i>
+                <span class="nav-text">Quick Payment</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link nav-link-action" href="#" onclick="openReceiptPrint()">
+                <i class="nav-icon fas fa-print"></i>
+                <span class="nav-text">Print Receipt</span>
+            </a>
+        </li>
+        {% endif %}
+        
+        <!-- Management Features -->
+        {% if user_role in 'owner,manager,supervisor' %}
+        <li class="nav-divider">
+            <span class="nav-divider-text">Management</span>
+        </li>
+        
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/payments/reports/">
@@ -34,6 +65,7 @@
                 <span class="nav-text">Payment Reports</span>
             </a>
         </li>
+        
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'reconciliation' %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/payments/reconciliation/">
@@ -41,7 +73,8 @@
                 <span class="nav-text">Reconciliation</span>
             </a>
         </li>
-        {% if user_role and user_role in 'owner,manager' %}
+        
+        {% if user_role in 'owner,manager' %}
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'methods' %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/payments/methods/">
@@ -49,6 +82,7 @@
                 <span class="nav-text">Payment Methods</span>
             </a>
         </li>
+        {% endif %}
         {% endif %}
     </ul>
 </li>

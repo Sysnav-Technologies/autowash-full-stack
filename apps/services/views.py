@@ -1,3 +1,5 @@
+import csv
+from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -17,7 +19,7 @@ from .models import (
 )
 from .forms import (
     ServiceForm, ServiceCategoryForm, ServicePackageForm, 
-    ServiceOrderForm, QuickOrderForm, ServiceOrderItemForm
+    ServiceOrderForm, QuickOrderForm, ServiceOrderItemForm, ServiceRatingForm
 )
 from datetime import datetime, timedelta
 import json
@@ -601,3 +603,1708 @@ def queue_status_ajax(request):
     }
     
     return JsonResponse(data)
+
+
+# Additional views to complete the services functionality
+
+@login_required
+@employee_required(['owner', 'manager'])
+def service_edit_view(request, pk):
+    """Edit service"""
+    service = get_object_or_404(Service, pk=pk)
+    
+    if request.method == 'POST':
+        form = ServiceForm(request.POST, request.FILES, instance=service)
+        if form.is_valid():
+            service = form.save()
+            messages.success(request, f'Service "{service.name}" updated successfully!')
+            return redirect('services:detail', pk=service.pk)
+    else:
+        form = ServiceForm(instance=service)
+    
+    context = {
+        'form': form,
+        'service': service,
+        'title': f'Edit Service - {service.name}'
+    }
+    return render(request, 'services/service_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def service_delete_view(request, pk):
+    """Delete service (soft delete)"""
+    service = get_object_or_404(Service, pk=pk)
+    
+    if request.method == 'POST':
+        service.delete()  # Soft delete
+        messages.success(request, f'Service "{service.name}" deleted successfully!')
+        return redirect('services:list')
+    
+    context = {
+        'service': service,
+        'title': f'Delete Service - {service.name}'
+    }
+    return render(request, 'services/service_confirm_delete.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_list_view(request):
+    """List service categories"""
+    categories = ServiceCategory.objects.filter(is_active=True).annotate(
+        service_count=Count('services', filter=Q(services__is_active=True))
+    ).order_by('display_order', 'name')
+    
+    context = {
+        'categories': categories,
+        'title': 'Service Categories'
+    }
+    return render(request, 'services/category_list.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_create_view(request):
+    """Create service category"""
+    if request.method == 'POST':
+        form = ServiceCategoryForm(request.POST)
+        if form.is_valid():
+            category = form.save()
+            messages.success(request, f'Category "{category.name}" created successfully!')
+            return redirect('services:category_list')
+    else:
+        form = ServiceCategoryForm()
+    
+    context = {
+        'form': form,
+        'title': 'Create Service Category'
+    }
+    return render(request, 'services/category_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_edit_view(request, pk):
+    """Edit service category"""
+    category = get_object_or_404(ServiceCategory, pk=pk)
+    
+    if request.method == 'POST':
+        form = ServiceCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            category = form.save()
+            messages.success(request, f'Category "{category.name}" updated successfully!')
+            return redirect('services:category_list')
+    else:
+        form = ServiceCategoryForm(instance=category)
+    
+    context = {
+        'form': form,
+        'category': category,
+        'title': f'Edit Category - {category.name}'
+    }
+    return render(request, 'services/category_form.html', context)
+
+@login_required
+@employee_required()
+@require_POST
+def cancel_service(request, order_id):
+    """Cancel service order"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if not order.can_be_cancelled:
+        messages.error(request, 'This order cannot be cancelled.')
+        return redirect('services:order_detail', pk=order.pk)
+    
+    cancellation_reason = request.POST.get('reason', '')
+    
+    order.status = 'cancelled'
+    order.internal_notes += f"\nCancelled by {request.employee.full_name}: {cancellation_reason}"
+    order.save()
+    
+    # Free service bay if assigned
+    if hasattr(order, 'queue_entry') and order.queue_entry.service_bay:
+        bay = order.queue_entry.service_bay
+        bay.complete_service()
+    
+    # Update queue entry
+    if hasattr(order, 'queue_entry'):
+        queue_entry = order.queue_entry
+        queue_entry.status = 'cancelled'
+        queue_entry.save()
+    
+    messages.success(request, f'Order {order.order_number} cancelled successfully.')
+    return redirect('services:order_detail', pk=order.pk)
+
+@login_required
+@employee_required()
+@require_POST
+def pause_service(request, order_id):
+    """Pause service"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if order.status != 'in_progress':
+        messages.error(request, 'Service is not in progress.')
+        return redirect('services:order_detail', pk=order.pk)
+    
+    # Record pause time in internal notes
+    order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
+    order.save()
+    
+    messages.success(request, 'Service paused.')
+    return redirect('services:order_detail', pk=order.pk)
+
+@login_required
+@employee_required()
+@require_POST
+def resume_service(request, order_id):
+    """Resume paused service"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if order.status != 'in_progress':
+        messages.error(request, 'Service is not paused.')
+        return redirect('services:order_detail', pk=order.pk)
+    
+    # Record resume time in internal notes
+    order.internal_notes += f"\nResumed by {request.employee.full_name} at {timezone.now()}"
+    order.save()
+    
+    messages.success(request, 'Service resumed.')
+    return redirect('services:order_detail', pk=order.pk)
+
+@login_required
+@employee_required()
+def process_payment(request, order_id):
+    """Process payment for order"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if request.method == 'POST':
+        payment_method = request.POST.get('payment_method')
+        amount_received = Decimal(request.POST.get('amount_received', '0'))
+        
+        if amount_received >= order.total_amount:
+            order.payment_status = 'paid'
+            order.payment_method = payment_method
+            order.save()
+            
+            messages.success(request, 'Payment processed successfully!')
+            return redirect('services:payment_receipt', order_id=order.id)
+        else:
+            messages.error(request, 'Insufficient payment amount.')
+    
+    context = {
+        'order': order,
+        'title': f'Process Payment - {order.order_number}'
+    }
+    return render(request, 'services/process_payment.html', context)
+
+@login_required
+@employee_required()
+def payment_receipt(request, order_id):
+    """Generate payment receipt"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    context = {
+        'order': order,
+        'title': f'Receipt - {order.order_number}'
+    }
+    return render(request, 'services/payment_receipt.html', context)
+
+@login_required
+@employee_required()
+def attendant_dashboard(request):
+    """Attendant dashboard with current assignments"""
+    # Get attendant's current assignments
+    my_orders = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee,
+        status__in=['confirmed', 'in_progress']
+    ).select_related('customer', 'vehicle').order_by('-created_at')
+    
+    # Get queue entries for today
+    today_queue = ServiceQueue.objects.filter(
+        created_at__date=timezone.now().date(),
+        status__in=['waiting', 'in_service']
+    ).select_related('order', 'order__customer').order_by('queue_number')
+    
+    # Get my service items in progress
+    my_service_items = ServiceOrderItem.objects.filter(
+        assigned_to=request.employee,
+        completed_at__isnull=True
+    ).select_related('order', 'service')
+    
+    # Statistics
+    stats = {
+        'orders_today': ServiceOrder.objects.filter(
+            assigned_attendant=request.employee,
+            created_at__date=timezone.now().date()
+        ).count(),
+        'completed_today': ServiceOrder.objects.filter(
+            assigned_attendant=request.employee,
+            status='completed',
+            actual_end_time__date=timezone.now().date()
+        ).count(),
+        'in_progress': my_orders.filter(status='in_progress').count(),
+        'total_revenue_today': ServiceOrder.objects.filter(
+            assigned_attendant=request.employee,
+            status='completed',
+            actual_end_time__date=timezone.now().date()
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+    }
+    
+    context = {
+        'my_orders': my_orders,
+        'today_queue': today_queue,
+        'my_service_items': my_service_items,
+        'stats': stats,
+        'title': 'My Dashboard'
+    }
+    return render(request, 'services/attendant_dashboard.html', context)
+
+@login_required
+@employee_required()
+def my_services_view(request):
+    """View attendant's assigned services"""
+    my_orders = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee
+    ).select_related('customer', 'vehicle').order_by('-created_at')
+    
+    # Filters
+    status = request.GET.get('status')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    if status:
+        my_orders = my_orders.filter(status=status)
+    if date_from:
+        my_orders = my_orders.filter(created_at__date__gte=date_from)
+    if date_to:
+        my_orders = my_orders.filter(created_at__date__lte=date_to)
+    
+    # Pagination
+    paginator = Paginator(my_orders, 20)
+    page = request.GET.get('page')
+    orders_page = paginator.get_page(page)
+    
+    context = {
+        'orders': orders_page,
+        'status_choices': ServiceOrder.STATUS_CHOICES,
+        'current_filters': {
+            'status': status,
+            'date_from': date_from,
+            'date_to': date_to
+        },
+        'title': 'My Services'
+    }
+    return render(request, 'services/my_services.html', context)
+
+@login_required
+@employee_required()
+@ajax_required
+def quick_customer_register(request):
+    """Quick customer registration via AJAX"""
+    if request.method == 'POST':
+        try:
+            from apps.customers.models import Customer, Vehicle
+            
+            # Customer data
+            first_name = request.POST.get('first_name')
+            last_name = request.POST.get('last_name')
+            phone = request.POST.get('phone')
+            
+            # Vehicle data
+            registration = request.POST.get('registration')
+            make = request.POST.get('make')
+            model = request.POST.get('model')
+            color = request.POST.get('color')
+            vehicle_type = request.POST.get('vehicle_type', 'sedan')
+            
+            with transaction.atomic():
+                # Create customer
+                customer = Customer.objects.create(
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone=phone,
+                    customer_id=generate_unique_code('CUST', 6),
+                    created_by=request.user
+                )
+                
+                # Create vehicle
+                vehicle = Vehicle.objects.create(
+                    customer=customer,
+                    registration_number=registration.upper(),
+                    make=make,
+                    model=model,
+                    color=color,
+                    vehicle_type=vehicle_type,
+                    year=timezone.now().year,
+                    created_by=request.user
+                )
+                
+                return JsonResponse({
+                    'success': True,
+                    'customer': {
+                        'id': str(customer.id),
+                        'name': customer.full_name,
+                        'phone': str(customer.phone)
+                    },
+                    'vehicle': {
+                        'id': str(vehicle.id),
+                        'registration': vehicle.registration_number,
+                        'full_name': vehicle.full_name
+                    }
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+@login_required
+@employee_required()
+@ajax_required
+def customer_search_ajax(request):
+    """Search customers via AJAX"""
+    query = request.GET.get('q', '')
+    
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+    
+    from apps.customers.models import Customer
+    
+    customers = Customer.objects.filter(
+        Q(first_name__icontains=query) |
+        Q(last_name__icontains=query) |
+        Q(phone__icontains=query) |
+        Q(customer_id__icontains=query),
+        is_active=True
+    )[:10]
+    
+    results = [
+        {
+            'id': str(customer.id),
+            'text': f"{customer.full_name} - {customer.phone}",
+            'name': customer.full_name,
+            'phone': str(customer.phone),
+            'customer_id': customer.customer_id
+        }
+        for customer in customers
+    ]
+    
+    return JsonResponse({'results': results})
+
+@login_required
+@employee_required()
+@ajax_required
+def vehicle_search_ajax(request):
+    """Search vehicles via AJAX"""
+    query = request.GET.get('q', '')
+    customer_id = request.GET.get('customer_id')
+    
+    from apps.customers.models import Vehicle
+    
+    vehicles = Vehicle.objects.filter(is_active=True)
+    
+    if customer_id:
+        vehicles = vehicles.filter(customer_id=customer_id)
+    
+    if query:
+        vehicles = vehicles.filter(
+            Q(registration_number__icontains=query) |
+            Q(make__icontains=query) |
+            Q(model__icontains=query)
+        )
+    
+    vehicles = vehicles.select_related('customer')[:10]
+    
+    results = [
+        {
+            'id': str(vehicle.id),
+            'text': f"{vehicle.registration_number} - {vehicle.full_name}",
+            'registration': vehicle.registration_number,
+            'make': vehicle.make,
+            'model': vehicle.model,
+            'color': vehicle.color,
+            'customer_name': vehicle.customer.full_name
+        }
+        for vehicle in vehicles
+    ]
+    
+    return JsonResponse({'results': results})
+
+@login_required
+@employee_required()
+@ajax_required
+def start_next_service(request):
+    """Start next service in queue"""
+    if request.method == 'POST':
+        # Get next waiting order for this attendant or any unassigned order
+        next_order = ServiceOrder.objects.filter(
+            Q(assigned_attendant=request.employee) | Q(assigned_attendant__isnull=True),
+            status='confirmed'
+        ).order_by('priority', 'created_at').first()
+        
+        if next_order:
+            next_order.status = 'in_progress'
+            next_order.actual_start_time = timezone.now()
+            next_order.assigned_attendant = request.employee
+            next_order.save()
+            
+            # Update queue entry
+            if hasattr(next_order, 'queue_entry'):
+                queue_entry = next_order.queue_entry
+                queue_entry.status = 'in_service'
+                queue_entry.actual_start_time = timezone.now()
+                queue_entry.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Started service for order {next_order.order_number}',
+                'redirect_url': reverse('services:order_detail', kwargs={'pk': next_order.pk})
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'No orders in queue'
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+@login_required
+@employee_required()
+@ajax_required
+def get_current_service(request):
+    """Get current service for attendant"""
+    current_service = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee,
+        status='in_progress'
+    ).first()
+    
+    if current_service:
+        return JsonResponse({
+            'current_service': {
+                'id': str(current_service.id),
+                'order_number': current_service.order_number,
+                'customer_name': current_service.customer.full_name
+            }
+        })
+    else:
+        return JsonResponse({'current_service': None})
+
+@login_required
+@employee_required()
+@ajax_required
+def calculate_order_price(request):
+    """Calculate order price via AJAX"""
+    service_ids = request.POST.getlist('service_ids[]')
+    quantities = request.POST.getlist('quantities[]')
+    
+    total_price = 0
+    estimated_duration = 0
+    
+    for i, service_id in enumerate(service_ids):
+        try:
+            service = Service.objects.get(id=service_id)
+            quantity = int(quantities[i]) if i < len(quantities) else 1
+            
+            total_price += service.base_price * quantity
+            estimated_duration += service.estimated_duration * quantity
+        except (Service.DoesNotExist, ValueError):
+            continue
+    
+    # Calculate tax (16% VAT for Kenya)
+    tax_amount = total_price * Decimal('0.16')
+    total_with_tax = total_price + tax_amount
+    
+    return JsonResponse({
+        'subtotal': float(total_price),
+        'tax_amount': float(tax_amount),
+        'total_amount': float(total_with_tax),
+        'estimated_duration': estimated_duration
+    })
+
+@login_required
+@employee_required(['owner', 'manager'])
+def service_reports_view(request):
+    """Service reports and analytics"""
+    # Date range filters
+    date_from = request.GET.get('date_from', (timezone.now() - timedelta(days=30)).date())
+    date_to = request.GET.get('date_to', timezone.now().date())
+    
+    # Service performance
+    service_performance = Service.objects.filter(
+        is_active=True
+    ).annotate(
+        total_orders=Count('order_items'),
+        total_revenue=Sum('order_items__total_price'),
+        avg_rating=Avg('order_items__rating')
+    ).order_by('-total_revenue')
+    
+    # Daily revenue
+    daily_revenue = ServiceOrder.objects.filter(
+        status='completed',
+        actual_end_time__date__range=[date_from, date_to]
+    ).extra(
+        select={'day': 'DATE(actual_end_time)'}
+    ).values('day').annotate(
+        revenue=Sum('total_amount'),
+        orders=Count('id')
+    ).order_by('day')
+    
+    # Top customers
+    top_customers = ServiceOrder.objects.filter(
+        status='completed',
+        created_at__date__range=[date_from, date_to]
+    ).values(
+        'customer__first_name',
+        'customer__last_name'
+    ).annotate(
+        total_spent=Sum('total_amount'),
+        order_count=Count('id')
+    ).order_by('-total_spent')[:10]
+    
+    context = {
+        'service_performance': service_performance,
+        'daily_revenue': daily_revenue,
+        'top_customers': top_customers,
+        'date_from': date_from,
+        'date_to': date_to,
+        'title': 'Service Reports'
+    }
+    return render(request, 'services/reports.html', context)
+
+
+# Service Management Views
+@login_required
+@employee_required(['owner', 'manager'])
+def service_edit_view(request, pk):
+    """Edit service"""
+    service = get_object_or_404(Service, pk=pk)
+    
+    if request.method == 'POST':
+        form = ServiceForm(request.POST, request.FILES, instance=service)
+        if form.is_valid():
+            service = form.save()
+            messages.success(request, f'Service "{service.name}" updated successfully!')
+            return redirect('services:detail', pk=service.pk)
+    else:
+        form = ServiceForm(instance=service)
+    
+    context = {
+        'form': form,
+        'service': service,
+        'title': f'Edit Service - {service.name}'
+    }
+    return render(request, 'services/service_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def service_delete_view(request, pk):
+    """Delete service (soft delete)"""
+    service = get_object_or_404(Service, pk=pk)
+    
+    if request.method == 'POST':
+        service.delete()  # Soft delete
+        messages.success(request, f'Service "{service.name}" deleted successfully!')
+        return redirect('services:list')
+    
+    context = {
+        'service': service,
+        'title': f'Delete Service - {service.name}'
+    }
+    return render(request, 'services/service_confirm_delete.html', context)
+
+# Category Management Views
+@login_required
+@employee_required(['owner', 'manager'])
+def category_list_view(request):
+    """List service categories"""
+    categories = ServiceCategory.objects.filter(is_active=True).annotate(
+        service_count=Count('services', filter=Q(services__is_active=True))
+    ).order_by('display_order', 'name')
+    
+    context = {
+        'categories': categories,
+        'title': 'Service Categories'
+    }
+    return render(request, 'services/category_list.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_create_view(request):
+    """Create service category"""
+    if request.method == 'POST':
+        form = ServiceCategoryForm(request.POST)
+        if form.is_valid():
+            category = form.save()
+            messages.success(request, f'Category "{category.name}" created successfully!')
+            return redirect('services:category_list')
+    else:
+        form = ServiceCategoryForm()
+    
+    context = {
+        'form': form,
+        'title': 'Create Service Category'
+    }
+    return render(request, 'services/category_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_edit_view(request, pk):
+    """Edit service category"""
+    category = get_object_or_404(ServiceCategory, pk=pk)
+    
+    if request.method == 'POST':
+        form = ServiceCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            category = form.save()
+            messages.success(request, f'Category "{category.name}" updated successfully!')
+            return redirect('services:category_list')
+    else:
+        form = ServiceCategoryForm(instance=category)
+    
+    context = {
+        'form': form,
+        'category': category,
+        'title': f'Edit Category - {category.name}'
+    }
+    return render(request, 'services/category_form.html', context)
+
+# Order Management Views
+@login_required
+@employee_required()
+def order_edit_view(request, pk):
+    """Edit service order"""
+    order = get_object_or_404(ServiceOrder, pk=pk)
+    
+    # Only allow editing pending/confirmed orders
+    if order.status not in ['pending', 'confirmed']:
+        messages.error(request, 'This order cannot be edited.')
+        return redirect('services:order_detail', pk=order.pk)
+    
+    if request.method == 'POST':
+        form = ServiceOrderForm(request.POST, instance=order)
+        if form.is_valid():
+            order = form.save()
+            
+            # Recalculate totals if services changed
+            order.calculate_totals()
+            order.save()
+            
+            messages.success(request, f'Order {order.order_number} updated successfully!')
+            return redirect('services:order_detail', pk=order.pk)
+    else:
+        form = ServiceOrderForm(instance=order)
+    
+    context = {
+        'form': form,
+        'order': order,
+        'title': f'Edit Order - {order.order_number}'
+    }
+    return render(request, 'services/order_form.html', context)
+
+@login_required
+@employee_required()
+def order_print_view(request, pk):
+    """Print order details"""
+    order = get_object_or_404(ServiceOrder, pk=pk)
+    order_items = order.order_items.all().select_related('service')
+    
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'title': f'Print Order - {order.order_number}'
+    }
+    return render(request, 'services/order_print.html', context)
+
+# Service Action Views
+@login_required
+@employee_required()
+@require_POST
+def cancel_service(request, order_id):
+    """Cancel service order"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if not order.can_be_cancelled:
+        messages.error(request, 'This order cannot be cancelled.')
+        return redirect('services:order_detail', pk=order.pk)
+    
+    cancellation_reason = request.POST.get('reason', '')
+    
+    order.status = 'cancelled'
+    order.internal_notes += f"\nCancelled by {request.employee.full_name}: {cancellation_reason}"
+    order.save()
+    
+    # Free service bay if assigned
+    if hasattr(order, 'current_bay') and order.current_bay.exists():
+        bay = order.current_bay.first()
+        bay.complete_service()
+    
+    # Update queue entry
+    if hasattr(order, 'queue_entry'):
+        queue_entry = order.queue_entry
+        queue_entry.status = 'cancelled'
+        queue_entry.save()
+    
+    messages.success(request, f'Order {order.order_number} cancelled successfully.')
+    return redirect('services:order_detail', pk=order.pk)
+
+@login_required
+@employee_required()
+@require_POST
+def pause_service(request, order_id):
+    """Pause service"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if order.status != 'in_progress':
+        messages.error(request, 'Service is not in progress.')
+        return redirect('services:order_detail', pk=order.pk)
+    
+    order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
+    order.save()
+    
+    messages.success(request, 'Service paused.')
+    return redirect('services:order_detail', pk=order.pk)
+
+@login_required
+@employee_required()
+@require_POST
+def resume_service(request, order_id):
+    """Resume paused service"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if order.status != 'in_progress':
+        messages.error(request, 'Service is not paused.')
+        return redirect('services:order_detail', pk=order.pk)
+    
+    order.internal_notes += f"\nResumed by {request.employee.full_name} at {timezone.now()}"
+    order.save()
+    
+    messages.success(request, 'Service resumed.')
+    return redirect('services:order_detail', pk=order.pk)
+
+# Payment Views
+@login_required
+@employee_required()
+def process_payment(request, order_id):
+    """Process payment for order"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if request.method == 'POST':
+        payment_method = request.POST.get('payment_method')
+        amount_received = Decimal(request.POST.get('amount_received', '0'))
+        
+        if amount_received >= order.total_amount:
+            order.payment_status = 'paid'
+            order.payment_method = payment_method
+            order.save()
+            
+            messages.success(request, 'Payment processed successfully!')
+            return redirect('services:payment_receipt', order_id=order.id)
+        else:
+            order.payment_status = 'partial'
+            order.save()
+            messages.warning(request, f'Partial payment received. Balance: KES {order.total_amount - amount_received}')
+    
+    context = {
+        'order': order,
+        'title': f'Process Payment - {order.order_number}'
+    }
+    return render(request, 'services/process_payment.html', context)
+
+@login_required
+@employee_required()
+def payment_receipt(request, order_id):
+    """Generate payment receipt"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    context = {
+        'order': order,
+        'title': f'Receipt - {order.order_number}',
+        'print_mode': request.GET.get('print') == 'true'
+    }
+    return render(request, 'services/payment_receipt.html', context)
+
+# Queue Management Views
+@login_required
+@employee_required()
+@require_POST
+def update_queue(request):
+    """Update queue order"""
+    queue_entries = request.POST.getlist('queue_order[]')
+    
+    for index, queue_id in enumerate(queue_entries):
+        try:
+            queue_entry = ServiceQueue.objects.get(id=queue_id)
+            queue_entry.queue_number = index + 1
+            queue_entry.save()
+        except ServiceQueue.DoesNotExist:
+            continue
+    
+    messages.success(request, 'Queue order updated successfully!')
+    return redirect('services:queue')
+
+@login_required
+@employee_required()
+@require_POST
+def update_queue_priority(request, queue_id):
+    """Update queue entry priority"""
+    queue_entry = get_object_or_404(ServiceQueue, id=queue_id)
+    priority = request.POST.get('priority')
+    
+    if priority in ['low', 'normal', 'high', 'urgent']:
+        queue_entry.order.priority = priority
+        queue_entry.order.save()
+        messages.success(request, 'Priority updated successfully!')
+    else:
+        messages.error(request, 'Invalid priority level.')
+    
+    return redirect('services:queue')
+
+# Service Package Views
+@login_required
+@employee_required(['owner', 'manager'])
+def package_list_view(request):
+    """List service packages"""
+    packages = ServicePackage.objects.filter(is_active=True).annotate(
+        service_count=Count('services')
+    ).order_by('name')
+    
+    context = {
+        'packages': packages,
+        'title': 'Service Packages'
+    }
+    return render(request, 'services/package_list.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def package_create_view(request):
+    """Create service package"""
+    if request.method == 'POST':
+        form = ServicePackageForm(request.POST, request.FILES)
+        if form.is_valid():
+            package = form.save()
+            messages.success(request, f'Package "{package.name}" created successfully!')
+            return redirect('services:package_detail', pk=package.pk)
+    else:
+        form = ServicePackageForm()
+    
+    context = {
+        'form': form,
+        'title': 'Create Service Package'
+    }
+    return render(request, 'services/package_form.html', context)
+
+@login_required
+@employee_required()
+def package_detail_view(request, pk):
+    """Service package detail"""
+    package = get_object_or_404(ServicePackage, pk=pk)
+    package_services = package.packageservice_set.all().select_related('service')
+    
+    context = {
+        'package': package,
+        'package_services': package_services,
+        'title': f'Package - {package.name}'
+    }
+    return render(request, 'services/package_detail.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def package_edit_view(request, pk):
+    """Edit service package"""
+    package = get_object_or_404(ServicePackage, pk=pk)
+    
+    if request.method == 'POST':
+        form = ServicePackageForm(request.POST, request.FILES, instance=package)
+        if form.is_valid():
+            package = form.save()
+            messages.success(request, f'Package "{package.name}" updated successfully!')
+            return redirect('services:package_detail', pk=package.pk)
+    else:
+        form = ServicePackageForm(instance=package)
+    
+    context = {
+        'form': form,
+        'package': package,
+        'title': f'Edit Package - {package.name}'
+    }
+    return render(request, 'services/package_form.html', context)
+
+# Service Bay Views
+@login_required
+@employee_required(['owner', 'manager'])
+def bay_list_view(request):
+    """List service bays"""
+    bays = ServiceBay.objects.all().order_by('bay_number')
+    
+    context = {
+        'bays': bays,
+        'title': 'Service Bays'
+    }
+    return render(request, 'services/bay_list.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def bay_create_view(request):
+    """Create service bay"""
+    if request.method == 'POST':
+        # Simple form handling - you might want to create a proper form class
+        name = request.POST.get('name')
+        bay_number = request.POST.get('bay_number')
+        description = request.POST.get('description', '')
+        max_vehicle_size = request.POST.get('max_vehicle_size', 'any')
+        
+        try:
+            bay = ServiceBay.objects.create(
+                name=name,
+                bay_number=int(bay_number),
+                description=description,
+                max_vehicle_size=max_vehicle_size,
+                has_pressure_washer=request.POST.get('has_pressure_washer') == 'on',
+                has_vacuum=request.POST.get('has_vacuum') == 'on',
+                has_lift=request.POST.get('has_lift') == 'on',
+                has_drainage=request.POST.get('has_drainage') == 'on'
+            )
+            messages.success(request, f'Service bay "{bay.name}" created successfully!')
+            return redirect('services:bay_list')
+        except Exception as e:
+            messages.error(request, f'Error creating service bay: {str(e)}')
+    
+    context = {
+        'title': 'Create Service Bay'
+    }
+    return render(request, 'services/bay_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def bay_edit_view(request, pk):
+    """Edit service bay"""
+    bay = get_object_or_404(ServiceBay, pk=pk)
+    
+    if request.method == 'POST':
+        bay.name = request.POST.get('name', bay.name)
+        bay.description = request.POST.get('description', bay.description)
+        bay.max_vehicle_size = request.POST.get('max_vehicle_size', bay.max_vehicle_size)
+        bay.has_pressure_washer = request.POST.get('has_pressure_washer') == 'on'
+        bay.has_vacuum = request.POST.get('has_vacuum') == 'on'
+        bay.has_lift = request.POST.get('has_lift') == 'on'
+        bay.has_drainage = request.POST.get('has_drainage') == 'on'
+        bay.is_active = request.POST.get('is_active') == 'on'
+        bay.save()
+        
+        messages.success(request, f'Service bay "{bay.name}" updated successfully!')
+        return redirect('services:bay_list')
+    
+    context = {
+        'bay': bay,
+        'title': f'Edit Service Bay - {bay.name}'
+    }
+    return render(request, 'services/bay_form.html', context)
+
+@login_required
+@employee_required()
+@require_POST
+def assign_bay(request, pk):
+    """Assign service bay to order"""
+    bay = get_object_or_404(ServiceBay, pk=pk)
+    order_id = request.POST.get('order_id')
+    
+    if not bay.is_available:
+        messages.error(request, 'Service bay is not available.')
+        return redirect('services:queue')
+    
+    try:
+        order = ServiceOrder.objects.get(id=order_id)
+        bay.assign_order(order)
+        messages.success(request, f'Order {order.order_number} assigned to {bay.name}')
+    except ServiceOrder.DoesNotExist:
+        messages.error(request, 'Order not found.')
+    
+    return redirect('services:queue')
+
+# Rating and Feedback Views
+@login_required
+@employee_required()
+def rate_service(request, order_id):
+    """Rate completed service"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    if order.status != 'completed':
+        messages.error(request, 'Order must be completed to rate.')
+        return redirect('services:order_detail', pk=order.pk)
+    
+    if request.method == 'POST':
+        form = ServiceRatingForm(request.POST)
+        if form.is_valid():
+            order.customer_rating = form.cleaned_data['overall_rating']
+            order.customer_feedback = form.cleaned_data.get('comments', '')
+            order.save()
+            
+            messages.success(request, 'Thank you for your feedback!')
+            return redirect('services:order_detail', pk=order.pk)
+    else:
+        form = ServiceRatingForm()
+    
+    context = {
+        'form': form,
+        'order': order,
+        'title': f'Rate Service - {order.order_number}'
+    }
+    return render(request, 'services/rate_service.html', context)
+
+@login_required
+@employee_required()
+def service_feedback(request, order_id):
+    """View service feedback"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    context = {
+        'order': order,
+        'title': f'Feedback - {order.order_number}'
+    }
+    return render(request, 'services/service_feedback.html', context)
+
+# Reports and Analytics Views
+@login_required
+@employee_required(['owner', 'manager'])
+def service_reports_view(request):
+    """Service reports and analytics"""
+    date_from = request.GET.get('date_from', (timezone.now() - timedelta(days=30)).date())
+    date_to = request.GET.get('date_to', timezone.now().date())
+    
+    # Service performance
+    service_performance = Service.objects.filter(
+        is_active=True
+    ).annotate(
+        total_orders=Count('order_items'),
+        total_revenue=Sum('order_items__total_price'),
+        avg_rating=Avg('order_items__rating')
+    ).order_by('-total_revenue')
+    
+    # Daily revenue
+    daily_revenue = ServiceOrder.objects.filter(
+        status='completed',
+        actual_end_time__date__range=[date_from, date_to]
+    ).extra(
+        select={'day': 'DATE(actual_end_time)'}
+    ).values('day').annotate(
+        revenue=Sum('total_amount'),
+        orders=Count('id')
+    ).order_by('day')
+    
+    context = {
+        'service_performance': service_performance,
+        'daily_revenue': daily_revenue,
+        'date_from': date_from,
+        'date_to': date_to,
+        'title': 'Service Reports'
+    }
+    return render(request, 'services/reports.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def daily_service_report(request):
+    """Daily service report"""
+    date = request.GET.get('date', timezone.now().date())
+    
+    orders = ServiceOrder.objects.filter(
+        created_at__date=date
+    ).select_related('customer', 'vehicle', 'assigned_attendant')
+    
+    stats = {
+        'total_orders': orders.count(),
+        'completed_orders': orders.filter(status='completed').count(),
+        'total_revenue': orders.filter(status='completed').aggregate(
+            total=Sum('total_amount')
+        )['total'] or 0,
+        'avg_service_time': orders.filter(
+            status='completed',
+            actual_start_time__isnull=False,
+            actual_end_time__isnull=False
+        ).aggregate(
+            avg=Avg(F('actual_end_time') - F('actual_start_time'))
+        )['avg']
+    }
+    
+    context = {
+        'orders': orders,
+        'stats': stats,
+        'date': date,
+        'title': f'Daily Report - {date}'
+    }
+    return render(request, 'services/daily_report.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def service_performance_report(request):
+    """Service performance report"""
+    date_from = request.GET.get('date_from', (timezone.now() - timedelta(days=30)).date())
+    date_to = request.GET.get('date_to', timezone.now().date())
+    
+    # Employee performance
+    employee_performance = ServiceOrder.objects.filter(
+        status='completed',
+        actual_end_time__date__range=[date_from, date_to]
+    ).values(
+        'assigned_attendant__employee_id',
+        'assigned_attendant__first_name',
+        'assigned_attendant__last_name'
+    ).annotate(
+        orders_completed=Count('id'),
+        total_revenue=Sum('total_amount'),
+        avg_rating=Avg('customer_rating'),
+        avg_service_time=Avg(F('actual_end_time') - F('actual_start_time'))
+    ).order_by('-orders_completed')
+    
+    context = {
+        'employee_performance': employee_performance,
+        'date_from': date_from,
+        'date_to': date_to,
+        'title': 'Performance Report'
+    }
+    return render(request, 'services/performance_report.html', context)
+
+# Attendant Dashboard Views
+@login_required
+@employee_required()
+def attendant_dashboard(request):
+    """Attendant dashboard with current assignments"""
+    my_orders = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee,
+        status__in=['confirmed', 'in_progress']
+    ).select_related('customer', 'vehicle').order_by('-created_at')
+    
+    today_queue = ServiceQueue.objects.filter(
+        created_at__date=timezone.now().date(),
+        status__in=['waiting', 'in_service']
+    ).select_related('order', 'order__customer').order_by('queue_number')
+    
+    my_service_items = ServiceOrderItem.objects.filter(
+        assigned_to=request.employee,
+        completed_at__isnull=True
+    ).select_related('order', 'service')
+    
+    # Statistics
+    stats = {
+        'orders_today': ServiceOrder.objects.filter(
+            assigned_attendant=request.employee,
+            created_at__date=timezone.now().date()
+        ).count(),
+        'completed_today': ServiceOrder.objects.filter(
+            assigned_attendant=request.employee,
+            status='completed',
+            actual_end_time__date=timezone.now().date()
+        ).count(),
+        'in_progress': my_orders.filter(status='in_progress').count(),
+        'total_revenue_today': ServiceOrder.objects.filter(
+            assigned_attendant=request.employee,
+            status='completed',
+            actual_end_time__date=timezone.now().date()
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+    }
+    
+    context = {
+        'my_orders': my_orders,
+        'today_queue': today_queue,
+        'my_service_items': my_service_items,
+        'stats': stats,
+        'title': 'My Dashboard'
+    }
+    return render(request, 'services/attendant_dashboard.html', context)
+
+@login_required
+@employee_required()
+def my_services_view(request):
+    """View attendant's assigned services"""
+    my_orders = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee
+    ).select_related('customer', 'vehicle').order_by('-created_at')
+    
+    # Filters
+    status = request.GET.get('status')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    if status:
+        my_orders = my_orders.filter(status=status)
+    if date_from:
+        my_orders = my_orders.filter(created_at__date__gte=date_from)
+    if date_to:
+        my_orders = my_orders.filter(created_at__date__lte=date_to)
+    
+    # Pagination
+    paginator = Paginator(my_orders, 20)
+    page = request.GET.get('page')
+    orders_page = paginator.get_page(page)
+    
+    context = {
+        'orders': orders_page,
+        'status_choices': ServiceOrder.STATUS_CHOICES,
+        'current_filters': {
+            'status': status,
+            'date_from': date_from,
+            'date_to': date_to
+        },
+        'title': 'My Services'
+    }
+    return render(request, 'services/my_services.html', context)
+
+# Quick Action Views
+@login_required
+@employee_required()
+def quick_customer_register(request):
+    """Quick customer registration"""
+    if request.method == 'POST':
+        try:
+            from apps.customers.models import Customer, Vehicle
+            
+            # Customer data
+            first_name = request.POST.get('first_name')
+            last_name = request.POST.get('last_name')
+            phone = request.POST.get('phone')
+            
+            # Vehicle data
+            registration = request.POST.get('registration')
+            make = request.POST.get('make')
+            model = request.POST.get('model')
+            color = request.POST.get('color')
+            vehicle_type = request.POST.get('vehicle_type', 'sedan')
+            
+            with transaction.atomic():
+                # Create customer
+                customer = Customer.objects.create(
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone=phone,
+                    customer_id=generate_unique_code('CUST', 6),
+                    created_by=request.user
+                )
+                
+                # Create vehicle
+                vehicle = Vehicle.objects.create(
+                    customer=customer,
+                    registration_number=registration.upper(),
+                    make=make,
+                    model=model,
+                    color=color,
+                    vehicle_type=vehicle_type,
+                    year=timezone.now().year,
+                    created_by=request.user
+                )
+                
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'customer': {
+                            'id': str(customer.id),
+                            'name': customer.full_name,
+                            'phone': str(customer.phone)
+                        },
+                        'vehicle': {
+                            'id': str(vehicle.id),
+                            'registration': vehicle.registration_number,
+                            'full_name': vehicle.full_name
+                        }
+                    })
+                else:
+                    messages.success(request, 'Customer registered successfully!')
+                    return redirect('services:quick_order')
+                    
+        except Exception as e:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+            else:
+                messages.error(request, f'Error registering customer: {str(e)}')
+    
+    context = {
+        'title': 'Quick Customer Registration'
+    }
+    return render(request, 'services/quick_customer_register.html', context)
+
+@login_required
+@employee_required()
+def quick_service_assign(request):
+    """Quick service assignment"""
+    if request.method == 'POST':
+        try:
+            customer_id = request.POST.get('customer_id')
+            vehicle_id = request.POST.get('vehicle_id')
+            service_ids = request.POST.getlist('service_ids[]')
+            
+            from apps.customers.models import Customer, Vehicle
+            
+            customer = Customer.objects.get(id=customer_id)
+            vehicle = Vehicle.objects.get(id=vehicle_id)
+            
+            with transaction.atomic():
+                # Create order
+                order = ServiceOrder.objects.create(
+                    customer=customer,
+                    vehicle=vehicle,
+                    assigned_attendant=request.employee,
+                    status='confirmed',
+                    priority='normal',
+                    created_by=request.user
+                )
+                
+                # Add services
+                total_amount = 0
+                for service_id in service_ids:
+                    service = Service.objects.get(id=service_id)
+                    ServiceOrderItem.objects.create(
+                        order=order,
+                        service=service,
+                        quantity=1,
+                        unit_price=service.base_price,
+                        assigned_to=request.employee
+                    )
+                    total_amount += service.base_price
+                
+                # Calculate totals
+                order.subtotal = total_amount
+                order.calculate_totals()
+                order.save()
+                
+                # Add to queue
+                add_order_to_queue(order)
+                
+                messages.success(request, f'Service assigned successfully! Order: {order.order_number}')
+                return redirect('services:order_detail', pk=order.pk)
+                
+        except Exception as e:
+            messages.error(request, f'Error assigning service: {str(e)}')
+    
+    # Get recent customers and popular services for quick selection
+    from apps.customers.models import Customer
+    recent_customers = Customer.objects.filter(is_active=True).order_by('-created_at')[:10]
+    popular_services = Service.objects.filter(is_active=True, is_popular=True).order_by('display_order')
+    
+    context = {
+        'recent_customers': recent_customers,
+        'popular_services': popular_services,
+        'title': 'Quick Service Assignment'
+    }
+    return render(request, 'services/quick_service_assign.html', context)
+
+# Export and Import Views
+@login_required
+@employee_required(['owner', 'manager'])
+def service_export_view(request):
+    """Export services to CSV"""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="services_export.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'Name', 'Category', 'Description', 'Base Price', 'Estimated Duration',
+        'Required Skill Level', 'Compatible Vehicles', 'Is Popular', 'Is Premium', 'Is Active'
+    ])
+    
+    services = Service.objects.select_related('category').order_by('category', 'name')
+    
+    for service in services:
+        writer.writerow([
+            service.name,
+            service.category.name if service.category else '',
+            service.description,
+            service.base_price,
+            service.estimated_duration,
+            service.required_skill_level,
+            service.compatible_vehicle_types,
+            service.is_popular,
+            service.is_premium,
+            service.is_active
+        ])
+    
+    return response
+
+@login_required
+@employee_required(['owner', 'manager'])
+def service_import_view(request):
+    """Import services from CSV"""
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        csv_file = request.FILES['csv_file']
+        
+        try:
+            # Read CSV file
+            decoded_file = csv_file.read().decode('utf-8')
+            csv_data = csv.DictReader(decoded_file.splitlines())
+            
+            imported_count = 0
+            errors = []
+            
+            for row_num, row in enumerate(csv_data, start=2):
+                try:
+                    # Get or create category
+                    category_name = row.get('Category', '').strip()
+                    category = None
+                    if category_name:
+                        category, created = ServiceCategory.objects.get_or_create(
+                            name=category_name,
+                            defaults={'created_by': request.user}
+                        )
+                    
+                    # Create service
+                    service, created = Service.objects.get_or_create(
+                        name=row['Name'].strip(),
+                        defaults={
+                            'category': category,
+                            'description': row.get('Description', '').strip(),
+                            'base_price': Decimal(row.get('Base Price', '0')),
+                            'estimated_duration': int(row.get('Estimated Duration', '30')),
+                            'required_skill_level': row.get('Required Skill Level', 'basic').lower(),
+                            'compatible_vehicle_types': row.get('Compatible Vehicles', 'sedan,suv,hatchback'),
+                            'is_popular': row.get('Is Popular', '').lower() in ['true', '1', 'yes'],
+                            'is_premium': row.get('Is Premium', '').lower() in ['true', '1', 'yes'],
+                            'is_active': row.get('Is Active', 'true').lower() in ['true', '1', 'yes'],
+                            'created_by': request.user
+                        }
+                    )
+                    
+                    if created:
+                        imported_count += 1
+                    
+                except Exception as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+            
+            if imported_count > 0:
+                messages.success(request, f'Successfully imported {imported_count} services.')
+            
+            if errors:
+                error_message = "Errors encountered:\n" + "\n".join(errors[:5])
+                if len(errors) > 5:
+                    error_message += f"\n... and {len(errors) - 5} more errors."
+                messages.warning(request, error_message)
+                
+        except Exception as e:
+            messages.error(request, f'Error processing CSV file: {str(e)}')
+    
+    context = {
+        'title': 'Import Services'
+    }
+    return render(request, 'services/service_import.html', context)
+
+# AJAX Endpoints
+@login_required
+@employee_required()
+@ajax_required
+def customer_search_ajax(request):
+    """Search customers via AJAX"""
+    query = request.GET.get('q', '')
+    
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+    
+    from apps.customers.models import Customer
+    
+    customers = Customer.objects.filter(
+        Q(first_name__icontains=query) |
+        Q(last_name__icontains=query) |
+        Q(phone__icontains=query) |
+        Q(customer_id__icontains=query),
+        is_active=True
+    )[:10]
+    
+    results = [
+        {
+            'id': str(customer.id),
+            'text': f"{customer.full_name} - {customer.phone}",
+            'name': customer.full_name,
+            'phone': str(customer.phone),
+            'customer_id': customer.customer_id
+        }
+        for customer in customers
+    ]
+    
+    return JsonResponse({'results': results})
+
+@login_required
+@employee_required()
+@ajax_required
+def vehicle_search_ajax(request):
+    """Search vehicles via AJAX"""
+    query = request.GET.get('q', '')
+    customer_id = request.GET.get('customer_id')
+    
+    from apps.customers.models import Vehicle
+    
+    vehicles = Vehicle.objects.filter(is_active=True)
+    
+    if customer_id:
+        vehicles = vehicles.filter(customer_id=customer_id)
+    
+    if query:
+        vehicles = vehicles.filter(
+            Q(registration_number__icontains=query) |
+            Q(make__icontains=query) |
+            Q(model__icontains=query)
+        )
+    
+    vehicles = vehicles.select_related('customer')[:10]
+    
+    results = [
+        {
+            'id': str(vehicle.id),
+            'text': f"{vehicle.registration_number} - {vehicle.full_name}",
+            'registration': vehicle.registration_number,
+            'make': vehicle.make,
+            'model': vehicle.model,
+            'color': vehicle.color,
+            'customer_name': vehicle.customer.full_name
+        }
+        for vehicle in vehicles
+    ]
+    
+    return JsonResponse({'results': results})
+
+@login_required
+@employee_required()
+@ajax_required
+def start_next_service(request):
+    """Start next service in queue"""
+    if request.method == 'POST':
+        # Get next waiting order for this attendant or any unassigned order
+        next_order = ServiceOrder.objects.filter(
+            Q(assigned_attendant=request.employee) | Q(assigned_attendant__isnull=True),
+            status='confirmed'
+        ).order_by('priority', 'created_at').first()
+        
+        if next_order:
+            next_order.status = 'in_progress'
+            next_order.actual_start_time = timezone.now()
+            next_order.assigned_attendant = request.employee
+            next_order.save()
+            
+            # Update queue entry
+            if hasattr(next_order, 'queue_entry'):
+                queue_entry = next_order.queue_entry
+                queue_entry.status = 'in_service'
+                queue_entry.actual_start_time = timezone.now()
+                queue_entry.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Started service for order {next_order.order_number}',
+                'redirect_url': reverse('services:order_detail', kwargs={'pk': next_order.pk})
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'No orders in queue'
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+@login_required
+@employee_required()
+@ajax_required
+def get_current_service(request):
+    """Get current service for attendant"""
+    current_service = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee,
+        status='in_progress'
+    ).first()
+    
+    if current_service:
+        return JsonResponse({
+            'current_service': {
+                'id': str(current_service.id),
+                'order_number': current_service.order_number,
+                'customer_name': current_service.customer.full_name
+            }
+        })
+    else:
+        return JsonResponse({'current_service': None})
+
+@login_required
+@employee_required()
+@ajax_required
+def calculate_order_price(request):
+    """Calculate order price via AJAX"""
+    service_ids = request.POST.getlist('service_ids[]')
+    quantities = request.POST.getlist('quantities[]')
+    
+    total_price = 0
+    estimated_duration = 0
+    
+    for i, service_id in enumerate(service_ids):
+        try:
+            service = Service.objects.get(id=service_id)
+            quantity = int(quantities[i]) if i < len(quantities) else 1
+            
+            total_price += service.base_price * quantity
+            estimated_duration += service.estimated_duration * quantity
+        except (Service.DoesNotExist, ValueError):
+            continue
+    
+    # Calculate tax (16% VAT for Kenya)
+    tax_amount = total_price * Decimal('0.16')
+    total_with_tax = total_price + tax_amount
+    
+    return JsonResponse({
+        'subtotal': float(total_price),
+        'tax_amount': float(tax_amount),
+        'total_amount': float(total_with_tax),
+        'estimated_duration': estimated_duration
+    })
+
+@login_required
+@employee_required()
+@ajax_required
+def bay_status_ajax(request):
+    """Get service bay status"""
+    bays = ServiceBay.objects.all().order_by('bay_number')
+    
+    bay_data = []
+    for bay in bays:
+        bay_info = {
+            'id': str(bay.id),
+            'name': bay.name,
+            'bay_number': bay.bay_number,
+            'is_available': bay.is_available,
+            'is_occupied': bay.is_occupied,
+            'current_order': None
+        }
+        
+        if bay.current_order:
+            bay_info['current_order'] = {
+                'order_number': bay.current_order.order_number,
+                'customer_name': bay.current_order.customer.full_name,
+                'start_time': bay.current_order.actual_start_time.isoformat() if bay.current_order.actual_start_time else None
+            }
+        
+        bay_data.append(bay_info)
+    
+    return JsonResponse({
+        'bays': bay_data,
+        'timestamp': timezone.now().isoformat()
+    })
+
+# Helper Functions
+def add_order_to_queue(order):
+    """Add order to service queue"""
+    # Get next queue number
+    last_queue_number = ServiceQueue.objects.filter(
+        created_at__date=timezone.now().date()
+    ).aggregate(max_num=models.Max('queue_number'))['max_num'] or 0
+    
+    # Calculate estimated times
+    estimated_duration = order.estimated_duration
+    estimated_start_time = timezone.now()
+    
+    # Check for orders ahead in queue
+    waiting_orders = ServiceQueue.objects.filter(status='waiting').count()
+    if waiting_orders > 0:
+        # Add buffer time based on queue length
+        estimated_start_time += timedelta(minutes=waiting_orders * 30)  # 30 min average per order
+    
+    estimated_end_time = estimated_start_time + timedelta(minutes=estimated_duration)
+    
+    ServiceQueue.objects.create(
+        order=order,
+        queue_number=last_queue_number + 1,
+        estimated_start_time=estimated_start_time,
+        estimated_end_time=estimated_end_time
+    )

@@ -173,51 +173,6 @@ elif DEBUG and RENDER:
     # Render with debug - add but with restrictions
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 
-# Debug Toolbar Configuration
-if DEBUG:
-    INTERNAL_IPS = [
-        '127.0.0.1',
-        'localhost',
-    ]
-    
-    # Configure debug toolbar for Render environment when debugging
-    if RENDER:
-        import socket
-        try:
-            # Get container IP for Render
-            hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
-            INTERNAL_IPS += [ip[: ip.rfind(".")] + ".1" for ip in ips]
-            INTERNAL_IPS += ips
-            
-        except Exception as e:
-            print(f"⚠️ Could not determine Render IPs for debug toolbar: {e}")
-        
-        # RENDER-SPECIFIC: Disable debug toolbar on admin operations to prevent timeout
-        DEBUG_TOOLBAR_CONFIG = {
-            'SHOW_TOOLBAR_CALLBACK': lambda request: (
-                DEBUG and 
-                not request.path.startswith('/system-admin/') and 
-                not request.path.startswith('/admin/')
-            ),
-            'DISABLE_PANELS': [
-                'debug_toolbar.panels.sql.SQLPanel',  # Disable SQL panel for performance
-                'debug_toolbar.panels.staticfiles.StaticFilesPanel',  # Disable static files panel
-            ],
-            'SHOW_TEMPLATE_CONTEXT': False,  # Reduce memory usage
-            'ENABLE_STACKTRACES': False,  # Reduce processing time
-            'SHOW_COLLAPSED': True,
-            'JQUERY_URL': '//ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
-        }
-        print("🐛 Debug toolbar configured for Render (ADMIN DISABLED)")
-    else:
-        # Local development - full debug toolbar
-        DEBUG_TOOLBAR_CONFIG = {
-            'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
-            'SHOW_TEMPLATE_CONTEXT': True,
-            'ENABLE_STACKTRACES': True,
-        }
-        print("🐛 Debug toolbar configured for local development")
-# TEMPLATES section for settings.py - Updated context processors
 
 TEMPLATES = [
     {

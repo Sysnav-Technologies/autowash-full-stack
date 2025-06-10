@@ -1,27 +1,44 @@
-<!-- Services Module -->
+<!-- includes/sidebar/modules/services.html -->
 <li class="nav-item nav-dropdown" id="services-dropdown">
     <a class="nav-link nav-dropdown-toggle {% if 'services' in request.resolver_match.namespace %}active{% endif %}" 
        href="#" onclick="toggleDropdown('services-dropdown')">
         <i class="nav-icon fas fa-car-wash"></i>
         <span class="nav-text">Services</span>
-        <span class="nav-arrow">
-            <i class="fas fa-chevron-right"></i>
-        </span>
     </a>
     <ul class="nav-submenu">
-        <!-- Service Management -->
+        <!-- Attendant Specific Dashboard -->
+        {% if user_role == 'attendant' %}
+        <li class="nav-item">
+            <a class="nav-link nav-link-featured {% if request.resolver_match.url_name == 'attendant_dashboard' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/dashboard/">
+                <i class="nav-icon fas fa-user-cog"></i>
+                <span class="nav-text">My Dashboard</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'my_services' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/my-services/">
+                <i class="nav-icon fas fa-clipboard-user"></i>
+                <span class="nav-text">My Services</span>
+                {% if my_active_services_count > 0 %}
+                <span class="nav-badge nav-badge-primary">{{ my_active_services_count }}</span>
+                {% endif %}
+            </a>
+        </li>
+        {% endif %}
+
+        <!-- Service Management - Manager/Owner/Supervisor -->
+        {% if user_role in 'owner,manager,supervisor' %}
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'services' in request.resolver_match.namespace %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/services/">
                 <i class="nav-icon fas fa-list"></i>
                 <span class="nav-text">All Services</span>
-                <span class="nav-badge-info">
-                    <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="View and manage all your services"></i>
-                </span>
             </a>
         </li>
         
-        {% if user_role and user_role in 'owner,manager' %}
+        {% if user_role in 'owner,manager' %}
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'services' in request.resolver_match.namespace %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/services/create/">
@@ -29,9 +46,34 @@
                 <span class="nav-text">Add Service</span>
             </a>
         </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'category_list' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/categories/">
+                <i class="nav-icon fas fa-tags"></i>
+                <span class="nav-text">Categories</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'package_list' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/packages/">
+                <i class="nav-icon fas fa-box-open"></i>
+                <span class="nav-text">Service Packages</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'bay_list' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/bays/">
+                <i class="nav-icon fas fa-car"></i>
+                <span class="nav-text">Service Bays</span>
+            </a>
+        </li>
+        {% endif %}
         {% endif %}
         
-        <!-- Service Orders Section -->
+        <!-- Orders & Queue Section -->
         <li class="nav-divider">
             <span class="nav-divider-text">Orders & Queue</span>
         </li>
@@ -46,6 +88,16 @@
                 {% endif %}
             </a>
         </li>
+        
+        {% if user_role in 'owner,manager,supervisor' %}
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'create_order' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/orders/create/">
+                <i class="nav-icon fas fa-plus"></i>
+                <span class="nav-text">Create Order</span>
+            </a>
+        </li>
+        {% endif %}
         
         <li class="nav-item">
             <a class="nav-link nav-link-featured {% if request.resolver_match.url_name == 'quick_order' %}active{% endif %}" 
@@ -67,39 +119,6 @@
             </a>
         </li>
         
-        <!-- Advanced Features (Manager/Owner) -->
-        {% if user_role and user_role in 'owner,manager' %}
-        <li class="nav-divider">
-            <span class="nav-divider-text">Advanced</span>
-        </li>
-        
-        <!-- Service Packages (if implemented) -->
-        <li class="nav-item nav-item-coming-soon">
-            <a class="nav-link" href="#" onclick="showComingSoon('Service Packages')">
-                <i class="nav-icon fas fa-box-open"></i>
-                <span class="nav-text">Service Packages</span>
-                <span class="nav-badge nav-badge-secondary">SOON</span>
-            </a>
-        </li>
-        
-        <!-- Service Bays Management (if implemented) -->
-        <li class="nav-item nav-item-coming-soon">
-            <a class="nav-link" href="#" onclick="showComingSoon('Service Bays')">
-                <i class="nav-icon fas fa-car"></i>
-                <span class="nav-text">Service Bays</span>
-                <span class="nav-badge nav-badge-secondary">SOON</span>
-            </a>
-        </li>
-        
-        <!-- Service Analytics -->
-        <li class="nav-item">
-            <a class="nav-link" href="/business/{{ request.tenant.slug }}/reports/analytics/?module=services">
-                <i class="nav-icon fas fa-chart-line"></i>
-                <span class="nav-text">Service Analytics</span>
-            </a>
-        </li>
-        {% endif %}
-        
         <!-- Quick Actions for Attendants -->
         {% if user_role == 'attendant' %}
         <li class="nav-divider">
@@ -107,16 +126,71 @@
         </li>
         
         <li class="nav-item">
-            <a class="nav-link nav-link-action" href="#" onclick="startService()">
+            <a class="nav-link nav-link-action {% if request.resolver_match.url_name == 'quick_customer_register' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/quick/customer-register/">
+                <i class="nav-icon fas fa-user-plus"></i>
+                <span class="nav-text">Register Customer</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link nav-link-action {% if request.resolver_match.url_name == 'quick_service_assign' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/quick/service-assign/">
+                <i class="nav-icon fas fa-hand-point-right"></i>
+                <span class="nav-text">Assign Service</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link nav-link-action" href="#" onclick="startNextService()">
                 <i class="nav-icon fas fa-play-circle"></i>
                 <span class="nav-text">Start Next Service</span>
             </a>
         </li>
         
         <li class="nav-item">
-            <a class="nav-link nav-link-action" href="#" onclick="completeService()">
+            <a class="nav-link nav-link-action" href="#" onclick="completeCurrentService()">
                 <i class="nav-icon fas fa-check-circle"></i>
                 <span class="nav-text">Complete Service</span>
+            </a>
+        </li>
+        {% endif %}
+        
+        <!-- Reports & Analytics (Manager/Owner) -->
+        {% if user_role in 'owner,manager' %}
+        <li class="nav-divider">
+            <span class="nav-divider-text">Reports & Analytics</span>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/reports/">
+                <i class="nav-icon fas fa-chart-line"></i>
+                <span class="nav-text">Service Reports</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'daily_report' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/reports/daily/">
+                <i class="nav-icon fas fa-calendar-day"></i>
+                <span class="nav-text">Daily Report</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'performance_report' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/reports/performance/">
+                <i class="nav-icon fas fa-chart-bar"></i>
+                <span class="nav-text">Performance Report</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'export' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/export/">
+                <i class="nav-icon fas fa-download"></i>
+                <span class="nav-text">Export Data</span>
             </a>
         </li>
         {% endif %}

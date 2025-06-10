@@ -1,4 +1,4 @@
-<!-- Customers Module -->
+<!-- includes/sidebar/modules/customers.html -->
 <li class="nav-item nav-dropdown" id="customers-dropdown">
     <a class="nav-link nav-dropdown-toggle {% if 'customers' in request.resolver_match.namespace %}active{% endif %}" 
        href="#" onclick="toggleDropdown('customers-dropdown')">
@@ -13,6 +13,8 @@
                 <span class="nav-text">All Customers</span>
             </a>
         </li>
+        
+        {% if user_role in 'owner,manager,supervisor' %}
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'customers' in request.resolver_match.namespace %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/customers/create/">
@@ -20,6 +22,7 @@
                 <span class="nav-text">Add Customer</span>
             </a>
         </li>
+        
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'loyalty_dashboard' %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/customers/loyalty/">
@@ -27,6 +30,7 @@
                 <span class="nav-text">Loyalty Program</span>
             </a>
         </li>
+        
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'export' and 'customers' in request.resolver_match.namespace %}active{% endif %}" 
                href="/business/{{ request.tenant.slug }}/customers/export/">
@@ -34,5 +38,35 @@
                 <span class="nav-text">Export Data</span>
             </a>
         </li>
+        {% endif %}
+        
+        <!-- Quick Search for All Users -->
+        <li class="nav-divider">
+            <span class="nav-divider-text">Quick Actions</span>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link nav-link-action" href="#" onclick="openCustomerSearch()">
+                <i class="nav-icon fas fa-search"></i>
+                <span class="nav-text">Find Customer</span>
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link nav-link-action" href="#" onclick="openVehicleSearch()">
+                <i class="nav-icon fas fa-car"></i>
+                <span class="nav-text">Find Vehicle</span>
+            </a>
+        </li>
+        
+        {% if user_role == 'attendant' %}
+        <li class="nav-item">
+            <a class="nav-link nav-link-action {% if request.resolver_match.url_name == 'quick_customer_register' %}active{% endif %}" 
+               href="/business/{{ request.tenant.slug }}/services/quick/customer-register/">
+                <i class="nav-icon fas fa-user-plus"></i>
+                <span class="nav-text">Quick Register</span>
+            </a>
+        </li>
+        {% endif %}
     </ul>
 </li>
