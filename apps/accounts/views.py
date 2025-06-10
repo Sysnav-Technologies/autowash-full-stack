@@ -181,9 +181,9 @@ def dashboard_redirect(request):
         
         if employee_business:
             # User is an employee - redirect to their business dashboard
-            business_url = f'/business/{employee_business.slug}/'
+            business_url = f'/business/{employee_business.slug}/services/dashboard/'
             print(f"Redirecting employee to business dashboard: {business_url}")
-            messages.success(request, f'Welcome back! Redirecting to {employee_business.name} dashboard.')
+            messages.success(request, f'Welcome back! Redirecting to your {employee_business.name} dashboard.')
             return redirect(business_url)
         
     except Exception as e:
@@ -256,6 +256,7 @@ def dashboard_redirect(request):
     print("No business access found, redirecting to business registration")
     messages.info(request, 'Welcome! Please register your business to get started, or contact your employer for access.')
     return redirect('/auth/business/register/')
+
 @login_required
 def business_register_view(request):
     """Business registration - NO schema/employee creation during registration"""
