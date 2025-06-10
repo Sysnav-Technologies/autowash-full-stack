@@ -319,38 +319,23 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# STATIC FILES CONFIGURATION - Render optimized
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
-if RENDER:
-    # Production on Render - use WhiteNoise
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-    
-    # Render-specific static file optimizations
-    WHITENOISE_USE_FINDERS = True
-    WHITENOISE_AUTOREFRESH = DEBUG  # Only refresh when debugging
-    WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
-else:
-    # Local development
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+
+# WhiteNoise configuration for static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / 'media'
 
-# Create required directories
-def ensure_directories():
-    directories = [
-        BASE_DIR / 'static', BASE_DIR / 'static' / 'css', BASE_DIR / 'static' / 'js',
-        BASE_DIR / 'static' / 'img', BASE_DIR / 'staticfiles', BASE_DIR / 'media', BASE_DIR / 'logs',
-    ]
-    for directory in directories:
-        directory.mkdir(exist_ok=True)
-
-ensure_directories()
-
+# Tenant-specific media storage
+TENANT_MEDIA_ROOT = BASE_DIR / 'tenant_media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
