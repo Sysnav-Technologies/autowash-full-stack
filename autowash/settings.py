@@ -1,4 +1,3 @@
-# Enhanced settings.py with path-based django-tenants routing
 import os
 from pathlib import Path
 from decouple import config
@@ -22,11 +21,11 @@ if not RENDER:
 else:
     # Production on Render
     ALLOWED_HOSTS = [
-        '.onrender.com',                    # Covers ALL Render subdomains
-        'autowash-3jpr.onrender.com',       # Your specific Render service
-        'autowash.co.ke',                   # Custom domain
-        'www.autowash.co.ke',               # WWW version
-        '*.autowash.co.ke',                 # Subdomains
+        '.onrender.com',                 
+        'autowash-3jpr.onrender.com',      
+        'autowash.co.ke',                   
+        'www.autowash.co.ke',               
+        '*.autowash.co.ke',                
     ]
     
     # Render automatically sets this environment variable
@@ -165,12 +164,11 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
 ]
 
-# Add debug toolbar middleware when enabled
 if DEBUG and not RENDER:
-    # Local development only
+   
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 elif DEBUG and RENDER:
-    # Render with debug - add but with restrictions
+
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 
 
@@ -185,7 +183,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                # Custom context processors - ORDER IS IMPORTANT!
                 'apps.core.context_processors.business_context',         # First - sets up business context
                 'apps.core.context_processors.user_role_context',        # Second - determines user role
                 'apps.core.context_processors.navigation_context',       # Third - builds navigation based on role
