@@ -5,6 +5,7 @@ import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 import dj_database_url
 
+
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 

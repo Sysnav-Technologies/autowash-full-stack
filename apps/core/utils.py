@@ -23,11 +23,12 @@ def generate_unique_code(prefix='', length=6):
 def upload_to_path(instance, filename):
     """Generate upload path for files"""
     ext = filename.split('.')[-1]
-    filename = f"{uuid.uuid4()}.{ext}"
+    # Convert UUID to string to avoid serialization issues
+    unique_filename = f"{str(uuid.uuid4())}.{ext}"
     return os.path.join(
         instance.__class__.__name__.lower(),
-        str(instance.id),
-        filename
+        str(instance.id) if instance.id else 'temp',
+        unique_filename
     )
 
 def send_email_notification(subject, message, recipient_list, html_message=None):

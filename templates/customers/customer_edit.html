@@ -1,0 +1,570 @@
+<!-- templates/customers/customer_edit.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Edit Customer - {{ customer.display_name }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="/business/{{ request.tenant.slug }}/">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/business/{{ request.tenant.slug }}/customers/">Customers</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/">{{ customer.display_name }}</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Edit</li>
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="fas fa-user-edit text-primary me-2"></i>Edit Customer
+            </h1>
+            <p class="text-muted mb-0">Update {{ customer.display_name }}'s information and preferences</p>
+        </div>
+        <div class="btn-toolbar">
+            <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-1"></i>Back to Details
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/customers/" class="btn btn-outline-primary">
+                <i class="fas fa-list me-1"></i>All Customers
+            </a>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+    <div class="row">
+        <div class="col-12">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {% if message.tags == 'error' %}
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                {% elif message.tags == 'success' %}
+                    <i class="fas fa-check-circle me-2"></i>
+                {% elif message.tags == 'warning' %}
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                {% else %}
+                    <i class="fas fa-info-circle me-2"></i>
+                {% endif %}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" id="customer-edit-form" novalidate>
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- Main Form Column -->
+            <div class="col-lg-8">
+                <!-- Customer Information Card -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-user me-2"></i>Customer Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Basic Information Section -->
+                        <div class="form-section mb-4">
+                            <div class="section-header d-flex align-items-center mb-3">
+                                <div class="section-icon me-3">
+                                    <i class="fas fa-info-circle"></i>
+                                </div>
+                                <h6 class="section-title mb-0">Basic Information</h6>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Customer Type <span class="text-danger">*</span></label>
+                                    {{ form.customer_type }}
+                                    {% if form.customer_type.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.customer_type.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">First Name <span class="text-danger">*</span></label>
+                                    {{ form.first_name }}
+                                    {% if form.first_name.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.first_name.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Last Name <span class="text-danger">*</span></label>
+                                    {{ form.last_name }}
+                                    {% if form.last_name.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.last_name.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Company Fields -->
+                            <div id="company-fields" {% if form.customer_type.value != 'corporate' %}style="display: none;"{% endif %}>
+                                <div class="row">
+                                    <div class="col-md-12 mb-3">
+                                        <label class="form-label fw-semibold">Company Name</label>
+                                        {{ form.company_name }}
+                                        {% if form.company_name.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.company_name.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Business Registration Number</label>
+                                        {{ form.business_registration_number }}
+                                        {% if form.business_registration_number.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.business_registration_number.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Tax Number</label>
+                                        {{ form.tax_number }}
+                                        {% if form.tax_number.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.tax_number.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contact Information Section -->
+                        <div class="form-section mb-4">
+                            <div class="section-header d-flex align-items-center mb-3">
+                                <div class="section-icon me-3">
+                                    <i class="fas fa-phone"></i>
+                                </div>
+                                <h6 class="section-title mb-0">Contact Information</h6>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Email Address</label>
+                                    {{ form.email }}
+                                    {% if form.email.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.email.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Preferred Contact Method</label>
+                                    {{ form.preferred_contact_method }}
+                                    {% if form.preferred_contact_method.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.preferred_contact_method.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Primary Phone</label>
+                                    {{ form.phone }}
+                                    {% if form.phone.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.phone.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Secondary Phone</label>
+                                    {{ form.phone_secondary }}
+                                    {% if form.phone_secondary.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.phone_secondary.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Personal Information Section -->
+                        <div class="form-section mb-4">
+                            <div class="section-header d-flex align-items-center mb-3">
+                                <div class="section-icon me-3">
+                                    <i class="fas fa-user-circle"></i>
+                                </div>
+                                <h6 class="section-title mb-0">Personal Information</h6>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Date of Birth</label>
+                                    {{ form.date_of_birth }}
+                                    {% if form.date_of_birth.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.date_of_birth.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Gender</label>
+                                    {{ form.gender }}
+                                    {% if form.gender.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.gender.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">National ID</label>
+                                    {{ form.national_id }}
+                                    {% if form.national_id.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.national_id.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Address Information Section -->
+                        <div class="form-section mb-4">
+                            <div class="section-header d-flex align-items-center mb-3">
+                                <div class="section-icon me-3">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                </div>
+                                <h6 class="section-title mb-0">Address Information</h6>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Street Address</label>
+                                {{ form.street_address }}
+                                {% if form.street_address.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.street_address.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">City</label>
+                                    {{ form.city }}
+                                    {% if form.city.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.city.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">County/State</label>
+                                    {{ form.state }}
+                                    {% if form.state.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.state.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Postal Code</label>
+                                    {{ form.postal_code }}
+                                    {% if form.postal_code.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.postal_code.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Account Settings Section -->
+                        <div class="form-section mb-4">
+                            <div class="section-header d-flex align-items-center mb-3">
+                                <div class="section-icon me-3">
+                                    <i class="fas fa-cog"></i>
+                                </div>
+                                <h6 class="section-title mb-0">Account Settings</h6>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check form-switch">
+                                        {{ form.is_vip }}
+                                        <label class="form-check-label fw-semibold" for="{{ form.is_vip.id_for_label }}">
+                                            <i class="fas fa-crown text-warning me-1"></i>VIP Customer
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Credit Limit (KES)</label>
+                                    {{ form.credit_limit }}
+                                    {% if form.credit_limit.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.credit_limit.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Communication Preferences -->
+                            <div class="mt-3">
+                                <label class="form-label fw-semibold">Communication Preferences</label>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.receive_marketing_sms }}
+                                            <label class="form-check-label" for="{{ form.receive_marketing_sms.id_for_label }}">
+                                                Marketing SMS
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.receive_marketing_email }}
+                                            <label class="form-check-label" for="{{ form.receive_marketing_email.id_for_label }}">
+                                                Marketing Emails
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.receive_service_reminders }}
+                                            <label class="form-check-label" for="{{ form.receive_service_reminders.id_for_label }}">
+                                                Service Reminders
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes Section -->
+                        <div class="form-section">
+                            <div class="section-header d-flex align-items-center mb-3">
+                                <div class="section-icon me-3">
+                                    <i class="fas fa-sticky-note"></i>
+                                </div>
+                                <h6 class="section-title mb-0">Internal Notes</h6>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Notes</label>
+                                {{ form.notes }}
+                                <div class="form-text">Add any special notes or instructions about this customer (visible to staff only)</div>
+                                {% if form.notes.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.notes.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar Column -->
+            <div class="col-lg-4">
+                <!-- Form Actions Card -->
+                <div class="card shadow-sm mb-4 sticky-top" style="top: 20px;">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-save me-2"></i>Actions
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-warning btn-lg">
+                                <i class="fas fa-save me-2"></i>Update Customer
+                            </button>
+                            
+                            <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions Card -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-bolt me-2"></i>Quick Actions
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye me-2"></i>View Details
+                            </a>
+                            <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/vehicles/add/" class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-car me-2"></i>Add Vehicle
+                            </a>
+                            <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/notes/add/" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-sticky-note me-2"></i>Add Note
+                            </a>
+                            <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/documents/" class="btn btn-outline-warning btn-sm">
+                                <i class="fas fa-file-upload me-2"></i>Documents
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Info Card -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Customer Info
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="customer-info">
+                            <div class="info-item mb-2">
+                                <strong>Customer ID:</strong> {{ customer.customer_id }}
+                            </div>
+                            <div class="info-item mb-2">
+                                <strong>Created:</strong> {{ customer.created_at|date:"M j, Y" }}
+                            </div>
+                            <div class="info-item mb-2">
+                                <strong>Total Orders:</strong> {{ customer.total_orders }}
+                            </div>
+                            <div class="info-item mb-2">
+                                <strong>Total Spent:</strong> KES {{ customer.total_spent|floatformat:2 }}
+                            </div>
+                            <div class="info-item">
+                                <strong>Status:</strong> 
+                                {% if customer.is_vip %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-crown me-1"></i>VIP
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Regular</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.section-icon {
+    width: 35px;
+    height: 35px;
+    background: var(--bs-warning);
+    color: var(--bs-dark);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+.form-section {
+    border-left: 3px solid var(--bs-warning);
+    padding-left: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-header {
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    font-weight: 600;
+    color: var(--bs-dark);
+}
+
+.customer-info .info-item {
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.sticky-top {
+    z-index: 1020;
+}
+
+@media (max-width: 992px) {
+    .sticky-top {
+        position: relative !important;
+        top: auto !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle customer type change for company fields
+    const customerTypeField = document.getElementById('id_customer_type');
+    const companyFields = document.getElementById('company-fields');
+    
+    function toggleCompanyFields() {
+        if (customerTypeField && companyFields) {
+            if (customerTypeField.value === 'corporate') {
+                companyFields.style.display = 'block';
+            } else {
+                companyFields.style.display = 'none';
+            }
+        }
+    }
+    
+    if (customerTypeField) {
+        customerTypeField.addEventListener('change', toggleCompanyFields);
+        toggleCompanyFields(); // Run on page load
+    }
+    
+    // Form validation
+    const form = document.getElementById('customer-edit-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            let isValid = true;
+            
+            // Clear previous error states
+            form.querySelectorAll('.is-invalid').forEach(field => {
+                field.classList.remove('is-invalid');
+            });
+            
+            // Check required fields
+            const requiredFields = form.querySelectorAll('input[required], select[required]');
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                }
+            });
+            
+            // Validate email format if provided
+            const emailField = document.getElementById('id_email');
+            if (emailField && emailField.value) {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(emailField.value)) {
+                    emailField.classList.add('is-invalid');
+                    isValid = false;
+                }
+            }
+            
+            // Corporate customer validation
+            const customerType = document.getElementById('id_customer_type');
+            const companyName = document.getElementById('id_company_name');
+            if (customerType && customerType.value === 'corporate') {
+                if (companyName && !companyName.value.trim()) {
+                    companyName.classList.add('is-invalid');
+                    isValid = false;
+                }
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+                // Scroll to first error
+                const firstError = form.querySelector('.is-invalid');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstError.focus();
+                }
+            }
+        });
+    }
+    
+    // Add loading state to submit button
+    const submitButton = document.querySelector('button[type="submit"]');
+    if (form && submitButton) {
+        form.addEventListener('submit', function() {
+            submitButton.disabled = true;
+            const originalText = submitButton.innerHTML;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+            
+            // Re-enable after 10 seconds as a fallback
+            setTimeout(() => {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+            }, 10000);
+        });
+    }
+});
+</script>
+{% endblock %}

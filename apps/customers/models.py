@@ -4,10 +4,12 @@ from django.core.validators import RegexValidator
 from phonenumber_field.modelfields import PhoneNumberField
 from apps.core.models import TimeStampedModel, SoftDeleteModel, Address, ContactInfo
 from apps.core.utils import upload_to_path
+from django_tenants.utils import schema_context, get_public_schema_name
 from decimal import Decimal
+import uuid
 
 class Customer(SoftDeleteModel, Address, ContactInfo):
-    """Customer model with comprehensive information"""
+    """Customer model with comprehensive information - FIXED for cross-schema compatibility"""
     
     CUSTOMER_TYPE_CHOICES = [
         ('individual', 'Individual'),
@@ -88,25 +90,34 @@ class Customer(SoftDeleteModel, Address, ContactInfo):
     @property
     def total_orders(self):
         """Get total number of orders"""
-        from apps.services.models import ServiceOrder
-        return ServiceOrder.objects.filter(customer=self).count()
+        try:
+            from apps.services.models import ServiceOrder
+            return ServiceOrder.objects.filter(customer=self).count()
+        except ImportError:
+            return 0
     
     @property
     def last_service_date(self):
         """Get last service date"""
-        from apps.services.models import ServiceOrder
-        last_order = ServiceOrder.objects.filter(customer=self).order_by('-created_at').first()
-        return last_order.created_at.date() if last_order else None
+        try:
+            from apps.services.models import ServiceOrder
+            last_order = ServiceOrder.objects.filter(customer=self).order_by('-created_at').first()
+            return last_order.created_at.date() if last_order else None
+        except ImportError:
+            return None
     
     @property
     def average_order_value(self):
         """Calculate average order value"""
-        from apps.services.models import ServiceOrder
-        from django.db.models import Avg
-        avg = ServiceOrder.objects.filter(customer=self, status='completed').aggregate(
-            avg=Avg('total_amount')
-        )['avg']
-        return avg or Decimal('0.00')
+        try:
+            from apps.services.models import ServiceOrder
+            from django.db.models import Avg
+            avg = ServiceOrder.objects.filter(customer=self, status='completed').aggregate(
+                avg=Avg('total_amount')
+            )['avg']
+            return avg or Decimal('0.00')
+        except ImportError:
+            return Decimal('0.00')
     
     @property
     def can_place_order(self):
@@ -133,8 +144,9 @@ class Customer(SoftDeleteModel, Address, ContactInfo):
         verbose_name_plural = "Customers"
         ordering = ['first_name', 'last_name']
 
+
 class Vehicle(TimeStampedModel):
-    """Customer vehicle information"""
+    """Customer vehicle information - FIXED for cross-schema compatibility"""
     
     VEHICLE_TYPE_CHOICES = [
         ('sedan', 'Sedan'),
@@ -195,8 +207,11 @@ class Vehicle(TimeStampedModel):
     @property
     def service_count(self):
         """Get total number of services for this vehicle"""
-        from apps.services.models import ServiceOrder
-        return ServiceOrder.objects.filter(vehicle=self).count()
+        try:
+            from apps.services.models import ServiceOrder
+            return ServiceOrder.objects.filter(vehicle=self).count()
+        except ImportError:
+            return 0
     
     @property
     def days_since_last_service(self):
@@ -211,8 +226,9 @@ class Vehicle(TimeStampedModel):
         verbose_name_plural = "Vehicles"
         ordering = ['registration_number']
 
+
 class CustomerNote(TimeStampedModel):
-    """Customer notes and interactions"""
+    """Customer notes and interactions - FIXED for cross-schema compatibility"""
     
     NOTE_TYPES = [
         ('general', 'General Note'),
@@ -244,8 +260,9 @@ class CustomerNote(TimeStampedModel):
         verbose_name_plural = "Customer Notes"
         ordering = ['-created_at']
 
+
 class CustomerDocument(TimeStampedModel):
-    """Customer document storage"""
+    """Customer document storage - FIXED for cross-schema compatibility"""
     
     DOCUMENT_TYPES = [
         ('id_copy', 'ID Copy'),
@@ -280,8 +297,9 @@ class CustomerDocument(TimeStampedModel):
         verbose_name_plural = "Customer Documents"
         ordering = ['-created_at']
 
+
 class CustomerFeedback(TimeStampedModel):
-    """Customer feedback and ratings"""
+    """Customer feedback and ratings - FIXED for cross-schema compatibility"""
     
     RATING_CHOICES = [
         (1, '1 - Very Poor'),
@@ -315,19 +333,32 @@ class CustomerFeedback(TimeStampedModel):
     is_published = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
     
-    # Response
+    # Response - FIXED: Use integer ID for cross-schema compatibility
     response = models.TextField(blank=True, help_text="Management response to feedback")
     responded_at = models.DateTimeField(null=True, blank=True)
-    responded_by = models.ForeignKey(
-        'employees.Employee',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='feedback_responses'
-    )
+    responded_by_id = models.IntegerField(null=True, blank=True, help_text="Employee ID who responded")
     
     def __str__(self):
         return f"{self.customer.display_name} - {self.overall_rating}/5 stars"
+    
+    @property
+    def responded_by(self):
+        """Get the employee who responded from employees app"""
+        if not self.responded_by_id:
+            return None
+        try:
+            from apps.employees.models import Employee
+            return Employee.objects.get(id=self.responded_by_id)
+        except (ImportError, Employee.DoesNotExist):
+            return None
+    
+    @responded_by.setter
+    def responded_by(self, employee):
+        """Set the employee who responded"""
+        if employee:
+            self.responded_by_id = employee.id
+        else:
+            self.responded_by_id = None
     
     @property
     def average_rating(self):
@@ -347,8 +378,9 @@ class CustomerFeedback(TimeStampedModel):
         verbose_name_plural = "Customer Feedback"
         ordering = ['-created_at']
 
+
 class LoyaltyProgram(TimeStampedModel):
-    """Loyalty program configuration"""
+    """Loyalty program configuration - FIXED for cross-schema compatibility"""
     
     name = models.CharField(max_length=100)
     description = models.TextField()

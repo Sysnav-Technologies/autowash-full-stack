@@ -1,3 +1,5 @@
+# apps/customers/urls.py - COMPLETE VERSION with Django's built-in UUID converter
+
 from django.urls import path
 from . import views
 

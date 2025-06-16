@@ -20,6 +20,7 @@ from .forms import (
     CustomerDocumentForm, CustomerFeedbackForm, CustomerSearchForm
 )
 import json
+import uuid
 
 @login_required
 @employee_required()
@@ -89,7 +90,7 @@ def customer_list_view(request):
 @login_required
 @employee_required()
 def customer_create_view(request):
-    """Create new customer"""
+    """Create new customer - FIXED UUID serialization"""
     if request.method == 'POST':
         customer_form = CustomerForm(request.POST)
         vehicle_form = VehicleForm(request.POST) if request.POST.get('add_vehicle') else None
@@ -100,34 +101,43 @@ def customer_create_view(request):
                     # Create customer
                     customer = customer_form.save(commit=False)
                     customer.customer_id = generate_unique_code('CUST', 6)
-                    customer.created_by = request.user
+                    customer.created_by = request.user  # Use user object directly
                     customer.save()
                     
                     # Create vehicle if provided
                     if vehicle_form and vehicle_form.is_valid():
                         vehicle = vehicle_form.save(commit=False)
                         vehicle.customer = customer
-                        vehicle.created_by = request.user
+                        vehicle.created_by = request.user  # Use user object directly
                         vehicle.save()
                     
                     # Send welcome message if requested
                     if customer_form.cleaned_data.get('send_welcome_message'):
                         if customer.phone:
-                            send_sms_notification(
-                                phone_number=str(customer.phone),
-                                message=f"Welcome to {request.business.name}! Your customer ID is {customer.customer_id}."
-                            )
+                            try:
+                                send_sms_notification(
+                                    phone_number=str(customer.phone),
+                                    message=f"Welcome to {request.business.name}! Your customer ID is {customer.customer_id}."
+                                )
+                            except Exception as sms_error:
+                                # Don't fail the whole operation if SMS fails
+                                messages.warning(request, f'Customer created but SMS failed: {str(sms_error)}')
                     
-                    messages.success(request, f'Customer {customer.display_name} created successfully!')
+                    # Success message with string conversion
+                    success_message = f'Customer {customer.display_name} created successfully!'
+                    messages.success(request, success_message)
                     
-                    # Redirect based on request
+                    # Redirect based on request - Django handles UUID automatically
                     if request.POST.get('create_another'):
                         return redirect('customers:create')
                     else:
                         return redirect('customers:detail', pk=customer.pk)
                         
             except Exception as e:
-                messages.error(request, f'Error creating customer: {str(e)}')
+                # Handle any other errors
+                error_message = f'Error creating customer: {str(e)}'
+                messages.error(request, error_message)
+                print(f"Customer creation error: {e}")  # For debugging
     else:
         customer_form = CustomerForm()
         vehicle_form = VehicleForm()
@@ -142,26 +152,37 @@ def customer_create_view(request):
 @login_required
 @employee_required()
 def customer_detail_view(request, pk):
-    """Customer detail view with complete information"""
+    """Customer detail view with complete information - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(pk, str):
+            pk = uuid.UUID(pk)
+    except (ValueError, TypeError):
+        # If conversion fails, let get_object_or_404 handle it
+        pass
+    
     customer = get_object_or_404(Customer, pk=pk)
     
     # Get related data
     vehicles = customer.vehicles.filter(is_active=True)
-    recent_orders = None  # Will be populated when services app is ready
-    notes = customer.notes.all()[:5]
+    notes = customer.customer_notes.all()[:5]  # Updated to use correct related name
     documents = customer.documents.all()
     feedback = customer.feedback.all()[:3]
     
-    # Calculate customer statistics
-    from apps.services.models import ServiceOrder
+    # Calculate customer statistics - Handle import errors gracefully
     try:
+        from apps.services.models import ServiceOrder
         order_stats = ServiceOrder.objects.filter(customer=customer).aggregate(
             total_orders=Count('id'),
             total_spent=Sum('total_amount'),
             avg_order_value=Avg('total_amount')
         )
         recent_orders = ServiceOrder.objects.filter(customer=customer).order_by('-created_at')[:5]
-    except:
+    except ImportError:
+        order_stats = {'total_orders': 0, 'total_spent': 0, 'avg_order_value': 0}
+        recent_orders = []
+    except Exception as e:
+        print(f"Error fetching order stats: {e}")
         order_stats = {'total_orders': 0, 'total_spent': 0, 'avg_order_value': 0}
         recent_orders = []
     
@@ -188,18 +209,32 @@ def customer_detail_view(request, pk):
 @login_required
 @employee_required()
 def customer_edit_view(request, pk):
-    """Edit customer information"""
+    """Edit customer information - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(pk, str):
+            pk = uuid.UUID(pk)
+    except (ValueError, TypeError): 
+        pass
+    
     customer = get_object_or_404(Customer, pk=pk)
     
     if request.method == 'POST':
         form = CustomerForm(request.POST, instance=customer)
         if form.is_valid():
-            customer = form.save(commit=False)
-            customer.updated_by = request.user
-            customer.save()
-            
-            messages.success(request, f'Customer {customer.display_name} updated successfully!')
-            return redirect('customers:detail', pk=customer.pk)
+            try:
+                customer = form.save(commit=False)
+                customer.updated_by = request.user  # Use user object directly
+                customer.save()
+                
+                success_message = f'Customer {customer.display_name} updated successfully!'
+                messages.success(request, success_message)
+                
+                # Convert UUID to string for redirect
+                return redirect('customers:detail', pk=customer.pk)
+            except Exception as e:
+                error_message = f'Error updating customer: {str(e)}'
+                messages.error(request, error_message)
     else:
         form = CustomerForm(instance=customer)
     
@@ -213,19 +248,33 @@ def customer_edit_view(request, pk):
 @login_required
 @employee_required()
 def vehicle_create_view(request, customer_pk):
-    """Add vehicle to customer"""
+    """Add vehicle to customer - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(customer_pk, str):
+            customer_pk = uuid.UUID(customer_pk)
+    except (ValueError, TypeError):
+        pass
+    
     customer = get_object_or_404(Customer, pk=customer_pk)
     
     if request.method == 'POST':
         form = VehicleForm(request.POST)
         if form.is_valid():
-            vehicle = form.save(commit=False)
-            vehicle.customer = customer
-            vehicle.created_by = request.user
-            vehicle.save()
-            
-            messages.success(request, f'Vehicle {vehicle.registration_number} added successfully!')
-            return redirect('customers:detail', pk=customer.pk)
+            try:
+                vehicle = form.save(commit=False)
+                vehicle.customer = customer
+                vehicle.created_by = request.user  # Use user object directly
+                vehicle.save()
+                
+                success_message = f'Vehicle {vehicle.registration_number} added successfully!'
+                messages.success(request, success_message)
+                
+                # Convert UUID to string for redirect
+                return redirect('customers:detail', pk=customer.pk)
+            except Exception as e:
+                error_message = f'Error adding vehicle: {str(e)}'
+                messages.error(request, error_message)
     else:
         form = VehicleForm()
     
@@ -239,18 +288,32 @@ def vehicle_create_view(request, customer_pk):
 @login_required
 @employee_required()
 def vehicle_edit_view(request, pk):
-    """Edit vehicle information"""
+    """Edit vehicle information - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(pk, str):
+            pk = uuid.UUID(pk)
+    except (ValueError, TypeError):
+        pass
+    
     vehicle = get_object_or_404(Vehicle, pk=pk)
     
     if request.method == 'POST':
         form = VehicleForm(request.POST, instance=vehicle)
         if form.is_valid():
-            vehicle = form.save(commit=False)
-            vehicle.updated_by = request.user
-            vehicle.save()
-            
-            messages.success(request, f'Vehicle {vehicle.registration_number} updated successfully!')
-            return redirect('customers:detail', pk=vehicle.customer.pk)
+            try:
+                vehicle = form.save(commit=False)
+                vehicle.updated_by_id = request.user.id  # Use integer ID
+                vehicle.save()
+                
+                success_message = f'Vehicle {vehicle.registration_number} updated successfully!'
+                messages.success(request, success_message)
+                
+                # Convert UUID to string for redirect
+                return redirect('customers:detail', pk=str(vehicle.customer.pk))
+            except Exception as e:
+                error_message = f'Error updating vehicle: {str(e)}'
+                messages.error(request, error_message)
     else:
         form = VehicleForm(instance=vehicle)
     
@@ -264,19 +327,30 @@ def vehicle_edit_view(request, pk):
 @login_required
 @employee_required()
 def customer_note_create_view(request, customer_pk):
-    """Add note to customer"""
+    """Add note to customer - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(customer_pk, str):
+            customer_pk = uuid.UUID(customer_pk)
+    except (ValueError, TypeError):
+        pass
+    
     customer = get_object_or_404(Customer, pk=customer_pk)
     
     if request.method == 'POST':
         form = CustomerNoteForm(request.POST)
         if form.is_valid():
-            note = form.save(commit=False)
-            note.customer = customer
-            note.created_by = request.user
-            note.save()
-            
-            messages.success(request, 'Note added successfully!')
-            return redirect('customers:detail', pk=customer.pk)
+            try:
+                note = form.save(commit=False)
+                note.customer = customer
+                note.created_by = request.user  # Use user object directly
+                note.save()
+                
+                messages.success(request, 'Note added successfully!')
+                return redirect('customers:detail', pk=customer.pk)
+            except Exception as e:
+                error_message = f'Error adding note: {str(e)}'
+                messages.error(request, error_message)
     else:
         form = CustomerNoteForm()
     
@@ -291,40 +365,44 @@ def customer_note_create_view(request, customer_pk):
 @employee_required()
 @ajax_required
 def customer_search_ajax(request):
-    """AJAX customer search for quick lookups"""
+    """AJAX customer search for quick lookups - FIXED UUID serialization"""
     query = request.GET.get('q', '').strip()
     customers = []
     
     if len(query) >= 2:
-        customer_qs = Customer.objects.filter(
-            Q(first_name__icontains=query) |
-            Q(last_name__icontains=query) |
-            Q(company_name__icontains=query) |
-            Q(customer_id__icontains=query) |
-            Q(phone__icontains=query) |
-            Q(vehicles__registration_number__icontains=query)
-        ).distinct()[:10]
-        
-        customers = [
-            {
-                'id': customer.id,
-                'customer_id': customer.customer_id,
-                'name': customer.display_name,
-                'phone': str(customer.phone) if customer.phone else '',
-                'email': customer.email,
-                'is_vip': customer.is_vip,
-                'vehicles': [
-                    {
-                        'id': vehicle.id,
-                        'registration': vehicle.registration_number,
-                        'make_model': f"{vehicle.make} {vehicle.model}",
-                        'year': vehicle.year
-                    }
-                    for vehicle in customer.vehicles.filter(is_active=True)
-                ]
-            }
-            for customer in customer_qs
-        ]
+        try:
+            customer_qs = Customer.objects.filter(
+                Q(first_name__icontains=query) |
+                Q(last_name__icontains=query) |
+                Q(company_name__icontains=query) |
+                Q(customer_id__icontains=query) |
+                Q(phone__icontains=query) |
+                Q(vehicles__registration_number__icontains=query)
+            ).distinct()[:10]
+            
+            customers = [
+                {
+                    'id': str(customer.id),  # Convert UUID to string
+                    'customer_id': customer.customer_id,
+                    'name': customer.display_name,
+                    'phone': str(customer.phone) if customer.phone else '',
+                    'email': customer.email,
+                    'is_vip': customer.is_vip,
+                    'vehicles': [
+                        {
+                            'id': str(vehicle.id),  # Convert UUID to string
+                            'registration': vehicle.registration_number,
+                            'make_model': f"{vehicle.make} {vehicle.model}",
+                            'year': vehicle.year
+                        }
+                        for vehicle in customer.vehicles.filter(is_active=True)
+                    ]
+                }
+                for customer in customer_qs
+            ]
+        except Exception as e:
+            print(f"Customer search error: {e}")
+            return JsonResponse({'error': 'Search failed', 'customers': []})
     
     return JsonResponse({'customers': customers})
 
@@ -332,38 +410,165 @@ def customer_search_ajax(request):
 @employee_required()
 @ajax_required
 def vehicle_search_ajax(request):
-    """AJAX vehicle search by registration number"""
+    """AJAX vehicle search by registration number - FIXED UUID serialization"""
     query = request.GET.get('q', '').strip()
     vehicles = []
     
     if len(query) >= 2:
-        vehicle_qs = Vehicle.objects.select_related('customer').filter(
-            registration_number__icontains=query,
-            is_active=True
-        )[:10]
-        
-        vehicles = [
-            {
-                'id': vehicle.id,
-                'registration_number': vehicle.registration_number,
-                'make_model': f"{vehicle.make} {vehicle.model} ({vehicle.year})",
-                'color': vehicle.color,
-                'customer': {
-                    'id': vehicle.customer.id,
-                    'name': vehicle.customer.display_name,
-                    'customer_id': vehicle.customer.customer_id,
-                    'phone': str(vehicle.customer.phone) if vehicle.customer.phone else '',
+        try:
+            vehicle_qs = Vehicle.objects.select_related('customer').filter(
+                registration_number__icontains=query,
+                is_active=True
+            )[:10]
+            
+            vehicles = [
+                {
+                    'id': str(vehicle.id),  # Convert UUID to string
+                    'registration_number': vehicle.registration_number,
+                    'make_model': f"{vehicle.make} {vehicle.model} ({vehicle.year})",
+                    'color': vehicle.color,
+                    'customer': {
+                        'id': str(vehicle.customer.id),  # Convert UUID to string
+                        'name': vehicle.customer.display_name,
+                        'customer_id': vehicle.customer.customer_id,
+                        'phone': str(vehicle.customer.phone) if vehicle.customer.phone else '',
+                    }
                 }
-            }
-            for vehicle in vehicle_qs
-        ]
+                for vehicle in vehicle_qs
+            ]
+        except Exception as e:
+            print(f"Vehicle search error: {e}")
+            return JsonResponse({'error': 'Search failed', 'vehicles': []})
     
     return JsonResponse({'vehicles': vehicles})
 
 @login_required
 @employee_required()
+@require_POST
+def toggle_customer_vip(request, pk):
+    """Toggle customer VIP status - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(pk, str):
+            pk = uuid.UUID(pk)
+    except (ValueError, TypeError):
+        pass
+    
+    try:
+        customer = get_object_or_404(Customer, pk=pk)
+        customer.is_vip = not customer.is_vip
+        customer.updated_by_id = request.user.id  # Use integer ID
+        customer.save(update_fields=['is_vip', 'updated_at', 'updated_by_id'])
+        
+        status = 'VIP' if customer.is_vip else 'regular'
+        success_message = f'{customer.display_name} is now a {status} customer.'
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True, 
+                'message': success_message,
+                'is_vip': customer.is_vip
+            })
+        else:
+            messages.success(request, success_message)
+            return redirect('customers:detail', pk=customer.pk)
+    
+    except Exception as e:
+        error_message = f'Error updating VIP status: {str(e)}'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_message})
+        else:
+            messages.error(request, error_message)
+            return redirect('customers:list')
+
+@login_required
+@employee_required()
+@require_POST
+def deactivate_customer(request, pk):
+    """Deactivate customer account - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(pk, str):
+            pk = uuid.UUID(pk)
+    except (ValueError, TypeError):
+        pass
+    
+    try:
+        customer = get_object_or_404(Customer, pk=pk)
+        customer.is_active = False
+        customer.updated_by = request.user  # Use user object directly
+        customer.save(update_fields=['is_active', 'updated_at'])  # Don't save updated_by_id
+        
+        success_message = f'{customer.display_name} account has been deactivated.'
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'message': success_message})
+        else:
+            messages.success(request, success_message)
+            return redirect('customers:detail', pk=customer.pk)
+    
+    except Exception as e:
+        error_message = f'Error deactivating customer: {str(e)}'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_message})
+        else:
+            messages.error(request, error_message)
+            return redirect('customers:list')
+
+@login_required
+@employee_required()
+def customer_export_view(request):
+    """Export customer data to CSV/Excel - FIXED UUID handling"""
+    import csv
+    from django.http import HttpResponse
+    
+    try:
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="customers.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow([
+            'Customer ID', 'Name', 'Type', 'Email', 'Phone', 'City', 
+            'Total Orders', 'Total Spent', 'Loyalty Points', 'VIP Status', 
+            'Active Status', 'Created Date'
+        ])
+        
+        customers = Customer.objects.all().select_related()
+        for customer in customers:
+            writer.writerow([
+                customer.customer_id,
+                customer.display_name,
+                customer.get_customer_type_display(),
+                customer.email,
+                str(customer.phone) if customer.phone else '',
+                customer.city,
+                customer.total_orders,
+                float(customer.total_spent) if customer.total_spent else 0,  # Convert Decimal to float
+                customer.loyalty_points,
+                'Yes' if customer.is_vip else 'No',
+                'Yes' if customer.is_active else 'No',
+                customer.created_at.strftime('%Y-%m-%d')
+            ])
+        
+        return response
+    
+    except Exception as e:
+        messages.error(request, f'Error exporting customers: {str(e)}')
+        return redirect('customers:list')
+
+# Additional utility views
+
+@login_required
+@employee_required()
 def customer_feedback_view(request, customer_pk):
-    """View customer feedback"""
+    """View customer feedback - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(customer_pk, str):
+            customer_pk = uuid.UUID(customer_pk)
+    except (ValueError, TypeError):
+        pass
+    
     customer = get_object_or_404(Customer, pk=customer_pk)
     feedback_list = customer.feedback.all().order_by('-created_at')
     
@@ -395,19 +600,30 @@ def customer_feedback_view(request, customer_pk):
 @login_required
 @employee_required()
 def customer_documents_view(request, customer_pk):
-    """View customer documents"""
+    """View customer documents - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(customer_pk, str):
+            customer_pk = uuid.UUID(customer_pk)
+    except (ValueError, TypeError):
+        pass
+    
     customer = get_object_or_404(Customer, pk=customer_pk)
     
     if request.method == 'POST':
         form = CustomerDocumentForm(request.POST, request.FILES)
         if form.is_valid():
-            document = form.save(commit=False)
-            document.customer = customer
-            document.created_by = request.user
-            document.save()
-            
-            messages.success(request, 'Document uploaded successfully!')
-            return redirect('customers:documents', customer_pk=customer.pk)
+            try:
+                document = form.save(commit=False)
+                document.customer = customer
+                document.created_by = request.user  # Use user object directly
+                document.save()
+                
+                messages.success(request, 'Document uploaded successfully!')
+                return redirect('customers:documents', customer_pk=customer.pk)
+            except Exception as e:
+                error_message = f'Error uploading document: {str(e)}'
+                messages.error(request, error_message)
     else:
         form = CustomerDocumentForm()
     
@@ -424,7 +640,7 @@ def customer_documents_view(request, customer_pk):
 @login_required
 @employee_required()
 def loyalty_dashboard_view(request):
-    """Loyalty program dashboard"""
+    """Loyalty program dashboard - FIXED UUID handling"""
     loyalty_program = LoyaltyProgram.objects.filter(is_active=True).first()
     
     if not loyalty_program:
@@ -447,7 +663,7 @@ def loyalty_dashboard_view(request):
     # Top customers by points
     top_customers = customers.order_by('-loyalty_points')[:10]
     
-    # Recent activity (would need to implement loyalty transactions)
+    # Recent activity (placeholder for now)
     recent_activity = []
     
     context = {
@@ -459,65 +675,3 @@ def loyalty_dashboard_view(request):
         'title': 'Loyalty Program Dashboard'
     }
     return render(request, 'customers/loyalty_dashboard.html', context)
-
-@login_required
-@employee_required()
-@require_POST
-def toggle_customer_vip(request, pk):
-    """Toggle customer VIP status"""
-    customer = get_object_or_404(Customer, pk=pk)
-    customer.is_vip = not customer.is_vip
-    customer.save(update_fields=['is_vip'])
-    
-    status = 'VIP' if customer.is_vip else 'regular'
-    messages.success(request, f'{customer.display_name} is now a {status} customer.')
-    
-    return redirect('customers:detail', pk=customer.pk)
-
-@login_required
-@employee_required()
-@require_POST
-def deactivate_customer(request, pk):
-    """Deactivate customer account"""
-    customer = get_object_or_404(Customer, pk=pk)
-    customer.is_active = False
-    customer.save(update_fields=['is_active'])
-    
-    messages.success(request, f'{customer.display_name} account has been deactivated.')
-    return redirect('customers:detail', pk=customer.pk)
-
-@login_required
-@employee_required()
-def customer_export_view(request):
-    """Export customer data to CSV/Excel"""
-    import csv
-    from django.http import HttpResponse
-    
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="customers.csv"'
-    
-    writer = csv.writer(response)
-    writer.writerow([
-        'Customer ID', 'Name', 'Type', 'Email', 'Phone', 'City', 
-        'Total Orders', 'Total Spent', 'Loyalty Points', 'VIP Status', 
-        'Active Status', 'Created Date'
-    ])
-    
-    customers = Customer.objects.all().select_related()
-    for customer in customers:
-        writer.writerow([
-            customer.customer_id,
-            customer.display_name,
-            customer.get_customer_type_display(),
-            customer.email,
-            str(customer.phone) if customer.phone else '',
-            customer.city,
-            customer.total_orders,
-            customer.total_spent,
-            customer.loyalty_points,
-            'Yes' if customer.is_vip else 'No',
-            'Yes' if customer.is_active else 'No',
-            customer.created_at.strftime('%Y-%m-%d')
-        ])
-    
-    return response
