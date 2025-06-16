@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from apps.accounts.views import profile_view
 
 app_name = 'businesses'
 
@@ -7,6 +8,8 @@ urlpatterns = [
     # Main Dashboard
     path('', views.dashboard_view, name='dashboard'),
     path('dashboard/', views.dashboard_view, name='dashboard'),
+    path('profile/', profile_view, name='profile'),
+
     
     # Analytics
     path('analytics/', views.analytics_view, name='analytics'),
