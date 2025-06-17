@@ -12,14 +12,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
-RENDER = config('RENDER', default=False, cast=bool)
 
-# SMART ALLOWED_HOSTS based on RENDER environment
-if not RENDER:
+# Environment Detection
+RENDER = config('RENDER', default=False, cast=bool)
+CPANEL = config('CPANEL', default=False, cast=bool)
+
+# SMART ALLOWED_HOSTS based on environment
+if not RENDER and not CPANEL:
     # Local development
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
     print("🏠 Running in LOCAL DEVELOPMENT mode")
-else:
+elif RENDER:
     # Production on Render
     ALLOWED_HOSTS = [
         '.onrender.com',                 
@@ -39,6 +42,25 @@ else:
         print("🚀 RENDER with DEBUG ENABLED")
     else:
         print("🚀 RENDER PRODUCTION mode")
+elif CPANEL:
+    # Production on cPanel
+    ALLOWED_HOSTS = [
+        'app.autowash.co.ke',
+        'autowash.co.ke',                   
+        'www.autowash.co.ke',               
+        '*.autowash.co.ke',
+    ]
+    
+    # Add cPanel domain if specified
+    cpanel_domain = config('CPANEL_DOMAIN', default='')
+    if cpanel_domain and cpanel_domain not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(cpanel_domain)
+        print(f"🏢 Added cPanel domain: {cpanel_domain}")
+    
+    if DEBUG:
+        print("🏢 CPANEL with DEBUG ENABLED")
+    else:
+        print("🏢 CPANEL PRODUCTION mode")
 
 # Multi-tenant Apps Configuration
 SHARED_APPS = [
@@ -95,12 +117,12 @@ TENANT_APPS = [
     'apps.notification',
 ]
 
-# Add debug toolbar when debugging is enabled - BUT NOT ON RENDER ADMIN
-if DEBUG and not RENDER:
+# Add debug toolbar when debugging is enabled - NOT in production environments
+if DEBUG and not RENDER and not CPANEL:
     # Only in local development
     SHARED_APPS.append('debug_toolbar')
-elif DEBUG and RENDER:
-    # On Render with debug - be selective
+elif DEBUG and (RENDER or CPANEL):
+    # Production with debug - be selective
     SHARED_APPS.append('debug_toolbar')
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
@@ -114,10 +136,20 @@ PUBLIC_SCHEMA_NAME = 'public'
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
 # PATH-BASED TENANT ROUTING CONFIGURATION
+if not RENDER and not CPANEL:
+    # Local development
+    public_domain = 'localhost:8000'
+elif RENDER:
+    # Render environment
+    public_domain = 'autowash-3jpr.onrender.com'
+elif CPANEL:
+    # cPanel environment
+    public_domain = 'app.autowash.co.ke'
+
 TENANT_ROUTING = {
     'ROUTING_METHOD': 'path',  # Use path-based instead of subdomain
     'TENANT_URL_PREFIX': 'business',  # URL prefix for tenant routes
-    'PUBLIC_TENANT_DOMAIN': 'localhost:8000' if not RENDER else 'autowash-3jpr.onrender.com',
+    'PUBLIC_TENANT_DOMAIN': public_domain,
 }
 
 # Enhanced Session Configuration for Multi-tenant setup
@@ -148,7 +180,13 @@ DATABASE_ROUTERS = (
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+]
+
+# Add WhiteNoise only for Render (cPanel serves static files differently)
+if RENDER:
+    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
+
+MIDDLEWARE.extend([
     'django.contrib.sessions.middleware.SessionMiddleware',
     'apps.core.middleware.SimpleSessionFixMiddleware',  # NEW - Session persistence
     'apps.core.middleware.PathBasedTenantMiddleware',  # BEFORE auth
@@ -163,15 +201,13 @@ MIDDLEWARE = [
     'apps.core.middleware.TimezoneMiddleware',
     'apps.core.middleware.UserActivityMiddleware',
     'allauth.account.middleware.AccountMiddleware',
-]
+])
 
-if DEBUG and not RENDER:
-   
+# Add debug toolbar middleware only in development
+if DEBUG and not RENDER and not CPANEL:
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
-elif DEBUG and RENDER:
-
+elif DEBUG and (RENDER or CPANEL):
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
-
 
 TEMPLATES = [
     {
@@ -208,18 +244,28 @@ DATABASES = {
     )
 }
 
-# Override engine for django-tenants
-DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
-
-# Configure SSL based on RENDER environment variable
-if not RENDER:
-    # Local development - disable SSL for local PostgreSQL
+# Override engine based on environment and database type
+if 'postgresql' in database_url.lower():
+    # PostgreSQL with django-tenants
+    DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
+elif 'mysql' in database_url.lower() and CPANEL:
+    # MySQL for cPanel (django-tenants doesn't support MySQL well, consider alternatives)
+    print("⚠️  WARNING: django-tenants has limited MySQL support. Consider PostgreSQL.")
+    DATABASES['default']['ENGINE'] = 'django.db.backends.mysql'
     DATABASES['default']['OPTIONS'] = {
-        'sslmode': 'disable',
-        'options': '-c search_path=public'
+        'charset': 'utf8mb4',
     }
-    print(f"📊 Using LOCAL PostgreSQL database (SSL disabled)")
-else:
+
+# Configure SSL and connection options based on environment
+if not RENDER and not CPANEL:
+    # Local development - disable SSL for local database
+    if 'postgresql' in database_url.lower():
+        DATABASES['default']['OPTIONS'] = {
+            'sslmode': 'disable',
+            'options': '-c search_path=public'
+        }
+    print(f"📊 Using LOCAL database (SSL disabled)")
+elif RENDER:
     # Production/Render - require SSL for external PostgreSQL + timeout settings
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'require',
@@ -228,20 +274,33 @@ else:
     # Optimize for Render performance during schema creation
     DATABASES['default']['CONN_MAX_AGE'] = 0 if DEBUG else 600  # Disable persistent connections when debugging
     print(f"📊 Using RENDER PostgreSQL database (SSL required, timeouts configured)")
+elif CPANEL:
+    # cPanel - typically localhost database
+    if 'postgresql' in database_url.lower():
+        DATABASES['default']['OPTIONS'] = {
+            'sslmode': 'prefer',  # Try SSL, but don't require it
+            'options': '-c search_path=public'
+        }
+    elif 'mysql' in database_url.lower():
+        DATABASES['default']['OPTIONS'] = {
+            'charset': 'utf8mb4',
+            'sql_mode': 'STRICT_TRANS_TABLES',
+        }
+    print(f"📊 Using CPANEL database (localhost)")
 
 # Redis & Channels
+redis_url = config('REDIS_URL', default='redis://localhost:6379/1')
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [config('REDIS_URL', default='redis://localhost:6379/1')],
+            "hosts": [redis_url],
         },
     },
 }
 
 # CACHE CONFIGURATION
-redis_url = config('REDIS_URL', default=None)
-if redis_url and redis_url != '':
+if redis_url and redis_url != '' and 'redis://' in redis_url:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.redis.RedisCache',
@@ -272,23 +331,38 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
+# Static files (CSS, JavaScript, Images) - Environment-specific
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+if RENDER:
+    # Render configuration
+    STATIC_ROOT = BASE_DIR / 'staticfiles'
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+elif CPANEL:
+    # cPanel configuration - typically served by Apache
+    STATIC_ROOT = BASE_DIR / 'public_html' / 'static'
+    # Use default static files handling for cPanel
+else:
+    # Local development
+    STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
-# WhiteNoise configuration for static files
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-# Media files
+# Media files - Environment-specific
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+
+if CPANEL:
+    # cPanel configuration
+    MEDIA_ROOT = BASE_DIR / 'public_html' / 'media'
+else:
+    # Render and local development
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 # Tenant-specific media storage
 TENANT_MEDIA_ROOT = BASE_DIR / 'tenant_media'
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -296,17 +370,21 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
-# Celery Configuration
-CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+# Celery Configuration - Only if Redis is available
+if redis_url and 'redis://' in redis_url:
+    CELERY_BROKER_URL = redis_url.replace('/1', '/0')
+    CELERY_RESULT_BACKEND = redis_url.replace('/1', '/0')
+    CELERY_ACCEPT_CONTENT = ['json']
+    CELERY_TASK_SERIALIZER = 'json'
+    CELERY_RESULT_SERIALIZER = 'json'
+    CELERY_TIMEZONE = TIME_ZONE
+    CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+    print("🔄 Celery configured with Redis")
+else:
+    print("⚠️  Celery disabled - No Redis available")
 
-# EMAIL CONFIGURATION based on RENDER environment
-if not RENDER:
+# EMAIL CONFIGURATION based on environment
+if not RENDER and not CPANEL:
     # Local development - Gmail SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
@@ -317,7 +395,7 @@ if not RENDER:
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@localhost')
     print("📧 Using LOCAL email configuration (Gmail SMTP)")
 else:
-    # Production/Render - Domain email
+    # Production - Domain email (both Render and cPanel)
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='mail.autowash.co.ke')
     EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -325,14 +403,17 @@ else:
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='noreply@autowash.co.ke')
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Autowash <noreply@autowash.co.ke>')
-    print("📧 Using PRODUCTION email configuration (Domain email)")
+    if RENDER:
+        print("📧 Using RENDER email configuration (Domain email)")
+    elif CPANEL:
+        print("📧 Using CPANEL email configuration (Domain email)")
 
 # SMS Configuration
 SMS_API_KEY = config('SMS_API_KEY', default='')
 SMS_USERNAME = config('SMS_USERNAME', default='sandbox')
 
-# M-PESA CONFIGURATION based on RENDER environment
-if not RENDER:
+# M-PESA CONFIGURATION based on environment
+if not RENDER and not CPANEL:
     # Local development - Sandbox
     MPESA_ENVIRONMENT = 'sandbox'
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
@@ -342,13 +423,18 @@ if not RENDER:
     MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='http://localhost:8000/api/mpesa/callback/')
     print("💰 Using SANDBOX M-Pesa configuration")
 else:
-    # Production/Render - Production M-Pesa
+    # Production - both Render and cPanel
     MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='production')
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
     MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
     MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
-    MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://www.autowash.co.ke/api/mpesa/callback/')
+    
+    if RENDER:
+        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://autowash-3jpr.onrender.com/api/mpesa/callback/')
+    elif CPANEL:
+        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://app.autowash.co.ke/api/mpesa/callback/')
+    
     print("💰 Using PRODUCTION M-Pesa configuration")
 
 # REST Framework
@@ -388,7 +474,7 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-if not RENDER:
+if not RENDER and not CPANEL:
     # Local development - relaxed security
     SECURE_HSTS_SECONDS = 0
     SECURE_SSL_REDIRECT = False
@@ -402,19 +488,29 @@ else:
         SECURE_SSL_REDIRECT = False
         SESSION_COOKIE_SECURE = False
         CSRF_COOKIE_SECURE = False
-        print("🔒 Using PRODUCTION security settings (RELAXED for debugging)")
+        if RENDER:
+            print("🔒 Using RENDER security settings (RELAXED for debugging)")
+        elif CPANEL:
+            print("🔒 Using CPANEL security settings (RELAXED for debugging)")
     else:
         # Strict production security
         SECURE_HSTS_SECONDS = 31536000
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
         SECURE_HSTS_PRELOAD = True
         SECURE_SSL_REDIRECT = True
-        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
-        print("🔒 Using PRODUCTION security settings (strict)")
-
-
+        
+        if RENDER:
+            SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+        elif CPANEL:
+            # cPanel might use different headers
+            SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+        
+        if RENDER:
+            print("🔒 Using RENDER security settings (strict)")
+        elif CPANEL:
+            print("🔒 Using CPANEL security settings (strict)")
 
 # Rate Limiting
 RATELIMIT_ENABLE = True
@@ -476,13 +572,13 @@ LOGGING = {
     },
 }
 
-# CORS CONFIGURATION based on RENDER environment
-if not RENDER:
+# CORS CONFIGURATION based on environment
+if not RENDER and not CPANEL:
     # Local development - allow all origins
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
     print("🌐 Using LOCAL CORS settings (allow all)")
-else:
+elif RENDER:
     # Production/Render - Render-optimized CORS
     CORS_ALLOWED_ORIGINS = [
         # Primary custom domains
@@ -510,11 +606,36 @@ else:
     CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight for 24 hours
     
     print("🌐 Using RENDER CORS settings (optimized for Render)")
+elif CPANEL:
+    # Production/cPanel - cPanel-optimized CORS
+    CORS_ALLOWED_ORIGINS = [
+        # Primary cPanel domains
+        "https://app.autowash.co.ke",
+        "https://autowash.co.ke",
+        "https://www.autowash.co.ke",
+    ]
+    
+    # Add cPanel domain if specified
+    cpanel_domain = config('CPANEL_DOMAIN', default='')
+    if cpanel_domain:
+        CORS_ALLOWED_ORIGINS.append(f"https://{cpanel_domain}")
+    
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^https://.*\.autowash\.co\.ke$",
+    ]
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_ALL_ORIGINS = False
+    
+    # cPanel-specific CORS optimizations
+    CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight for 24 hours
+    
+    print("🌐 Using CPANEL CORS settings (optimized for cPanel)")
 
 # Sentry Configuration - Only when not debugging
-if RENDER and not DEBUG and config('SENTRY_DSN', default=''):
+sentry_dsn = config('SENTRY_DSN', default='')
+if (RENDER or CPANEL) and not DEBUG and sentry_dsn:
     sentry_sdk.init(
-        dsn=config('SENTRY_DSN'),
+        dsn=sentry_dsn,
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True
@@ -555,8 +676,8 @@ SUBSCRIPTION_PLANS = {
     }
 }
 
-# STARTUP MESSAGES based on RENDER environment
-if not RENDER:
+# STARTUP MESSAGES based on environment
+if not RENDER and not CPANEL:
     print("\n" + "="*70)
     print("🏠 AUTOWASH - LOCAL DEVELOPMENT ENVIRONMENT (PATH-BASED)")
     print("="*70)
@@ -567,7 +688,7 @@ if not RENDER:
     print("🔒 Security: Relaxed")
     print(f"🐛 Debug mode: {'Enabled' if DEBUG else 'Disabled'}")
     print("="*70 + "\n")
-else:
+elif RENDER:
     print("\n" + "="*70) 
     print("🚀 AUTOWASH - PRODUCTION ENVIRONMENT (RENDER - PATH-BASED)")
     print("="*70)
@@ -590,4 +711,32 @@ else:
             print("🐛 Sentry: No DSN configured")
     
     print("📁 Static files: WhiteNoise")
+    print("="*70 + "\n")
+elif CPANEL:
+    print("\n" + "="*70) 
+    print("🏢 AUTOWASH - PRODUCTION ENVIRONMENT (CPANEL - PATH-BASED)")
+    print("="*70)
+    print("🌐 Main site: https://app.autowash.co.ke")
+    print("🏢 Business URLs: https://app.autowash.co.ke/business/{slug}/")
+    print("📧 Email: Domain server")
+    print("💰 M-Pesa: Production")
+    
+    if DEBUG:
+        print("🔧 DEBUG MODE: Enabled")
+        print("🐛 Debug toolbar: Available")
+        print("📝 Enhanced logging: Enabled")
+        print("🔒 Security: Relaxed for debugging")
+        print("🐛 Sentry: Disabled")
+    else:
+        print("🔒 Security: Strict production mode")
+        if config('SENTRY_DSN', default=''):
+            print("🐛 Sentry: Enabled")
+        else:
+            print("🐛 Sentry: No DSN configured")
+    
+    print("📁 Static files: Apache/Nginx")
+    if redis_url and 'redis://' in redis_url:
+        print("🔄 Celery: Enabled with Redis")
+    else:
+        print("🔄 Celery: Disabled (No Redis)")
     print("="*70 + "\n")
