@@ -233,7 +233,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 
-# DATABASE CONFIGURATION
+# DATABASE CONFIGURATION - FIXED for django-tenants
 database_url = config('DATABASE_URL')
 
 DATABASES = {
@@ -244,50 +244,33 @@ DATABASES = {
     )
 }
 
-# Override engine based on environment and database type
-if 'postgresql' in database_url.lower():
-    # PostgreSQL with django-tenants
-    DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
-elif 'mysql' in database_url.lower() and CPANEL:
-    # MySQL for cPanel (django-tenants doesn't support MySQL well, consider alternatives)
-    print("⚠️  WARNING: django-tenants has limited MySQL support. Consider PostgreSQL.")
-    DATABASES['default']['ENGINE'] = 'django.db.backends.mysql'
-    DATABASES['default']['OPTIONS'] = {
-        'charset': 'utf8mb4',
-    }
+# CRITICAL FIX: Always use django-tenants PostgreSQL backend
+# This is REQUIRED for django-tenants to work properly
+DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
 
 # Configure SSL and connection options based on environment
 if not RENDER and not CPANEL:
-    # Local development - disable SSL for local database
-    if 'postgresql' in database_url.lower():
-        DATABASES['default']['OPTIONS'] = {
-            'sslmode': 'disable',
-            'options': '-c search_path=public'
-        }
-    print(f"📊 Using LOCAL database (SSL disabled)")
+    # Local development - disable SSL for local PostgreSQL
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'disable',
+        'options': '-c search_path=public'
+    }
+    print(f"📊 Using LOCAL PostgreSQL database (SSL disabled)")
 elif RENDER:
     # Production/Render - require SSL for external PostgreSQL + timeout settings
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'require',
         'options': '-c search_path=public -c statement_timeout=300000 -c lock_timeout=300000'
     }
-    # Optimize for Render performance during schema creation
-    DATABASES['default']['CONN_MAX_AGE'] = 0 if DEBUG else 600  # Disable persistent connections when debugging
+    DATABASES['default']['CONN_MAX_AGE'] = 0 if DEBUG else 600
     print(f"📊 Using RENDER PostgreSQL database (SSL required, timeouts configured)")
 elif CPANEL:
     # cPanel - typically localhost database
-    if 'postgresql' in database_url.lower():
-        DATABASES['default']['OPTIONS'] = {
-            'sslmode': 'prefer',  # Try SSL, but don't require it
-            'options': '-c search_path=public'
-        }
-    elif 'mysql' in database_url.lower():
-        DATABASES['default']['OPTIONS'] = {
-            'charset': 'utf8mb4',
-            'sql_mode': 'STRICT_TRANS_TABLES',
-        }
-    print(f"📊 Using CPANEL database (localhost)")
-
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'prefer',  # Try SSL, but don't require it
+        'options': '-c search_path=public'
+    }
+    print(f"📊 Using CPANEL PostgreSQL database (localhost)")
 # Redis & Channels
 redis_url = config('REDIS_URL', default='redis://localhost:6379/1')
 CHANNEL_LAYERS = {

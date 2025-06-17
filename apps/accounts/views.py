@@ -17,6 +17,7 @@ from django.utils.text import slugify
 import uuid
 from django.conf import settings
 from apps.core.decorators import ajax_required
+from apps.core.management.environment import get_current_environment, get_domain_for_environment, get_environment_context, get_error_message, get_success_message
 from .models import UserProfile, Business, BusinessSettings, BusinessVerification, Domain
 from .forms import (
     UserRegistrationForm, UserProfileForm, BusinessRegistrationForm,
@@ -257,14 +258,23 @@ def dashboard_redirect(request):
     messages.info(request, 'Welcome! Please register your business to get started, or contact your employer for access.')
     return redirect('/auth/business/register/')
 
+
 @login_required
 def business_register_view(request):
-    """Business registration - NO schema/employee creation during registration"""
+    """
+    Business registration view with multi-environment support
+    Supports Local, Render, and cPanel environments
+    NO schema/employee creation during registration - only after admin approval
+    """
+    
+    # Detect current environment
+    environment = get_current_environment()
+    
     print(f"\n" + "="*50)
     print(f"BUSINESS REGISTER VIEW CALLED - PATH-BASED ROUTING")
     print(f"Request method: {request.method}")
     print(f"User: {request.user}")
-    print(f"Environment: {'LOCAL' if not settings.RENDER else 'RENDER'}")
+    print(f"Environment: {environment.upper()}")
     print(f"Debug mode: {'ON' if settings.DEBUG else 'OFF'}")
     print(f"="*50)
     
@@ -304,6 +314,7 @@ def business_register_view(request):
                     print(f"About to save business: {business.name}")
                     print(f"Schema name: {business.schema_name}")
                     print(f"Business slug: {business.slug}")
+                    print(f"Environment: {environment}")
                     
                     # Check for conflicts
                     original_slug = business.slug
@@ -322,16 +333,10 @@ def business_register_view(request):
                     business.save()
                     print(f"Business saved successfully! ID: {business.id}")
                     
-                    # Create domain record for path-based routing
+                    # Create domain record for path-based routing (environment-specific)
                     print("Creating domain record for path-based routing...")
-                    
-                    # For path-based routing, we use a standardized domain format
-                    if not settings.RENDER:
-                        # Local development
-                        domain_name = f'{business.slug}.path-based.localhost'
-                    else:
-                        # Production on Render
-                        domain_name = f'{business.slug}.path-based.autowash'
+                    domain_name = get_domain_for_environment(business.slug, environment)
+                    print(f"Domain name for {environment}: {domain_name}")
 
                     # Create domain but note that schema doesn't exist yet
                     domain = Domain.objects.create(
@@ -350,10 +355,8 @@ def business_register_view(request):
                     # That will be done by admin during approval process
                     print("Business registration complete - waiting for admin approval")
                     
-                    success_message = (
-                        f'Business "{business.name}" registered successfully! '
-                        f'Please upload verification documents. Admin will review and activate your account.'
-                    )
+                    # Environment-specific success message
+                    success_message = get_success_message(business, environment)
                     messages.success(request, success_message)
                     
                     # Redirect to verification upload
@@ -364,7 +367,10 @@ def business_register_view(request):
                 print(f"Error: {str(e)}")
                 import traceback
                 traceback.print_exc()
-                messages.error(request, f'Registration failed: {str(e)}')
+                
+                # Environment-specific error handling
+                error_message = get_error_message(str(e), environment)
+                messages.error(request, error_message)
         else:
             print("=== FORM VALIDATION ERRORS ===")
             for field, errors in form.errors.items():
@@ -372,7 +378,13 @@ def business_register_view(request):
     else:
         form = BusinessRegistrationForm()
     
-    return render(request, 'auth/business_register.html', {'form': form})
+    # Add environment context to template
+    context = {
+        'form': form,
+        **get_environment_context()  # This adds all environment info to template
+    }
+    
+    return render(request, 'auth/business_register.html', context)
 
 @login_required
 def verification_pending(request):
