@@ -7,6 +7,8 @@ from django.views.generic import TemplateView
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect
 
+from apps.core.views import health_check
+
 def public_root_redirect(request):
     """Handle root redirects for public schema"""
     print("🌐 PUBLIC ROOT REDIRECT")
@@ -28,6 +30,8 @@ def public_root_redirect(request):
 print("🌐 PUBLIC URLs configuration loaded")
 
 urlpatterns = [
+    # Health
+    path('health/', health_check, name='health_check'),
     # Public admin (system-wide)
     path('system-admin/', admin.site.urls),
     

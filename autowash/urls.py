@@ -7,6 +7,8 @@ from django.views.generic import TemplateView
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect, HttpResponse
 
+from apps.core.views import health_check
+
 def root_redirect(request):
     """Smart root redirect based on user authentication and business context"""
     print(f"\n" + "="*50)
@@ -35,11 +37,21 @@ def root_redirect(request):
                 'title': 'Business Dashboard'
             })
     
+    # Early return for anonymous users to avoid database queries
+    if not request.user.is_authenticated:
+        print(f"User not authenticated, redirecting to public")
+        return HttpResponseRedirect('/public/')
+    
     try:
+        # Only query database if user is authenticated
         if request.user.is_authenticated:
-            # Check if user owns a business
+            # Use select_related to optimize the query
             try:
-                business = request.user.owned_businesses.first()
+                from apps.businesses.models import Business  # Import here to avoid circular imports
+                business = Business.objects.filter(
+                    owner=request.user
+                ).select_related('owner').first()
+                
                 if business:
                     print(f"User business found: {business.name}")
                     print(f"Business verified: {business.is_verified}")
@@ -54,12 +66,12 @@ def root_redirect(request):
                 else:
                     print(f"No business found, redirecting to business registration")
                     return HttpResponseRedirect('/auth/business/register/')
+                    
             except Exception as e:
                 print(f"Error checking business: {e}")
+                # Fallback to auth dashboard instead of crashing
                 return HttpResponseRedirect('/auth/dashboard/')
-        else:
-            print(f"User not authenticated, redirecting to public")
-            return HttpResponseRedirect('/public/')
+                
     except Exception as e:
         print(f"Root redirect error: {e}")
         # Fallback in case of any errors
@@ -70,6 +82,8 @@ def root_redirect(request):
 print("🏢 TENANT URLs configuration loaded (post-middleware)")
 
 urlpatterns = [
+    # Health check
+    path('health/', health_check, name='health_check'),
     # Admin for tenants  
     path('admin/', admin.site.urls),
     
