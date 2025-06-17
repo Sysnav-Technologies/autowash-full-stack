@@ -1,3 +1,12 @@
+# CRITICAL: Set threading limits BEFORE any imports
+import os
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+os.environ['BLAS_NUM_THREADS'] = '1'
+
 import csv
 import json
 import pandas as pd
@@ -16,6 +25,7 @@ import xlsxwriter
 import io
 import os
 
+# Rest of your utils.py code continues exactly as before...
 class ReportGenerator:
     """Handles report data generation"""
     
