@@ -79,7 +79,7 @@ SHARED_APPS = [
     'phonenumber_field',
     'django_extensions',
     'django_filters',
-    'import_export',
+    # 'import_export',
     'corsheaders',
     'rest_framework',
     'rest_framework.authtoken',
