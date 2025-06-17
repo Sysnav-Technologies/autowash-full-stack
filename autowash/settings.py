@@ -15,7 +15,8 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Environment Detection
 RENDER = config('RENDER', default=False, cast=bool)
-CPANEL = config('CPANEL', default=False, cast=bool)
+CPANEL = os.getenv('CPANEL', 'False').lower() in ('true', '1', 'yes')
+# CPANEL = config('CPANEL', default=False, cast=bool)
 
 # SMART ALLOWED_HOSTS based on environment
 if not RENDER and not CPANEL:
