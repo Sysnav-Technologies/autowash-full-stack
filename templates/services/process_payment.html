@@ -1,0 +1,1233 @@
+<!-- templates/services/process_payment.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Process Payment - Order {{ order.order_number }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+    --primary-500: #3b82f6;
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --success-500: #10b981;
+    --success-50: #ecfdf5;
+    --success-100: #d1fae5;
+    --success-600: #059669;
+    --warning-500: #f59e0b;
+    --warning-50: #fffbeb;
+    --warning-100: #fef3c7;
+    --danger-500: #ef4444;
+    --danger-50: #fef2f2;
+    --danger-100: #fecaca;
+    --info-500: #06b6d4;
+    --info-50: #f0f9ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --transition: 0.15s ease-in-out;
+}
+
+.page-header {
+    background: linear-gradient(135deg, var(--success-50), var(--primary-50));
+    border: 1px solid var(--success-100);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-subtitle {
+    margin: 0.5rem 0 0;
+    color: var(--gray-600);
+    font-size: 1rem;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all var(--transition);
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.btn-success {
+    background: var(--success-500);
+    color: white;
+    border-color: var(--success-500);
+}
+
+.btn-success:hover {
+    background: var(--success-600);
+    text-decoration: none;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-500);
+    text-decoration: none;
+    color: var(--gray-700);
+}
+
+.btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1rem;
+}
+
+.card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background: var(--gray-50);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.card-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.payment-methods {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.payment-method {
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition);
+    background: white;
+}
+
+.payment-method:hover {
+    border-color: var(--primary-300);
+    background: var(--primary-50);
+}
+
+.payment-method.selected {
+    border-color: var(--primary-500);
+    background: var(--primary-50);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.payment-method-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--gray-600);
+}
+
+.payment-method.selected .payment-method-icon {
+    color: var(--primary-600);
+}
+
+.payment-method-name {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+}
+
+.payment-method-desc {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+}
+
+.order-summary {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.summary-row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--success-600);
+}
+
+.summary-label {
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.summary-value {
+    color: var(--gray-900);
+    font-weight: 600;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.form-label.required::after {
+    content: " *";
+    color: var(--danger-500);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    transition: all var(--transition);
+    background: white;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-control.is-invalid {
+    border-color: var(--danger-500);
+}
+
+.input-group {
+    position: relative;
+}
+
+.input-group-prepend {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-500);
+    font-weight: 600;
+    z-index: 10;
+}
+
+.form-control.with-prepend {
+    padding-left: 3rem;
+}
+
+.amount-display {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--success-600);
+    text-align: center;
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--success-50);
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--success-100);
+}
+
+.payment-details {
+    background: var(--info-50);
+    border: 1px solid var(--info-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.payment-details h6 {
+    color: var(--info-700);
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+}
+
+.payment-details ul {
+    margin: 0;
+    padding-left: 1.5rem;
+    color: var(--info-700);
+}
+
+.payment-details li {
+    margin-bottom: 0.25rem;
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+}
+
+.alert-info {
+    background: var(--info-50);
+    color: var(--info-700);
+    border-color: var(--info-200);
+}
+
+.alert-warning {
+    background: var(--warning-50);
+    color: var(--warning-700);
+    border-color: var(--warning-200);
+}
+
+.alert-success {
+    background: var(--success-50);
+    color: var(--success-700);
+    border-color: var(--success-200);
+}
+
+.receipt-preview {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-top: 2rem;
+    font-family: monospace;
+}
+
+.receipt-header {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px dashed var(--gray-300);
+}
+
+.receipt-items {
+    margin: 1rem 0;
+}
+
+.receipt-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.receipt-footer {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 2px dashed var(--gray-300);
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.processing-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.processing-content {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.spinner {
+    border: 4px solid var(--gray-200);
+    border-top: 4px solid var(--primary-500);
+    border-radius: 50%;
+    width: 3rem;
+    height: 3rem;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -0.75rem;
+}
+
+.col-md-8 {
+    flex: 0 0 66.666667%;
+    padding: 0 0.75rem;
+}
+
+.col-md-4 {
+    flex: 0 0 33.333333%;
+    padding: 0 0.75rem;
+}
+
+@media (max-width: 768px) {
+    .col-md-8,
+    .col-md-4 {
+        flex: 0 0 100%;
+    }
+    
+    .payment-methods {
+        grid-template-columns: 1fr;
+    }
+    
+    .amount-display {
+        font-size: 1.5rem;
+    }
+}
+
+.text-muted { color: var(--gray-500); }
+.text-success { color: var(--success-600); }
+.text-primary { color: var(--primary-600); }
+.d-flex { display: flex; }
+.justify-content-between { justify-content: space-between; }
+.align-items-center { align-items: center; }
+.mb-0 { margin-bottom: 0; }
+.mt-3 { margin-top: 1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="page-title">
+                <i class="fas fa-credit-card"></i>
+                Process Payment
+            </h1>
+            <p class="page-subtitle">Order {{ order.order_number }} - {{ order.customer.full_name }}</p>
+        </div>
+        
+        <div>
+            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i>
+                Back to Order
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Payment Form -->
+    <div class="col-md-8">
+        <form id="paymentForm" method="post" action="/business/{{ request.tenant.slug }}/payments/create/{{ order.id }}/">
+            {% csrf_token %}
+            
+            <!-- Order Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-receipt"></i>
+                        Order Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="order-summary">
+                        <div class="summary-row">
+                            <span class="summary-label">Order Number:</span>
+                            <span class="summary-value">{{ order.order_number }}</span>
+                        </div>
+                        
+                        <div class="summary-row">
+                            <span class="summary-label">Customer:</span>
+                            <span class="summary-value">{{ order.customer.full_name }}</span>
+                        </div>
+                        
+                        <div class="summary-row">
+                            <span class="summary-label">Vehicle:</span>
+                            <span class="summary-value">{{ order.vehicle.registration_number }} ({{ order.vehicle.make }} {{ order.vehicle.model }})</span>
+                        </div>
+                        
+                        <div class="summary-row">
+                            <span class="summary-label">Services:</span>
+                            <div>
+                                {% for item in order.order_items.all %}
+                                    <div class="text-muted" style="font-size: 0.875rem;">
+                                        {{ item.service.name }} {% if item.quantity > 1 %}x{{ item.quantity }}{% endif %} - KES {{ item.total_price }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="summary-row">
+                            <span class="summary-label">Subtotal:</span>
+                            <span class="summary-value">KES {{ order.subtotal }}</span>
+                        </div>
+                        
+                        {% if order.discount_amount > 0 %}
+                            <div class="summary-row">
+                                <span class="summary-label">Discount:</span>
+                                <span class="summary-value text-success">-KES {{ order.discount_amount }}</span>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="summary-row">
+                            <span class="summary-label">Tax (16%):</span>
+                            <span class="summary-value">KES {{ order.tax_amount }}</span>
+                        </div>
+                        
+                        <div class="summary-row">
+                            <span class="summary-label">Total Amount:</span>
+                            <span class="summary-value">KES {{ order.total_amount }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Method Selection -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-credit-card"></i>
+                        Select Payment Method
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="payment-methods">
+                        <div class="payment-method" onclick="selectPaymentMethod('cash')" data-method="cash">
+                            <div class="payment-method-icon">
+                                <i class="fas fa-money-bills"></i>
+                            </div>
+                            <div class="payment-method-name">Cash</div>
+                            <div class="payment-method-desc">Pay with cash</div>
+                        </div>
+                        
+                        <div class="payment-method" onclick="selectPaymentMethod('card')" data-method="card">
+                            <div class="payment-method-icon">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            <div class="payment-method-name">Card</div>
+                            <div class="payment-method-desc">Credit/Debit card</div>
+                        </div>
+                        
+                        <div class="payment-method" onclick="selectPaymentMethod('mpesa')" data-method="mpesa">
+                            <div class="payment-method-icon">
+                                <i class="fas fa-mobile-alt"></i>
+                            </div>
+                            <div class="payment-method-name">M-Pesa</div>
+                            <div class="payment-method-desc">Mobile money</div>
+                        </div>
+                        
+                        <div class="payment-method" onclick="selectPaymentMethod('bank_transfer')" data-method="bank_transfer">
+                            <div class="payment-method-icon">
+                                <i class="fas fa-university"></i>
+                            </div>
+                            <div class="payment-method-name">Bank Transfer</div>
+                            <div class="payment-method-desc">Direct bank transfer</div>
+                        </div>
+                    </div>
+                    
+                    <input type="hidden" id="selectedPaymentMethod" name="payment_method" required>
+                </div>
+            </div>
+
+            <!-- Payment Details -->
+            <div id="paymentDetailsSection" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-info-circle"></i>
+                            Payment Details
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Amount Display -->
+                        <div class="amount-display" id="amountDisplay">
+                            KES {{ order.total_amount }}
+                        </div>
+                        
+                        <!-- Amount Received Input -->
+                        <div class="form-group">
+                            <label for="amountReceived" class="form-label required">Amount Received</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">KES</div>
+                                <input type="number" class="form-control with-prepend" id="amountReceived" name="amount_received" 
+                                       step="0.01" min="0" value="{{ order.total_amount }}" required 
+                                       onchange="calculateChange()" oninput="calculateChange()">
+                            </div>
+                        </div>
+                        
+                        <!-- Change Display -->
+                        <div id="changeDisplay" style="display: none;">
+                            <div class="alert alert-success">
+                                <strong>Change to give:</strong> <span id="changeAmount">KES 0.00</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Payment Method Specific Details -->
+                        <div id="cashDetails" class="payment-details" style="display: none;">
+                            <h6><i class="fas fa-money-bills"></i> Cash Payment</h6>
+                            <ul>
+                                <li>Count the cash carefully</li>
+                                <li>Check for counterfeit notes</li>
+                                <li>Provide receipt and change if applicable</li>
+                            </ul>
+                        </div>
+                        
+                        <div id="cardDetails" class="payment-details" style="display: none;">
+                            <h6><i class="fas fa-credit-card"></i> Card Payment</h6>
+                            <ul>
+                                <li>Insert or tap the card on the terminal</li>
+                                <li>Enter PIN if required</li>
+                                <li>Wait for transaction approval</li>
+                                <li>Print receipt for customer</li>
+                            </ul>
+                        </div>
+                        
+                        <div id="mpesaDetails" class="payment-details" style="display: none;">
+                            <h6><i class="fas fa-mobile-alt"></i> M-Pesa Payment</h6>
+                            <div class="form-group">
+                                <label for="mpesaPhone" class="form-label">Customer Phone Number</label>
+                                <input type="tel" class="form-control" id="mpesaPhone" name="mpesa_phone" 
+                                       placeholder="+254 700 000 000" value="{{ order.customer.phone }}">
+                            </div>
+                            <ul>
+                                <li>Customer will receive STK push notification</li>
+                                <li>Customer enters M-Pesa PIN on their phone</li>
+                                <li>Transaction will be processed automatically</li>
+                            </ul>
+                        </div>
+                        
+                        <div id="bankTransferDetails" class="payment-details" style="display: none;">
+                            <h6><i class="fas fa-university"></i> Bank Transfer</h6>
+                            <div class="form-group">
+                                <label for="referenceNumber" class="form-label">Reference Number</label>
+                                <input type="text" class="form-control" id="referenceNumber" name="reference_number" 
+                                       placeholder="Enter transaction reference">
+                            </div>
+                            <ul>
+                                <li>Provide bank account details to customer</li>
+                                <li>Wait for transfer confirmation</li>
+                                <li>Verify reference number</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Notes -->
+                        <div class="form-group">
+                            <label for="paymentNotes" class="form-label">Payment Notes (Optional)</label>
+                            <textarea class="form-control" id="paymentNotes" name="notes" rows="3" 
+                                      placeholder="Any additional notes about the payment..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div id="submitSection" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center" style="gap: 1rem;">
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Cancel
+                    </a>
+                    
+                    <button type="submit" class="btn btn-success btn-lg" id="processPaymentBtn">
+                        <i class="fas fa-check"></i>
+                        Process Payment
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-calculator"></i>
+                    Payment Calculator
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Quick Amount Buttons</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <button type="button" class="btn btn-outline-secondary" onclick="setAmount({{ order.total_amount }})">
+                            Exact Amount
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setAmount({{ order.total_amount|floatformat:0|add:100 }})">
+                            +100
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setAmount({{ order.total_amount|floatformat:0|add:500 }})">
+                            +500
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setAmount({{ order.total_amount|floatformat:0|add:1000 }})">
+                            +1000
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Common Denominations</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.875rem;">
+                        <button type="button" class="btn btn-outline-secondary" onclick="addAmount(50)">+50</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="addAmount(100)">+100</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="addAmount(200)">+200</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="addAmount(500)">+500</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="addAmount(1000)">+1000</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearAmount()">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Information -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Order Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; gap: 0.75rem;">
+                    <div>
+                        <small class="text-muted">Order Date</small>
+                        <div>{{ order.created_at|date:"M d, Y g:i A" }}</div>
+                    </div>
+                    
+                    <div>
+                        <small class="text-muted">Service Duration</small>
+                        <div>
+                            {% if order.duration_minutes %}
+                                {{ order.duration_minutes }} minutes
+                            {% else %}
+                                {{ order.estimated_duration }} minutes (estimated)
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <small class="text-muted">Attendant</small>
+                        <div>{{ order.assigned_attendant.full_name|default:"Not assigned" }}</div>
+                    </div>
+                    
+                    {% if order.customer.customer_id %}
+                        <div>
+                            <small class="text-muted">Customer ID</small>
+                            <div>{{ order.customer.customer_id }}</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment History -->
+        {% if order.payment_history %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-history"></i>
+                        Payment History
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Add payment history if available -->
+                    <div class="text-muted">No previous payments</div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Processing Overlay -->
+<div id="processingOverlay" class="processing-overlay">
+    <div class="processing-content">
+        <div class="spinner"></div>
+        <h5>Processing Payment...</h5>
+        <p class="text-muted">Please wait while we process your payment.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedMethod = null;
+const totalAmount = {{ order.total_amount }};
+
+// Payment method selection
+function selectPaymentMethod(method) {
+    // Remove previous selection
+    document.querySelectorAll('.payment-method').forEach(el => {
+        el.classList.remove('selected');
+    });
+    
+    // Add selection to clicked method
+    document.querySelector(`[data-method="${method}"]`).classList.add('selected');
+    
+    // Set hidden input
+    document.getElementById('selectedPaymentMethod').value = method;
+    selectedMethod = method;
+    
+    // Show payment details
+    showPaymentDetails(method);
+}
+
+function showPaymentDetails(method) {
+    // Hide all method-specific details
+    document.querySelectorAll('.payment-details').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Show selected method details
+    document.getElementById(`${method}Details`).style.display = 'block';
+    
+    // Show payment details section
+    document.getElementById('paymentDetailsSection').style.display = 'block';
+    document.getElementById('submitSection').style.display = 'block';
+    
+    // Set default amount
+    document.getElementById('amountReceived').value = totalAmount;
+    calculateChange();
+}
+
+// Amount calculation functions
+function calculateChange() {
+    const amountReceived = parseFloat(document.getElementById('amountReceived').value) || 0;
+    const change = amountReceived - totalAmount;
+    
+    const changeDisplay = document.getElementById('changeDisplay');
+    const changeAmount = document.getElementById('changeAmount');
+    
+    if (change > 0) {
+        changeDisplay.style.display = 'block';
+        changeAmount.textContent = `KES ${change.toFixed(2)}`;
+        changeDisplay.className = 'alert alert-success';
+        changeDisplay.querySelector('strong').textContent = 'Change to give:';
+    } else if (change < 0) {
+        changeDisplay.style.display = 'block';
+        changeAmount.textContent = `KES ${Math.abs(change).toFixed(2)}`;
+        changeDisplay.className = 'alert alert-warning';
+        changeDisplay.querySelector('strong').textContent = 'Amount short:';
+    } else {
+        changeDisplay.style.display = 'none';
+    }
+}
+
+function setAmount(amount) {
+    document.getElementById('amountReceived').value = amount.toFixed(2);
+    calculateChange();
+}
+
+function addAmount(amount) {
+    const currentAmount = parseFloat(document.getElementById('amountReceived').value) || 0;
+    document.getElementById('amountReceived').value = (currentAmount + amount).toFixed(2);
+    calculateChange();
+}
+
+function clearAmount() {
+    document.getElementById('amountReceived').value = '0.00';
+    calculateChange();
+}
+
+// Form submission
+document.getElementById('paymentForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!selectedMethod) {
+        showToast('Please select a payment method', 'error');
+        return;
+    }
+    
+    const amountReceived = parseFloat(document.getElementById('amountReceived').value) || 0;
+    
+    if (amountReceived < totalAmount) {
+        if (!confirm(`Amount received (KES ${amountReceived.toFixed(2)}) is less than total amount (KES ${totalAmount.toFixed(2)}). This will mark the payment as partial. Continue?`)) {
+            return;
+        }
+    }
+    
+    // Show processing overlay
+    document.getElementById('processingOverlay').style.display = 'flex';
+    
+    // Prepare form data
+    const formData = new FormData(this);
+    
+    // Submit the form to the payments app
+    fetch(`/business/{{ request.tenant.slug }}/payments/create/{{ order.id }}/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        document.getElementById('processingOverlay').style.display = 'none';
+        
+        if (data.success) {
+            showToast('Payment processed successfully!', 'success');
+            
+            // Redirect to receipt page after a short delay
+            setTimeout(() => {
+                window.location.href = data.redirect_url || `/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/payment/receipt/`;
+            }, 1500);
+        } else {
+            showToast(data.message || 'Error processing payment', 'error');
+            
+            if (data.errors) {
+                displayFormErrors(data.errors);
+            }
+        }
+    })
+    .catch(error => {
+        document.getElementById('processingOverlay').style.display = 'none';
+        console.error('Payment processing error:', error);
+        
+        let errorMessage = 'Error processing payment. Please try again.';
+        
+        if (error.message.includes('500')) {
+            errorMessage = 'Server error. Please contact support.';
+        } else if (error.message.includes('403')) {
+            errorMessage = 'Access denied. Please refresh and try again.';
+        }
+        
+        showToast(errorMessage, 'error');
+    });
+});
+
+// M-Pesa specific handling
+function initiateMpesaPayment() {
+    const phone = document.getElementById('mpesaPhone').value;
+    
+    if (!phone) {
+        showToast('Phone number is required for M-Pesa payment', 'error');
+        return;
+    }
+    
+    // Show processing for M-Pesa
+    document.getElementById('processingOverlay').style.display = 'flex';
+    document.querySelector('.processing-content h5').textContent = 'Initiating M-Pesa Payment...';
+    document.querySelector('.processing-content p').textContent = 'Sending STK push to customer phone...';
+    
+    // This would integrate with your M-Pesa payment processing
+    // For now, we'll simulate the process
+    setTimeout(() => {
+        document.querySelector('.processing-content h5').textContent = 'Waiting for Customer...';
+        document.querySelector('.processing-content p').textContent = 'Customer should enter PIN on their phone to complete payment.';
+        
+        // Simulate waiting for customer to complete payment
+        setTimeout(() => {
+            document.getElementById('processingOverlay').style.display = 'none';
+            // Handle M-Pesa response here
+        }, 10000);
+    }, 2000);
+}
+
+// Form validation
+function validatePaymentForm() {
+    const method = document.getElementById('selectedPaymentMethod').value;
+    const amount = parseFloat(document.getElementById('amountReceived').value) || 0;
+    
+    if (!method) {
+        showToast('Please select a payment method', 'error');
+        return false;
+    }
+    
+    if (amount <= 0) {
+        showToast('Please enter a valid amount', 'error');
+        return false;
+    }
+    
+    // Method-specific validation
+    if (method === 'mpesa') {
+        const phone = document.getElementById('mpesaPhone').value;
+        if (!phone) {
+            showToast('Phone number is required for M-Pesa payment', 'error');
+            return false;
+        }
+    }
+    
+    if (method === 'bank_transfer') {
+        const reference = document.getElementById('referenceNumber').value;
+        if (!reference) {
+            showToast('Reference number is required for bank transfer', 'error');
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Error handling
+function displayFormErrors(errors) {
+    // Clear previous errors
+    document.querySelectorAll('.form-control').forEach(field => {
+        field.classList.remove('is-invalid');
+    });
+    document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+    
+    // Display new errors
+    Object.keys(errors).forEach(fieldName => {
+        const fieldErrors = errors[fieldName];
+        if (fieldErrors && fieldErrors.length > 0) {
+            const field = document.querySelector(`[name="${fieldName}"]`);
+            
+            if (field) {
+                field.classList.add('is-invalid');
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'invalid-feedback';
+                errorDiv.textContent = fieldErrors[0];
+                field.parentNode.appendChild(errorDiv);
+            }
+        }
+    });
+}
+
+// Utility functions
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showToast(message, type) {
+    // Remove existing toasts
+    document.querySelectorAll('.toast-notification').forEach(toast => toast.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    
+    const iconMap = {
+        'success': 'check-circle',
+        'error': 'exclamation-triangle',
+        'warning': 'exclamation-circle',
+        'info': 'info-circle'
+    };
+    
+    const colorMap = {
+        'success': '#10b981',
+        'error': '#ef4444',
+        'warning': '#f59e0b',
+        'info': '#06b6d4'
+    };
+    
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${iconMap[type] || 'info-circle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Apply styles
+    toast.style.cssText = `
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        z-index: 9999;
+        min-width: 300px;
+        max-width: 500px;
+        animation: slideInRight 0.3s ease-out;
+        border-left: 4px solid ${colorMap[type] || colorMap.info};
+    `;
+    
+    const content = toast.querySelector('.toast-content');
+    content.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #374151;
+    `;
+    
+    const icon = content.querySelector('i');
+    icon.style.color = colorMap[type] || colorMap.info;
+    
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 0.375rem;
+        transition: color 0.15s ease-in-out;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+}
+
+// Add CSS animations for toast
+if (!document.getElementById('toast-animations')) {
+    const style = document.createElement('style');
+    style.id = 'toast-animations';
+    style.textContent = `
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(100%); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideOutRight {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(100%); }
+        }
+        .invalid-feedback {
+            display: block;
+            width: 100%;
+            margin-top: 0.25rem;
+            font-size: 0.875rem;
+            color: #ef4444;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // ESC to cancel
+    if (e.key === 'Escape') {
+        if (confirm('Are you sure you want to cancel payment processing?')) {
+            window.location.href = `/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/`;
+        }
+    }
+    
+    // Enter to submit (if form is valid)
+    if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        if (validatePaymentForm()) {
+            document.getElementById('paymentForm').dispatchEvent(new Event('submit'));
+        }
+    }
+});
+
+// Auto-focus on amount input when payment method is selected
+document.querySelectorAll('.payment-method').forEach(method => {
+    method.addEventListener('click', function() {
+        setTimeout(() => {
+            document.getElementById('amountReceived').focus();
+            document.getElementById('amountReceived').select();
+        }, 100);
+    });
+});
+
+// Format phone number for M-Pesa
+document.getElementById('mpesaPhone').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.startsWith('0')) {
+        value = '254' + value.substring(1);
+    }
+    if (value.startsWith('254') && !value.startsWith('+254')) {
+        value = '+' + value;
+    }
+    
+    e.target.value = value;
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-select cash payment if no method is pre-selected
+    if (!selectedMethod) {
+        // selectPaymentMethod('cash');
+    }
+    
+    console.log('Payment processing page loaded');
+    
+    // Set focus on first payment method
+    document.querySelector('.payment-method').focus();
+});
+</script>
+{% endblock %}

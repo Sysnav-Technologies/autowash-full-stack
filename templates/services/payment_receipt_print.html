@@ -1,0 +1,407 @@
+<!-- templates/services/payment_receipt_print.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt - {{ order.order_number }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 11pt;
+            line-height: 1.2;
+            color: #000;
+            background: #fff;
+            width: 80mm;
+            margin: 0 auto;
+        }
+        
+        .receipt {
+            width: 100%;
+            padding: 2mm;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 1px solid #000;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+        }
+        
+        .logo {
+            width: 15mm;
+            height: 15mm;
+            margin: 0 auto 2mm;
+            background: #000;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8pt;
+        }
+        
+        .business-name {
+            font-size: 14pt;
+            font-weight: bold;
+            margin: 1mm 0;
+            text-transform: uppercase;
+        }
+        
+        .business-details {
+            font-size: 8pt;
+            line-height: 1.1;
+        }
+        
+        .receipt-number {
+            font-size: 12pt;
+            font-weight: bold;
+            margin: 2mm 0;
+        }
+        
+        .section {
+            margin: 3mm 0;
+        }
+        
+        .section-title {
+            font-size: 10pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-bottom: 1px solid #000;
+            padding-bottom: 1mm;
+            margin-bottom: 2mm;
+        }
+        
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1mm;
+            font-size: 9pt;
+        }
+        
+        .row.bold {
+            font-weight: bold;
+        }
+        
+        .item {
+            margin-bottom: 2mm;
+            padding-bottom: 1mm;
+            border-bottom: 1px dotted #666;
+        }
+        
+        .item-name {
+            font-weight: bold;
+            margin-bottom: 1mm;
+        }
+        
+        .item-details {
+            font-size: 8pt;
+            color: #666;
+        }
+        
+        .item-price {
+            text-align: right;
+            font-weight: bold;
+            margin-top: 1mm;
+        }
+        
+        .totals {
+            border: 1px solid #000;
+            padding: 2mm;
+            margin: 3mm 0;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1mm;
+            padding-bottom: 1mm;
+            border-bottom: 1px dotted #ccc;
+        }
+        
+        .total-row:last-child {
+            border-bottom: 2px solid #000;
+            font-weight: bold;
+            font-size: 11pt;
+            margin-top: 2mm;
+            padding-top: 2mm;
+        }
+        
+        .payment-info {
+            border: 1px solid #000;
+            padding: 2mm;
+            margin: 2mm 0;
+            font-size: 9pt;
+        }
+        
+        .footer {
+            text-align: center;
+            border-top: 1px solid #000;
+            padding-top: 3mm;
+            margin-top: 3mm;
+            font-size: 8pt;
+        }
+        
+        .thank-you {
+            font-weight: bold;
+            font-size: 10pt;
+            margin-bottom: 2mm;
+            text-transform: uppercase;
+        }
+        
+        .contact {
+            margin: 1mm 0;
+        }
+        
+        .legal {
+            margin-top: 2mm;
+            font-size: 7pt;
+            color: #666;
+        }
+        
+        /* Print-specific styles */
+        @media print {
+            body {
+                width: auto;
+                margin: 0;
+            }
+            
+            .receipt {
+                width: 100%;
+                padding: 0;
+            }
+        }
+        
+        /* Thermal printer specific */
+        @media print and (max-width: 60mm) {
+            body {
+                font-size: 9pt;
+                width: 58mm;
+            }
+            
+            .business-name {
+                font-size: 12pt;
+            }
+            
+            .logo {
+                width: 12mm;
+                height: 12mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <!-- Header -->
+        <div class="header">
+            <div class="receipt-number">RECEIPT #{{ order.order_number }}</div>
+            
+            {% if request.tenant.logo %}
+                <img src="{{ request.tenant.logo.url }}" alt="Logo" class="logo" style="border-radius: 50%; object-fit: cover;">
+            {% else %}
+                <div class="logo">LOGO</div>
+            {% endif %}
+            
+            <div class="business-name">{{ request.tenant.name }}</div>
+            <div class="business-details">
+                {% if request.tenant.business_type %}{{ request.tenant.business_type }}<br>{% endif %}
+                {% if request.tenant.address %}{{ request.tenant.address }}<br>{% endif %}
+                {% if request.tenant.city %}{{ request.tenant.city }}{% endif %}{% if request.tenant.postal_code %}, {{ request.tenant.postal_code }}{% endif %}<br>
+                {% if request.tenant.phone %}Tel: {{ request.tenant.phone }}<br>{% endif %}
+                {% if request.tenant.email %}{{ request.tenant.email }}{% endif %}
+            </div>
+        </div>
+        
+        <!-- Transaction Details -->
+        <div class="section">
+            <div class="section-title">Transaction Details</div>
+            <div class="row">
+                <span>Date:</span>
+                <span>{{ order.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            <div class="row">
+                <span>Customer:</span>
+                <span>{{ order.customer.full_name }}</span>
+            </div>
+            {% if order.customer.phone %}
+            <div class="row">
+                <span>Phone:</span>
+                <span>{{ order.customer.phone }}</span>
+            </div>
+            {% endif %}
+            <div class="row">
+                <span>Vehicle:</span>
+                <span>{{ order.vehicle.registration_number }}</span>
+            </div>
+            <div class="row">
+                <span>Make/Model:</span>
+                <span>{{ order.vehicle.make }} {{ order.vehicle.model }}</span>
+            </div>
+            {% if order.assigned_attendant %}
+            <div class="row">
+                <span>Attendant:</span>
+                <span>{{ order.assigned_attendant.full_name }}</span>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Services -->
+        <div class="section">
+            <div class="section-title">Services</div>
+            
+            {% if order.package %}
+                <div class="item">
+                    <div class="item-name">PACKAGE: {{ order.package.name|upper }}</div>
+                    <div class="item-details">{{ order.package.description|default:"Service package" }}</div>
+                    <div class="item-price">KES {{ order.package.total_price }}</div>
+                </div>
+            {% endif %}
+            
+            {% for item in order.order_items.all %}
+                <div class="item">
+                    <div class="item-name">{{ item.service.name|upper }}</div>
+                    <div class="item-details">
+                        {% if item.quantity > 1 %}Qty: {{ item.quantity }} @ KES {{ item.unit_price }} each<br>{% endif %}
+                        Duration: {{ item.service.estimated_duration }} min
+                        {% if item.completed_at %} | Completed: {{ item.completed_at|date:"H:i" }}{% endif %}
+                    </div>
+                    <div class="item-price">KES {{ item.total_price }}</div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Totals -->
+        <div class="totals">
+            <div class="total-row">
+                <span>SUBTOTAL:</span>
+                <span>KES {{ order.subtotal }}</span>
+            </div>
+            
+            {% if order.discount_amount > 0 %}
+            <div class="total-row">
+                <span>DISCOUNT:</span>
+                <span>-KES {{ order.discount_amount }}</span>
+            </div>
+            {% endif %}
+            
+            <div class="total-row">
+                <span>TAX (16%):</span>
+                <span>KES {{ order.tax_amount }}</span>
+            </div>
+            
+            <div class="total-row">
+                <span>TOTAL:</span>
+                <span>KES {{ order.total_amount }}</span>
+            </div>
+        </div>
+        
+        <!-- Payment Information -->
+        <div class="payment-info">
+            <div class="row bold">
+                <span>PAYMENT STATUS:</span>
+                <span>{{ order.get_payment_status_display|upper }}</span>
+            </div>
+            <div class="row">
+                <span>METHOD:</span>
+                <span>{% if payment %}{{ payment.payment_method.name|upper }}{% else %}{{ order.get_payment_method_display|upper|default:"CASH" }}{% endif %}</span>
+            </div>
+            <div class="row">
+                <span>PAID ON:</span>
+                <span>{% if payment %}{{ payment.completed_at|date:"d/m/Y H:i" }}{% else %}{{ order.updated_at|date:"d/m/Y H:i" }}{% endif %}</span>
+            </div>
+            {% if payment and payment.payment_id %}
+            <div class="row">
+                <span>PAYMENT ID:</span>
+                <span>{{ payment.payment_id }}</span>
+            </div>
+            {% endif %}
+            {% if payment and payment.reference_number %}
+            <div class="row">
+                <span>REFERENCE:</span>
+                <span>{{ payment.reference_number }}</span>
+            </div>
+            {% endif %}
+            {% if payment and payment.transaction_id %}
+            <div class="row">
+                <span>TRANSACTION:</span>
+                <span>{{ payment.transaction_id }}</span>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Customer Feedback -->
+        {% if order.customer_rating %}
+        <div class="section">
+            <div class="section-title">Customer Rating</div>
+            <div class="row">
+                <span>RATING:</span>
+                <span>{{ order.customer_rating }}/5 STARS</span>
+            </div>
+            {% if order.customer_feedback %}
+            <div style="margin-top: 2mm; font-size: 8pt; font-style: italic;">
+                "{{ order.customer_feedback }}"
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div class="thank-you">Thank You for Your Business!</div>
+            
+            <div>Your satisfaction is our priority.</div>
+            <div>Please contact us if you have any concerns.</div>
+            
+            {% if request.tenant.phone %}
+            <div class="contact">Phone: {{ request.tenant.phone }}</div>
+            {% endif %}
+            {% if request.tenant.email %}
+            <div class="contact">Email: {{ request.tenant.email }}</div>
+            {% endif %}
+            {% if request.tenant.website %}
+            <div class="contact">Web: {{ request.tenant.website }}</div>
+            {% endif %}
+            
+            <div class="legal">
+                {% if request.tenant.tax_number %}
+                Tax ID: {{ request.tenant.tax_number }}<br>
+                {% endif %}
+                {% if request.tenant.registration_number %}
+                Reg: {{ request.tenant.registration_number }}<br>
+                {% endif %}
+                This is a computer-generated receipt.<br>
+                No signature required.<br>
+                Printed: {{ "now"|date:"d/m/Y H:i" }}
+            </div>
+            
+            <div style="margin-top: 3mm; font-size: 7pt; word-break: break-all;">
+                Online: {{ request.get_host }}/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-print when page loads
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                window.print();
+                // Close window after printing (optional)
+                // window.close();
+            }, 500);
+        });
+        
+        // Print again when user presses Ctrl+P
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+        });
+    </script>
+</body>
+</html>

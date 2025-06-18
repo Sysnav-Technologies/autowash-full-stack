@@ -1,0 +1,1655 @@
+<!-- templates/services/order_detail.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Order {{ order.order_number }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+    --primary-500: #3b82f6;
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --success-500: #10b981;
+    --success-50: #ecfdf5;
+    --success-100: #d1fae5;
+    --success-600: #059669;
+    --warning-500: #f59e0b;
+    --warning-50: #fffbeb;
+    --warning-100: #fef3c7;
+    --danger-500: #ef4444;
+    --danger-50: #fef2f2;
+    --danger-100: #fecaca;
+    --info-500: #06b6d4;
+    --info-50: #f0f9ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --transition: 0.15s ease-in-out;
+}
+
+.page-header {
+    background: linear-gradient(135deg, var(--primary-50), var(--success-50));
+    border: 1px solid var(--primary-100);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-subtitle {
+    margin: 0.5rem 0 0;
+    color: var(--gray-600);
+    font-size: 1rem;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-pending { background: var(--warning-100); color: var(--warning-600); }
+.status-confirmed { background: var(--info-100); color: var(--info-600); }
+.status-in_progress { background: var(--primary-100); color: var(--primary-600); }
+.status-completed { background: var(--success-100); color: var(--success-600); }
+.status-cancelled { background: var(--danger-100); color: var(--danger-600); }
+.status-no_show { background: var(--gray-100); color: var(--gray-600); }
+
+.priority-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.priority-low { background: var(--gray-100); color: var(--gray-600); }
+.priority-normal { background: var(--info-100); color: var(--info-600); }
+.priority-high { background: var(--warning-100); color: var(--warning-600); }
+.priority-urgent { background: var(--danger-100); color: var(--danger-600); }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all var(--transition);
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.btn-primary {
+    background: var(--primary-500);
+    color: white;
+    border-color: var(--primary-500);
+}
+
+.btn-primary:hover {
+    background: var(--primary-600);
+    text-decoration: none;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background: var(--success-500);
+    color: white;
+    border-color: var(--success-500);
+}
+
+.btn-success:hover {
+    background: var(--success-600);
+    text-decoration: none;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-warning {
+    background: var(--warning-500);
+    color: white;
+    border-color: var(--warning-500);
+}
+
+.btn-warning:hover {
+    background: #d97706;
+    text-decoration: none;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background: var(--danger-500);
+    color: white;
+    border-color: var(--danger-500);
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    text-decoration: none;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: var(--primary-600);
+    border-color: var(--primary-300);
+}
+
+.btn-outline-primary:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-500);
+    text-decoration: none;
+    color: var(--primary-700);
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-500);
+    text-decoration: none;
+    color: var(--gray-700);
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+}
+
+.card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background: var(--gray-50);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.card-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.info-value {
+    font-size: 0.875rem;
+    color: var(--gray-900);
+    font-weight: 500;
+}
+
+.service-item {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.service-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.service-name {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.service-price {
+    font-weight: 700;
+    color: var(--primary-600);
+}
+
+.service-details {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-bottom: 0.5rem;
+}
+
+.service-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 0.5rem;
+    background: var(--gray-200);
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--success-500);
+    transition: width var(--transition);
+}
+
+.progress-text {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    white-space: nowrap;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--gray-200);
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -0.5rem;
+    top: 0.25rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: var(--gray-300);
+    border: 3px solid white;
+    box-shadow: var(--shadow-sm);
+}
+
+.timeline-item.completed::before {
+    background: var(--success-500);
+}
+
+.timeline-item.current::before {
+    background: var(--primary-500);
+    animation: pulse 2s infinite;
+}
+
+.timeline-content {
+    margin-left: 1rem;
+}
+
+.timeline-title {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0 0 0.25rem 0;
+}
+
+.timeline-time {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+}
+
+.payment-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.payment-pending {
+    background: var(--warning-50);
+    color: var(--warning-600);
+    border: 1px solid var(--warning-200);
+}
+
+.payment-partial {
+    background: var(--info-50);
+    color: var(--info-600);
+    border: 1px solid var(--info-200);
+}
+
+.payment-paid {
+    background: var(--success-50);
+    color: var(--success-600);
+    border: 1px solid var(--success-200);
+}
+
+.payment-refunded {
+    background: var(--gray-50);
+    color: var(--gray-600);
+    border: 1px solid var(--gray-200);
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+}
+
+.alert-info {
+    background: var(--info-50);
+    color: var(--info-700);
+    border-color: var(--info-200);
+}
+
+.alert-warning {
+    background: var(--warning-50);
+    color: var(--warning-700);
+    border-color: var(--warning-200);
+}
+
+.alert-success {
+    background: var(--success-50);
+    color: var(--success-700);
+    border-color: var(--success-200);
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--gray-600);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    transition: all var(--transition);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+    padding-right: 2.5rem;
+    appearance: none;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -0.75rem;
+}
+
+.col-md-8 {
+    flex: 0 0 66.666667%;
+    padding: 0 0.75rem;
+}
+
+.col-md-4 {
+    flex: 0 0 33.333333%;
+    padding: 0 0.75rem;
+}
+
+.col-12 {
+    flex: 0 0 100%;
+    padding: 0 0.75rem;
+}
+
+@media (max-width: 768px) {
+    .col-md-8,
+    .col-md-4 {
+        flex: 0 0 100%;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .card-actions {
+        justify-content: stretch;
+    }
+    
+    .card-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .service-header {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .modal-content {
+        margin: 10% 1rem;
+        width: auto;
+    }
+}
+
+.text-muted { color: var(--gray-500); }
+.text-success { color: var(--success-600); }
+.text-primary { color: var(--primary-600); }
+.text-warning { color: var(--warning-600); }
+.text-danger { color: var(--danger-600); }
+.d-flex { display: flex; }
+.justify-content-between { justify-content: space-between; }
+.align-items-center { align-items: center; }
+.mb-0 { margin-bottom: 0; }
+.mt-2 { margin-top: 0.5rem; }
+.me-2 { margin-right: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="page-title">
+                <i class="fas fa-file-invoice"></i>
+                Order {{ order.order_number }}
+            </h1>
+            <p class="page-subtitle">
+                Created {{ order.created_at|date:"M d, Y \a\t g:i A" }} by {{ order.created_by.get_full_name|default:order.created_by.username }}
+            </p>
+        </div>
+        
+        <div class="d-flex align-items-center" style="gap: 1rem;">
+            <span class="status-badge status-{{ order.status }}">
+                {% if order.status == 'pending' %}
+                    <i class="fas fa-clock"></i>
+                {% elif order.status == 'confirmed' %}
+                    <i class="fas fa-check"></i>
+                {% elif order.status == 'in_progress' %}
+                    <i class="fas fa-play"></i>
+                {% elif order.status == 'completed' %}
+                    <i class="fas fa-check-circle"></i>
+                {% elif order.status == 'cancelled' %}
+                    <i class="fas fa-times-circle"></i>
+                {% elif order.status == 'no_show' %}
+                    <i class="fas fa-user-times"></i>
+                {% endif %}
+                {{ order.get_status_display }}
+            </span>
+            
+            <span class="priority-badge priority-{{ order.priority }}">
+                {% if order.priority == 'urgent' %}
+                    <i class="fas fa-exclamation-triangle"></i>
+                {% elif order.priority == 'high' %}
+                    <i class="fas fa-exclamation"></i>
+                {% elif order.priority == 'normal' %}
+                    <i class="fas fa-minus"></i>
+                {% else %}
+                    <i class="fas fa-arrow-down"></i>
+                {% endif %}
+                {{ order.get_priority_display }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Main Content -->
+    <div class="col-md-8">
+        <!-- Customer & Vehicle Information -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-user"></i>
+                    Customer & Vehicle
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Customer</span>
+                        <span class="info-value">{{ order.customer.full_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Phone</span>
+                        <span class="info-value">{{ order.customer.phone|default:"Not provided" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Customer ID</span>
+                        <span class="info-value">{{ order.customer.customer_id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Vehicle</span>
+                        <span class="info-value">{{ order.vehicle.registration_number }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Make & Model</span>
+                        <span class="info-value">{{ order.vehicle.make }} {{ order.vehicle.model }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Color</span>
+                        <span class="info-value">{{ order.vehicle.color }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-list-check"></i>
+                    Services
+                    {% if order.package %}
+                        - {{ order.package.name }}
+                    {% endif %}
+                </h5>
+                <div class="card-actions">
+                    {% if order.status == 'pending' or order.status == 'confirmed' %}
+                        <button class="btn btn-outline-primary btn-sm" onclick="editServices()">
+                            <i class="fas fa-edit"></i>
+                            Edit Services
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                {% if order.package %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-box"></i>
+                        <strong>Service Package:</strong> {{ order.package.name }}
+                        {% if order.package.description %}
+                            <br><small>{{ order.package.description }}</small>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                
+                {% for item in order_items %}
+                    <div class="service-item">
+                        <div class="service-header">
+                            <h6 class="service-name">{{ item.service.name }}</h6>
+                            <span class="service-price">
+                                {% if item.quantity > 1 %}
+                                    {{ item.quantity }} × KES {{ item.unit_price }} = 
+                                {% endif %}
+                                KES {{ item.total_price }}
+                            </span>
+                        </div>
+                        
+                        <div class="service-details">
+                            <span><i class="fas fa-clock"></i> {{ item.service.estimated_duration }} min</span>
+                            {% if item.assigned_to %}
+                                <span><i class="fas fa-user"></i> {{ item.assigned_to.full_name }}</span>
+                            {% endif %}
+                            {% if item.started_at %}
+                                <span><i class="fas fa-play"></i> Started {{ item.started_at|date:"g:i A" }}</span>
+                            {% endif %}
+                            {% if item.completed_at %}
+                                <span><i class="fas fa-check"></i> Completed {{ item.completed_at|date:"g:i A" }}</span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if item.started_at and not item.completed_at %}
+                            <div class="service-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 60%;"></div>
+                                </div>
+                                <span class="progress-text">In Progress</span>
+                            </div>
+                        {% elif item.completed_at %}
+                            <div class="service-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 100%;"></div>
+                                </div>
+                                <span class="progress-text text-success">Completed</span>
+                            </div>
+                        {% endif %}
+                        
+                        {% if item.rating %}
+                            <div class="mt-2">
+                                <span class="text-muted">Rating:</span>
+                                {% for i in "12345" %}
+                                    <i class="fas fa-star {% if forloop.counter <= item.rating %}text-warning{% else %}text-muted{% endif %}"></i>
+                                {% endfor %}
+                                {% if item.comments %}
+                                    <small class="text-muted d-block">{{ item.comments }}</small>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% empty %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        No services added to this order yet.
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-history"></i>
+                    Order Timeline
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item completed">
+                        <div class="timeline-content">
+                            <h6 class="timeline-title">Order Created</h6>
+                            <p class="timeline-time">{{ order.created_at|date:"M d, Y g:i A" }}</p>
+                        </div>
+                    </div>
+                    
+                    {% if order.status != 'pending' %}
+                        <div class="timeline-item completed">
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">Order Confirmed</h6>
+                                <p class="timeline-time">{{ order.updated_at|date:"M d, Y g:i A" }}</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if order.actual_start_time %}
+                        <div class="timeline-item completed">
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">Service Started</h6>
+                                <p class="timeline-time">{{ order.actual_start_time|date:"M d, Y g:i A" }}</p>
+                                {% if order.assigned_attendant %}
+                                    <small class="text-muted">by {{ order.assigned_attendant.full_name }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if order.status == 'in_progress' %}
+                        <div class="timeline-item current">
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">Service In Progress</h6>
+                                <p class="timeline-time">
+                                    {% if order.actual_start_time %}
+                                        Duration: {{ order.duration_minutes }} minutes
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if order.actual_end_time %}
+                        <div class="timeline-item completed">
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">Service Completed</h6>
+                                <p class="timeline-time">{{ order.actual_end_time|date:"M d, Y g:i A" }}</p>
+                                <small class="text-muted">Total duration: {{ order.duration_minutes }} minutes</small>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if order.status == 'cancelled' %}
+                        <div class="timeline-item">
+                            <div class="timeline-content">
+                                <h6 class="timeline-title text-danger">Order Cancelled</h6>
+                                <p class="timeline-time">{{ order.updated_at|date:"M d, Y g:i A" }}</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes & Instructions -->
+        {% if order.special_instructions or order.internal_notes %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-sticky-note"></i>
+                        Notes & Instructions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if order.special_instructions %}
+                        <div class="mb-3">
+                            <h6 class="text-primary">Special Instructions</h6>
+                            <p class="mb-0">{{ order.special_instructions }}</p>
+                        </div>
+                    {% endif %}
+                    
+                    {% if order.internal_notes %}
+                        <div>
+                            <h6 class="text-muted">Internal Notes</h6>
+                            <p class="mb-0">{{ order.internal_notes|linebreaks }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Order Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-cogs"></i>
+                    Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid" style="gap: 0.75rem;">
+                    {% if order.status == 'pending' or order.status == 'confirmed' %}
+                        <button class="btn btn-success" onclick="startService()">
+                            <i class="fas fa-play"></i>
+                            Start Service
+                        </button>
+                    {% endif %}
+                    
+                    {% if order.status == 'in_progress' %}
+                        <button class="btn btn-primary" onclick="completeService()">
+                            <i class="fas fa-check"></i>
+                            Complete Service
+                        </button>
+                        
+                        <button class="btn btn-warning" onclick="pauseService()">
+                            <i class="fas fa-pause"></i>
+                            Pause Service
+                        </button>
+                    {% endif %}
+                    
+                    {% if order.can_be_cancelled %}
+                        <button class="btn btn-danger" onclick="cancelService()">
+                            <i class="fas fa-times"></i>
+                            Cancel Order
+                        </button>
+                    {% endif %}
+                    
+                    {% if order.status == 'completed' and order.payment_status != 'paid' %}
+                        <a href="/business/{{ request.tenant.slug }}/payments/create/{{ order.id }}/" class="btn btn-success">
+                            <i class="fas fa-credit-card"></i>
+                            Process Payment
+                        </a>
+                    {% endif %}
+                    
+                    {% if order.status == 'completed' and order.payment_status == 'paid' %}
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/receipt/" class="btn btn-outline-primary">
+                            <i class="fas fa-receipt"></i>
+                            View Receipt
+                        </a>
+                    {% endif %}
+                    
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/print/" class="btn btn-outline-secondary" target="_blank">
+                        <i class="fas fa-print"></i>
+                        Print Order
+                    </a>
+                    
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/edit/" class="btn btn-outline-primary">
+                        <i class="fas fa-edit"></i>
+                        Edit Order
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-calculator"></i>
+                    Order Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Subtotal</span>
+                        <span class="info-value">KES {{ order.subtotal }}</span>
+                    </div>
+                    
+                    {% if order.discount_amount > 0 %}
+                        <div class="info-item">
+                            <span class="info-label">Discount</span>
+                            <span class="info-value text-success">-KES {{ order.discount_amount }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="info-item">
+                        <span class="info-label">Tax (16%)</span>
+                        <span class="info-value">KES {{ order.tax_amount }}</span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-label">Total Amount</span>
+                        <span class="info-value" style="font-size: 1.25rem; font-weight: 700; color: var(--primary-600);">
+                            KES {{ order.total_amount }}
+                        </span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-label">Payment Status</span>
+                        <span class="payment-status payment-{{ order.payment_status }}">
+                            {% if order.payment_status == 'pending' %}
+                                <i class="fas fa-clock"></i>
+                            {% elif order.payment_status == 'partial' %}
+                                <i class="fas fa-exclamation-triangle"></i>
+                            {% elif order.payment_status == 'paid' %}
+                                <i class="fas fa-check-circle"></i>
+                            {% elif order.payment_status == 'refunded' %}
+                                <i class="fas fa-undo"></i>
+                            {% endif %}
+                            {{ order.get_payment_status_display }}
+                        </span>
+                    </div>
+                    
+                    {% if order.payment_method %}
+                        <div class="info-item">
+                            <span class="info-label">Payment Method</span>
+                            <span class="info-value">{{ order.get_payment_method_display }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Assignment & Scheduling -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    Assignment & Scheduling
+                </h5>
+                <div class="card-actions">
+                    <button class="btn btn-outline-primary btn-sm" onclick="editAssignment()">
+                        <i class="fas fa-edit"></i>
+                        Edit
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Assigned Attendant</span>
+                        <span class="info-value">
+                            {% if order.assigned_attendant %}
+                                {{ order.assigned_attendant.full_name }}
+                            {% else %}
+                                <span class="text-muted">Not assigned</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    {% if order.scheduled_date %}
+                        <div class="info-item">
+                            <span class="info-label">Scheduled Date</span>
+                            <span class="info-value">{{ order.scheduled_date|date:"M d, Y" }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    {% if order.scheduled_time %}
+                        <div class="info-item">
+                            <span class="info-label">Scheduled Time</span>
+                            <span class="info-value">{{ order.scheduled_time|time:"g:i A" }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="info-item">
+                        <span class="info-label">Estimated Duration</span>
+                        <span class="info-value">{{ order.estimated_duration }} minutes</span>
+                    </div>
+                    
+                    {% if order.actual_start_time %}
+                        <div class="info-item">
+                            <span class="info-label">Actual Start</span>
+                            <span class="info-value">{{ order.actual_start_time|date:"M d, g:i A" }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    {% if order.actual_end_time %}
+                        <div class="info-item">
+                            <span class="info-label">Actual End</span>
+                            <span class="info-value">{{ order.actual_end_time|date:"M d, g:i A" }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    {% if order.duration_minutes %}
+                        <div class="info-item">
+                            <span class="info-label">Actual Duration</span>
+                            <span class="info-value">{{ order.duration_minutes }} minutes</span>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                {% if order.is_overdue %}
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Overdue:</strong> This service is taking longer than expected.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Queue Information -->
+        {% if queue_entry %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-list-ol"></i>
+                        Queue Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Queue Number</span>
+                            <span class="info-value">#{{ queue_entry.queue_number }}</span>
+                        </div>
+                        
+                        <div class="info-item">
+                            <span class="info-label">Queue Status</span>
+                            <span class="info-value">{{ queue_entry.get_status_display }}</span>
+                        </div>
+                        
+                        {% if queue_entry.service_bay %}
+                            <div class="info-item">
+                                <span class="info-label">Service Bay</span>
+                                <span class="info-value">{{ queue_entry.service_bay.name }}</span>
+                            </div>
+                        {% endif %}
+                        
+                        {% if queue_entry.estimated_start_time %}
+                            <div class="info-item">
+                                <span class="info-label">Estimated Start</span>
+                                <span class="info-value">{{ queue_entry.estimated_start_time|date:"g:i A" }}</span>
+                            </div>
+                        {% endif %}
+                        
+                        {% if queue_entry.estimated_wait_time > 0 %}
+                            <div class="info-item">
+                                <span class="info-label">Estimated Wait</span>
+                                <span class="info-value">{{ queue_entry.estimated_wait_time }} minutes</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if queue_entry.status == 'waiting' and available_bays %}
+                        <div class="mt-3">
+                            <button class="btn btn-outline-primary btn-sm" onclick="assignBay()">
+                                <i class="fas fa-car"></i>
+                                Assign Service Bay
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Customer Feedback -->
+        {% if order.status == 'completed' and order.customer_rating %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-star"></i>
+                        Customer Feedback
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <span class="info-label d-block">Rating</span>
+                        <div>
+                            {% for i in "12345" %}
+                                <i class="fas fa-star {% if forloop.counter <= order.customer_rating %}text-warning{% else %}text-muted{% endif %}"></i>
+                            {% endfor %}
+                            <span class="ms-2">{{ order.customer_rating }}/5</span>
+                        </div>
+                    </div>
+                    
+                    {% if order.customer_feedback %}
+                        <div>
+                            <span class="info-label d-block">Comments</span>
+                            <p class="mb-0">{{ order.customer_feedback }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% elif order.status == 'completed' %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-star"></i>
+                        Customer Feedback
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <p class="text-muted mb-3">No feedback received yet</p>
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/rate/" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-star"></i>
+                        Request Feedback
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modals -->
+
+<!-- Start Service Modal -->
+<div id="startServiceModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Start Service</h5>
+            <button type="button" class="modal-close" onclick="closeModal('startServiceModal')">&times;</button>
+        </div>
+        <form method="post" action="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/start/">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="serviceBay" class="form-label">Assign Service Bay (Optional)</label>
+                    <select class="form-control form-select" id="serviceBay" name="service_bay">
+                        <option value="">Select a service bay...</option>
+                        {% for bay in available_bays %}
+                            <option value="{{ bay.id }}">{{ bay.name }} (Bay {{ bay.bay_number }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="startNotes" class="form-label">Notes (Optional)</label>
+                    <textarea class="form-control" id="startNotes" name="notes" rows="3" placeholder="Any notes about starting the service..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeModal('startServiceModal')">Cancel</button>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-play"></i>
+                    Start Service
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Complete Service Modal -->
+<div id="completeServiceModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Complete Service</h5>
+            <button type="button" class="modal-close" onclick="closeModal('completeServiceModal')">&times;</button>
+        </div>
+        <form method="post" action="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/complete/">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    Are you sure you want to mark this service as completed? This action will:
+                    <ul class="mb-0 mt-2">
+                        <li>Mark all service items as completed</li>
+                        <li>Update the queue status</li>
+                        <li>Free up the assigned service bay</li>
+                        <li>Send completion notification to customer</li>
+                    </ul>
+                </div>
+                
+                <div class="form-group">
+                    <label for="completionNotes" class="form-label">Completion Notes (Optional)</label>
+                    <textarea class="form-control" id="completionNotes" name="notes" rows="3" placeholder="Any notes about the completed service..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeModal('completeServiceModal')">Cancel</button>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check"></i>
+                    Complete Service
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Cancel Service Modal -->
+<div id="cancelServiceModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Cancel Order</h5>
+            <button type="button" class="modal-close" onclick="closeModal('cancelServiceModal')">&times;</button>
+        </div>
+        <form method="post" action="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/cancel/">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The order will be cancelled and removed from the queue.
+                </div>
+                
+                <div class="form-group">
+                    <label for="cancelReason" class="form-label">Cancellation Reason <span class="text-danger">*</span></label>
+                    <select class="form-control form-select" id="cancelReason" name="reason" required>
+                        <option value="">Select a reason...</option>
+                        <option value="customer_request">Customer Request</option>
+                        <option value="vehicle_issue">Vehicle Issue</option>
+                        <option value="equipment_failure">Equipment Failure</option>
+                        <option value="staff_unavailable">Staff Unavailable</option>
+                        <option value="weather">Weather Conditions</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="cancelNotes" class="form-label">Additional Notes</label>
+                    <textarea class="form-control" id="cancelNotes" name="notes" rows="3" placeholder="Please provide details about the cancellation..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeModal('cancelServiceModal')">Close</button>
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-times"></i>
+                    Cancel Order
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Assignment Modal -->
+<div id="editAssignmentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Edit Assignment</h5>
+            <button type="button" class="modal-close" onclick="closeModal('editAssignmentModal')">&times;</button>
+        </div>
+        <form method="post" action="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/edit/">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="assignedAttendant" class="form-label">Assigned Attendant</label>
+                    <select class="form-control form-select" id="assignedAttendant" name="assigned_attendant">
+                        <option value="">Select an attendant...</option>
+                        {% for attendant in available_attendants %}
+                            <option value="{{ attendant.id }}" {% if order.assigned_attendant.id == attendant.id %}selected{% endif %}>
+                                {{ attendant.full_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="priority" class="form-label">Priority</label>
+                    <select class="form-control form-select" id="priority" name="priority">
+                        <option value="low" {% if order.priority == 'low' %}selected{% endif %}>Low</option>
+                        <option value="normal" {% if order.priority == 'normal' %}selected{% endif %}>Normal</option>
+                        <option value="high" {% if order.priority == 'high' %}selected{% endif %}>High</option>
+                        <option value="urgent" {% if order.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="scheduledDate" class="form-label">Scheduled Date</label>
+                    <input type="date" class="form-control" id="scheduledDate" name="scheduled_date" value="{{ order.scheduled_date|date:'Y-m-d' }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="scheduledTime" class="form-label">Scheduled Time</label>
+                    <input type="time" class="form-control" id="scheduledTime" name="scheduled_time" value="{{ order.scheduled_time|time:'H:i' }}">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeModal('editAssignmentModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Assign Bay Modal -->
+<div id="assignBayModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Assign Service Bay</h5>
+            <button type="button" class="modal-close" onclick="closeModal('assignBayModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="baySelect" class="form-label">Available Service Bays</label>
+                <select class="form-control form-select" id="baySelect" name="bay_id" required>
+                    <option value="">Select a service bay...</option>
+                    {% for bay in available_bays %}
+                        <option value="{{ bay.id }}">
+                            {{ bay.name }} (Bay {{ bay.bay_number }}) - {{ bay.get_max_vehicle_size_display }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                The customer will be notified about the bay assignment.
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" onclick="closeModal('assignBayModal')">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="assignSelectedBay()">
+                <i class="fas fa-car"></i>
+                Assign Bay
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Modal functions
+function openModal(modalId) {
+    document.getElementById(modalId).style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// Action functions
+function startService() {
+    openModal('startServiceModal');
+}
+
+function completeService() {
+    openModal('completeServiceModal');
+}
+
+function pauseService() {
+    if (confirm('Are you sure you want to pause this service?')) {
+        fetch("/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/pause/", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Failed to pause service. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+        });
+    }
+}
+
+function cancelService() {
+    openModal('cancelServiceModal');
+}
+
+function editAssignment() {
+    openModal('editAssignmentModal');
+}
+
+function editServices() {
+    window.location.href = "/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/edit/";
+}
+
+function assignBay() {
+    openModal('assignBayModal');
+}
+
+function assignSelectedBay() {
+    const baySelect = document.getElementById('baySelect');
+    const selectedBayId = baySelect.value;
+    
+    if (!selectedBayId) {
+        alert('Please select a service bay');
+        return;
+    }
+    
+    // Make AJAX request to assign the bay using the order-specific endpoint
+    const formData = new FormData();
+    formData.append('bay_id', selectedBayId);
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/assign-bay/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('assignBayModal');
+            showToast(data.message, 'success');
+            setTimeout(() => location.reload(), 1000); // Reload to show updated bay assignment
+        } else {
+            showToast(data.message || 'Failed to assign service bay', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Failed to assign service bay. Please try again.', 'error');
+    });
+}
+
+// Add toast notification function
+function showToast(message, type) {
+    // Remove existing toasts
+    document.querySelectorAll('.toast-notification').forEach(toast => toast.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    
+    const iconMap = {
+        'success': 'check-circle',
+        'error': 'exclamation-triangle',
+        'warning': 'exclamation-circle',
+        'info': 'info-circle'
+    };
+    
+    const colorMap = {
+        'success': '#10b981',
+        'error': '#ef4444',
+        'warning': '#f59e0b',
+        'info': '#06b6d4'
+    };
+    
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${iconMap[type] || 'info-circle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Apply styles
+    toast.style.cssText = `
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        z-index: 9999;
+        min-width: 300px;
+        max-width: 500px;
+        animation: slideInRight 0.3s ease-out;
+        border-left: 4px solid ${colorMap[type] || colorMap.info};
+    `;
+    
+    const content = toast.querySelector('.toast-content');
+    content.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #374151;
+    `;
+    
+    const icon = content.querySelector('i');
+    icon.style.color = colorMap[type] || colorMap.info;
+    
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 0.375rem;
+        transition: color 0.15s ease-in-out;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+}
+
+// Utility functions
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        if (event.target === modal) {
+            closeModal(modal.id);
+        }
+    });
+}
+
+// Auto-refresh order status every 30 seconds if service is in progress
+{% if order.status == 'in_progress' %}
+setInterval(() => {
+    // Only refresh if the page is visible
+    if (!document.hidden) {
+        fetch(window.location.href, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            // You could implement partial updates here
+            // For now, we'll just reload if there are significant changes
+            console.log('Status check completed');
+        })
+        .catch(error => {
+            console.error('Status check failed:', error);
+        });
+    }
+}, 30000);
+{% endif %}
+
+// Initialize tooltips if you're using Bootstrap tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    // Add any initialization code here
+    console.log('Order detail page loaded');
+});
+</script>
+{% endblock %}

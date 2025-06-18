@@ -1,5 +1,3 @@
-# Add these URLs to your existing urlpatterns in urls.py
-
 from django.urls import path
 from . import views
 

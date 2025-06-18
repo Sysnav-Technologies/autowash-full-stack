@@ -1890,122 +1890,390 @@ function updateReviewStep() {
 
 // Form Submission
 function submitOrder() {
-    const form = document.getElementById('quickOrderForm');
-    const formData = new FormData(form);
-    
-    // Prepare the data based on customer selection
-    if (selectedCustomer) {
-        // Existing customer
-        formData.set('existing_customer_id', selectedCustomer.id);
-        formData.delete('customer_name');
-        formData.delete('customer_phone');
-        formData.delete('customer_email');
-    } else {
-        // New customer - ensure we have the data
-        const customerName = document.getElementById('customerName').value.trim();
-        const customerPhone = document.getElementById('customerPhone').value.trim();
-        const customerEmail = document.getElementById('customerEmail').value.trim();
-        
-        formData.set('customer_name', customerName);
-        formData.set('customer_phone', customerPhone);
-        formData.set('customer_email', customerEmail);
-    }
-    
-    // Prepare vehicle data
-    if (selectedVehicle) {
-        // Existing vehicle
-        formData.set('existing_vehicle_id', selectedVehicle.id);
-        // Clear new vehicle fields
-        formData.delete('vehicle_registration');
-        formData.delete('vehicle_make');
-        formData.delete('vehicle_model');
-        formData.delete('vehicle_color');
-        formData.delete('vehicle_year');
-        formData.delete('vehicle_type');
-    } else {
-        // New vehicle
-        formData.set('vehicle_registration', document.getElementById('vehicleRegistration').value.trim().toUpperCase());
-        formData.set('vehicle_make', document.getElementById('vehicleMake').value.trim());
-        formData.set('vehicle_model', document.getElementById('vehicleModel').value.trim());
-        formData.set('vehicle_color', document.getElementById('vehicleColor').value.trim());
-        formData.set('vehicle_year', document.getElementById('vehicleYear').value);
-        formData.set('vehicle_type', document.getElementById('vehicleType').value);
-    }
-    
-    // Add selected services or package
-    const selectionData = JSON.parse(document.getElementById('selectedServicesData').value || '{}');
-    
-    if (selectionData.type === 'package' && selectionData.package_id) {
-        formData.set('selected_package', selectionData.package_id);
-        formData.set('service_type', 'package');
-    } else if (selectionData.type === 'individual' && selectionData.service_ids) {
-        selectionData.service_ids.forEach(serviceId => {
-            formData.append('selected_services', serviceId);
-        });
-        formData.set('service_type', 'individual');
-    } else {
-        showToast('Please select services or a package', 'error');
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
+    // Validate that we have all required data
+    if (!validateAllSteps()) {
+        showToast('Please complete all required fields', 'error');
         return;
     }
     
-    // Add order details
-    formData.set('special_instructions', document.getElementById('specialInstructions').value.trim());
-    formData.set('priority', document.getElementById('priority').value);
-    
-    // Show loading state
+    const form = document.getElementById('quickOrderForm');
     const submitBtn = document.getElementById('submitBtn');
     const originalText = submitBtn.innerHTML;
+    
+    // Show loading state
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Order...';
     submitBtn.disabled = true;
     
-    fetch(`/business/{{ request.tenant.slug }}/services/orders/quick/`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'X-Requested-With': 'XMLHttpRequest'
+    try {
+        // Prepare form data
+        const formData = new FormData();
+        
+        // Add CSRF token
+        const csrfToken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (!csrfToken) {
+            throw new Error('CSRF token not found');
         }
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            showToast('Order created successfully!', 'success');
-            setTimeout(() => {
-                window.location.href = `/business/{{ request.tenant.slug }}/services/orders/${data.order_id}/`;
-            }, 1500);
+        
+        // Customer data
+        if (selectedCustomer) {
+            formData.set('existing_customer_id', selectedCustomer.id);
         } else {
-            showToast(data.message || 'Error creating order', 'error');
+            const customerName = document.getElementById('customerName').value.trim();
+            const customerPhone = document.getElementById('customerPhone').value.trim();
+            const customerEmail = document.getElementById('customerEmail').value.trim();
             
-            // Show field-specific errors if available
-            if (data.errors) {
-                console.log('Form errors:', data.errors);
-                Object.keys(data.errors).forEach(fieldName => {
-                    const field = form.querySelector(`[name="${fieldName}"]`);
-                    if (field) {
-                        field.classList.add('is-invalid');
-                        // You could add error display logic here
-                    }
-                });
+            if (!customerName || !customerPhone) {
+                throw new Error('Customer name and phone are required');
             }
+            
+            formData.set('customer_name', customerName);
+            formData.set('customer_phone', customerPhone);
+            formData.set('customer_email', customerEmail);
         }
-    })
-    .catch(error => {
-        console.error('Order creation error:', error);
-        showToast('Error creating order. Please check your connection and try again.', 'error');
-    })
-    .finally(() => {
+        
+        // Vehicle data
+        if (selectedVehicle) {
+            formData.set('existing_vehicle_id', selectedVehicle.id);
+        } else {
+            const vehicleRegistration = document.getElementById('vehicleRegistration').value.trim().toUpperCase();
+            const vehicleMake = document.getElementById('vehicleMake').value.trim();
+            const vehicleModel = document.getElementById('vehicleModel').value.trim();
+            const vehicleColor = document.getElementById('vehicleColor').value.trim();
+            const vehicleType = document.getElementById('vehicleType').value;
+            const vehicleYear = document.getElementById('vehicleYear').value;
+            
+            if (!vehicleRegistration || !vehicleMake || !vehicleModel || !vehicleColor || !vehicleType) {
+                throw new Error('All vehicle information is required');
+            }
+            
+            formData.set('vehicle_registration', vehicleRegistration);
+            formData.set('vehicle_make', vehicleMake);
+            formData.set('vehicle_model', vehicleModel);
+            formData.set('vehicle_color', vehicleColor);
+            formData.set('vehicle_type', vehicleType);
+            formData.set('vehicle_year', vehicleYear);
+        }
+        
+        // Service selection data
+        const selectionData = JSON.parse(document.getElementById('selectedServicesData').value || '{}');
+        
+        if (selectionData.type === 'package' && selectionData.package_id) {
+            formData.set('service_type', 'package');
+            formData.set('selected_package', selectionData.package_id);
+        } else if (selectionData.type === 'individual' && selectionData.service_ids && selectionData.service_ids.length > 0) {
+            formData.set('service_type', 'individual');
+            selectionData.service_ids.forEach(serviceId => {
+                formData.append('selected_services', serviceId);
+            });
+        } else {
+            throw new Error('Please select at least one service or package');
+        }
+        
+        // Additional order details
+        formData.set('special_instructions', document.getElementById('specialInstructions').value.trim());
+        formData.set('priority', document.getElementById('priority').value);
+        
+        // Log the data being sent (for debugging)
+        console.log('Submitting order with data:', Object.fromEntries(formData.entries()));
+        
+        // Make the request with proper error handling
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'  // Important for CSRF
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
+            // Check if response is ok
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Server did not return JSON response');
+            }
+            
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            
+            if (data.success) {
+                showToast('Order created successfully!', 'success');
+                
+                // Redirect after a short delay
+                setTimeout(() => {
+                    if (data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        // Fallback redirect
+                        window.location.href = `/business/{{ request.tenant.slug }}/services/orders/${data.order_id}/`;
+                    }
+                }, 1500);
+            } else {
+                // Handle server-side validation errors
+                showToast(data.message || 'Error creating order', 'error');
+                
+                // Show field-specific errors if available
+                if (data.errors) {
+                    console.log('Form errors:', data.errors);
+                    displayFormErrors(data.errors);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Order creation error:', error);
+            
+            let errorMessage = 'Error creating order. Please try again.';
+            
+            if (error.message.includes('CSRF')) {
+                errorMessage = 'Security token expired. Please refresh the page and try again.';
+            } else if (error.message.includes('HTTP 500')) {
+                errorMessage = 'Server error. Please contact support if this persists.';
+            } else if (error.message.includes('HTTP 403')) {
+                errorMessage = 'Access denied. Please refresh the page and try again.';
+            } else if (error.message.includes('HTTP 404')) {
+                errorMessage = 'Service not found. Please refresh the page.';
+            } else if (error.message.includes('Network')) {
+                errorMessage = 'Network error. Please check your connection.';
+            }
+            
+            showToast(errorMessage, 'error');
+        })
+        .finally(() => {
+            // Restore button state
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+        
+    } catch (error) {
+        console.error('Form preparation error:', error);
+        showToast(error.message || 'Error preparing order data', 'error');
+        
+        // Restore button state
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
+    }
+}
+
+function validateAllSteps() {
+    // Validate customer
+    if (!selectedCustomer) {
+        const name = document.getElementById('customerName').value.trim();
+        const phone = document.getElementById('customerPhone').value.trim();
+        if (!name || !phone) {
+            return false;
+        }
+    }
+    
+    // Validate vehicle
+    if (!selectedVehicle) {
+        const registration = document.getElementById('vehicleRegistration').value.trim();
+        const make = document.getElementById('vehicleMake').value.trim();
+        const model = document.getElementById('vehicleModel').value.trim();
+        const color = document.getElementById('vehicleColor').value.trim();
+        const type = document.getElementById('vehicleType').value;
+        
+        if (!registration || !make || !model || !color || !type) {
+            return false;
+        }
+    }
+    
+    // Validate services
+    const selectionData = JSON.parse(document.getElementById('selectedServicesData').value || '{}');
+    if (serviceType === 'package' && !selectedPackage) {
+        return false;
+    } else if (serviceType === 'individual' && selectedServices.length === 0) {
+        return false;
+    }
+    
+    return true;
+}
+
+function displayFormErrors(errors) {
+    // Clear previous errors
+    document.querySelectorAll('.form-control').forEach(field => {
+        field.classList.remove('is-invalid');
+    });
+    document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+    
+    // Display new errors
+    Object.keys(errors).forEach(fieldName => {
+        const fieldErrors = errors[fieldName];
+        if (fieldErrors && fieldErrors.length > 0) {
+            // Try to find the form field
+            let field = document.querySelector(`[name="${fieldName}"]`);
+            if (!field) {
+                // Try alternative field names
+                const fieldMappings = {
+                    'customer_name': 'customerName',
+                    'customer_phone': 'customerPhone',
+                    'vehicle_registration': 'vehicleRegistration',
+                    'vehicle_make': 'vehicleMake',
+                    'vehicle_model': 'vehicleModel',
+                    'vehicle_color': 'vehicleColor',
+                    'vehicle_type': 'vehicleType'
+                };
+                field = document.getElementById(fieldMappings[fieldName]);
+            }
+            
+            if (field) {
+                field.classList.add('is-invalid');
+                
+                // Add error message
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'invalid-feedback';
+                errorDiv.textContent = fieldErrors[0];
+                field.parentNode.appendChild(errorDiv);
+            }
+        }
     });
 }
 
+// Enhanced CSRF token getter
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Enhanced toast with better positioning and styling
+function showToast(message, type) {
+    // Remove existing toasts
+    document.querySelectorAll('.toast-notification').forEach(toast => toast.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    
+    const iconMap = {
+        'success': 'check-circle',
+        'error': 'exclamation-triangle',
+        'warning': 'exclamation-circle',
+        'info': 'info-circle'
+    };
+    
+    const colorMap = {
+        'success': '#10b981',
+        'error': '#ef4444',
+        'warning': '#f59e0b',
+        'info': '#06b6d4'
+    };
+    
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${iconMap[type] || 'info-circle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Apply styles
+    toast.style.cssText = `
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        z-index: 9999;
+        min-width: 300px;
+        max-width: 500px;
+        animation: slideInRight 0.3s ease-out;
+        border-left: 4px solid ${colorMap[type] || colorMap.info};
+    `;
+    
+    const content = toast.querySelector('.toast-content');
+    content.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #374151;
+    `;
+    
+    const icon = content.querySelector('i');
+    icon.style.color = colorMap[type] || colorMap.info;
+    
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 0.375rem;
+        transition: color 0.15s ease-in-out;
+    `;
+    
+    closeBtn.addEventListener('mouseenter', () => {
+        closeBtn.style.color = '#374151';
+    });
+    
+    closeBtn.addEventListener('mouseleave', () => {
+        closeBtn.style.color = '#9ca3af';
+    });
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+}
+
+// Add CSS animations
+if (!document.getElementById('toast-animations')) {
+    const style = document.createElement('style');
+    style.id = 'toast-animations';
+    style.textContent = `
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(100%); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideOutRight {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(100%); }
+        }
+        .invalid-feedback {
+            display: block;
+            width: 100%;
+            margin-top: 0.25rem;
+            font-size: 0.875rem;
+            color: #ef4444;
+        }
+        .form-control.is-invalid {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+    `;
+    document.head.appendChild(style);
+}
 // Auto-search as user types
 document.getElementById('customerSearchInput').addEventListener('input', function() {
     clearTimeout(this.searchTimeout);

@@ -34,8 +34,8 @@ urlpatterns = [
     path('orders/<uuid:order_id>/resume/', views.resume_service, name='resume_service'),
     
     # Payment Management
-    path('orders/<uuid:order_id>/payment/', views.process_payment, name='process_payment'),
-    path('orders/<uuid:order_id>/payment/receipt/', views.payment_receipt, name='payment_receipt'),
+    path('orders/<uuid:order_id>/process-payment/', views.process_payment, name='process_payment'),
+    path('orders/<uuid:order_id>/receipt/', views.payment_receipt, name='payment_receipt'),
     
     # Queue Management
     path('queue/', views.queue_view, name='queue'),
@@ -53,6 +53,7 @@ urlpatterns = [
     path('bays/create/', views.bay_create_view, name='bay_create'),
     path('bays/<uuid:pk>/edit/', views.bay_edit_view, name='bay_edit'),
     path('bays/<uuid:pk>/assign/', views.assign_bay, name='assign_bay'),
+    path('orders/<uuid:order_id>/assign-bay/', views.assign_bay_to_order, name='assign_bay_to_order'),
     
     # Customer Rating & Feedback
     path('orders/<uuid:order_id>/rate/', views.rate_service, name='rate_service'),

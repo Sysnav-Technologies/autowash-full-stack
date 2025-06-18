@@ -276,117 +276,268 @@ def order_create_view(request):
     }
     return render(request, 'services/order_form.html', context)
 
-@login_required
+
+import json
+import logging
+from decimal import Decimal
+from django.http import JsonResponse
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.db import transaction
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.http import require_http_methods
+from apps.core.decorators import employee_required
+from apps.core.utils import generate_unique_code
+from .models import Service, ServiceCategory, ServicePackage, ServiceOrder, ServiceOrderItem
+from .forms import QuickOrderForm
+
+logger = logging.getLogger(__name__)
+
+@csrf_protect
 @employee_required()
+@require_http_methods(["GET", "POST"])
 def quick_order_view(request):
     """Quick order creation for walk-in customers"""
     if request.method == 'POST':
-        form = QuickOrderForm(request.POST)
-        if form.is_valid():
-            try:
-                with transaction.atomic():
-                    # Create or get customer
-                    from apps.customers.models import Customer, Vehicle
+        try:
+            with transaction.atomic():
+                # Log the incoming data for debugging
+                logger.info(f"Quick order POST data: {request.POST}")
+                
+                # Import here to avoid circular imports
+                from apps.customers.models import Customer, Vehicle
+                
+                # Determine if this is an existing customer or new customer
+                existing_customer_id = request.POST.get('existing_customer_id')
+                customer = None
+                
+                if existing_customer_id:
+                    # Existing customer
+                    try:
+                        customer = Customer.objects.get(id=existing_customer_id)
+                        logger.info(f"Using existing customer: {customer.full_name}")
+                    except Customer.DoesNotExist:
+                        logger.error(f"Customer with ID {existing_customer_id} not found")
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'success': False,
+                                'message': 'Selected customer not found',
+                                'errors': {'customer': ['Customer not found']}
+                            })
+                        else:
+                            messages.error(request, 'Selected customer not found')
+                            return redirect('services:quick_order')
+                else:
+                    # New customer - validate required fields
+                    customer_name = request.POST.get('customer_name', '').strip()
+                    customer_phone = request.POST.get('customer_phone', '').strip()
                     
-                    customer_data = form.cleaned_data
-                    customer, created = Customer.objects.get_or_create(
-                        phone=customer_data['customer_phone'],
-                        defaults={
-                            'first_name': customer_data['customer_name'].split()[0],
-                            'last_name': ' '.join(customer_data['customer_name'].split()[1:]),
-                            'customer_id': generate_unique_code('CUST', 6),
-                            'created_by': request.user
-                        }
+                    if not customer_name or not customer_phone:
+                        error_msg = 'Customer name and phone are required'
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'success': False,
+                                'message': error_msg,
+                                'errors': {
+                                    'customer_name': ['Name is required'] if not customer_name else [],
+                                    'customer_phone': ['Phone is required'] if not customer_phone else []
+                                }
+                            })
+                        else:
+                            messages.error(request, error_msg)
+                            return redirect('services:quick_order')
+                    
+                    # Create new customer
+                    name_parts = customer_name.split(' ', 1)
+                    first_name = name_parts[0]
+                    last_name = name_parts[1] if len(name_parts) > 1 else ''
+                    
+                    customer = Customer.objects.create(
+                        first_name=first_name,
+                        last_name=last_name,
+                        phone=customer_phone,
+                        email=request.POST.get('customer_email', '').strip(),
+                        customer_id=generate_unique_code('CUST', 6),
+                        created_by_id=request.user.id
                     )
+                    logger.info(f"Created new customer: {customer.full_name}")
+                
+                # Handle vehicle selection/creation
+                existing_vehicle_id = request.POST.get('existing_vehicle_id')
+                vehicle = None
+                
+                if existing_vehicle_id:
+                    # Existing vehicle
+                    try:
+                        vehicle = Vehicle.objects.get(id=existing_vehicle_id, customer=customer)
+                        logger.info(f"Using existing vehicle: {vehicle.registration_number}")
+                    except Vehicle.DoesNotExist:
+                        error_msg = 'Selected vehicle not found'
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'success': False,
+                                'message': error_msg,
+                                'errors': {'vehicle': ['Vehicle not found']}
+                            })
+                        else:
+                            messages.error(request, error_msg)
+                            return redirect('services:quick_order')
+                else:
+                    # New vehicle - validate required fields
+                    vehicle_registration = request.POST.get('vehicle_registration', '').strip().upper()
+                    vehicle_make = request.POST.get('vehicle_make', '').strip()
+                    vehicle_model = request.POST.get('vehicle_model', '').strip()
+                    vehicle_color = request.POST.get('vehicle_color', '').strip()
+                    vehicle_type = request.POST.get('vehicle_type', '').strip()
                     
-                    # Create or get vehicle
-                    vehicle, created = Vehicle.objects.get_or_create(
-                        registration_number=customer_data['vehicle_registration'].upper(),
-                        defaults={
-                            'customer': customer,
-                            'make': customer_data['vehicle_make'],
-                            'model': customer_data['vehicle_model'],
-                            'color': customer_data['vehicle_color'],
-                            'vehicle_type': customer_data.get('vehicle_type', 'sedan'),
-                            'year': customer_data.get('vehicle_year', timezone.now().year),
-                            'created_by': request.user
-                        }
-                    )
+                    if not all([vehicle_registration, vehicle_make, vehicle_model, vehicle_color, vehicle_type]):
+                        error_msg = 'All vehicle fields are required'
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'success': False,
+                                'message': error_msg,
+                                'errors': {'vehicle': ['All vehicle information is required']}
+                            })
+                        else:
+                            messages.error(request, error_msg)
+                            return redirect('services:quick_order')
                     
-                    # Create order
-                    order = ServiceOrder.objects.create(
+                    # Check if vehicle already exists
+                    if Vehicle.objects.filter(registration_number=vehicle_registration).exists():
+                        error_msg = f'Vehicle {vehicle_registration} already exists'
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'success': False,
+                                'message': error_msg,
+                                'errors': {'vehicle_registration': ['Vehicle already exists']}
+                            })
+                        else:
+                            messages.error(request, error_msg)
+                            return redirect('services:quick_order')
+                    
+                    # Create new vehicle
+                    vehicle = Vehicle.objects.create(
                         customer=customer,
-                        vehicle=vehicle,
-                        assigned_attendant=request.employee,
-                        status='confirmed',
-                        priority='normal',
-                        created_by=request.user
+                        registration_number=vehicle_registration,
+                        make=vehicle_make,
+                        model=vehicle_model,
+                        color=vehicle_color,
+                        vehicle_type=vehicle_type,
+                        year=int(request.POST.get('vehicle_year', 2020)),
+                        created_by_id=request.user.id
                     )
+                    logger.info(f"Created new vehicle: {vehicle.registration_number}")
+                
+                # Create the service order
+                order = ServiceOrder.objects.create(
+                    customer=customer,
+                    vehicle=vehicle,
+                    assigned_attendant=getattr(request, 'employee', None),
+                    status='confirmed',
+                    priority=request.POST.get('priority', 'normal'),
+                    special_instructions=request.POST.get('special_instructions', '').strip(),
+                    created_by_id=request.user.id
+                )
+                logger.info(f"Created order: {order.order_number}")
+                
+                # Handle service selection
+                service_type = request.POST.get('service_type', 'individual')
+                total_amount = Decimal('0')
+                
+                if service_type == 'package':
+                    # Handle service package
+                    selected_package_id = request.POST.get('selected_package')
+                    if not selected_package_id:
+                        raise ValueError("Package must be selected")
                     
-                    # Add selected services
-                    # Get service type
-                    service_type = request.POST.get('service_type', 'individual')
-                    total_amount = Decimal('0')
-
-                    if service_type == 'package':
-                        # Handle service package
-                        selected_package_id = request.POST.get('selected_package')
-                        if not selected_package_id:
-                            raise ValueError("Package must be selected")
+                    try:
+                        package = ServicePackage.objects.get(id=selected_package_id, is_active=True)
+                        order.package = package
+                        total_amount = package.total_price
                         
+                        # Add individual services from the package
+                        for package_service in package.packageservice_set.all():
+                            ServiceOrderItem.objects.create(
+                                order=order,
+                                service=package_service.service,
+                                quantity=package_service.quantity,
+                                unit_price=package_service.custom_price or package_service.service.base_price,
+                                assigned_to=getattr(request, 'employee', None)
+                            )
+                        logger.info(f"Added package services: {package.name}")
+                    except ServicePackage.DoesNotExist:
+                        raise ValueError("Selected package not found")
+                else:
+                    # Handle individual services
+                    selected_services = request.POST.getlist('selected_services')
+                    if not selected_services:
+                        raise ValueError("At least one service must be selected")
+                    
+                    for service_id in selected_services:
                         try:
-                            package = ServicePackage.objects.get(id=selected_package_id, is_active=True)
-                            order.package = package
-                            total_amount = package.total_price
-                            
-                            # Add individual services from the package
-                            for package_service in package.packageservice_set.all():
-                                ServiceOrderItem.objects.create(
-                                    order=order,
-                                    service=package_service.service,
-                                    quantity=package_service.quantity,
-                                    unit_price=package_service.custom_price or package_service.service.base_price,
-                                    assigned_to_id=getattr(request, 'employee', {}).get('id') if hasattr(request, 'employee') else None
-                                )
-                        except ServicePackage.DoesNotExist:
-                            raise ValueError("Selected package not found")
-                            
-                    else:
-                        # Handle individual services
-                        selected_services = request.POST.getlist('selected_services')
-                        if not selected_services:
-                            raise ValueError("At least one service must be selected")
-                        
-                        for service_id in selected_services:
-                            try:
-                                service = Service.objects.get(id=service_id, is_active=True)
-                                ServiceOrderItem.objects.create(
-                                    order=order,
-                                    service=service,
-                                    quantity=1,
-                                    unit_price=service.base_price,
-                                    assigned_to_id=getattr(request, 'employee', {}).get('id') if hasattr(request, 'employee') else None
-                                )
-                                total_amount += service.base_price
-                            except Service.DoesNotExist:
-                                continue
-                    
-                    # Calculate totals
-                    order.subtotal = total_amount
-                    order.calculate_totals()
-                    order.save()
-                    
-                    # Add to queue
-                    add_order_to_queue(order)
-                    
+                            service = Service.objects.get(id=service_id, is_active=True)
+                            ServiceOrderItem.objects.create(
+                                order=order,
+                                service=service,
+                                quantity=1,
+                                unit_price=service.base_price,
+                                assigned_to=getattr(request, 'employee', None)
+                            )
+                            total_amount += service.base_price
+                            logger.info(f"Added service: {service.name}")
+                        except Service.DoesNotExist:
+                            logger.warning(f"Service {service_id} not found, skipping")
+                            continue
+                
+                # Calculate totals
+                order.subtotal = total_amount
+                order.calculate_totals()
+                order.save()
+                
+                # Add to queue
+                add_order_to_queue(order)
+                
+                logger.info(f"Order {order.order_number} created successfully")
+                
+                # Return appropriate response
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'message': f'Order {order.order_number} created successfully!',
+                        'order_id': str(order.id),
+                        'order_number': order.order_number,
+                        'redirect_url': f'/business/{request.tenant.slug}/services/orders/{order.id}/'
+                    })
+                else:
                     messages.success(request, f'Quick order {order.order_number} created successfully!')
                     return redirect('services:order_detail', pk=order.pk)
-                    
-            except Exception as e:
-                messages.error(request, f'Error creating quick order: {str(e)}')
-    else:
-        form = QuickOrderForm()
+                
+        except ValueError as e:
+            error_msg = str(e)
+            logger.error(f"ValueError in quick order creation: {error_msg}")
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': error_msg,
+                    'errors': {'general': [error_msg]}
+                })
+            else:
+                messages.error(request, error_msg)
+                return redirect('services:quick_order')
+        except Exception as e:
+            error_msg = f'Error creating quick order: {str(e)}'
+            logger.error(f"Exception in quick order creation: {error_msg}", exc_info=True)
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'An unexpected error occurred. Please try again.',
+                    'errors': {'general': [str(e)]}
+                })
+            else:
+                messages.error(request, error_msg)
+                return redirect('services:quick_order')
     
+    # GET request - show the form
     # Get popular services for quick selection
     popular_services = Service.objects.filter(
         is_active=True,
@@ -400,14 +551,49 @@ def quick_order_view(request):
 
     # Get service categories
     categories = ServiceCategory.objects.filter(is_active=True).prefetch_related('services')
+    
     context = {
-        'form': form,
         'popular_services': popular_services,
         'categories': categories,
         'service_packages': service_packages, 
         'title': 'Quick Order (Walk-in Customer)'
     }
     return render(request, 'services/quick_order.html', context)
+
+def add_order_to_queue(order):
+    """Add order to service queue"""
+    try:
+        from .models import ServiceQueue
+        from django.db import models
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Get next queue number
+        last_queue_number = ServiceQueue.objects.filter(
+            created_at__date=timezone.now().date()
+        ).aggregate(max_num=models.Max('queue_number'))['max_num'] or 0
+        
+        # Calculate estimated times
+        estimated_duration = order.estimated_duration
+        estimated_start_time = timezone.now()
+        
+        # Check for orders ahead in queue
+        waiting_orders = ServiceQueue.objects.filter(status='waiting').count()
+        if waiting_orders > 0:
+            # Add buffer time based on queue length
+            estimated_start_time += timedelta(minutes=waiting_orders * 30)  # 30 min average per order
+        
+        estimated_end_time = estimated_start_time + timedelta(minutes=estimated_duration)
+        
+        ServiceQueue.objects.create(
+            order=order,
+            queue_number=last_queue_number + 1,
+            estimated_start_time=estimated_start_time,
+            estimated_end_time=estimated_end_time
+        )
+        logger.info(f"Added order {order.order_number} to queue")
+    except Exception as e:
+        logger.error(f"Error adding order to queue: {str(e)}", exc_info=True)
 
 @login_required
 @employee_required()
@@ -813,40 +999,74 @@ def resume_service(request, order_id):
 @login_required
 @employee_required()
 def process_payment(request, order_id):
-    """Process payment for order"""
+    """Redirect to payments app for payment processing"""
     order = get_object_or_404(ServiceOrder, id=order_id)
     
-    if request.method == 'POST':
-        payment_method = request.POST.get('payment_method')
-        amount_received = Decimal(request.POST.get('amount_received', '0'))
-        
-        if amount_received >= order.total_amount:
-            order.payment_status = 'paid'
-            order.payment_method = payment_method
-            order.save()
-            
-            messages.success(request, 'Payment processed successfully!')
-            return redirect('services:payment_receipt', order_id=order.id)
-        else:
-            messages.error(request, 'Insufficient payment amount.')
-    
-    context = {
-        'order': order,
-        'title': f'Process Payment - {order.order_number}'
-    }
-    return render(request, 'services/process_payment.html', context)
+    # Redirect to the payments app
+    return redirect('payments:create_for_order', order_id=order.id)
 
 @login_required
 @employee_required()
 def payment_receipt(request, order_id):
-    """Generate payment receipt"""
+    """Generate payment receipt - Updated to work with payments app"""
     order = get_object_or_404(ServiceOrder, id=order_id)
+    
+    # Get the latest completed payment for this order
+    try:
+        from apps.payments.models import Payment
+        latest_payment = Payment.objects.filter(
+            service_order=order,
+            status__in=['completed', 'verified']
+        ).latest('completed_at')
+    except Payment.DoesNotExist:
+        latest_payment = None
     
     context = {
         'order': order,
-        'title': f'Receipt - {order.order_number}'
+        'payment': latest_payment,
+        'title': f'Receipt - {order.order_number}',
+        'print_mode': request.GET.get('print') == 'true'
     }
+    
+    # If this is a direct print request, use the minimal print template
+    if request.GET.get('print') == 'true':
+        return render(request, 'services/payment_receipt_print.html', context)
+    
     return render(request, 'services/payment_receipt.html', context)
+
+def update_payment_status(self):
+    """Update order payment status based on payments"""
+    try:
+        from apps.payments.models import Payment
+        from decimal import Decimal
+        
+        # Get all completed payments for this order
+        completed_payments = Payment.objects.filter(
+            service_order=self,
+            status__in=['completed', 'verified']
+        )
+        
+        total_paid = completed_payments.aggregate(
+            total=models.Sum('amount')
+        )['total'] or Decimal('0')
+        
+        if total_paid >= self.total_amount:
+            self.payment_status = 'paid'
+        elif total_paid > 0:
+            self.payment_status = 'partial'
+        else:
+            self.payment_status = 'pending'
+        
+        # Set payment method from latest payment
+        latest_payment = completed_payments.order_by('-completed_at').first()
+        if latest_payment:
+            self.payment_method = latest_payment.payment_method.method_type
+        
+        self.save(update_fields=['payment_status', 'payment_method'])
+        
+    except ImportError:
+        # Payments app not available
+        pass
 
 @login_required
 @employee_required()
@@ -1716,18 +1936,80 @@ def assign_bay(request, pk):
     bay = get_object_or_404(ServiceBay, pk=pk)
     order_id = request.POST.get('order_id')
     
+    if not order_id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'Order ID is required'})
+        messages.error(request, 'Order ID is required.')
+        return redirect('services:queue')
+    
     if not bay.is_available:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'Service bay is not available'})
         messages.error(request, 'Service bay is not available.')
         return redirect('services:queue')
     
     try:
         order = ServiceOrder.objects.get(id=order_id)
         bay.assign_order(order)
-        messages.success(request, f'Order {order.order_number} assigned to {bay.name}')
+        
+        # Update queue entry if exists
+        if hasattr(order, 'queue_entry'):
+            queue_entry = order.queue_entry
+            queue_entry.service_bay = bay
+            queue_entry.save()
+        
+        message = f'Order {order.order_number} assigned to {bay.name}'
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'message': message})
+        
+        messages.success(request, message)
+        return redirect('services:order_detail', pk=order.pk)
+        
     except ServiceOrder.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'Order not found'})
         messages.error(request, 'Order not found.')
+        return redirect('services:queue')
+    except Exception as e:
+        logger.error(f"Error assigning bay: {str(e)}", exc_info=True)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'An error occurred while assigning the bay'})
+        messages.error(request, 'An error occurred while assigning the bay.')
+        return redirect('services:queue')
     
-    return redirect('services:queue')
+# Assign Bay to Order View
+@login_required
+@employee_required()
+@require_POST  
+def assign_bay_to_order(request, order_id):
+    """Assign service bay to a specific order"""
+    order = get_object_or_404(ServiceOrder, id=order_id)
+    bay_id = request.POST.get('bay_id')
+    
+    if not bay_id:
+        return JsonResponse({'success': False, 'message': 'Bay ID is required'})
+    
+    try:
+        bay = ServiceBay.objects.get(id=bay_id, is_active=True, is_occupied=False)
+        bay.assign_order(order)
+        
+        # Update queue entry if exists
+        if hasattr(order, 'queue_entry'):
+            queue_entry = order.queue_entry
+            queue_entry.service_bay = bay
+            queue_entry.save()
+        
+        return JsonResponse({
+            'success': True, 
+            'message': f'Order {order.order_number} assigned to {bay.name}'
+        })
+        
+    except ServiceBay.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Service bay not found or unavailable'})
+    except Exception as e:
+        logger.error(f"Error assigning bay to order: {str(e)}", exc_info=True)
+        return JsonResponse({'success': False, 'message': 'An error occurred while assigning the bay'})
 
 # Rating and Feedback Views
 @login_required
@@ -2455,3 +2737,5 @@ def add_order_to_queue(order):
         estimated_start_time=estimated_start_time,
         estimated_end_time=estimated_end_time
     )
+
+
