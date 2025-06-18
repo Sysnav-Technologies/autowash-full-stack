@@ -1,471 +1,429 @@
 <!-- templates/services/quick_order.html -->
 {% extends 'base/base.html' %}
 {% load static %}
-{% load crispy_forms_tags %}
 
 {% block title %}Quick Order - {{ block.super }}{% endblock %}
 
-{% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1 class="page-title">
-            <i class="fas fa-bolt text-warning"></i>
-            Quick Order
-        </h1>
-        <p class="page-description">Fast service order for walk-in customers</p>
-    </div>
-    
-    <div class="page-actions">
-        <a href="/business/{{ request.tenant.slug }}/services/orders/" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i>
-            Back to Orders
-        </a>
-        <a href="/business/{{ request.tenant.slug }}/services/quick/customer-register/" class="btn btn-outline-primary">
-            <i class="fas fa-user-plus"></i>
-            Register New Customer
-        </a>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-lg-8">
-        <!-- Customer & Vehicle Selection -->
-        <div class="content-card">
-            <div class="card-header">
-                <h5 class="card-title">
-                    <i class="fas fa-users"></i>
-                    Customer & Vehicle Selection
-                </h5>
-            </div>
-            
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="customer-search">Search Customer</label>
-                            <div class="search-input-group">
-                                <input type="text" id="customer-search" class="form-control" 
-                                       placeholder="Search by name, phone, or ID...">
-                                <button type="button" class="btn btn-outline-secondary" onclick="clearCustomerSearch()">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                            <div id="customer-results" class="search-results"></div>
-                        </div>
-                        
-                        <div id="selected-customer" class="selected-item" style="display: none;">
-                            <div class="selected-item-content">
-                                <div class="selected-item-info">
-                                    <h6 id="selected-customer-name"></h6>
-                                    <p id="selected-customer-details"></p>
-                                </div>
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearCustomer()">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="vehicle-search">Search Vehicle</label>
-                            <div class="search-input-group">
-                                <input type="text" id="vehicle-search" class="form-control" 
-                                       placeholder="Search by registration, make, model..." disabled>
-                                <button type="button" class="btn btn-outline-secondary" onclick="clearVehicleSearch()">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                            <div id="vehicle-results" class="search-results"></div>
-                        </div>
-                        
-                        <div id="selected-vehicle" class="selected-item" style="display: none;">
-                            <div class="selected-item-content">
-                                <div class="selected-item-info">
-                                    <h6 id="selected-vehicle-registration"></h6>
-                                    <p id="selected-vehicle-details"></p>
-                                </div>
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearVehicle()">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="customer-vehicle-actions" id="customer-vehicle-actions" style="display: none;">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        Customer and vehicle selected. You can now add services to create an order.
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Service Selection -->
-        <div class="content-card">
-            <div class="card-header">
-                <h5 class="card-title">
-                    <i class="fas fa-car-wash"></i>
-                    Select Services
-                </h5>
-                <div class="card-actions">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-outline-primary active" onclick="showAllServices()">
-                            All Services
-                        </button>
-                        <button type="button" class="btn btn-outline-primary" onclick="showPopularServices()">
-                            Popular
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="card-body">
-                <!-- Service Categories Tabs -->
-                <div class="service-categories-tabs">
-                    <button class="category-tab active" data-category="all" onclick="filterByCategory('all')">
-                        All Categories
-                    </button>
-                    {% for category in categories %}
-                    <button class="category-tab" data-category="{{ category.id }}" onclick="filterByCategory('{{ category.id }}')">
-                        <i class="{{ category.icon }}"></i>
-                        {{ category.name }}
-                    </button>
-                    {% endfor %}
-                </div>
-                
-                <!-- Services Grid -->
-                <div class="services-selection-grid" id="services-grid">
-                    {% for service in popular_services %}
-                    <div class="service-selection-card" data-service-id="{{ service.id }}" data-category="{{ service.category.id }}" data-popular="true">
-                        <div class="service-card-header">
-                            {% if service.image %}
-                            <img src="{{ service.image.url }}" alt="{{ service.name }}" class="service-image">
-                            {% else %}
-                            <div class="service-image-placeholder">
-                                <i class="fas fa-car-wash"></i>
-                            </div>
-                            {% endif %}
-                            
-                            <div class="service-badges">
-                                {% if service.is_popular %}
-                                <span class="badge badge-warning">Popular</span>
-                                {% endif %}
-                                {% if service.is_premium %}
-                                <span class="badge badge-info">Premium</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="service-card-content">
-                            <h6 class="service-name">{{ service.name }}</h6>
-                            <p class="service-description">{{ service.description|truncatewords:10 }}</p>
-                            
-                            <div class="service-details">
-                                <div class="service-price">
-                                    <strong>KES {{ service.base_price }}</strong>
-                                </div>
-                                <div class="service-duration">
-                                    <i class="fas fa-clock"></i>
-                                    {{ service.estimated_duration }} min
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="service-card-actions">
-                            <button type="button" class="btn btn-success btn-sm" onclick="addServiceToOrder('{{ service.id }}', '{{ service.name }}', {{ service.base_price }}, {{ service.estimated_duration }})">
-                                <i class="fas fa-plus"></i>
-                                Add Service
-                            </button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-4">
-        <!-- Order Summary -->
-        <div class="content-card order-summary-card">
-            <div class="card-header">
-                <h5 class="card-title">
-                    <i class="fas fa-shopping-cart"></i>
-                    Order Summary
-                </h5>
-            </div>
-            
-            <div class="card-body">
-                <div id="order-items" class="order-items">
-                    <div class="empty-order-message">
-                        <i class="fas fa-shopping-cart"></i>
-                        <p>No services selected</p>
-                        <small>Select services to add to order</small>
-                    </div>
-                </div>
-                
-                <div id="order-totals" class="order-totals" style="display: none;">
-                    <div class="total-row">
-                        <span>Subtotal:</span>
-                        <span id="subtotal">KES 0.00</span>
-                    </div>
-                    <div class="total-row">
-                        <span>Tax (16%):</span>
-                        <span id="tax-amount">KES 0.00</span>
-                    </div>
-                    <div class="total-row total-final">
-                        <span><strong>Total:</strong></span>
-                        <span><strong id="total-amount">KES 0.00</strong></span>
-                    </div>
-                    <div class="total-row">
-                        <span>Est. Duration:</span>
-                        <span id="total-duration">0 min</span>
-                    </div>
-                </div>
-                
-                <div id="order-actions" class="order-actions" style="display: none;">
-                    <button type="button" class="btn btn-primary btn-lg w-100" onclick="createOrder()">
-                        <i class="fas fa-check"></i>
-                        Create Order
-                    </button>
-                    
-                    <div class="order-options mt-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="start-immediately" checked>
-                            <label class="form-check-label" for="start-immediately">
-                                Start service immediately
-                            </label>
-                        </div>
-                        
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="send-notifications">
-                            <label class="form-check-label" for="send-notifications">
-                                Send notifications to customer
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Quick Actions -->
-        <div class="content-card">
-            <div class="card-header">
-                <h6 class="card-title">
-                    <i class="fas fa-bolt"></i>
-                    Quick Actions
-                </h6>
-            </div>
-            
-            <div class="card-body">
-                <div class="quick-actions-grid">
-                    <button class="quick-action-btn" onclick="addPopularPackage()">
-                        <i class="fas fa-star"></i>
-                        <span>Popular Package</span>
-                    </button>
-                    
-                    <button class="quick-action-btn" onclick="addBasicWash()">
-                        <i class="fas fa-car"></i>
-                        <span>Basic Wash</span>
-                    </button>
-                    
-                    <button class="quick-action-btn" onclick="addPremiumWash()">
-                        <i class="fas fa-crown"></i>
-                        <span>Premium Wash</span>
-                    </button>
-                    
-                    <button class="quick-action-btn" onclick="clearOrder()">
-                        <i class="fas fa-trash"></i>
-                        <span>Clear All</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Hidden form for order creation -->
-<form id="order-form" action="/business/{{ request.tenant.slug }}/services/orders/quick/" method="post" style="display: none;">
-    {% csrf_token %}
-    <input type="hidden" id="form-customer-id" name="customer_id">
-    <input type="hidden" id="form-vehicle-id" name="vehicle_id">
-    <input type="hidden" id="form-services-data" name="services_data">
-    <input type="hidden" id="form-start-immediately" name="start_immediately">
-    <input type="hidden" id="form-send-notifications" name="send_notifications">
-</form>
-{% endblock %}
-
 {% block extra_css %}
 <style>
-.search-input-group {
-    position: relative;
-    display: flex;
+:root {
+    --primary-500: #3b82f6;
+    --primary-50: #eff6ff;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --success-500: #10b981;
+    --success-50: #ecfdf5;
+    --success-600: #059669;
+    --warning-500: #f59e0b;
+    --warning-50: #fffbeb;
+    --info-500: #06b6d4;
+    --info-50: #f0f9ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --transition-fast: 0.15s ease-in-out;
 }
 
-.search-input-group .form-control {
-    border-radius: var(--radius-md) 0 0 var(--radius-md);
-}
-
-.search-input-group .btn {
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
-    border-left: none;
-}
-
-.search-results {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: white;
-    border: 1px solid var(--gray-300);
-    border-top: none;
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
-    max-height: 300px;
-    overflow-y: auto;
-    z-index: 1000;
-    box-shadow: var(--shadow-lg);
-}
-
-.search-result-item {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--gray-100);
-    cursor: pointer;
-    transition: background-color var(--transition-fast);
-}
-
-.search-result-item:hover {
-    background-color: var(--gray-50);
-}
-
-.search-result-item:last-child {
-    border-bottom: none;
-}
-
-.selected-item {
-    border: 1px solid var(--success-300);
-    border-radius: var(--radius-md);
-    background: var(--success-50);
-    padding: 0.75rem;
-    margin-top: 0.75rem;
-}
-
-.selected-item-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.selected-item-info h6 {
-    margin: 0;
-    color: var(--success-800);
-    font-weight: 600;
-}
-
-.selected-item-info p {
-    margin: 0;
-    color: var(--success-700);
-    font-size: 0.875rem;
-}
-
-.service-categories-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.category-tab {
-    background: var(--gray-100);
-    border: 1px solid var(--gray-300);
-    color: var(--gray-700);
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.category-tab:hover {
-    background: var(--gray-200);
-}
-
-.category-tab.active {
-    background: var(--primary-100);
-    border-color: var(--primary-300);
-    color: var(--primary-700);
-}
-
-.services-selection-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
-}
-
-.service-selection-card {
-    border: 1px solid var(--gray-200);
+.page-header {
+    background: linear-gradient(135deg, var(--primary-50), var(--success-50));
+    border: 1px solid var(--primary-200);
     border-radius: var(--radius-lg);
-    overflow: hidden;
-    background: white;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-description {
+    margin: 0.5rem 0 0;
+    color: var(--gray-600);
+    font-size: 1rem;
+}
+
+.page-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
     transition: all var(--transition-fast);
     cursor: pointer;
+    font-size: 0.875rem;
 }
 
-.service-selection-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+.btn-outline-secondary {
+    background: transparent;
+    color: var(--gray-600);
+    border-color: var(--gray-300);
 }
 
-.service-card-header {
+.btn-outline-secondary:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-500);
+    text-decoration: none;
+    color: var(--gray-700);
+}
+
+.btn-success {
+    background: var(--success-500);
+    color: white;
+    border-color: var(--success-500);
+}
+
+.btn-success:hover {
+    background: var(--success-600);
+    text-decoration: none;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-primary {
+    background: var(--primary-500);
+    color: white;
+    border-color: var(--primary-500);
+}
+
+.btn-primary:hover {
+    background: var(--primary-600);
+    text-decoration: none;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1rem;
+}
+
+.quick-order-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.order-progress {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
     position: relative;
-    height: 120px;
-    overflow: hidden;
 }
 
-.service-image,
-.service-image-placeholder {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+.order-progress::before {
+    content: '';
+    position: absolute;
+    top: 1rem;
+    left: 2rem;
+    right: 2rem;
+    height: 2px;
+    background: var(--gray-200);
+    z-index: 1;
 }
 
-.service-image-placeholder {
-    background: linear-gradient(135deg, var(--primary-100), var(--primary-200));
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: white;
+    padding: 0.5rem;
+    z-index: 2;
+    position: relative;
+}
+
+.progress-number {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--gray-200);
+    color: var(--gray-600);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    color: var(--primary-600);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    transition: all var(--transition-fast);
 }
 
-.service-badges {
+.progress-step.active .progress-number {
+    background: var(--primary-500);
+    color: white;
+}
+
+.progress-step.completed .progress-number {
+    background: var(--success-500);
+    color: white;
+}
+
+.progress-label {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    text-align: center;
+}
+
+.step-content {
+    display: none;
+}
+
+.step-content.active {
+    display: block;
+}
+
+.form-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.card-header {
+    background: var(--gray-50);
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.card-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.form-label.required::after {
+    content: " *";
+    color: #ef4444;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+    background: white;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-control.is-invalid {
+    border-color: #ef4444;
+}
+
+.form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+    padding-right: 2.5rem;
+    appearance: none;
+}
+
+.customer-search-section {
+    background: var(--info-50);
+    border: 1px solid var(--info-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.search-input-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.search-btn {
+    background: var(--primary-500);
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.search-results {
+    margin-top: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.search-result-item {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.search-result-item:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-300);
+}
+
+.selected-customer,
+.selected-vehicle {
+    background: var(--success-50);
+    border: 1px solid var(--success-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.selection-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.change-btn {
+    background: none;
+    border: none;
+    color: var(--primary-600);
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-decoration: underline;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.service-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+}
+
+.service-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-color: var(--primary-300);
+}
+
+.service-card.selected {
+    border-color: var(--primary-500);
+    background: var(--primary-50);
+}
+
+.service-card.selected::before {
+    content: '✓';
     position: absolute;
     top: 0.5rem;
     right: 0.5rem;
+    background: var(--primary-500);
+    color: white;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 
-.service-card-content {
-    padding: 1rem;
+.service-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
 }
 
 .service-name {
+    font-size: 1rem;
     font-weight: 600;
     color: var(--gray-900);
-    margin-bottom: 0.5rem;
+    margin: 0;
+}
+
+.service-price {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary-600);
 }
 
 .service-description {
     font-size: 0.875rem;
     color: var(--gray-600);
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     line-height: 1.4;
 }
 
@@ -473,422 +431,1255 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
-}
-
-.service-price {
-    font-size: 1rem;
-    color: var(--gray-900);
-}
-
-.service-duration {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.service-card-actions {
-    padding: 0 1rem 1rem;
-}
-
-.service-card-actions .btn {
-    width: 100%;
-}
-
-.order-summary-card {
-    position: sticky;
-    top: 2rem;
-}
-
-.order-items {
-    min-height: 200px;
-}
-
-.empty-order-message {
-    text-align: center;
-    padding: 2rem 1rem;
+    font-size: 0.75rem;
     color: var(--gray-500);
 }
 
-.empty-order-message i {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    opacity: 0.5;
-}
-
-.order-item {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    margin-bottom: 0.5rem;
-    background: white;
-}
-
-.order-item-info {
-    flex: 1;
-}
-
-.order-item-name {
-    font-weight: 600;
-    color: var(--gray-900);
-    margin-bottom: 0.25rem;
-}
-
-.order-item-details {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-}
-
-.order-item-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.quantity-controls {
+.service-duration {
     display: flex;
     align-items: center;
     gap: 0.25rem;
 }
 
-.quantity-btn {
-    width: 24px;
-    height: 24px;
-    border: 1px solid var(--gray-300);
-    background: white;
+.service-category {
+    background: var(--gray-100);
+    color: var(--gray-700);
+    padding: 0.125rem 0.5rem;
     border-radius: var(--radius-sm);
+    font-size: 0.625rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.service-type-selector .btn-group {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.service-type-selector .btn {
+    border-radius: 0;
+    border-color: var(--primary-300);
+}
+
+.service-type-selector .btn.active {
+    background: var(--primary-500);
+    color: white;
+    border-color: var(--primary-500);
+}
+
+.packages-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.package-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+}
+
+.package-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-color: var(--primary-300);
+}
+
+.package-card.selected {
+    border-color: var(--primary-500);
+    background: var(--primary-50);
+}
+
+.package-card.selected::before {
+    content: '✓';
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: var(--primary-500);
+    color: white;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0.75rem;
-    cursor: pointer;
+    font-weight: 600;
+    z-index: 2;
 }
 
-.quantity-input {
-    width: 40px;
-    text-align: center;
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-    padding: 0.25rem;
+.package-header {
+    margin-bottom: 1rem;
+}
+
+.package-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0 0 0.5rem 0;
+}
+
+.package-pricing {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.original-price {
     font-size: 0.875rem;
+    color: var(--gray-500);
+    text-decoration: line-through;
 }
 
-.order-totals {
-    border-top: 1px solid var(--gray-200);
+.package-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary-600);
+}
+
+.savings {
+    font-size: 0.75rem;
+    color: var(--success-600);
+    font-weight: 600;
+    background: var(--success-50);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+}
+
+.package-description {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
+.package-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+}
+
+.package-duration,
+.package-services-count {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.package-badge {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+}
+
+.discount-badge {
+    background: var(--warning-500);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.popular-badge {
+    top: 0.5rem;
+    left: 0.5rem;
+}
+
+.popular-label {
+    background: var(--success-500);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.order-summary {
+    position: sticky;
+    top: 2rem;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.summary-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.summary-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.summary-content {
+    margin-bottom: 1.5rem;
+}
+
+.selected-services-list {
+    margin-bottom: 1rem;
+}
+
+.selected-service-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.selected-service-item:last-child {
+    border-bottom: none;
+}
+
+.service-item-name {
+    font-size: 0.875rem;
+    color: var(--gray-900);
+}
+
+.service-item-price {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.summary-totals {
+    border-top: 2px solid var(--gray-200);
     padding-top: 1rem;
-    margin-top: 1rem;
 }
 
 .total-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 0.5rem;
-    font-size: 0.875rem;
 }
 
-.total-final {
-    border-top: 1px solid var(--gray-200);
-    padding-top: 0.5rem;
+.total-row.main {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--gray-900);
     margin-top: 0.5rem;
-    font-size: 1rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--gray-200);
 }
 
-.order-actions {
-    margin-top: 1.5rem;
-}
-
-.order-options .form-check {
-    margin-bottom: 0.5rem;
-}
-
-.quick-actions-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+.summary-actions {
+    display: flex;
+    flex-direction: column;
     gap: 0.75rem;
 }
 
-.quick-action-btn {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    padding: 1rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all var(--transition-fast);
+.step-navigation {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
+    padding: 1.5rem;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+    margin-top: 2rem;
 }
 
-.quick-action-btn:hover {
+.nav-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btn-outline-gray {
+    background: transparent;
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+.btn-outline-gray:hover {
     background: var(--gray-100);
-    transform: translateY(-1px);
-}
-
-.quick-action-btn i {
-    font-size: 1.5rem;
-    color: var(--primary-600);
-}
-
-.quick-action-btn span {
-    font-size: 0.875rem;
-    font-weight: 500;
+    border-color: var(--gray-400);
+    text-decoration: none;
     color: var(--gray-700);
 }
 
-@media (max-width: 768px) {
-    .services-selection-grid {
-        grid-template-columns: 1fr;
+.step-indicator {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--gray-500);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.category-filter {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.category-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    background: white;
+    color: var(--gray-700);
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+}
+
+.category-btn:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+}
+
+.category-btn.active {
+    background: var(--primary-500);
+    color: white;
+    border-color: var(--primary-500);
+}
+
+@media (max-width: 1024px) {
+    .quick-order-container {
+        padding: 0 1rem;
     }
     
-    .service-categories-tabs {
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        padding-bottom: 0.5rem;
-    }
-    
-    .order-summary-card {
+    .order-summary {
         position: static;
-    }
-    
-    .quick-actions-grid {
-        grid-template-columns: 1fr;
+        margin-top: 2rem;
     }
 }
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .services-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .search-input-group {
+        flex-direction: column;
+    }
+    
+    .order-progress {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .step-navigation {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+}
+
+.text-muted { color: var(--gray-500); }
+.text-success { color: var(--success-600); }
+.text-primary { color: var(--primary-600); }
+.d-flex { display: flex; }
+.justify-content-between { justify-content: space-between; }
+.align-items-center { align-items: center; }
+.p-3 { padding: 1rem; }
 </style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-bolt text-primary"></i>
+            Quick Order
+        </h1>
+        <p class="page-description">Create a service order quickly for walk-in customers</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/services/dashboard/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="quick-order-container">
+    <!-- Progress Indicator -->
+    <div class="order-progress">
+        <div class="progress-step active" id="step1-indicator">
+            <div class="progress-number">1</div>
+            <div class="progress-label">Customer</div>
+        </div>
+        <div class="progress-step" id="step2-indicator">
+            <div class="progress-number">2</div>
+            <div class="progress-label">Vehicle</div>
+        </div>
+        <div class="progress-step" id="step3-indicator">
+            <div class="progress-number">3</div>
+            <div class="progress-label">Services</div>
+        </div>
+        <div class="progress-step" id="step4-indicator">
+            <div class="progress-number">4</div>
+            <div class="progress-label">Review</div>
+        </div>
+    </div>
+
+    <form id="quickOrderForm" method="post">
+        {% csrf_token %}
+        
+        <!-- Step 1: Customer Selection -->
+        <div class="step-content active" id="step1">
+            <div class="form-card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-user"></i>
+                        Select Customer
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Customer Search -->
+                    <div class="customer-search-section">
+                        <h6><i class="fas fa-search"></i> Search Existing Customer</h6>
+                        <div class="search-input-group">
+                            <input type="text" class="form-control" id="customerSearchInput" placeholder="Search by name, phone, or customer ID...">
+                            <button type="button" class="search-btn" onclick="searchCustomers()">
+                                <i class="fas fa-search"></i>
+                                Search
+                            </button>
+                        </div>
+                        <div id="customerSearchResults" class="search-results" style="display: none;"></div>
+                    </div>
+
+                    <!-- Selected Customer Display -->
+                    <div id="selectedCustomerDisplay" style="display: none;">
+                        <div class="selected-customer">
+                            <div class="selection-header">
+                                <h6><i class="fas fa-check-circle text-success"></i> Selected Customer</h6>
+                                <button type="button" class="change-btn" onclick="changeCustomer()">Change</button>
+                            </div>
+                            <div id="selectedCustomerInfo"></div>
+                        </div>
+                    </div>
+
+                    <!-- New Customer Form -->
+                    <div id="newCustomerForm">
+                        <h6><i class="fas fa-user-plus"></i> New Customer</h6>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerName" class="form-label required">Full Name</label>
+                                <input type="text" class="form-control" id="customerName" name="customer_name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="customerPhone" class="form-label required">Phone Number</label>
+                                <input type="tel" class="form-control" id="customerPhone" name="customer_phone" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="customerEmail" class="form-label">Email (Optional)</label>
+                            <input type="email" class="form-control" id="customerEmail" name="customer_email">
+                        </div>
+                    </div>
+
+                    <!-- Hidden fields for selected customer -->
+                    <input type="hidden" id="selectedCustomerId" name="selected_customer_id">
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Vehicle Selection -->
+        <div class="step-content" id="step2">
+            <div class="form-card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-car"></i>
+                        Select Vehicle
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Vehicle Search (for existing customers) -->
+                    <div id="vehicleSearchSection" style="display: none;">
+                        <div class="customer-search-section">
+                            <h6><i class="fas fa-search"></i> Search Customer's Vehicles</h6>
+                            <div class="search-input-group">
+                                <input type="text" class="form-control" id="vehicleSearchInput" placeholder="Search by registration number...">
+                                <button type="button" class="search-btn" onclick="searchVehicles()">
+                                    <i class="fas fa-search"></i>
+                                    Search
+                                </button>
+                            </div>
+                            <div id="vehicleSearchResults" class="search-results" style="display: none;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Selected Vehicle Display -->
+                    <div id="selectedVehicleDisplay" style="display: none;">
+                        <div class="selected-vehicle">
+                            <div class="selection-header">
+                                <h6><i class="fas fa-check-circle text-success"></i> Selected Vehicle</h6>
+                                <button type="button" class="change-btn" onclick="changeVehicle()">Change</button>
+                            </div>
+                            <div id="selectedVehicleInfo"></div>
+                        </div>
+                    </div>
+
+                    <!-- New Vehicle Form -->
+                    <div id="newVehicleForm">
+                        <h6><i class="fas fa-plus"></i> Vehicle Information</h6>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vehicleRegistration" class="form-label required">Registration Number</label>
+                                <input type="text" class="form-control" id="vehicleRegistration" name="vehicle_registration" required style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label for="vehicleType" class="form-label required">Vehicle Type</label>
+                                <select class="form-control form-select" id="vehicleType" name="vehicle_type" required>
+                                    <option value="">Select Type</option>
+                                    <option value="sedan">Sedan</option>
+                                    <option value="suv">SUV</option>
+                                    <option value="hatchback">Hatchback</option>
+                                    <option value="pickup">Pickup Truck</option>
+                                    <option value="van">Van</option>
+                                    <option value="bus">Bus</option>
+                                    <option value="motorcycle">Motorcycle</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vehicleMake" class="form-label required">Make</label>
+                                <input type="text" class="form-control" id="vehicleMake" name="vehicle_make" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="vehicleModel" class="form-label required">Model</label>
+                                <input type="text" class="form-control" id="vehicleModel" name="vehicle_model" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vehicleColor" class="form-label required">Color</label>
+                                <input type="text" class="form-control" id="vehicleColor" name="vehicle_color" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="vehicleYear" class="form-label">Year</label>
+                                <input type="number" class="form-control" id="vehicleYear" name="vehicle_year" min="1990" max="2025" value="2020">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden fields for selected vehicle -->
+                    <input type="hidden" id="selectedVehicleId" name="selected_vehicle_id">
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Service Selection -->
+        <div class="step-content" id="step3">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="form-card">
+                        <div class="card-header">
+                            <h5 class="card-title">
+                                <i class="fas fa-list-check"></i>
+                                Select Services
+                            </h5>
+                        </div>
+                        
+                        <div class="card-body">
+                            <!-- Service Type Selector -->
+                            <div class="service-type-selector mb-3">
+                                <div class="btn-group w-100" role="group">
+                                    <button type="button" class="btn btn-outline-primary active" id="individualServicesBtn" onclick="showServiceType('individual')">
+                                        <i class="fas fa-list"></i>
+                                        Individual Services
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary" id="packagesBtn" onclick="showServiceType('packages')">
+                                        <i class="fas fa-box"></i>
+                                        Service Packages
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Individual Services Section -->
+                            <div id="individualServicesSection">
+                                <!-- Category Filter -->
+                                <div class="category-filter">
+                                    <button type="button" class="category-btn active" onclick="filterServices('all')" data-category="all">
+                                        All Services
+                                    </button>
+                                    {% for category in categories %}
+                                    <button type="button" class="category-btn" onclick="filterServices('{{ category.id }}')" data-category="{{ category.id }}">
+                                        <i class="{{ category.icon }}"></i>
+                                        {{ category.name }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Services Grid -->
+                                <div class="services-grid" id="servicesGrid">
+                                    {% for service in popular_services %}
+                                    <div class="service-card" onclick="toggleService('{{ service.id }}')" data-service-id="{{ service.id }}" data-category="{{ service.category.id }}">
+                                        <div class="service-header">
+                                            <h6 class="service-name">{{ service.name }}</h6>
+                                            <div class="service-price">KES {{ service.base_price }}</div>
+                                        </div>
+                                        <p class="service-description">{{ service.description|truncatewords:15 }}</p>
+                                        <div class="service-details">
+                                            <div class="service-duration">
+                                                <i class="fas fa-clock"></i>
+                                                {{ service.estimated_duration }} min
+                                            </div>
+                                            <div class="service-category">{{ service.category.name }}</div>
+                                        </div>
+                                    </div>
+                                    {% empty %}
+                                    <div class="empty-state">
+                                        <i class="fas fa-car-wash"></i>
+                                        <p>No services available</p>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Service Packages Section -->
+                            <div id="packagesSection" style="display: none;">
+                                <div class="packages-grid">
+                                    {% for package in service_packages %}
+                                    <div class="package-card" onclick="togglePackage('{{ package.id }}')" data-package-id="{{ package.id }}">
+                                        <div class="package-header">
+                                            <h6 class="package-name">{{ package.name }}</h6>
+                                            <div class="package-pricing">
+                                                {% if package.discount_percentage > 0 %}
+                                                <div class="original-price">KES {{ package.original_price|floatformat:2 }}</div>
+                                                <div class="package-price">KES {{ package.total_price }}</div>
+                                                <div class="savings">Save KES {{ package.savings_amount|floatformat:2 }}</div>
+                                                {% else %}
+                                                <div class="package-price">KES {{ package.total_price }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <p class="package-description">{{ package.description|truncatewords:20 }}</p>
+                                        <div class="package-details">
+                                            <div class="package-duration">
+                                                <i class="fas fa-clock"></i>
+                                                {{ package.estimated_duration }} min
+                                            </div>
+                                            <div class="package-services-count">
+                                                <i class="fas fa-list"></i>
+                                                {{ package.service_count }} services
+                                            </div>
+                                        </div>
+                                        {% if package.discount_percentage > 0 %}
+                                        <div class="package-badge">
+                                            <span class="discount-badge">{{ package.discount_percentage|floatformat:0 }}% OFF</span>
+                                        </div>
+                                        {% endif %}
+                                        {% if package.is_popular %}
+                                        <div class="package-badge popular-badge">
+                                            <span class="popular-label">POPULAR</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% empty %}
+                                    <div class="empty-state">
+                                        <i class="fas fa-box"></i>
+                                        <p>No service packages available</p>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <!-- Order Summary -->
+                    <div class="order-summary">
+                        <div class="summary-header">
+                            <h6 class="summary-title">
+                                <i class="fas fa-shopping-cart"></i>
+                                Order Summary
+                            </h6>
+                        </div>
+                        
+                        <div class="summary-content">
+                            <div id="selectedServicesDisplay">
+                                <div class="empty-state">
+                                    <i class="fas fa-list"></i>
+                                    <p>No services selected</p>
+                                </div>
+                            </div>
+                            
+                            <div class="selected-services-list" id="selectedServicesList" style="display: none;">
+                                <!-- Selected services will be populated here -->
+                            </div>
+                            
+                            <div class="summary-totals" id="summaryTotals" style="display: none;">
+                                <div class="total-row">
+                                    <span>Subtotal:</span>
+                                    <span id="subtotalAmount">KES 0</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>Tax (16%):</span>
+                                    <span id="taxAmount">KES 0</span>
+                                </div>
+                                <div class="total-row main">
+                                    <span>Total:</span>
+                                    <span id="totalAmount">KES 0</span>
+                                </div>
+                                <div class="total-row">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock"></i>
+                                        Est. Duration: <span id="estimatedDuration">0</span> min
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="summary-actions">
+                            <button type="button" class="btn btn-outline-gray" onclick="clearAllServices()">
+                                <i class="fas fa-trash"></i>
+                                Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Review & Submit -->
+        <div class="step-content" id="step4">
+            <div class="form-card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-check-circle"></i>
+                        Review Order
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Customer Information</h6>
+                            <div id="reviewCustomerInfo" class="mb-3">
+                                <!-- Customer info will be populated here -->
+                            </div>
+                            
+                            <h6>Vehicle Information</h6>
+                            <div id="reviewVehicleInfo" class="mb-3">
+                                <!-- Vehicle info will be populated here -->
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6>Selected Services</h6>
+                            <div id="reviewServicesInfo" class="mb-3">
+                                <!-- Services info will be populated here -->
+                            </div>
+                            
+                            <h6>Order Total</h6>
+                            <div id="reviewTotalInfo">
+                                <!-- Total info will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="specialInstructions" class="form-label">Special Instructions (Optional)</label>
+                        <textarea class="form-control" id="specialInstructions" name="special_instructions" rows="3" placeholder="Any special requirements or notes..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="priority" class="form-label">Priority</label>
+                        <select class="form-control form-select" id="priority" name="priority">
+                            <option value="normal">Normal</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden field for selected services -->
+        <input type="hidden" id="selectedServicesData" name="selected_services">
+    </form>
+
+    <!-- Step Navigation -->
+    <div class="step-navigation">
+        <div class="step-indicator">
+            Step <span id="currentStepNumber">1</span> of 4
+        </div>
+        
+        <div class="nav-buttons">
+            <button type="button" class="btn btn-outline-gray" id="prevBtn" onclick="previousStep()" style="display: none;">
+                <i class="fas fa-arrow-left"></i>
+                Previous
+            </button>
+            
+            <button type="button" class="btn btn-primary" id="nextBtn" onclick="nextStep()">
+                Next
+                <i class="fas fa-arrow-right"></i>
+            </button>
+            
+            <button type="button" class="btn btn-success btn-lg" id="submitBtn" onclick="submitOrder()" style="display: none;">
+                <i class="fas fa-check"></i>
+                Create Order
+            </button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Global variables
+let currentStep = 1;
 let selectedCustomer = null;
 let selectedVehicle = null;
-let orderItems = [];
-let searchTimeout;
+let selectedServices = [];
+let selectedPackage = null;
+let allServices = [];
+let serviceType = 'individual'; // 'individual' or 'package'
 
-// Initialize on page load
+// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    initializeEventListeners();
     loadAllServices();
+    updateStepIndicator();
 });
 
-function initializeEventListeners() {
-    // Customer search
-    const customerSearch = document.getElementById('customer-search');
-    customerSearch.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            searchCustomers(this.value);
-        }, 300);
-    });
-    
-    // Vehicle search
-    const vehicleSearch = document.getElementById('vehicle-search');
-    vehicleSearch.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            searchVehicles(this.value);
-        }, 300);
-    });
+// Step Management
+function nextStep() {
+    if (validateCurrentStep()) {
+        if (currentStep < 4) {
+            currentStep++;
+            showStep(currentStep);
+            updateStepIndicator();
+            updateNavigationButtons();
+        }
+    }
 }
 
-// Customer search functions
-function searchCustomers(query) {
+function previousStep() {
+    if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+        updateStepIndicator();
+        updateNavigationButtons();
+    }
+}
+
+function showStep(step) {
+    // Hide all steps
+    document.querySelectorAll('.step-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Show current step
+    document.getElementById(`step${step}`).classList.add('active');
+    
+    // Update step-specific content
+    if (step === 2) {
+        updateVehicleStep();
+    } else if (step === 4) {
+        updateReviewStep();
+    }
+}
+
+function updateStepIndicator() {
+    document.getElementById('currentStepNumber').textContent = currentStep;
+    
+    // Update progress indicators
+    for (let i = 1; i <= 4; i++) {
+        const indicator = document.getElementById(`step${i}-indicator`);
+        if (i < currentStep) {
+            indicator.classList.add('completed');
+            indicator.classList.remove('active');
+        } else if (i === currentStep) {
+            indicator.classList.add('active');
+            indicator.classList.remove('completed');
+        } else {
+            indicator.classList.remove('active', 'completed');
+        }
+    }
+}
+
+function updateNavigationButtons() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Show/hide previous button
+    prevBtn.style.display = currentStep > 1 ? 'inline-flex' : 'none';
+    
+    // Show next or submit button
+    if (currentStep === 4) {
+        nextBtn.style.display = 'none';
+        submitBtn.style.display = 'inline-flex';
+    } else {
+        nextBtn.style.display = 'inline-flex';
+        submitBtn.style.display = 'none';
+    }
+}
+
+function validateCurrentStep() {
+    switch (currentStep) {
+        case 1:
+            return validateCustomerStep();
+        case 2:
+            return validateVehicleStep();
+        case 3:
+            return validateServicesStep();
+        case 4:
+            return true; // Review step doesn't need validation
+        default:
+            return true;
+    }
+}
+
+// Customer Management
+function searchCustomers() {
+    const query = document.getElementById('customerSearchInput').value.trim();
+    const resultsContainer = document.getElementById('customerSearchResults');
+    
     if (query.length < 2) {
-        document.getElementById('customer-results').innerHTML = '';
+        resultsContainer.style.display = 'none';
         return;
     }
     
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/customer/search/?q=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-            displayCustomerResults(data.results);
-        })
-        .catch(error => {
-            console.error('Error searching customers:', error);
-        });
+    resultsContainer.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    resultsContainer.style.display = 'block';
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/customer/search/?q=${encodeURIComponent(query)}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayCustomerResults(data.customers || []);
+    })
+    .catch(error => {
+        console.error('Search error:', error);
+        resultsContainer.innerHTML = '<div class="text-danger p-3">Error searching customers</div>';
+    });
 }
 
 function displayCustomerResults(customers) {
-    const resultsDiv = document.getElementById('customer-results');
+    const resultsContainer = document.getElementById('customerSearchResults');
     
     if (customers.length === 0) {
-        resultsDiv.innerHTML = '<div class="search-result-item">No customers found</div>';
+        resultsContainer.innerHTML = '<div class="text-muted p-3">No customers found</div>';
         return;
     }
     
-    resultsDiv.innerHTML = customers.map(customer => `
-        <div class="search-result-item" onclick="selectCustomer('${customer.id}', '${customer.name}', '${customer.phone}', '${customer.customer_id}')">
-            <strong>${customer.name}</strong><br>
-            <small>${customer.phone} - ID: ${customer.customer_id}</small>
-        </div>
-    `).join('');
+    let html = '';
+    customers.forEach(customer => {
+        html += `
+            <div class="search-result-item" onclick="selectCustomer('${customer.id}', '${customer.full_name}', '${customer.phone}', '${customer.customer_id}')">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>${customer.full_name}</strong>
+                        <br><small>${customer.phone || 'No phone'}</small>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted">${customer.customer_id}</small>
+                        <br><small>${customer.vehicle_count || 0} vehicle(s)</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
 }
 
 function selectCustomer(id, name, phone, customerId) {
-    selectedCustomer = { id, name, phone, customer_id: customerId };
+    selectedCustomer = { id, name, phone, customerId };
     
     // Update UI
-    document.getElementById('customer-search').style.display = 'none';
-    document.getElementById('customer-results').innerHTML = '';
+    document.getElementById('selectedCustomerId').value = id;
+    document.getElementById('selectedCustomerInfo').innerHTML = `
+        <strong>${name}</strong><br>
+        <small>Phone: ${phone}</small><br>
+        <small>ID: ${customerId}</small>
+    `;
     
-    const selectedCustomerDiv = document.getElementById('selected-customer');
-    document.getElementById('selected-customer-name').textContent = name;
-    document.getElementById('selected-customer-details').textContent = `${phone} - ID: ${customerId}`;
-    selectedCustomerDiv.style.display = 'block';
+    // Show selected customer, hide search and new customer form
+    document.getElementById('selectedCustomerDisplay').style.display = 'block';
+    document.getElementById('customerSearchResults').style.display = 'none';
+    document.getElementById('newCustomerForm').style.display = 'none';
     
-    // Enable vehicle search
-    document.getElementById('vehicle-search').disabled = false;
-    
-    // Search vehicles for this customer
-    searchVehiclesForCustomer(id);
-    
-    updateOrderStatus();
+    // Clear search input
+    document.getElementById('customerSearchInput').value = '';
 }
 
-function clearCustomer() {
+function changeCustomer() {
     selectedCustomer = null;
-    selectedVehicle = null;
+    document.getElementById('selectedCustomerId').value = '';
+    document.getElementById('selectedCustomerDisplay').style.display = 'none';
+    document.getElementById('newCustomerForm').style.display = 'block';
     
-    document.getElementById('customer-search').style.display = 'block';
-    document.getElementById('customer-search').value = '';
-    document.getElementById('selected-customer').style.display = 'none';
-    document.getElementById('vehicle-search').disabled = true;
-    document.getElementById('vehicle-search').value = '';
-    document.getElementById('selected-vehicle').style.display = 'none';
-    document.getElementById('vehicle-results').innerHTML = '';
-    
-    updateOrderStatus();
+    // Clear form fields
+    document.getElementById('customerName').value = '';
+    document.getElementById('customerPhone').value = '';
+    document.getElementById('customerEmail').value = '';
 }
 
-function clearCustomerSearch() {
-    document.getElementById('customer-search').value = '';
-    document.getElementById('customer-results').innerHTML = '';
-}
-
-// Vehicle search functions
-function searchVehicles(query) {
-    if (!selectedCustomer) return;
-    
-    let url = `/business/{{ request.tenant.slug }}/services/ajax/vehicle/search/?customer_id=${selectedCustomer.id}`;
-    if (query) {
-        url += `&q=${encodeURIComponent(query)}`;
+function validateCustomerStep() {
+    if (selectedCustomer) {
+        return true;
     }
     
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            displayVehicleResults(data.results);
-        })
-        .catch(error => {
-            console.error('Error searching vehicles:', error);
-        });
+    // Validate new customer form
+    const name = document.getElementById('customerName').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    
+    if (!name || !phone) {
+        showToast('Please enter customer name and phone number', 'error');
+        return false;
+    }
+    
+    return true;
 }
 
-function searchVehiclesForCustomer(customerId) {
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/vehicle/search/?customer_id=${customerId}`)
-        .then(response => response.json())
-        .then(data => {
-            displayVehicleResults(data.results);
-        })
-        .catch(error => {
-            console.error('Error searching vehicles:', error);
-        });
+// Vehicle Management
+function updateVehicleStep() {
+    if (selectedCustomer) {
+        document.getElementById('vehicleSearchSection').style.display = 'block';
+        loadCustomerVehicles();
+    } else {
+        document.getElementById('vehicleSearchSection').style.display = 'none';
+    }
+}
+
+function loadCustomerVehicles() {
+    if (!selectedCustomer) return;
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/vehicle/search/?customer_id=${selectedCustomer.id}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.results && data.results.length > 0) {
+            displayVehicleOptions(data.results);
+        }
+    })
+    .catch(error => {
+        console.error('Error loading vehicles:', error);
+    });
+}
+
+function displayVehicleOptions(vehicles) {
+    const resultsContainer = document.getElementById('vehicleSearchResults');
+    
+    let html = '<h6>Customer\'s Vehicles:</h6>';
+    vehicles.forEach(vehicle => {
+        html += `
+            <div class="search-result-item" onclick="selectVehicle('${vehicle.id}', '${vehicle.registration}', '${vehicle.make}', '${vehicle.model}', '${vehicle.color}')">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>${vehicle.registration}</strong>
+                        <br><small>${vehicle.make} ${vehicle.model}</small>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted">${vehicle.color}</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+    resultsContainer.style.display = 'block';
+}
+
+function searchVehicles() {
+    const query = document.getElementById('vehicleSearchInput').value.trim();
+    const customerId = selectedCustomer ? selectedCustomer.id : '';
+    
+    if (query.length < 2) return;
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/vehicle/search/?q=${encodeURIComponent(query)}&customer_id=${customerId}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayVehicleResults(data.results || []);
+    })
+    .catch(error => {
+        console.error('Vehicle search error:', error);
+    });
 }
 
 function displayVehicleResults(vehicles) {
-    const resultsDiv = document.getElementById('vehicle-results');
+    const resultsContainer = document.getElementById('vehicleSearchResults');
     
     if (vehicles.length === 0) {
-        resultsDiv.innerHTML = '<div class="search-result-item">No vehicles found</div>';
+        resultsContainer.innerHTML = '<div class="text-muted p-3">No vehicles found</div>';
         return;
     }
     
-    resultsDiv.innerHTML = vehicles.map(vehicle => `
-        <div class="search-result-item" onclick="selectVehicle('${vehicle.id}', '${vehicle.registration}', '${vehicle.make}', '${vehicle.model}', '${vehicle.color}')">
-            <strong>${vehicle.registration}</strong> - ${vehicle.make} ${vehicle.model}<br>
-            <small>${vehicle.color}</small>
-        </div>
-    `).join('');
+    let html = '';
+    vehicles.forEach(vehicle => {
+        html += `
+            <div class="search-result-item" onclick="selectVehicle('${vehicle.id}', '${vehicle.registration}', '${vehicle.make}', '${vehicle.model}', '${vehicle.color}')">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>${vehicle.registration}</strong>
+                        <br><small>${vehicle.make} ${vehicle.model}</small>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted">${vehicle.color}</small>
+                        <br><small>${vehicle.customer_name}</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
 }
 
 function selectVehicle(id, registration, make, model, color) {
     selectedVehicle = { id, registration, make, model, color };
     
     // Update UI
-    document.getElementById('vehicle-search').style.display = 'none';
-    document.getElementById('vehicle-results').innerHTML = '';
+    document.getElementById('selectedVehicleId').value = id;
+    document.getElementById('selectedVehicleInfo').innerHTML = `
+        <strong>${registration}</strong><br>
+        <small>${make} ${model}</small><br>
+        <small>Color: ${color}</small>
+    `;
     
-    const selectedVehicleDiv = document.getElementById('selected-vehicle');
-    document.getElementById('selected-vehicle-registration').textContent = registration;
-    document.getElementById('selected-vehicle-details').textContent = `${make} ${model} - ${color}`;
-    selectedVehicleDiv.style.display = 'block';
-    
-    updateOrderStatus();
+    // Show selected vehicle, hide search and new vehicle form
+    document.getElementById('selectedVehicleDisplay').style.display = 'block';
+    document.getElementById('vehicleSearchResults').style.display = 'none';
+    document.getElementById('newVehicleForm').style.display = 'none';
 }
 
-function clearVehicle() {
+function changeVehicle() {
     selectedVehicle = null;
+    document.getElementById('selectedVehicleId').value = '';
+    document.getElementById('selectedVehicleDisplay').style.display = 'none';
+    document.getElementById('newVehicleForm').style.display = 'block';
     
-    document.getElementById('vehicle-search').style.display = 'block';
-    document.getElementById('vehicle-search').value = '';
-    document.getElementById('selected-vehicle').style.display = 'none';
-    
-    updateOrderStatus();
+    // Clear form fields
+    document.getElementById('vehicleRegistration').value = '';
+    document.getElementById('vehicleMake').value = '';
+    document.getElementById('vehicleModel').value = '';
+    document.getElementById('vehicleColor').value = '';
+    document.getElementById('vehicleYear').value = '2020';
+    document.getElementById('vehicleType').value = '';
 }
 
-function clearVehicleSearch() {
-    document.getElementById('vehicle-search').value = '';
-    document.getElementById('vehicle-results').innerHTML = '';
+function validateVehicleStep() {
+    if (selectedVehicle) {
+        return true;
+    }
+    
+    // Validate new vehicle form
+    const registration = document.getElementById('vehicleRegistration').value.trim();
+    const make = document.getElementById('vehicleMake').value.trim();
+    const model = document.getElementById('vehicleModel').value.trim();
+    const color = document.getElementById('vehicleColor').value.trim();
+    const type = document.getElementById('vehicleType').value;
+    
+    if (!registration || !make || !model || !color || !type) {
+        showToast('Please fill in all required vehicle information', 'error');
+        return false;
+    }
+    
+    return true;
 }
 
-// Service selection functions
-function loadAllServices() {
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/all-services/`)
-        .then(response => response.json())
-        .then(data => {
-            displayServices(data.services);
-        })
-        .catch(error => {
-            console.error('Error loading services:', error);
+// Service Management
+function showServiceType(type) {
+    serviceType = type;
+    
+    // Update button states
+    document.getElementById('individualServicesBtn').classList.toggle('active', type === 'individual');
+    document.getElementById('packagesBtn').classList.toggle('active', type === 'packages');
+    
+    // Show/hide sections
+    document.getElementById('individualServicesSection').style.display = type === 'individual' ? 'block' : 'none';
+    document.getElementById('packagesSection').style.display = type === 'packages' ? 'block' : 'none';
+    
+    // Clear selections when switching types
+    if (type === 'individual') {
+        selectedPackage = null;
+        document.querySelectorAll('.package-card').forEach(card => {
+            card.classList.remove('selected');
         });
-}
-
-function showAllServices() {
-    document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    } else {
+        selectedServices = [];
+        document.querySelectorAll('.service-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+    }
     
-    document.querySelectorAll('.service-selection-card').forEach(card => {
-        card.style.display = 'block';
-    });
+    updateOrderSummary();
 }
 
-function showPopularServices() {
-    document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    
-    document.querySelectorAll('.service-selection-card').forEach(card => {
-        if (card.dataset.popular === 'true') {
-            card.style.display = 'block';
-        } else {
-            card.style.display = 'none';
-        }
-    });
+function loadAllServices() {
+    // Services are already loaded from the template
+    // This function can be used to load additional services via AJAX if needed
 }
 
-function filterByCategory(categoryId) {
-    // Update active tab
-    document.querySelectorAll('.category-tab').forEach(tab => tab.classList.remove('active'));
+function filterServices(categoryId) {
+    // Update active category button
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
     document.querySelector(`[data-category="${categoryId}"]`).classList.add('active');
     
-    // Filter services
-    document.querySelectorAll('.service-selection-card').forEach(card => {
-        if (categoryId === 'all' || card.dataset.category === categoryId) {
+    // Filter service cards
+    document.querySelectorAll('.service-card').forEach(card => {
+        const cardCategory = card.dataset.category;
+        if (categoryId === 'all' || cardCategory === categoryId) {
             card.style.display = 'block';
         } else {
             card.style.display = 'none';
@@ -896,173 +1687,385 @@ function filterByCategory(categoryId) {
     });
 }
 
-// Order management functions
-function addServiceToOrder(serviceId, serviceName, servicePrice, serviceDuration) {
-    const existingItem = orderItems.find(item => item.service_id === serviceId);
+function toggleService(serviceId) {
+    const serviceCard = document.querySelector(`[data-service-id="${serviceId}"]`);
+    const isSelected = serviceCard.classList.contains('selected');
     
-    if (existingItem) {
-        existingItem.quantity += 1;
+    if (isSelected) {
+        // Remove service
+        serviceCard.classList.remove('selected');
+        selectedServices = selectedServices.filter(s => s.id !== serviceId);
     } else {
-        orderItems.push({
-            service_id: serviceId,
+        // Add service
+        serviceCard.classList.add('selected');
+        
+        // Get service data from the card
+        const serviceName = serviceCard.querySelector('.service-name').textContent;
+        const servicePriceText = serviceCard.querySelector('.service-price').textContent;
+        const servicePrice = parseFloat(servicePriceText.replace(/[^0-9.]/g, ''));
+        const serviceDuration = parseInt(serviceCard.querySelector('.service-duration').textContent);
+        
+        selectedServices.push({
+            id: serviceId,
             name: serviceName,
-            price: parseFloat(servicePrice),
-            duration: parseInt(serviceDuration),
-            quantity: 1
+            price: servicePrice,
+            duration: serviceDuration
         });
     }
     
     updateOrderSummary();
-    showSuccessToast(`${serviceName} added to order`);
 }
 
-function removeServiceFromOrder(serviceId) {
-    orderItems = orderItems.filter(item => item.service_id !== serviceId);
-    updateOrderSummary();
-}
-
-function updateServiceQuantity(serviceId, quantity) {
-    const item = orderItems.find(item => item.service_id === serviceId);
-    if (item) {
-        item.quantity = Math.max(1, parseInt(quantity));
-        updateOrderSummary();
+function togglePackage(packageId) {
+    const packageCard = document.querySelector(`[data-package-id="${packageId}"]`);
+    const isSelected = packageCard.classList.contains('selected');
+    
+    // Clear all other package selections (only one package can be selected)
+    document.querySelectorAll('.package-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    if (isSelected) {
+        // Deselect package
+        selectedPackage = null;
+    } else {
+        // Select package
+        packageCard.classList.add('selected');
+        
+        // Get package data from the card
+        const packageName = packageCard.querySelector('.package-name').textContent;
+        const packagePriceText = packageCard.querySelector('.package-price').textContent;
+        const packagePrice = parseFloat(packagePriceText.replace(/[^0-9.]/g, ''));
+        const packageDuration = parseInt(packageCard.querySelector('.package-duration').textContent);
+        const servicesCount = parseInt(packageCard.querySelector('.package-services-count').textContent);
+        
+        selectedPackage = {
+            id: packageId,
+            name: packageName,
+            price: packagePrice,
+            duration: packageDuration,
+            servicesCount: servicesCount
+        };
     }
+    
+    updateOrderSummary();
 }
 
 function updateOrderSummary() {
-    const orderItemsDiv = document.getElementById('order-items');
-    const orderTotalsDiv = document.getElementById('order-totals');
-    const orderActionsDiv = document.getElementById('order-actions');
+    const selectedServicesDisplay = document.getElementById('selectedServicesDisplay');
+    const selectedServicesList = document.getElementById('selectedServicesList');
+    const summaryTotals = document.getElementById('summaryTotals');
     
-    if (orderItems.length === 0) {
-        orderItemsDiv.innerHTML = `
-            <div class="empty-order-message">
-                <i class="fas fa-shopping-cart"></i>
-                <p>No services selected</p>
-                <small>Select services to add to order</small>
+    let hasSelection = false;
+    let subtotal = 0;
+    let totalDuration = 0;
+    let servicesHtml = '';
+    
+    if (serviceType === 'package' && selectedPackage) {
+        // Package selected
+        hasSelection = true;
+        subtotal = selectedPackage.price;
+        totalDuration = selectedPackage.duration;
+        
+        servicesHtml = `
+            <div class="selected-service-item">
+                <div class="service-item-name">
+                    <strong>${selectedPackage.name}</strong>
+                    <br><small>${selectedPackage.servicesCount} services included</small>
+                </div>
+                <div class="service-item-price">KES ${selectedPackage.price.toFixed(2)}</div>
             </div>
         `;
-        orderTotalsDiv.style.display = 'none';
-        orderActionsDiv.style.display = 'none';
+    } else if (serviceType === 'individual' && selectedServices.length > 0) {
+        // Individual services selected
+        hasSelection = true;
+        
+        selectedServices.forEach(service => {
+            servicesHtml += `
+                <div class="selected-service-item">
+                    <div class="service-item-name">${service.name}</div>
+                    <div class="service-item-price">KES ${service.price.toFixed(2)}</div>
+                </div>
+            `;
+            subtotal += service.price;
+            totalDuration += service.duration;
+        });
+    }
+    
+    if (!hasSelection) {
+        selectedServicesDisplay.style.display = 'block';
+        selectedServicesList.style.display = 'none';
+        summaryTotals.style.display = 'none';
         return;
     }
     
-    // Display order items
-    orderItemsDiv.innerHTML = orderItems.map(item => `
-        <div class="order-item">
-            <div class="order-item-info">
-                <div class="order-item-name">${item.name}</div>
-                <div class="order-item-details">
-                    KES ${(item.price * item.quantity).toFixed(2)} | ${item.duration * item.quantity} min
-                </div>
-            </div>
-            <div class="order-item-actions">
-                <div class="quantity-controls">
-                    <button class="quantity-btn" onclick="updateServiceQuantity('${item.service_id}', ${item.quantity - 1})">-</button>
-                    <input type="number" class="quantity-input" value="${item.quantity}" min="1" 
-                           onchange="updateServiceQuantity('${item.service_id}', this.value)">
-                    <button class="quantity-btn" onclick="updateServiceQuantity('${item.service_id}', ${item.quantity + 1})">+</button>
-                </div>
-                <button class="btn btn-sm btn-outline-danger" onclick="removeServiceFromOrder('${item.service_id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
+    selectedServicesDisplay.style.display = 'none';
+    selectedServicesList.style.display = 'block';
+    summaryTotals.style.display = 'block';
     
-    // Calculate totals
-    const subtotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const taxAmount = subtotal * 0.16;
-    const total = subtotal + taxAmount;
-    const totalDuration = orderItems.reduce((sum, item) => sum + (item.duration * item.quantity), 0);
+    selectedServicesList.innerHTML = servicesHtml;
     
-    // Update totals display
-    document.getElementById('subtotal').textContent = `KES ${subtotal.toFixed(2)}`;
-    document.getElementById('tax-amount').textContent = `KES ${taxAmount.toFixed(2)}`;
-    document.getElementById('total-amount').textContent = `KES ${total.toFixed(2)}`;
-    document.getElementById('total-duration').textContent = `${totalDuration} min`;
+    // Update totals
+    const tax = subtotal * 0.16;
+    const total = subtotal + tax;
     
-    orderTotalsDiv.style.display = 'block';
+    document.getElementById('subtotalAmount').textContent = `KES ${subtotal.toFixed(2)}`;
+    document.getElementById('taxAmount').textContent = `KES ${tax.toFixed(2)}`;
+    document.getElementById('totalAmount').textContent = `KES ${total.toFixed(2)}`;
+    document.getElementById('estimatedDuration').textContent = totalDuration;
     
-    // Show order actions if customer and vehicle are selected
-    if (selectedCustomer && selectedVehicle) {
-        orderActionsDiv.style.display = 'block';
-    }
-}
-
-function updateOrderStatus() {
-    const actionsDiv = document.getElementById('customer-vehicle-actions');
-    const orderActionsDiv = document.getElementById('order-actions');
-    
-    if (selectedCustomer && selectedVehicle) {
-        actionsDiv.style.display = 'block';
-        if (orderItems.length > 0) {
-            orderActionsDiv.style.display = 'block';
-        }
+    // Update hidden field based on service type
+    if (serviceType === 'package' && selectedPackage) {
+        document.getElementById('selectedServicesData').value = JSON.stringify({
+            type: 'package',
+            package_id: selectedPackage.id
+        });
     } else {
-        actionsDiv.style.display = 'none';
-        orderActionsDiv.style.display = 'none';
+        document.getElementById('selectedServicesData').value = JSON.stringify({
+            type: 'individual',
+            service_ids: selectedServices.map(s => s.id)
+        });
     }
 }
 
-// Quick action functions
-function addPopularPackage() {
-    // Add popular services combination
-    showInfoToast('Popular package feature coming soon!');
+function clearAllServices() {
+    selectedServices = [];
+    selectedPackage = null;
+    
+    document.querySelectorAll('.service-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    document.querySelectorAll('.package-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    updateOrderSummary();
 }
 
-function addBasicWash() {
-    // Add basic wash services
-    showInfoToast('Basic wash package feature coming soon!');
-}
-
-function addPremiumWash() {
-    // Add premium wash services
-    showInfoToast('Premium wash package feature coming soon!');
-}
-
-function clearOrder() {
-    if (confirm('Are you sure you want to clear all services from the order?')) {
-        orderItems = [];
-        updateOrderSummary();
-        showInfoToast('Order cleared');
+function validateServicesStep() {
+    if (serviceType === 'package' && !selectedPackage) {
+        showToast('Please select a service package', 'error');
+        return false;
+    } else if (serviceType === 'individual' && selectedServices.length === 0) {
+        showToast('Please select at least one service', 'error');
+        return false;
     }
+    return true;
 }
 
-// Order creation
-function createOrder() {
-    if (!selectedCustomer || !selectedVehicle || orderItems.length === 0) {
-        showErrorToast('Please select customer, vehicle, and at least one service');
+// Review Step
+function updateReviewStep() {
+    // Update customer info
+    const customerInfo = selectedCustomer ? 
+        `<strong>${selectedCustomer.name}</strong><br><small>Phone: ${selectedCustomer.phone}</small>` :
+        `<strong>${document.getElementById('customerName').value}</strong><br><small>Phone: ${document.getElementById('customerPhone').value}</small>`;
+    document.getElementById('reviewCustomerInfo').innerHTML = customerInfo;
+    
+    // Update vehicle info
+    const vehicleInfo = selectedVehicle ?
+        `<strong>${selectedVehicle.registration}</strong><br><small>${selectedVehicle.make} ${selectedVehicle.model}</small><br><small>Color: ${selectedVehicle.color}</small>` :
+        `<strong>${document.getElementById('vehicleRegistration').value}</strong><br><small>${document.getElementById('vehicleMake').value} ${document.getElementById('vehicleModel').value}</small><br><small>Color: ${document.getElementById('vehicleColor').value}</small>`;
+    document.getElementById('reviewVehicleInfo').innerHTML = vehicleInfo;
+    
+    // Update services info
+    let servicesHtml = '';
+    selectedServices.forEach(service => {
+        servicesHtml += `<div>${service.name} - KES ${service.price.toFixed(2)}</div>`;
+    });
+    document.getElementById('reviewServicesInfo').innerHTML = servicesHtml;
+    
+    // Update total info
+    const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
+    const tax = subtotal * 0.16;
+    const total = subtotal + tax;
+    const duration = selectedServices.reduce((sum, service) => sum + service.duration, 0);
+    
+    document.getElementById('reviewTotalInfo').innerHTML = `
+        <div>Subtotal: KES ${subtotal.toFixed(2)}</div>
+        <div>Tax: KES ${tax.toFixed(2)}</div>
+        <div><strong>Total: KES ${total.toFixed(2)}</strong></div>
+        <div><small>Duration: ${duration} minutes</small></div>
+    `;
+}
+
+// Form Submission
+function submitOrder() {
+    const form = document.getElementById('quickOrderForm');
+    const formData = new FormData(form);
+    
+    // Prepare the data based on customer selection
+    if (selectedCustomer) {
+        // Existing customer
+        formData.set('existing_customer_id', selectedCustomer.id);
+        formData.delete('customer_name');
+        formData.delete('customer_phone');
+        formData.delete('customer_email');
+    } else {
+        // New customer - ensure we have the data
+        const customerName = document.getElementById('customerName').value.trim();
+        const customerPhone = document.getElementById('customerPhone').value.trim();
+        const customerEmail = document.getElementById('customerEmail').value.trim();
+        
+        formData.set('customer_name', customerName);
+        formData.set('customer_phone', customerPhone);
+        formData.set('customer_email', customerEmail);
+    }
+    
+    // Prepare vehicle data
+    if (selectedVehicle) {
+        // Existing vehicle
+        formData.set('existing_vehicle_id', selectedVehicle.id);
+        // Clear new vehicle fields
+        formData.delete('vehicle_registration');
+        formData.delete('vehicle_make');
+        formData.delete('vehicle_model');
+        formData.delete('vehicle_color');
+        formData.delete('vehicle_year');
+        formData.delete('vehicle_type');
+    } else {
+        // New vehicle
+        formData.set('vehicle_registration', document.getElementById('vehicleRegistration').value.trim().toUpperCase());
+        formData.set('vehicle_make', document.getElementById('vehicleMake').value.trim());
+        formData.set('vehicle_model', document.getElementById('vehicleModel').value.trim());
+        formData.set('vehicle_color', document.getElementById('vehicleColor').value.trim());
+        formData.set('vehicle_year', document.getElementById('vehicleYear').value);
+        formData.set('vehicle_type', document.getElementById('vehicleType').value);
+    }
+    
+    // Add selected services or package
+    const selectionData = JSON.parse(document.getElementById('selectedServicesData').value || '{}');
+    
+    if (selectionData.type === 'package' && selectionData.package_id) {
+        formData.set('selected_package', selectionData.package_id);
+        formData.set('service_type', 'package');
+    } else if (selectionData.type === 'individual' && selectionData.service_ids) {
+        selectionData.service_ids.forEach(serviceId => {
+            formData.append('selected_services', serviceId);
+        });
+        formData.set('service_type', 'individual');
+    } else {
+        showToast('Please select services or a package', 'error');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
         return;
     }
     
-    // Prepare form data
-    document.getElementById('form-customer-id').value = selectedCustomer.id;
-    document.getElementById('form-vehicle-id').value = selectedVehicle.id;
-    document.getElementById('form-services-data').value = JSON.stringify(orderItems);
-    document.getElementById('form-start-immediately').value = document.getElementById('start-immediately').checked;
-    document.getElementById('form-send-notifications').value = document.getElementById('send-notifications').checked;
+    // Add order details
+    formData.set('special_instructions', document.getElementById('specialInstructions').value.trim());
+    formData.set('priority', document.getElementById('priority').value);
     
-    // Submit form
-    document.getElementById('order-form').submit();
+    // Show loading state
+    const submitBtn = document.getElementById('submitBtn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Order...';
+    submitBtn.disabled = true;
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/orders/quick/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showToast('Order created successfully!', 'success');
+            setTimeout(() => {
+                window.location.href = `/business/{{ request.tenant.slug }}/services/orders/${data.order_id}/`;
+            }, 1500);
+        } else {
+            showToast(data.message || 'Error creating order', 'error');
+            
+            // Show field-specific errors if available
+            if (data.errors) {
+                console.log('Form errors:', data.errors);
+                Object.keys(data.errors).forEach(fieldName => {
+                    const field = form.querySelector(`[name="${fieldName}"]`);
+                    if (field) {
+                        field.classList.add('is-invalid');
+                        // You could add error display logic here
+                    }
+                });
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Order creation error:', error);
+        showToast('Error creating order. Please check your connection and try again.', 'error');
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
 }
+
+// Auto-search as user types
+document.getElementById('customerSearchInput').addEventListener('input', function() {
+    clearTimeout(this.searchTimeout);
+    this.searchTimeout = setTimeout(() => {
+        if (this.value.length >= 2) {
+            searchCustomers();
+        }
+    }, 300);
+});
+
+document.getElementById('vehicleSearchInput').addEventListener('input', function() {
+    clearTimeout(this.searchTimeout);
+    this.searchTimeout = setTimeout(() => {
+        if (this.value.length >= 2) {
+            searchVehicles();
+        }
+    }, 300);
+});
+
+// Phone number formatting
+document.getElementById('customerPhone').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.startsWith('0')) {
+        value = '254' + value.substring(1);
+    }
+    if (value.startsWith('254') && !value.startsWith('+254')) {
+        value = '+' + value;
+    }
+    
+    e.target.value = value;
+});
+
+// Registration number formatting
+document.getElementById('vehicleRegistration').addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase();
+});
 
 // Utility functions
-function showSuccessToast(message) {
-    showToast(message, 'success');
-}
-
-function showErrorToast(message) {
-    showToast(message, 'error');
-}
-
-function showInfoToast(message) {
-    showToast(message, 'info');
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 
 function showToast(message, type) {
+    // Remove existing toasts
+    document.querySelectorAll('.toast-notification').forEach(toast => toast.remove());
+    
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
+    toast.className = `toast-notification toast-${type}`;
     toast.innerHTML = `
         <div class="toast-content">
             <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
@@ -1073,13 +2076,89 @@ function showToast(message, type) {
         </button>
     `;
     
+    // Toast styles
+    toast.style.cssText = `
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        background: white;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: 1rem;
+        box-shadow: var(--shadow-lg);
+        z-index: 9999;
+        min-width: 300px;
+        animation: slideInRight 0.3s ease-out;
+        border-left: 4px solid ${type === 'success' ? 'var(--success-500)' : type === 'error' ? '#ef4444' : 'var(--info-500)'};
+    `;
+    
+    const content = toast.querySelector('.toast-content');
+    content.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    `;
+    
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        color: var(--gray-400);
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: var(--radius-sm);
+    `;
+    
     document.body.appendChild(toast);
     
     setTimeout(() => {
         if (toast.parentElement) {
             toast.remove();
         }
-    }, 4000);
+    }, 5000);
 }
 </script>
+
+<style>
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.row {
+    display: flex;
+    gap: 2rem;
+    margin: 0 -1rem;
+}
+
+.col-lg-8 {
+    flex: 0 0 66.666667%;
+    padding: 0 1rem;
+}
+
+.col-lg-4 {
+    flex: 0 0 33.333333%;
+    padding: 0 1rem;
+}
+
+.col-md-6 {
+    flex: 0 0 50%;
+    padding: 0 1rem;
+}
+
+@media (max-width: 768px) {
+    .row {
+        flex-direction: column;
+    }
+    
+    .col-lg-8,
+    .col-lg-4,
+    .col-md-6 {
+        flex: 1;
+    }
+}
+</style>
 {% endblock %}

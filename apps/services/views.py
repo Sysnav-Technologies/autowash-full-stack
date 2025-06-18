@@ -324,19 +324,52 @@ def quick_order_view(request):
                     )
                     
                     # Add selected services
-                    service_ids = form.cleaned_data['selected_services']
-                    total_amount = 0
-                    
-                    for service_id in service_ids:
-                        service = Service.objects.get(id=service_id)
-                        ServiceOrderItem.objects.create(
-                            order=order,
-                            service=service,
-                            quantity=1,
-                            unit_price=service.base_price,
-                            assigned_to=request.employee
-                        )
-                        total_amount += service.base_price
+                    # Get service type
+                    service_type = request.POST.get('service_type', 'individual')
+                    total_amount = Decimal('0')
+
+                    if service_type == 'package':
+                        # Handle service package
+                        selected_package_id = request.POST.get('selected_package')
+                        if not selected_package_id:
+                            raise ValueError("Package must be selected")
+                        
+                        try:
+                            package = ServicePackage.objects.get(id=selected_package_id, is_active=True)
+                            order.package = package
+                            total_amount = package.total_price
+                            
+                            # Add individual services from the package
+                            for package_service in package.packageservice_set.all():
+                                ServiceOrderItem.objects.create(
+                                    order=order,
+                                    service=package_service.service,
+                                    quantity=package_service.quantity,
+                                    unit_price=package_service.custom_price or package_service.service.base_price,
+                                    assigned_to_id=getattr(request, 'employee', {}).get('id') if hasattr(request, 'employee') else None
+                                )
+                        except ServicePackage.DoesNotExist:
+                            raise ValueError("Selected package not found")
+                            
+                    else:
+                        # Handle individual services
+                        selected_services = request.POST.getlist('selected_services')
+                        if not selected_services:
+                            raise ValueError("At least one service must be selected")
+                        
+                        for service_id in selected_services:
+                            try:
+                                service = Service.objects.get(id=service_id, is_active=True)
+                                ServiceOrderItem.objects.create(
+                                    order=order,
+                                    service=service,
+                                    quantity=1,
+                                    unit_price=service.base_price,
+                                    assigned_to_id=getattr(request, 'employee', {}).get('id') if hasattr(request, 'employee') else None
+                                )
+                                total_amount += service.base_price
+                            except Service.DoesNotExist:
+                                continue
                     
                     # Calculate totals
                     order.subtotal = total_amount
@@ -359,10 +392,19 @@ def quick_order_view(request):
         is_active=True,
         is_popular=True
     ).order_by('display_order')[:8]
-    
+
+    # Get service packages
+    service_packages = ServicePackage.objects.filter(
+        is_active=True
+    ).order_by('-is_popular', 'name')[:8]
+
+    # Get service categories
+    categories = ServiceCategory.objects.filter(is_active=True).prefetch_related('services')
     context = {
         'form': form,
         'popular_services': popular_services,
+        'categories': categories,
+        'service_packages': service_packages, 
         'title': 'Quick Order (Walk-in Customer)'
     }
     return render(request, 'services/quick_order.html', context)
@@ -1923,63 +1965,95 @@ def quick_customer_register(request):
         try:
             from apps.customers.models import Customer, Vehicle
             
-            # Customer data
-            first_name = request.POST.get('first_name')
-            last_name = request.POST.get('last_name')
-            phone = request.POST.get('phone')
-            
-            # Vehicle data
-            registration = request.POST.get('registration')
-            make = request.POST.get('make')
-            model = request.POST.get('model')
-            color = request.POST.get('color')
-            vehicle_type = request.POST.get('vehicle_type', 'sedan')
-            
             with transaction.atomic():
+                # Customer data from form
+                customer_type = request.POST.get('customer_type', 'individual')
+                first_name = request.POST.get('first_name')
+                last_name = request.POST.get('last_name')
+                company_name = request.POST.get('company_name', '')
+                phone = request.POST.get('phone')
+                email = request.POST.get('email', '')
+                preferred_contact_method = request.POST.get('preferred_contact_method', 'phone')
+                
+                # Address data
+                address = request.POST.get('address', '')
+                city = request.POST.get('city', 'Nairobi')
+                county = request.POST.get('county', 'Nairobi')
+                
+                # Preferences
+                receive_marketing_sms = request.POST.get('receive_marketing_sms') == 'on'
+                receive_marketing_email = request.POST.get('receive_marketing_email') == 'on'
+                receive_service_reminders = request.POST.get('receive_service_reminders') == 'on'
+                
                 # Create customer
                 customer = Customer.objects.create(
+                    customer_type=customer_type,
                     first_name=first_name,
                     last_name=last_name,
+                    company_name=company_name,
                     phone=phone,
+                    email=email,
+                    preferred_contact_method=preferred_contact_method,
+                    street_address=address,
+                    city=city,
+                    state=county,  # Using state field for county
+                    receive_marketing_sms=receive_marketing_sms,
+                    receive_marketing_email=receive_marketing_email,
+                    receive_service_reminders=receive_service_reminders,
                     customer_id=generate_unique_code('CUST', 6),
-                    created_by=request.user
+                    created_by_id=request.user.id
                 )
                 
-                # Create vehicle
-                vehicle = Vehicle.objects.create(
-                    customer=customer,
-                    registration_number=registration.upper(),
-                    make=make,
-                    model=model,
-                    color=color,
-                    vehicle_type=vehicle_type,
-                    year=timezone.now().year,
-                    created_by=request.user
-                )
+                # Create vehicles from the form
+                vehicle_count = 0
+                i = 0
+                while request.POST.get(f'vehicles[{i}][registration_number]'):
+                    registration = request.POST.get(f'vehicles[{i}][registration_number]', '').upper()
+                    if registration:
+                        vehicle = Vehicle.objects.create(
+                            customer=customer,
+                            registration_number=registration,
+                            make=request.POST.get(f'vehicles[{i}][make]', ''),
+                            model=request.POST.get(f'vehicles[{i}][model]', ''),
+                            year=int(request.POST.get(f'vehicles[{i}][year]', timezone.now().year)),
+                            color=request.POST.get(f'vehicles[{i}][color]', ''),
+                            vehicle_type=request.POST.get(f'vehicles[{i}][vehicle_type]', 'sedan'),
+                            fuel_type=request.POST.get(f'vehicles[{i}][fuel_type]', 'petrol'),
+                            transmission=request.POST.get(f'vehicles[{i}][transmission]', 'manual'),
+                            created_by_id=request.user.id
+                        )
+                        vehicle_count += 1
+                    i += 1
                 
+                # Check if this is an AJAX request
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({
                         'success': True,
+                        'message': 'Customer registered successfully!',
+                        'customer_id': str(customer.id),
                         'customer': {
                             'id': str(customer.id),
                             'name': customer.full_name,
-                            'phone': str(customer.phone)
+                            'phone': str(customer.phone),
+                            'customer_id': customer.customer_id
                         },
-                        'vehicle': {
-                            'id': str(vehicle.id),
-                            'registration': vehicle.registration_number,
-                            'full_name': vehicle.full_name
-                        }
+                        'vehicle_count': vehicle_count
                     })
                 else:
-                    messages.success(request, 'Customer registered successfully!')
-                    return redirect('services:quick_order')
+                    create_order = request.POST.get('create_order') == 'true'
+                    messages.success(request, f'Customer {customer.full_name} registered successfully!')
                     
+                    if create_order:
+                        return redirect('services:create_order') + f'?customer={customer.id}'
+                    else:
+                        return redirect('services:dashboard')
+                        
         except Exception as e:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': False,
-                    'error': str(e)
+                    'message': f'Error registering customer: {str(e)}',
+                    'errors': {}
                 })
             else:
                 messages.error(request, f'Error registering customer: {str(e)}')
@@ -1988,7 +2062,6 @@ def quick_customer_register(request):
         'title': 'Quick Customer Registration'
     }
     return render(request, 'services/quick_customer_register.html', context)
-
 @login_required
 @employee_required()
 def quick_service_assign(request):
@@ -2155,36 +2228,44 @@ def service_import_view(request):
 # AJAX Endpoints
 @login_required
 @employee_required()
-@ajax_required
+@ajax_required  
 def customer_search_ajax(request):
-    """Search customers via AJAX"""
-    query = request.GET.get('q', '')
+    """AJAX endpoint for customer search"""
+    query = request.GET.get('q', '').strip()
     
     if len(query) < 2:
-        return JsonResponse({'results': []})
+        return JsonResponse({'customers': []})  
     
-    from apps.customers.models import Customer
-    
-    customers = Customer.objects.filter(
-        Q(first_name__icontains=query) |
-        Q(last_name__icontains=query) |
-        Q(phone__icontains=query) |
-        Q(customer_id__icontains=query),
-        is_active=True
-    )[:10]
-    
-    results = [
-        {
-            'id': str(customer.id),
-            'text': f"{customer.full_name} - {customer.phone}",
-            'name': customer.full_name,
-            'phone': str(customer.phone),
-            'customer_id': customer.customer_id
-        }
-        for customer in customers
-    ]
-    
-    return JsonResponse({'results': results})
+    try:
+        from apps.customers.models import Customer
+        
+        customers = Customer.objects.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(phone__icontains=query) |
+            Q(customer_id__icontains=query) |
+            Q(company_name__icontains=query)
+        ).select_related().prefetch_related('vehicles')[:10]
+        
+        # Format the results
+        results = []
+        for customer in customers:
+            full_name = f"{customer.first_name} {customer.last_name}".strip()
+            if customer.customer_type == 'corporate' and customer.company_name:
+                full_name = customer.company_name
+            
+            results.append({
+                'id': str(customer.id),
+                'full_name': full_name,
+                'phone': str(customer.phone) if customer.phone else '',
+                'customer_id': customer.customer_id,
+                'vehicle_count': customer.vehicles.count()
+            })
+        
+        return JsonResponse({'customers': results})  # <-- Change 'results' to 'customers'
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 @employee_required()

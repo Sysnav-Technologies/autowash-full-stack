@@ -1,5 +1,3 @@
-# apps/employees/models.py - Fixed to avoid FK constraint to User
-
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator

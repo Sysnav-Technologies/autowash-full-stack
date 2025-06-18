@@ -1,529 +1,1055 @@
 <!-- templates/services/quick_customer_register.html -->
 {% extends 'base/base.html' %}
 {% load static %}
-{% load crispy_forms_tags %}
 
-{% block title %}Quick Customer Registration - {{ block.super }}{% endblock %}
-
-{% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1 class="page-title">
-            <i class="fas fa-user-plus text-success"></i>
-            Quick Customer Registration
-        </h1>
-        <p class="page-description">Register new walk-in customers quickly</p>
-    </div>
-    
-    <div class="page-actions">
-        <a href="/business/{{ request.business.slug }}/services/orders/quick/" class="btn btn-outline-primary">
-            <i class="fas fa-arrow-left"></i>
-            Back to Quick Order
-        </a>
-    </div>
-</div>
-
-<div class="content-card">
-    <div class="card-header">
-        <h5 class="card-title">Customer & Vehicle Information</h5>
-        <div class="card-actions">
-            <span class="badge badge-info">
-                <i class="fas fa-clock"></i>
-                Quick Registration
-            </span>
-        </div>
-    </div>
-    
-    <div class="card-body">
-        <form method="POST" id="quick-registration-form">
-            {% csrf_token %}
-            
-            <!-- Customer Information Section -->
-            <div class="form-section">
-                <h6 class="section-title">
-                    <i class="fas fa-user"></i>
-                    Customer Information
-                </h6>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="first_name">First Name <span class="text-danger">*</span></label>
-                            <input type="text" name="first_name" id="first_name" class="form-control" required>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="last_name">Last Name <span class="text-danger">*</span></label>
-                            <input type="text" name="last_name" id="last_name" class="form-control" required>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="phone">Phone Number <span class="text-danger">*</span></label>
-                            <input type="tel" name="phone" id="phone" class="form-control" 
-                                   placeholder="+254701234567 or 0701234567" required>
-                            <small class="form-text text-muted">Enter valid Kenyan phone number</small>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="email">Email (Optional)</label>
-                            <input type="email" name="email" id="email" class="form-control" 
-                                   placeholder="customer@example.com">
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Vehicle Information Section -->
-            <div class="form-section">
-                <h6 class="section-title">
-                    <i class="fas fa-car"></i>
-                    Vehicle Information
-                </h6>
-                
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="registration_number">Registration Number <span class="text-danger">*</span></label>
-                            <input type="text" name="registration_number" id="registration_number" 
-                                   class="form-control text-uppercase" 
-                                   placeholder="KCX 123Y" required>
-                            <small class="form-text text-muted">Will be converted to uppercase</small>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="make">Make <span class="text-danger">*</span></label>
-                            <input type="text" name="make" id="make" class="form-control" 
-                                   placeholder="Toyota, Nissan, Honda..." required>
-                            <datalist id="make-suggestions">
-                                <option value="Toyota">
-                                <option value="Nissan">
-                                <option value="Honda">
-                                <option value="Mazda">
-                                <option value="Mitsubishi">
-                                <option value="Subaru">
-                                <option value="Mercedes-Benz">
-                                <option value="BMW">
-                                <option value="Volkswagen">
-                                <option value="Hyundai">
-                            </datalist>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="model">Model <span class="text-danger">*</span></label>
-                            <input type="text" name="model" id="model" class="form-control" 
-                                   placeholder="Vitz, Demio, Fit..." required>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="color">Color <span class="text-danger">*</span></label>
-                            <select name="color" id="color" class="form-select" required>
-                                <option value="">Select Color</option>
-                                <option value="White">White</option>
-                                <option value="Black">Black</option>
-                                <option value="Silver">Silver</option>
-                                <option value="Gray">Gray</option>
-                                <option value="Red">Red</option>
-                                <option value="Blue">Blue</option>
-                                <option value="Green">Green</option>
-                                <option value="Yellow">Yellow</option>
-                                <option value="Orange">Orange</option>
-                                <option value="Brown">Brown</option>
-                                <option value="Gold">Gold</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="vehicle_type">Vehicle Type <span class="text-danger">*</span></label>
-                            <select name="vehicle_type" id="vehicle_type" class="form-select" required>
-                                <option value="sedan">Sedan</option>
-                                <option value="hatchback">Hatchback</option>
-                                <option value="suv">SUV</option>
-                                <option value="pickup">Pickup</option>
-                                <option value="van">Van</option>
-                                <option value="wagon">Station Wagon</option>
-                                <option value="coupe">Coupe</option>
-                                <option value="convertible">Convertible</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="year">Year <span class="text-danger">*</span></label>
-                            <select name="year" id="year" class="form-select" required>
-                                <option value="">Select Year</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Additional Information Section -->
-            <div class="form-section">
-                <h6 class="section-title">
-                    <i class="fas fa-info-circle"></i>
-                    Additional Information (Optional)
-                </h6>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="id_number">ID Number</label>
-                            <input type="text" name="id_number" id="id_number" class="form-control" 
-                                   placeholder="12345678">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="location">Location/Area</label>
-                            <input type="text" name="location" id="location" class="form-control" 
-                                   placeholder="Westlands, Karen, etc.">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="notes">Notes</label>
-                    <textarea name="notes" id="notes" class="form-control" rows="2" 
-                              placeholder="Any additional information about the customer or vehicle..."></textarea>
-                </div>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="form-actions">
-                <button type="submit" class="btn btn-success btn-lg">
-                    <i class="fas fa-user-plus"></i>
-                    Register Customer & Vehicle
-                </button>
-                <a href="/business/{{ request.business.slug }}/services/orders/quick/" class="btn btn-secondary btn-lg">
-                    <i class="fas fa-times"></i>
-                    Cancel
-                </a>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Registration Success Modal -->
-<div class="modal fade" id="registrationSuccessModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-check-circle"></i>
-                    Registration Successful
-                </h5>
-            </div>
-            <div class="modal-body">
-                <div class="text-center">
-                    <div class="success-icon mb-3">
-                        <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
-                    </div>
-                    <h6>Customer and vehicle registered successfully!</h6>
-                    <p class="text-muted">What would you like to do next?</p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" onclick="createQuickOrder()">
-                    <i class="fas fa-bolt"></i>
-                    Create Quick Order
-                </button>
-                <button type="button" class="btn btn-success" onclick="registerAnother()">
-                    <i class="fas fa-plus"></i>
-                    Register Another
-                </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    Close
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Duplicate Check Modal -->
-<div class="modal fade" id="duplicateCheckModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    Duplicate Found
-                </h5>
-            </div>
-            <div class="modal-body">
-                <div id="duplicate-info"></div>
-                <p>Would you like to proceed with the existing customer or register as new?</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" onclick="useExisting()">
-                    Use Existing
-                </button>
-                <button type="button" class="btn btn-warning" onclick="registerNew()">
-                    Register New
-                </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    Cancel
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+{% block title %}Quick Customer Register - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <style>
-.form-section {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+:root {
+    --primary-500: #3b82f6;
+    --primary-50: #eff6ff;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --success-500: #10b981;
+    --success-50: #ecfdf5;
+    --success-600: #059669;
+    --warning-500: #f59e0b;
+    --warning-50: #fffbeb;
+    --info-500: #06b6d4;
+    --info-50: #f0f9ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --transition-fast: 0.15s ease-in-out;
 }
 
-.section-title {
+.page-header {
+    background: linear-gradient(135deg, var(--primary-50), var(--info-50));
+    border: 1px solid var(--primary-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-description {
+    margin: 0.5rem 0 0;
+    color: var(--gray-600);
+    font-size: 1rem;
+}
+
+.page-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-500);
+    text-decoration: none;
     color: var(--gray-700);
+}
+
+.quick-register-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.form-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.form-header {
+    background: var(--gray-50);
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.form-title {
+    margin: 0;
+    font-size: 1.25rem;
     font-weight: 600;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--gray-200);
+    color: var(--gray-900);
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.form-body {
+    padding: 1.5rem;
+}
+
+.form-section {
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary-200);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
 }
 
 .form-group {
     margin-bottom: 1rem;
 }
 
-.form-group label {
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
     font-weight: 500;
     color: var(--gray-700);
     margin-bottom: 0.5rem;
 }
 
-.text-danger {
-    color: var(--danger-600) !important;
+.form-label.required::after {
+    content: " *";
+    color: #ef4444;
 }
 
-.form-control:focus,
-.form-select:focus {
-    border-color: var(--primary-400);
-    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+    background: white;
 }
 
-.form-actions {
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-control.is-invalid {
+    border-color: #ef4444;
+}
+
+.form-control.is-invalid:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.invalid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: #ef4444;
+}
+
+.form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+    padding-right: 2.5rem;
+    appearance: none;
+}
+
+.customer-type-selector {
     display: flex;
-    gap: 1rem;
-    justify-content: center;
-    padding: 2rem 0 1rem;
-    border-top: 1px solid var(--gray-200);
-    margin-top: 2rem;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
 }
 
-.text-uppercase {
-    text-transform: uppercase;
+.type-option {
+    flex: 1;
+    padding: 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: white;
+    cursor: pointer;
+    text-align: center;
+    transition: all var(--transition-fast);
+    position: relative;
 }
 
-.success-icon {
-    animation: successPulse 1s ease-in-out;
+.type-option:hover {
+    border-color: var(--primary-300);
+    background: var(--primary-50);
 }
 
-@keyframes successPulse {
-    0% { transform: scale(0.5); opacity: 0; }
-    50% { transform: scale(1.1); opacity: 0.8; }
-    100% { transform: scale(1); opacity: 1; }
+.type-option.active {
+    border-color: var(--primary-500);
+    background: var(--primary-50);
+    color: var(--primary-700);
 }
 
-.duplicate-warning {
-    background: var(--warning-100);
-    border: 1px solid var(--warning-300);
+.type-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.type-option-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.type-option-label {
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.vehicle-section {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
+    margin-top: 1rem;
+}
+
+.add-vehicle-btn {
+    background: var(--success-500);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    transition: all var(--transition-fast);
+}
+
+.add-vehicle-btn:hover {
+    background: var(--success-600);
+    transform: translateY(-1px);
+}
+
+.vehicle-form {
+    background: white;
+    border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     padding: 1rem;
-    margin: 1rem 0;
+    margin-bottom: 1rem;
+    position: relative;
 }
 
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+.remove-vehicle-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 1.5rem;
+    height: 1.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 9999;
+    cursor: pointer;
+    font-size: 0.75rem;
 }
 
-.loading-spinner {
-    background: white;
-    padding: 2rem;
-    border-radius: var(--radius-lg);
-    text-align: center;
+.form-actions {
+    background: var(--gray-50);
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
 }
 
-.form-validation-error {
-    border-color: var(--danger-400) !important;
-    box-shadow: 0 0 0 0.2rem rgba(var(--danger-rgb), 0.25) !important;
+.btn-success {
+    background: var(--success-500);
+    color: white;
+    border-color: var(--success-500);
 }
 
-.validation-message {
-    color: var(--danger-600);
-    font-size: 0.875rem;
+.btn-success:hover {
+    background: var(--success-600);
+    text-decoration: none;
+    color: white;
+}
+
+.btn-primary {
+    background: var(--primary-500);
+    color: white;
+    border-color: var(--primary-500);
+}
+
+.btn-primary:hover {
+    background: var(--primary-600);
+    text-decoration: none;
+    color: white;
+}
+
+.form-text {
+    font-size: 0.75rem;
+    color: var(--gray-500);
     margin-top: 0.25rem;
 }
 
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.checkbox-item input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--primary-500);
+}
+
+.customer-search-section {
+    background: var(--info-50);
+    border: 1px solid var(--info-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.search-input-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.search-input-group .form-control {
+    flex: 1;
+}
+
+.search-btn {
+    background: var(--primary-500);
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.search-results {
+    margin-top: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.search-result-item {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.search-result-item:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-300);
+}
+
 @media (max-width: 768px) {
-    .form-actions {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .customer-type-selector {
         flex-direction: column;
     }
     
-    .form-actions .btn {
-        width: 100%;
-        margin-bottom: 0.5rem;
+    .form-actions {
+        flex-direction: column;
+        align-items: stretch;
     }
     
-    .form-section {
-        padding: 1rem;
+    .search-input-group {
+        flex-direction: column;
     }
 }
 </style>
 {% endblock %}
 
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-user-plus text-primary"></i>
+            Quick Customer Register
+        </h1>
+        <p class="page-description">Quickly register a new customer and their vehicle(s) for service.</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/services/dashboard/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="quick-register-container">
+    <!-- Customer Search Section -->
+    <div class="customer-search-section">
+        <h6><i class="fas fa-search"></i> Search Existing Customer</h6>
+        <p class="form-text">Check if customer already exists before creating a new one</p>
+        <div class="search-input-group">
+            <input type="text" class="form-control" id="customerSearch" placeholder="Search by name, phone, or customer ID...">
+            <button type="button" class="search-btn" onclick="searchCustomers()">
+                <i class="fas fa-search"></i>
+                Search
+            </button>
+        </div>
+        <div id="searchResults" class="search-results" style="display: none;"></div>
+    </div>
+
+    <!-- Registration Form -->
+    <form id="customerRegistrationForm" method="post" class="form-card">
+        {% csrf_token %}
+        
+        <div class="form-header">
+            <h5 class="form-title">
+                <i class="fas fa-user-circle"></i>
+                Customer Information
+            </h5>
+        </div>
+        
+        <div class="form-body">
+            <!-- Customer Type Selection -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-user-tag"></i>
+                    Customer Type
+                </div>
+                
+                <div class="customer-type-selector">
+                    <label class="type-option active" onclick="selectCustomerType('individual')">
+                        <input type="radio" name="customer_type" value="individual" checked>
+                        <i class="fas fa-user type-option-icon"></i>
+                        <div class="type-option-label">Individual</div>
+                    </label>
+                    
+                    <label class="type-option" onclick="selectCustomerType('corporate')">
+                        <input type="radio" name="customer_type" value="corporate">
+                        <i class="fas fa-building type-option-icon"></i>
+                        <div class="type-option-label">Corporate</div>
+                    </label>
+                    
+                    <label class="type-option" onclick="selectCustomerType('government')">
+                        <input type="radio" name="customer_type" value="government">
+                        <i class="fas fa-landmark type-option-icon"></i>
+                        <div class="type-option-label">Government</div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Basic Information -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-info-circle"></i>
+                    Basic Information
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="firstName" class="form-label required">First Name</label>
+                        <input type="text" class="form-control" id="firstName" name="first_name" required>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lastName" class="form-label required">Last Name</label>
+                        <input type="text" class="form-control" id="lastName" name="last_name" required>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group full-width" id="companyNameGroup" style="display: none;">
+                    <label for="companyName" class="form-label">Company Name</label>
+                    <input type="text" class="form-control" id="companyName" name="company_name">
+                    <div class="invalid-feedback"></div>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-phone"></i>
+                    Contact Information
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="phone" class="form-label required">Primary Phone</label>
+                        <input type="tel" class="form-control" id="phone" name="phone" required>
+                        <div class="form-text">Format: +254712345678</div>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="phoneSecondary" class="form-label">Secondary Phone</label>
+                        <input type="tel" class="form-control" id="phoneSecondary" name="phone_secondary">
+                        <div class="invalid-feedback"></div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email">
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="preferredContact" class="form-label">Preferred Contact Method</label>
+                        <select class="form-control form-select" id="preferredContact" name="preferred_contact_method">
+                            <option value="phone">Phone</option>
+                            <option value="sms">SMS</option>
+                            <option value="email">Email</option>
+                            <option value="whatsapp">WhatsApp</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Address Information -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Address Information
+                </div>
+                
+                <div class="form-group">
+                    <label for="address" class="form-label">Street Address</label>
+                    <textarea class="form-control" id="address" name="address" rows="2" placeholder="Building, street, area..."></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="city" class="form-label">City</label>
+                        <input type="text" class="form-control" id="city" name="city" value="Nairobi">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="county" class="form-label">County</label>
+                        <select class="form-control form-select" id="county" name="county">
+                            <option value="Nairobi">Nairobi</option>
+                            <option value="Mombasa">Mombasa</option>
+                            <option value="Kiambu">Kiambu</option>
+                            <option value="Machakos">Machakos</option>
+                            <option value="Kajiado">Kajiado</option>
+                            <option value="Nakuru">Nakuru</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vehicle Information -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-car"></i>
+                    Vehicle Information
+                </div>
+                
+                <div class="vehicle-section">
+                    <button type="button" class="add-vehicle-btn" onclick="addVehicleForm()">
+                        <i class="fas fa-plus"></i>
+                        Add Vehicle
+                    </button>
+                    
+                    <div id="vehicleForms">
+                        <div class="vehicle-form" data-index="0">
+                            <button type="button" class="remove-vehicle-btn" onclick="removeVehicleForm(0)" style="display: none;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label required">Registration Number</label>
+                                    <input type="text" class="form-control" name="vehicles[0][registration_number]" required>
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label required">Vehicle Type</label>
+                                    <select class="form-control form-select" name="vehicles[0][vehicle_type]" required>
+                                        <option value="">Select Type</option>
+                                        <option value="sedan">Sedan</option>
+                                        <option value="suv">SUV</option>
+                                        <option value="hatchback">Hatchback</option>
+                                        <option value="pickup">Pickup Truck</option>
+                                        <option value="van">Van</option>
+                                        <option value="bus">Bus</option>
+                                        <option value="truck">Truck</option>
+                                        <option value="motorcycle">Motorcycle</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label required">Make</label>
+                                    <input type="text" class="form-control" name="vehicles[0][make]" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label required">Model</label>
+                                    <input type="text" class="form-control" name="vehicles[0][model]" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label required">Year</label>
+                                    <input type="number" class="form-control" name="vehicles[0][year]" min="1990" max="2025" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label required">Color</label>
+                                    <input type="text" class="form-control" name="vehicles[0][color]" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Fuel Type</label>
+                                    <select class="form-control form-select" name="vehicles[0][fuel_type]">
+                                        <option value="petrol">Petrol</option>
+                                        <option value="diesel">Diesel</option>
+                                        <option value="hybrid">Hybrid</option>
+                                        <option value="electric">Electric</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">Transmission</label>
+                                    <select class="form-control form-select" name="vehicles[0][transmission]">
+                                        <option value="manual">Manual</option>
+                                        <option value="automatic">Automatic</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preferences -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-cog"></i>
+                    Preferences
+                </div>
+                
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="receiveMarketing" name="receive_marketing_sms" checked>
+                        <label for="receiveMarketing">Receive promotional SMS messages</label>
+                    </div>
+                    
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="receiveEmail" name="receive_marketing_email" checked>
+                        <label for="receiveEmail">Receive promotional emails</label>
+                    </div>
+                    
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="receiveReminders" name="receive_service_reminders" checked>
+                        <label for="receiveReminders">Receive service reminders</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <div class="action-info">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle"></i>
+                    Customer will be automatically assigned a unique ID
+                </small>
+            </div>
+            
+            <div class="action-buttons">
+                <button type="button" class="btn btn-success" onclick="registerAndCreateOrder()">
+                    <i class="fas fa-plus-circle"></i>
+                    Register & Create Order
+                </button>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    Register Customer Only
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    initializeForm();
-    populateYearOptions();
-    setupFormValidation();
-    setupAutoComplete();
-});
+let vehicleCount = 1;
+let searchTimeout;
 
-function initializeForm() {
-    const form = document.getElementById('quick-registration-form');
-    
-    // Auto-uppercase registration number
-    const regInput = document.getElementById('registration_number');
-    regInput.addEventListener('input', function() {
-        this.value = this.value.toUpperCase();
+// Customer type selection
+function selectCustomerType(type) {
+    // Update radio buttons
+    document.querySelectorAll('input[name="customer_type"]').forEach(radio => {
+        radio.checked = radio.value === type;
     });
     
-    // Phone number formatting
-    const phoneInput = document.getElementById('phone');
-    phoneInput.addEventListener('input', function() {
-        let value = this.value.replace(/\D/g, '');
-        
-        if (value.startsWith('254')) {
-            this.value = '+' + value;
-        } else if (value.startsWith('0')) {
-            this.value = value;
+    // Update visual selection
+    document.querySelectorAll('.type-option').forEach(option => {
+        option.classList.remove('active');
+    });
+    
+    event.target.closest('.type-option').classList.add('active');
+    
+    // Show/hide company name field
+    const companyNameGroup = document.getElementById('companyNameGroup');
+    const companyNameInput = document.getElementById('companyName');
+    
+    if (type === 'corporate' || type === 'government') {
+        companyNameGroup.style.display = 'block';
+        companyNameInput.required = true;
+    } else {
+        companyNameGroup.style.display = 'none';
+        companyNameInput.required = false;
+    }
+}
+
+// Customer search functionality
+function searchCustomers() {
+    const query = document.getElementById('customerSearch').value.trim();
+    const resultsContainer = document.getElementById('searchResults');
+    
+    if (query.length < 2) {
+        resultsContainer.style.display = 'none';
+        return;
+    }
+    
+    // Show loading
+    resultsContainer.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    resultsContainer.style.display = 'block';
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/customer/search/?q=${encodeURIComponent(query)}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+        .then(response => response.json())
+        .then(data => {
+            displaySearchResults(data.customers || []);
+        })
+        .catch(error => {
+            console.error('Search error:', error);
+            resultsContainer.innerHTML = '<div class="text-danger p-3">Error searching customers</div>';
+        });
+}
+
+function displaySearchResults(customers) {
+    const resultsContainer = document.getElementById('searchResults');
+    
+    if (customers.length === 0) {
+        resultsContainer.innerHTML = '<div class="text-muted p-3">No customers found</div>';
+        return;
+    }
+    
+    let html = '';
+    customers.forEach(customer => {
+        html += `
+            <div class="search-result-item" onclick="selectExistingCustomer('${customer.id}')">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>${customer.full_name}</strong>
+                        <br><small>${customer.phone || 'No phone'}</small>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted">${customer.customer_id}</small>
+                        <br><small>${customer.vehicle_count || 0} vehicle(s)</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+}
+
+function selectExistingCustomer(customerId) {
+    // Redirect to create order for existing customer
+    window.location.href = `/business/{{ request.tenant.slug }}/services/orders/create/?customer=${customerId}`;
+}
+
+// Auto-search as user types
+document.getElementById('customerSearch').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(searchCustomers, 300);
+});
+
+// Vehicle management
+function addVehicleForm() {
+    const vehicleForms = document.getElementById('vehicleForms');
+    const newIndex = vehicleCount;
+    
+    const vehicleFormHtml = `
+        <div class="vehicle-form" data-index="${newIndex}">
+            <button type="button" class="remove-vehicle-btn" onclick="removeVehicleForm(${newIndex})">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Registration Number</label>
+                    <input type="text" class="form-control" name="vehicles[${newIndex}][registration_number]" required>
+                    <div class="invalid-feedback"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label required">Vehicle Type</label>
+                    <select class="form-control form-select" name="vehicles[${newIndex}][vehicle_type]" required>
+                        <option value="">Select Type</option>
+                        <option value="sedan">Sedan</option>
+                        <option value="suv">SUV</option>
+                        <option value="hatchback">Hatchback</option>
+                        <option value="pickup">Pickup Truck</option>
+                        <option value="van">Van</option>
+                        <option value="bus">Bus</option>
+                        <option value="truck">Truck</option>
+                        <option value="motorcycle">Motorcycle</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Make</label>
+                    <input type="text" class="form-control" name="vehicles[${newIndex}][make]" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label required">Model</label>
+                    <input type="text" class="form-control" name="vehicles[${newIndex}][model]" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Year</label>
+                    <input type="number" class="form-control" name="vehicles[${newIndex}][year]" min="1990" max="2025" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label required">Color</label>
+                    <input type="text" class="form-control" name="vehicles[${newIndex}][color]" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Fuel Type</label>
+                    <select class="form-control form-select" name="vehicles[${newIndex}][fuel_type]">
+                        <option value="petrol">Petrol</option>
+                        <option value="diesel">Diesel</option>
+                        <option value="hybrid">Hybrid</option>
+                        <option value="electric">Electric</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Transmission</label>
+                    <select class="form-control form-select" name="vehicles[${newIndex}][transmission]">
+                        <option value="manual">Manual</option>
+                        <option value="automatic">Automatic</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    vehicleForms.insertAdjacentHTML('beforeend', vehicleFormHtml);
+    vehicleCount++;
+    
+    // Show remove button on first vehicle if there are now multiple vehicles
+    updateRemoveButtons();
+}
+
+function removeVehicleForm(index) {
+    const vehicleForm = document.querySelector(`[data-index="${index}"]`);
+    if (vehicleForm) {
+        vehicleForm.remove();
+        updateRemoveButtons();
+    }
+}
+
+function updateRemoveButtons() {
+    const vehicleForms = document.querySelectorAll('.vehicle-form');
+    vehicleForms.forEach((form, index) => {
+        const removeBtn = form.querySelector('.remove-vehicle-btn');
+        if (vehicleForms.length > 1) {
+            removeBtn.style.display = 'flex';
+        } else {
+            removeBtn.style.display = 'none';
+        }
+    });
+}
+
+// Form validation
+function validateForm() {
+    let isValid = true;
+    const form = document.getElementById('customerRegistrationForm');
+    
+    // Clear previous errors
+    form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    
+    // Required fields validation
+    const requiredFields = form.querySelectorAll('[required]');
+    requiredFields.forEach(field => {
+        if (!field.value.trim()) {
+            field.classList.add('is-invalid');
+            const feedback = field.parentElement.querySelector('.invalid-feedback');
+            if (feedback) {
+                feedback.textContent = 'This field is required';
+            }
+            isValid = false;
         }
     });
     
-    // Form submission
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        submitRegistration();
+    // Phone validation
+    const phoneField = document.getElementById('phone');
+    const phoneValue = phoneField.value.trim();
+    if (phoneValue && !isValidKenyanPhone(phoneValue)) {
+        phoneField.classList.add('is-invalid');
+        const feedback = phoneField.parentElement.querySelector('.invalid-feedback');
+        if (feedback) {
+            feedback.textContent = 'Please enter a valid Kenyan phone number (e.g., +254712345678)';
+        }
+        isValid = false;
+    }
+    
+    // Email validation
+    const emailField = document.getElementById('email');
+    const emailValue = emailField.value.trim();
+    if (emailValue && !isValidEmail(emailValue)) {
+        emailField.classList.add('is-invalid');
+        const feedback = emailField.parentElement.querySelector('.invalid-feedback');
+        if (feedback) {
+            feedback.textContent = 'Please enter a valid email address';
+        }
+        isValid = false;
+    }
+    
+    // Vehicle registration validation
+    const regNumbers = form.querySelectorAll('input[name*="registration_number"]');
+    const regValues = Array.from(regNumbers).map(input => input.value.trim().toUpperCase());
+    
+    regNumbers.forEach((input, index) => {
+        const value = input.value.trim();
+        if (value) {
+            // Check for duplicates
+            const duplicateIndex = regValues.indexOf(value.toUpperCase());
+            if (duplicateIndex !== index && duplicateIndex !== -1) {
+                input.classList.add('is-invalid');
+                const feedback = input.parentElement.querySelector('.invalid-feedback');
+                if (feedback) {
+                    feedback.textContent = 'Duplicate registration number';
+                }
+                isValid = false;
+            }
+        }
     });
-}
-
-function populateYearOptions() {
-    const yearSelect = document.getElementById('year');
-    const currentYear = new Date().getFullYear();
     
-    for (let year = currentYear; year >= 1990; year--) {
-        const option = document.createElement('option');
-        option.value = year;
-        option.textContent = year;
-        if (year === 2020) option.selected = true;
-        yearSelect.appendChild(option);
-    }
-}
-
-function setupFormValidation() {
-    const requiredFields = document.querySelectorAll('[required]');
-    
-    requiredFields.forEach(field => {
-        field.addEventListener('blur', validateField);
-        field.addEventListener('input', clearValidationError);
-    });
-}
-
-function validateField(event) {
-    const field = event.target;
-    const value = field.value.trim();
-    
-    clearValidationError(event);
-    
-    if (!value) {
-        showFieldError(field, 'This field is required');
-        return false;
-    }
-    
-    // Specific validation
-    switch (field.name) {
-        case 'phone':
-            if (!isValidKenyanPhone(value)) {
-                showFieldError(field, 'Please enter a valid Kenyan phone number');
-                return false;
-            }
-            break;
-        case 'email':
-            if (value && !isValidEmail(value)) {
-                showFieldError(field, 'Please enter a valid email address');
-                return false;
-            }
-            break;
-        case 'registration_number':
-            if (value.length < 6) {
-                showFieldError(field, 'Registration number should be at least 6 characters');
-                return false;
-            }
-            checkDuplicateRegistration(value);
-            break;
-    }
-    
-    return true;
-}
-
-function showFieldError(field, message) {
-    field.classList.add('form-validation-error');
-    
-    let errorDiv = field.parentNode.querySelector('.validation-message');
-    if (!errorDiv) {
-        errorDiv = document.createElement('div');
-        errorDiv.className = 'validation-message';
-        field.parentNode.appendChild(errorDiv);
-    }
-    errorDiv.textContent = message;
-}
-
-function clearValidationError(event) {
-    const field = event.target;
-    field.classList.remove('form-validation-error');
-    
-    const errorDiv = field.parentNode.querySelector('.validation-message');
-    if (errorDiv) {
-        errorDiv.remove();
-    }
+    return isValid;
 }
 
 function isValidKenyanPhone(phone) {
-    const kenyanPhoneRegex = /^(\+254|254|0)?[17]\d{8}$/;
-    return kenyanPhoneRegex.test(phone.replace(/\s/g, ''));
+    // Kenyan phone number validation
+    const kenyanPhoneRegex = /^(\+254|254|0)[17]\d{8}$/;
+    return kenyanPhoneRegex.test(phone.replace(/\s+/g, ''));
 }
 
 function isValidEmail(email) {
@@ -531,163 +1057,138 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 
-function checkDuplicateRegistration(regNumber) {
-    if (regNumber.length < 6) return;
+// Form submission
+document.getElementById('customerRegistrationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
     
-    fetch(`/business/{{ request.business.slug }}/services/ajax/check-registration/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ registration_number: regNumber })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.exists) {
-            showDuplicateWarning(data.vehicle);
-        }
-    })
-    .catch(error => console.error('Error checking registration:', error));
-}
-
-function showDuplicateWarning(vehicle) {
-    const regField = document.getElementById('registration_number');
-    const duplicateInfo = `
-        <div class="duplicate-warning">
-            <strong>Vehicle Found:</strong> ${vehicle.registration_number}<br>
-            <strong>Owner:</strong> ${vehicle.customer_name}<br>
-            <strong>Vehicle:</strong> ${vehicle.make} ${vehicle.model} (${vehicle.color})
-        </div>
-    `;
-    
-    document.getElementById('duplicate-info').innerHTML = duplicateInfo;
-    new bootstrap.Modal(document.getElementById('duplicateCheckModal')).show();
-}
-
-function setupAutoComplete() {
-    const makeInput = document.getElementById('make');
-    makeInput.setAttribute('list', 'make-suggestions');
-}
-
-function submitRegistration() {
-    const form = document.getElementById('quick-registration-form');
-    const formData = new FormData(form);
-    
-    // Validate all required fields
-    const requiredFields = form.querySelectorAll('[required]');
-    let isValid = true;
-    
-    requiredFields.forEach(field => {
-        if (!validateField({ target: field })) {
-            isValid = false;
-        }
-    });
-    
-    if (!isValid) {
-        showErrorToast('Please fix the errors in the form');
+    if (!validateForm()) {
+        showToast('Please correct the errors in the form', 'error');
         return;
     }
     
-    showLoadingOverlay();
+    submitForm(false);
+});
+
+function registerAndCreateOrder() {
+    if (!validateForm()) {
+        showToast('Please correct the errors in the form', 'error');
+        return;
+    }
     
-    fetch(form.action || window.location.href, {
+    submitForm(true);
+}
+
+function submitForm(createOrder = false) {
+    const form = document.getElementById('customerRegistrationForm');
+    const formData = new FormData(form);
+    
+    // Add create order flag
+    if (createOrder) {
+        formData.append('create_order', 'true');
+    }
+    
+    // Show loading state
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const createOrderBtn = form.querySelector('button[onclick="registerAndCreateOrder()"]');
+    
+    const originalSubmitText = submitBtn.innerHTML;
+    const originalCreateOrderText = createOrderBtn.innerHTML;
+    
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+    createOrderBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    submitBtn.disabled = true;
+    createOrderBtn.disabled = true;
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/quick/customer-register/`, {
         method: 'POST',
+        body: formData,
         headers: {
             'X-CSRFToken': getCookie('csrftoken'),
-        },
-        body: formData
+            'X-Requested-With': 'XMLHttpRequest'
+        }
     })
     .then(response => response.json())
     .then(data => {
-        hideLoadingOverlay();
-        
         if (data.success) {
-            // Store customer data for quick order
-            sessionStorage.setItem('newCustomer', JSON.stringify({
-                customer: data.customer,
-                vehicle: data.vehicle
-            }));
+            showToast('Customer registered successfully!', 'success');
             
-            showRegistrationSuccess();
+            setTimeout(() => {
+                if (createOrder && data.customer_id) {
+                    // Redirect to create order
+                    window.location.href = `/business/{{ request.tenant.slug }}/services/orders/create/?customer=${data.customer_id}`;
+                } else {
+                    // Redirect to dashboard or customer list
+                    window.location.href = `/business/{{ request.tenant.slug }}/services/dashboard/`;
+                }
+            }, 1500);
         } else {
-            showErrorToast(data.error || 'Registration failed');
+            showToast(data.message || 'Error registering customer', 'error');
+            
+            // Show field-specific errors
+            if (data.errors) {
+                Object.keys(data.errors).forEach(fieldName => {
+                    const field = form.querySelector(`[name="${fieldName}"]`);
+                    if (field) {
+                        field.classList.add('is-invalid');
+                        const feedback = field.parentElement.querySelector('.invalid-feedback');
+                        if (feedback) {
+                            feedback.textContent = Array.isArray(data.errors[fieldName]) ? data.errors[fieldName][0] : data.errors[fieldName];
+                        }
+                    }
+                });
+            }
         }
     })
     .catch(error => {
-        hideLoadingOverlay();
-        showErrorToast('Error during registration');
         console.error('Registration error:', error);
+        showToast('Error registering customer. Please try again.', 'error');
+    })
+    .finally(() => {
+        // Restore button states
+        submitBtn.innerHTML = originalSubmitText;
+        createOrderBtn.innerHTML = originalCreateOrderText;
+        submitBtn.disabled = false;
+        createOrderBtn.disabled = false;
     });
 }
 
-function showRegistrationSuccess() {
-    new bootstrap.Modal(document.getElementById('registrationSuccessModal')).show();
-}
-
-function createQuickOrder() {
-    window.location.href = `/business/{{ request.business.slug }}/services/orders/quick/`;
-}
-
-function registerAnother() {
-    document.getElementById('quick-registration-form').reset();
-    bootstrap.Modal.getInstance(document.getElementById('registrationSuccessModal')).hide();
-    document.getElementById('first_name').focus();
-}
-
-function useExisting() {
-    bootstrap.Modal.getInstance(document.getElementById('duplicateCheckModal')).hide();
-    createQuickOrder();
-}
-
-function registerNew() {
-    bootstrap.Modal.getInstance(document.getElementById('duplicateCheckModal')).hide();
-    // Continue with registration
-}
-
-function showLoadingOverlay() {
-    const overlay = document.createElement('div');
-    overlay.className = 'loading-overlay';
-    overlay.innerHTML = `
-        <div class="loading-spinner">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2">Registering customer...</p>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-}
-
-function hideLoadingOverlay() {
-    const overlay = document.querySelector('.loading-overlay');
-    if (overlay) {
-        overlay.remove();
+// Phone number formatting
+document.getElementById('phone').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    // Auto-format Kenyan numbers
+    if (value.startsWith('0')) {
+        value = '254' + value.substring(1);
     }
-}
-
-function showErrorToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'toast toast-error';
-    toast.innerHTML = `
-        <div class="toast-content">
-            <i class="fas fa-exclamation-triangle"></i>
-            <span>${message}</span>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
+    if (value.startsWith('254') && !value.startsWith('+254')) {
+        value = '+' + value;
+    }
     
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-        }
-    }, 5000);
-}
+    e.target.value = value;
+});
 
+// Secondary phone formatting
+document.getElementById('phoneSecondary').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.startsWith('0')) {
+        value = '254' + value.substring(1);
+    }
+    if (value.startsWith('254') && !value.startsWith('+254')) {
+        value = '+' + value;
+    }
+    
+    e.target.value = value;
+});
+
+// Registration number formatting
+document.addEventListener('input', function(e) {
+    if (e.target.name && e.target.name.includes('registration_number')) {
+        e.target.value = e.target.value.toUpperCase();
+    }
+});
+
+// Utility functions
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -703,57 +1204,118 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// Auto-focus first field
-document.getElementById('first_name').focus();
+function showToast(message, type) {
+    // Remove existing toasts
+    document.querySelectorAll('.toast-notification').forEach(toast => toast.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Toast styles
+    toast.style.cssText = `
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        background: white;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: 1rem;
+        box-shadow: var(--shadow-lg);
+        z-index: 9999;
+        min-width: 300px;
+        animation: slideInRight 0.3s ease-out;
+        border-left: 4px solid ${type === 'success' ? 'var(--success-500)' : type === 'error' ? '#ef4444' : 'var(--info-500)'};
+    `;
+    
+    const content = toast.querySelector('.toast-content');
+    content.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    `;
+    
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        color: var(--gray-400);
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: var(--radius-sm);
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+// Initialize form
+document.addEventListener('DOMContentLoaded', function() {
+    // Set initial focus
+    document.getElementById('customerSearch').focus();
+    
+    // Clear any existing validation errors on input
+    document.querySelectorAll('.form-control').forEach(input => {
+        input.addEventListener('input', function() {
+            this.classList.remove('is-invalid');
+        });
+    });
+});
 </script>
 
-<!-- Toast Styles -->
+<!-- Add CSS animation -->
 <style>
-.toast {
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1rem;
-    box-shadow: var(--shadow-lg);
-    z-index: 9999;
-    min-width: 300px;
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.toast-notification {
     animation: slideInRight 0.3s ease-out;
 }
 
-.toast.toast-error {
-    border-left: 4px solid var(--danger-500);
-}
-
-.toast-content {
+.d-flex {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
 }
 
-.toast-close {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: none;
-    border: none;
-    color: var(--gray-400);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
+.justify-content-between {
+    justify-content: space-between;
 }
 
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+.text-end {
+    text-align: end;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-muted {
+    color: var(--gray-500);
+}
+
+.text-danger {
+    color: #ef4444;
+}
+
+.p-3 {
+    padding: 1rem;
 }
 </style>
 {% endblock %}

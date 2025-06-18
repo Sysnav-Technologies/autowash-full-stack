@@ -4,6 +4,731 @@
 
 {% block title %}My Dashboard - {{ block.super }}{% endblock %}
 
+{% block extra_css %}
+<style>
+:root {
+    --primary-500: #3b82f6;
+    --primary-50: #eff6ff;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --success-500: #10b981;
+    --success-50: #ecfdf5;
+    --success-600: #059669;
+    --warning-500: #f59e0b;
+    --warning-50: #fffbeb;
+    --info-500: #06b6d4;
+    --info-50: #f0f9ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --transition-fast: 0.15s ease-in-out;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--primary-50), var(--info-50));
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--primary-200);
+}
+
+.page-header-content h1 {
+    margin: 0;
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-description {
+    margin: 0.5rem 0 0;
+    color: var(--gray-600);
+    font-size: 1rem;
+}
+
+.page-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.btn-success {
+    background: var(--success-500);
+    color: white;
+    border-color: var(--success-500);
+}
+
+.btn-success:hover {
+    background: var(--success-600);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+    color: white;
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: var(--primary-600);
+    border-color: var(--primary-300);
+}
+
+.btn-outline-primary:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-500);
+    text-decoration: none;
+    color: var(--primary-700);
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-fast);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+
+.stat-card-primary::before { background: var(--primary-500); }
+.stat-card-success::before { background: var(--success-500); }
+.stat-card-info::before { background: var(--info-500); }
+.stat-card-warning::before { background: var(--warning-500); }
+
+.stat-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-lg);
+    background: var(--gray-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-600);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.stat-content h3 {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.stat-content p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.stat-change {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.content-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.assignments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.assignment-card {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    background: white;
+    transition: all var(--transition-fast);
+}
+
+.assignment-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    border-color: var(--primary-300);
+}
+
+.assignment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.assignment-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.assignment-number {
+    margin: 0;
+    font-weight: 600;
+    color: var(--primary-600);
+    font-size: 1rem;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.badge-pending { background: var(--warning-50); color: var(--warning-700); }
+.badge-confirmed { background: var(--info-50); color: var(--info-700); }
+.badge-in_progress { background: var(--primary-50); color: var(--primary-700); }
+.badge-completed { background: var(--success-50); color: var(--success-700); }
+.badge-cancelled { background: var(--gray-100); color: var(--gray-700); }
+
+.priority-badge {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.5rem;
+}
+
+.priority-high { background: #fef2f2; color: #dc2626; }
+.priority-urgent { background: #fef2f2; color: #dc2626; font-weight: 700; }
+
+.assignment-time {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.time-elapsed {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--success-600);
+    font-weight: 500;
+}
+
+.assignment-details {
+    margin-bottom: 1rem;
+}
+
+.customer-vehicle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.customer-info,
+.vehicle-info {
+    font-size: 0.875rem;
+}
+
+.customer-info strong,
+.vehicle-info strong {
+    color: var(--gray-900);
+}
+
+.customer-info small,
+.vehicle-info small {
+    color: var(--gray-600);
+}
+
+.services-list {
+    margin-bottom: 1rem;
+}
+
+.service-tag {
+    display: inline-block;
+    background: var(--primary-100);
+    color: var(--primary-700);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    margin: 0.125rem;
+    font-weight: 500;
+}
+
+.order-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.order-total {
+    font-weight: 600;
+    color: var(--gray-900);
+    font-size: 1rem;
+}
+
+.order-duration {
+    color: var(--gray-600);
+}
+
+.assignment-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.btn-warning {
+    background: var(--warning-500);
+    color: white;
+    border-color: var(--warning-500);
+}
+
+.btn-warning:hover {
+    background: #d97706;
+    transform: translateY(-1px);
+    text-decoration: none;
+    color: white;
+}
+
+.btn-primary {
+    background: var(--primary-500);
+    color: white;
+    border-color: var(--primary-500);
+}
+
+.btn-primary:hover {
+    background: var(--primary-600);
+    transform: translateY(-1px);
+    text-decoration: none;
+    color: white;
+}
+
+.assignment-notes {
+    background: var(--info-50);
+    border: 1px solid var(--info-200);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--info-800);
+}
+
+.assignment-notes i {
+    color: var(--info-600);
+    margin-right: 0.5rem;
+}
+
+.empty-assignments {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-assignments-icon {
+    font-size: 3rem;
+    color: var(--gray-300);
+    margin-bottom: 1rem;
+}
+
+.empty-assignments h6 {
+    margin: 0 0 0.5rem;
+    font-size: 1.125rem;
+    color: var(--gray-700);
+}
+
+.empty-assignments p {
+    margin: 0 0 1.5rem;
+    color: var(--gray-500);
+}
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.queue-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: white;
+    transition: all var(--transition-fast);
+}
+
+.queue-item:hover {
+    background: var(--gray-50);
+    border-color: var(--primary-300);
+}
+
+.queue-item-mine {
+    background: var(--primary-50);
+    border-color: var(--primary-200);
+}
+
+.queue-badge {
+    background: var(--primary-600);
+    color: white;
+    border-radius: 50%;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.queue-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.queue-order {
+    font-weight: 600;
+    color: var(--gray-900);
+    font-size: 0.875rem;
+}
+
+.queue-customer {
+    color: var(--gray-600);
+    font-size: 0.75rem;
+    margin: 0.125rem 0;
+}
+
+.queue-status {
+    margin-top: 0.25rem;
+}
+
+.queue-time {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+}
+
+.empty-queue {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--gray-500);
+}
+
+.empty-queue i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.quick-action-btn {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.quick-action-btn:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-200);
+    transform: translateY(-1px);
+    text-decoration: none;
+    color: inherit;
+}
+
+.quick-action-btn i {
+    font-size: 1.25rem;
+    color: var(--primary-600);
+}
+
+.quick-action-btn span {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.performance-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.metric {
+    text-align: center;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    margin-bottom: 0.25rem;
+}
+
+.metric-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+}
+
+.metric-target {
+    font-size: 0.625rem;
+    color: var(--gray-500);
+}
+
+.attendance-status {
+    text-align: center;
+}
+
+.attendance-info {
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.attendance-info > div {
+    margin-bottom: 0.5rem;
+}
+
+.attendance-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    text-decoration: none;
+    color: white;
+}
+
+.row {
+    display: flex;
+    gap: 2rem;
+    margin: 0 -1rem;
+}
+
+.col-lg-8 {
+    flex: 0 0 66.666667%;
+    padding: 0 1rem;
+}
+
+.col-lg-4 {
+    flex: 0 0 33.333333%;
+    padding: 0 1rem;
+}
+
+.mt-4 {
+    margin-top: 1.5rem;
+}
+
+.text-primary { color: var(--primary-600); }
+.text-success { color: var(--success-600); }
+.text-warning { color: var(--warning-600); }
+.text-muted { color: var(--gray-500); }
+
+.toast-notification {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 9999;
+    min-width: 300px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast-notification.toast-success { border-left: 4px solid var(--success-500); }
+.toast-notification.toast-error { border-left: 4px solid #ef4444; }
+.toast-notification.toast-info { border-left: 4px solid var(--info-500); }
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.toast-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 1024px) {
+    .row {
+        flex-direction: column;
+    }
+    
+    .col-lg-8,
+    .col-lg-4 {
+        flex: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .customer-vehicle {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .assignment-actions {
+        justify-content: center;
+    }
+    
+    .quick-actions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .attendance-actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div class="page-header-content">
@@ -11,7 +736,7 @@
             <i class="fas fa-user-cog text-primary"></i>
             My Dashboard
         </h1>
-        <p class="page-description">Welcome back, {{ request.employee.full_name }}! Here's your service overview.</p>
+        <p class="page-description">Welcome back, {{ request.user.get_full_name|default:request.user.username }}! Here's your service overview.</p>
     </div>
     
     <div class="page-actions">
@@ -33,7 +758,7 @@
             <i class="fas fa-clipboard-check"></i>
         </div>
         <div class="stat-content">
-            <h3>{{ stats.orders_today }}</h3>
+            <h3>{{ stats.orders_today|default:0 }}</h3>
             <p>Orders Today</p>
             <small class="stat-change">
                 {% if stats.completed_today > 0 %}
@@ -51,7 +776,7 @@
             <i class="fas fa-check-circle"></i>
         </div>
         <div class="stat-content">
-            <h3>{{ stats.completed_today }}</h3>
+            <h3>{{ stats.completed_today|default:0 }}</h3>
             <p>Completed Today</p>
             <small class="stat-change">
                 {% if stats.in_progress > 0 %}
@@ -69,7 +794,7 @@
             <i class="fas fa-dollar-sign"></i>
         </div>
         <div class="stat-content">
-            <h3>KES {{ stats.total_revenue_today|floatformat:0 }}</h3>
+            <h3>KES {{ stats.total_revenue_today|floatformat:0|default:0 }}</h3>
             <p>Revenue Today</p>
             <small class="stat-change">From completed services</small>
         </div>
@@ -207,57 +932,6 @@
                 {% endif %}
             </div>
         </div>
-        
-        <!-- Service Items in Progress -->
-        {% if my_service_items %}
-        <div class="content-card mt-4">
-            <div class="card-header">
-                <h5 class="card-title">
-                    <i class="fas fa-cog"></i>
-                    Service Items in Progress
-                </h5>
-            </div>
-            
-            <div class="card-body">
-                <div class="service-items-list">
-                    {% for item in my_service_items %}
-                    <div class="service-item-card">
-                        <div class="service-item-info">
-                            <h6>{{ item.service.name }}</h6>
-                            <p>Order: {{ item.order.order_number }} - {{ item.order.customer.full_name }}</p>
-                        </div>
-                        <div class="service-item-status">
-                            {% if item.started_at %}
-                            <span class="status-in-progress">
-                                <i class="fas fa-cog fa-spin"></i>
-                                In Progress
-                            </span>
-                            {% else %}
-                            <span class="status-pending">
-                                <i class="fas fa-clock"></i>
-                                Pending
-                            </span>
-                            {% endif %}
-                        </div>
-                        <div class="service-item-actions">
-                            {% if not item.started_at %}
-                            <button class="btn btn-sm btn-success" onclick="startServiceItem('{{ item.id }}')">
-                                <i class="fas fa-play"></i>
-                                Start
-                            </button>
-                            {% else %}
-                            <button class="btn btn-sm btn-primary" onclick="completeServiceItem('{{ item.id }}')">
-                                <i class="fas fa-check"></i>
-                                Complete
-                            </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
     
     <!-- Today's Queue & Quick Actions -->
@@ -281,7 +955,7 @@
                 {% if today_queue %}
                 <div class="queue-list">
                     {% for entry in today_queue %}
-                    <div class="queue-item {% if entry.order.assigned_attendant == request.employee %}queue-item-mine{% endif %}">
+                    <div class="queue-item {% if entry.order.assigned_attendant_id == request.user.id %}queue-item-mine{% endif %}">
                         <div class="queue-number">
                             <span class="queue-badge">{{ entry.queue_number }}</span>
                         </div>
@@ -294,7 +968,7 @@
                         </div>
                         <div class="queue-time">
                             {% if entry.status == 'waiting' %}
-                            <small class="text-muted">Est. {{ entry.estimated_wait_time }} min</small>
+                            <small class="text-muted">Est. {{ entry.estimated_wait_time|default:0 }} min</small>
                             {% elif entry.status == 'in_service' %}
                             <small class="text-success">Active</small>
                             {% endif %}
@@ -322,35 +996,35 @@
             
             <div class="card-body">
                 <div class="quick-actions-grid">
-                    <button class="quick-action-btn" onclick="openQuickCustomerRegister()">
+                    <a href="/business/{{ request.tenant.slug }}/services/quick/customer-register/" class="quick-action-btn">
                         <i class="fas fa-user-plus"></i>
                         <span>Register Customer</span>
-                    </button>
+                    </a>
                     
-                    <button class="quick-action-btn" onclick="openQuickServiceAssign()">
+                    <a href="/business/{{ request.tenant.slug }}/services/quick/service-assign/" class="quick-action-btn">
                         <i class="fas fa-hand-point-right"></i>
                         <span>Assign Service</span>
-                    </button>
+                    </a>
                     
-                    <button class="quick-action-btn" onclick="openPaymentProcess()">
+                    <a href="/business/{{ request.tenant.slug }}/payments/create/" class="quick-action-btn">
                         <i class="fas fa-credit-card"></i>
                         <span>Process Payment</span>
-                    </button>
+                    </a>
                     
-                    <button class="quick-action-btn" onclick="printReceipt()">
+                    <a href="#" onclick="printReceipt()" class="quick-action-btn">
                         <i class="fas fa-print"></i>
                         <span>Print Receipt</span>
-                    </button>
+                    </a>
                     
-                    <button class="quick-action-btn" onclick="openCustomerSearch()">
+                    <a href="#" onclick="openCustomerSearch()" class="quick-action-btn">
                         <i class="fas fa-search"></i>
                         <span>Find Customer</span>
-                    </button>
+                    </a>
                     
-                    <button class="quick-action-btn" onclick="viewMyPerformance()">
+                    <a href="#" onclick="viewMyPerformance()" class="quick-action-btn">
                         <i class="fas fa-chart-line"></i>
                         <span>My Performance</span>
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>
@@ -368,25 +1042,25 @@
                 <div class="performance-metrics">
                     <div class="metric">
                         <div class="metric-label">Services Completed</div>
-                        <div class="metric-value">{{ stats.completed_today }}</div>
+                        <div class="metric-value">{{ stats.completed_today|default:0 }}</div>
                         <div class="metric-target">Target: 8</div>
                     </div>
                     
                     <div class="metric">
                         <div class="metric-label">Revenue Generated</div>
-                        <div class="metric-value">KES {{ stats.total_revenue_today|floatformat:0 }}</div>
+                        <div class="metric-value">KES {{ stats.total_revenue_today|floatformat:0|default:0 }}</div>
                         <div class="metric-target">Target: KES 5,000</div>
                     </div>
                     
                     <div class="metric">
                         <div class="metric-label">Average Service Time</div>
-                        <div class="metric-value">-- min</div>
+                        <div class="metric-value">{{ stats.avg_service_time|default:"--" }} min</div>
                         <div class="metric-target">Target: 45 min</div>
                     </div>
                     
                     <div class="metric">
                         <div class="metric-label">Customer Satisfaction</div>
-                        <div class="metric-value">--</div>
+                        <div class="metric-value">{{ stats.avg_rating|default:"--" }}★</div>
                         <div class="metric-target">Target: 4.5★</div>
                     </div>
                 </div>
@@ -432,414 +1106,6 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    box-shadow: var(--shadow-sm);
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--primary-500);
-}
-
-.stat-card-primary::before { background: var(--primary-500); }
-.stat-card-success::before { background: var(--success-500); }
-.stat-card-info::before { background: var(--info-500); }
-.stat-card-warning::before { background: var(--warning-500); }
-
-.stat-icon {
-    width: 3rem;
-    height: 3rem;
-    border-radius: var(--radius-lg);
-    background: var(--gray-100);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--primary-600);
-    font-size: 1.25rem;
-}
-
-.stat-content h3 {
-    margin: 0;
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--gray-900);
-}
-
-.stat-content p {
-    margin: 0;
-    font-size: 0.875rem;
-    color: var(--gray-600);
-    font-weight: 500;
-}
-
-.stat-change {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-top: 0.25rem;
-}
-
-.assignments-list {
-    space-y: 1rem;
-}
-
-.assignment-card {
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1.25rem;
-    background: white;
-    transition: all var(--transition-fast);
-}
-
-.assignment-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
-}
-
-.assignment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.assignment-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.assignment-number {
-    margin: 0;
-    font-weight: 600;
-    color: var(--primary-600);
-}
-
-.assignment-time {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-}
-
-.time-elapsed {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: var(--success-600);
-    font-weight: 500;
-}
-
-.assignment-details {
-    margin-bottom: 1rem;
-}
-
-.customer-vehicle {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--gray-100);
-}
-
-.customer-info,
-.vehicle-info {
-    font-size: 0.875rem;
-}
-
-.services-list {
-    margin-bottom: 1rem;
-}
-
-.service-tag {
-    display: inline-block;
-    background: var(--primary-100);
-    color: var(--primary-700);
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    margin: 0.125rem;
-}
-
-.order-summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.875rem;
-}
-
-.order-total {
-    font-weight: 600;
-    color: var(--gray-900);
-}
-
-.order-duration {
-    color: var(--gray-600);
-}
-
-.assignment-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.assignment-notes {
-    background: var(--info-50);
-    border: 1px solid var(--info-200);
-    border-radius: var(--radius-md);
-    padding: 0.75rem;
-    margin-top: 1rem;
-    font-size: 0.875rem;
-    color: var(--info-800);
-}
-
-.empty-assignments {
-    text-align: center;
-    padding: 3rem 1rem;
-}
-
-.empty-assignments-icon {
-    font-size: 3rem;
-    color: var(--gray-300);
-    margin-bottom: 1rem;
-}
-
-.queue-list {
-    space-y: 0.75rem;
-}
-
-.queue-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    background: white;
-}
-
-.queue-item-mine {
-    background: var(--primary-50);
-    border-color: var(--primary-200);
-}
-
-.queue-badge {
-    background: var(--primary-600);
-    color: white;
-    border-radius: 50%;
-    width: 1.5rem;
-    height: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.queue-info {
-    flex: 1;
-}
-
-.queue-order {
-    font-weight: 600;
-    color: var(--gray-900);
-    font-size: 0.875rem;
-}
-
-.queue-customer {
-    color: var(--gray-600);
-    font-size: 0.75rem;
-}
-
-.queue-status {
-    margin-top: 0.25rem;
-}
-
-.empty-queue {
-    text-align: center;
-    padding: 2rem 1rem;
-    color: var(--gray-500);
-}
-
-.empty-queue i {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-    opacity: 0.5;
-}
-
-.quick-actions-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-}
-
-.quick-action-btn {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    padding: 1rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.quick-action-btn:hover {
-    background: var(--primary-50);
-    border-color: var(--primary-200);
-    transform: translateY(-1px);
-}
-
-.quick-action-btn i {
-    font-size: 1.25rem;
-    color: var(--primary-600);
-}
-
-.quick-action-btn span {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--gray-700);
-}
-
-.performance-metrics {
-    space-y: 1rem;
-}
-
-.metric {
-    text-align: center;
-    padding: 1rem;
-    background: var(--gray-50);
-    border-radius: var(--radius-md);
-}
-
-.metric-label {
-    font-size: 0.75rem;
-    color: var(--gray-600);
-    margin-bottom: 0.25rem;
-}
-
-.metric-value {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--gray-900);
-    margin-bottom: 0.25rem;
-}
-
-.metric-target {
-    font-size: 0.625rem;
-    color: var(--gray-500);
-}
-
-.attendance-status {
-    text-align: center;
-}
-
-.attendance-info {
-    margin-bottom: 1rem;
-    font-size: 0.875rem;
-}
-
-.attendance-info > div {
-    margin-bottom: 0.5rem;
-}
-
-.attendance-actions {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.service-items-list {
-    space-y: 0.75rem;
-}
-
-.service-item-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    background: white;
-}
-
-.service-item-info h6 {
-    margin: 0;
-    font-size: 0.875rem;
-    color: var(--gray-900);
-}
-
-.service-item-info p {
-    margin: 0;
-    font-size: 0.75rem;
-    color: var(--gray-600);
-}
-
-.status-in-progress {
-    color: var(--primary-600);
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.status-pending {
-    color: var(--warning-600);
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-@media (max-width: 768px) {
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .customer-vehicle {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
-    }
-    
-    .assignment-actions {
-        justify-content: center;
-    }
-    
-    .quick-actions-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .attendance-actions {
-        flex-direction: column;
-    }
-}
-</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -894,7 +1160,7 @@ function updateElapsedTimes() {
 }
 
 function loadAttendanceStatus() {
-    fetch(`/business/{{ request.tenant.slug }}/employees/ajax/attendance-status/`)
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/attendance-status/`)
         .then(response => response.json())
         .then(data => {
             if (data.check_in_time) {
@@ -1007,34 +1273,24 @@ function completeService(orderId) {
 }
 
 // Quick action functions
-function openQuickCustomerRegister() {
-    window.location.href = '/business/{{ request.tenant.slug }}/services/quick/customer-register/';
-}
-
-function openQuickServiceAssign() {
-    window.location.href = '/business/{{ request.tenant.slug }}/services/quick/service-assign/';
-}
-
-function openPaymentProcess() {
-    window.location.href = '/business/{{ request.tenant.slug }}/payments/create/';
+function openCustomerSearch() {
+    // Open customer search in new window or modal
+    window.location.href = `/business/{{ request.tenant.slug }}/customers/search/`;
 }
 
 function printReceipt() {
-    window.location.href = '/business/{{ request.tenant.slug }}/payments/receipts/';
-}
-
-function openCustomerSearch() {
-    // Open customer search modal (implement as needed)
-    showInfoToast('Customer search feature - opening...');
+    // Open receipt printing interface
+    window.location.href = `/business/{{ request.tenant.slug }}/payments/receipts/`;
 }
 
 function viewMyPerformance() {
-    window.location.href = '/business/{{ request.tenant.slug }}/employees/my-performance/';
+    // Show performance details
+    window.location.href = `/business/{{ request.tenant.slug }}/services/my-performance/`;
 }
 
 // Attendance functions
 function checkIn() {
-    fetch(`/business/{{ request.tenant.slug }}/employees/ajax/check-in/`, {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/check-in/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': getCookie('csrftoken'),
@@ -1056,7 +1312,7 @@ function checkIn() {
 }
 
 function takeBreak() {
-    fetch(`/business/{{ request.tenant.slug }}/employees/ajax/break-start/`, {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/break-start/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': getCookie('csrftoken'),
@@ -1079,7 +1335,7 @@ function takeBreak() {
 
 function checkOut() {
     if (confirm('Are you sure you want to check out?')) {
-        fetch(`/business/{{ request.tenant.slug }}/employees/ajax/check-out/`, {
+        fetch(`/business/{{ request.tenant.slug }}/services/ajax/check-out/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -1130,8 +1386,11 @@ function showInfoToast(message) {
 }
 
 function showToast(message, type) {
+    // Remove existing toasts
+    document.querySelectorAll('.toast-notification').forEach(toast => toast.remove());
+    
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
+    toast.className = `toast-notification toast-${type}`;
     toast.innerHTML = `
         <div class="toast-content">
             <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
@@ -1151,48 +1410,4 @@ function showToast(message, type) {
     }, 4000);
 }
 </script>
-
-<!-- Toast Styles -->
-<style>
-.toast {
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1rem;
-    box-shadow: var(--shadow-lg);
-    z-index: 9999;
-    min-width: 300px;
-    animation: slideInRight 0.3s ease-out;
-}
-
-.toast.toast-success { border-left: 4px solid var(--success-500); }
-.toast.toast-error { border-left: 4px solid var(--danger-500); }
-.toast.toast-info { border-left: 4px solid var(--info-500); }
-
-.toast-content {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.toast-close {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: none;
-    border: none;
-    color: var(--gray-400);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
-}
-
-@keyframes slideInRight {
-    from { opacity: 0; transform: translateX(100%); }
-    to { opacity: 1; transform: translateX(0); }
-}
-</style>
 {% endblock %}
