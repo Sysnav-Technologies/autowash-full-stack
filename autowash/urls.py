@@ -79,7 +79,7 @@ def root_redirect(request):
 
 # IMPORTANT: These URLs are for TENANT schemas AFTER the middleware has stripped the business prefix
 # So /business/eldo-wash/customers/ becomes /customers/ by the time it reaches here
-print("🏢 TENANT URLs configuration loaded (post-middleware)")
+print("TENANT URLs configuration loaded (post-middleware)")
 
 urlpatterns = [
     # Health check
@@ -122,9 +122,9 @@ if settings.DEBUG:
         urlpatterns = [
             path('__debug__/', include(debug_toolbar.urls)),
         ] + urlpatterns
-        print("🐛 Debug toolbar URLs added to TENANT schema")
+        print("Debug toolbar URLs added to TENANT schema")
     except ImportError:
-        print("⚠️ Debug toolbar not available (not installed)")
+        print("Debug toolbar not available (not installed)")
 
 # Serve media files when in local development or when debugging on Render
 if not getattr(settings, 'RENDER', True) or settings.DEBUG:

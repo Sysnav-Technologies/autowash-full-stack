@@ -611,19 +611,19 @@ elif CPANEL:
     print("[CORS] Using CPANEL CORS settings (optimized for cPanel)")
 
 # Sentry Configuration - Only when not debugging
-sentry_dsn = config('SENTRY_DSN', default='')
-if (RENDER or CPANEL) and not DEBUG and sentry_dsn:
-    sentry_sdk.init(
-        dsn=sentry_dsn,
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True
-    )
-    print("[SENTRY] Sentry error tracking enabled")
-elif DEBUG:
-    print("[SENTRY] Sentry disabled (debug mode active)")
-else:
-    print("[SENTRY] Sentry disabled (local development or no DSN)")
+# sentry_dsn = config('SENTRY_DSN', default='')
+# if (RENDER or CPANEL) and not DEBUG and sentry_dsn:
+#     sentry_sdk.init(
+#         dsn=sentry_dsn,
+#         integrations=[DjangoIntegration()],
+#         traces_sample_rate=1.0,
+#         send_default_pii=True
+#     )
+#     print("[SENTRY] Sentry error tracking enabled")
+# elif DEBUG:
+#     print("[SENTRY] Sentry disabled (debug mode active)")
+# else:
+#     print("[SENTRY] Sentry disabled (local development or no DSN)")
 
 # Custom Settings
 BUSINESS_LOGO_UPLOAD_PATH = 'business_logos/'
