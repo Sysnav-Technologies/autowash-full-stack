@@ -63,15 +63,25 @@ class Command(BaseCommand):
             self.create_cache_table()
             self.stdout.write(self.style.SUCCESS('✅ Cache table created'))
 
-            # Step 4: Run migrations for shared schema
+            # Step 4: Create migrations if needed
             if not options['skip_migrations']:
+                self.stdout.write('📝 Creating migrations...')
+                self.create_migrations()
+                self.stdout.write(self.style.SUCCESS('✅ Migrations created'))
+
+                # Step 5: Run shared schema migrations
                 self.stdout.write('🔄 Running shared schema migrations...')
                 self.run_shared_migrations()
                 self.stdout.write(self.style.SUCCESS('✅ Shared schema migrations completed'))
+
+                # Step 6: Run tenant schema migrations - THIS WAS MISSING!
+                self.stdout.write('🏢 Running tenant schema migrations...')
+                self.run_tenant_migrations()
+                self.stdout.write(self.style.SUCCESS('✅ Tenant schema migrations completed'))
             else:
                 self.stdout.write(self.style.WARNING('⏭️ Skipping migrations'))
 
-            # Step 5: Collect static files (environment-specific)
+            # Step 7: Collect static files (environment-specific)
             if not options['skip_static']:
                 self.stdout.write('📂 Collecting static files...')
                 self.collect_static_files(environment)
@@ -79,7 +89,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.WARNING('⏭️ Skipping static files'))
 
-            # Step 6: Create superuser FIRST (required for public tenant)
+            # Step 8: Create superuser FIRST (required for public tenant)
             if not options['skip_superuser']:
                 self.stdout.write('👤 Creating superuser...')
                 superuser = self.create_superuser()
@@ -94,17 +104,17 @@ class Command(BaseCommand):
                 except Exception as e:
                     raise Exception(f"Failed to find superuser for public tenant: {e}")
 
-            # Step 7: Create public tenant (with superuser as owner)
+            # Step 9: Create public tenant (with superuser as owner)
             self.stdout.write('🏢 Creating public tenant...')
             self.create_public_tenant(superuser, environment)
             self.stdout.write(self.style.SUCCESS('✅ Public tenant created'))
 
-            # Step 8: Environment-specific setup
+            # Step 10: Environment-specific setup
             self.stdout.write(f'⚙️ Running {environment} specific setup...')
             self.environment_specific_setup(environment)
             self.stdout.write(self.style.SUCCESS('✅ Environment setup completed'))
 
-            # Step 9: Run health checks
+            # Step 11: Run health checks
             self.stdout.write('🏥 Running health checks...')
             self.run_health_checks()
             self.stdout.write(self.style.SUCCESS('✅ Health checks passed'))
@@ -177,20 +187,66 @@ class Command(BaseCommand):
             if 'already exists' not in str(e).lower():
                 raise
 
+    def create_migrations(self):
+        """Create migrations for all apps if needed"""
+        self.stdout.write("  📝 Creating migration files...")
+        
+        apps_to_migrate = [
+            'accounts',
+            'businesses', 
+            'core',
+            'subscriptions',
+            'employees',
+            'customers',
+            'services',
+            'inventory',
+            'suppliers',
+            'payments',
+            'reports',
+            'expenses',
+            'notification',
+        ]
+
+        for app in apps_to_migrate:
+            try:
+                call_command('makemigrations', app, verbosity=0, interactive=False)
+                self.stdout.write(f"    ✓ Created migrations for {app}")
+            except Exception as e:
+                self.stdout.write(f"    ⚠️ Could not create migrations for {app}: {e}")
+
+        # Create any remaining migrations
+        try:
+            call_command('makemigrations', verbosity=0, interactive=False)
+            self.stdout.write("    ✓ Created any remaining migrations")
+        except Exception as e:
+            self.stdout.write(f"    ⚠️ Could not create remaining migrations: {e}")
+
     def run_shared_migrations(self):
         """Run migrations for shared schema"""
         try:
             # Try django-tenants migrations first
+            self.stdout.write("  🏗️ Running shared schema migrations...")
             call_command('migrate_schemas', '--shared', verbosity=1)
         except Exception as e:
             self.stdout.write(
-                self.style.WARNING(f'Django-tenants migration warning: {e}')
+                self.style.WARNING(f'  ⚠️ Django-tenants shared migration warning: {e}')
             )
             # Try regular migrate as fallback
             try:
+                self.stdout.write("  🔄 Trying regular migrate as fallback...")
                 call_command('migrate', verbosity=1)
             except Exception as e2:
                 raise Exception(f"Both django-tenants and regular migrations failed: {e2}")
+
+    def run_tenant_migrations(self):
+        """Run migrations for tenant schemas - THIS IS CRITICAL!"""
+        try:
+            self.stdout.write("  🏢 Running tenant schema migrations...")
+            call_command('migrate_schemas', verbosity=1)
+        except Exception as e:
+            self.stdout.write(f"  ⚠️ Tenant migration warning: {e}")
+            # This is critical - if tenant migrations fail, we need to know
+            raise Exception(f"Tenant migrations failed: {e}")
 
     def collect_static_files(self, environment):
         """Collect static files with environment-specific handling"""
@@ -228,13 +284,13 @@ class Command(BaseCommand):
             # Check if public tenant exists
             try:
                 public_tenant = Business.objects.get(schema_name='public')
-                self.stdout.write('Public tenant already exists')
+                self.stdout.write('  ✓ Public tenant already exists')
                 
                 # Update owner if not set
                 if not public_tenant.owner:
                     public_tenant.owner = owner_user
                     public_tenant.save()
-                    self.stdout.write('Updated public tenant owner')
+                    self.stdout.write('  ✓ Updated public tenant owner')
                     
             except Business.DoesNotExist:
                 # Create public tenant with owner
@@ -252,7 +308,7 @@ class Command(BaseCommand):
                     is_active=True,
                     is_verified=True
                 )
-                self.stdout.write('Public tenant created with owner')
+                self.stdout.write('  ✓ Public tenant created with owner')
 
             # Create domains for public tenant based on environment
             domains_to_create = self.get_domains_for_environment(environment)
@@ -266,9 +322,9 @@ class Command(BaseCommand):
                     }
                 )
                 if created:
-                    self.stdout.write(f'Created domain: {domain_name}')
+                    self.stdout.write(f'  ✓ Created domain: {domain_name}')
                 else:
-                    self.stdout.write(f'Domain already exists: {domain_name}')
+                    self.stdout.write(f'  ✓ Domain already exists: {domain_name}')
 
         except Exception as e:
             raise Exception(f"Failed to create public tenant: {e}")
@@ -302,27 +358,27 @@ class Command(BaseCommand):
         """Create superuser with predefined credentials"""
         try:
             # Check if superuser exists
-            superuser = User.objects.filter(email='admin@autowash.co.ke').first()
+            superuser = User.objects.filter(email='admin@gmail.com').first()
             if superuser:
-                self.stdout.write('Superuser already exists')
+                self.stdout.write('  ✓ Superuser already exists')
                 return superuser
 
             # Create superuser
             superuser = User.objects.create_superuser(
-                username='autowash',
-                email='admin@autowash.co.ke',
+                username='admin',
+                email='admin@gmail.com',
                 password='123456',
                 first_name='Admin',
                 last_name='User'
             )
-            self.stdout.write('Superuser created successfully')
+            self.stdout.write('  ✓ Superuser created successfully')
             return superuser
 
         except IntegrityError:
             # Handle case where username might exist but not email
             try:
-                superuser = User.objects.get(username='autowash')
-                self.stdout.write('Superuser already exists (found by username)')
+                superuser = User.objects.get(username='admin')
+                self.stdout.write('  ✓ Superuser already exists (found by username)')
                 return superuser
             except User.DoesNotExist:
                 raise Exception("IntegrityError but superuser not found")
@@ -415,7 +471,7 @@ class Command(BaseCommand):
         )
         self.stdout.write('🌐 Main site: http://localhost:8000/')
         self.stdout.write('👤 Admin: http://localhost:8000/admin/')
-        self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
+        self.stdout.write('🔑 Login: admin@gmail.com / 123456')
         self.stdout.write('🏢 Business URLs: http://localhost:8000/business/{slug}/')
         self.stdout.write('📋 Register a business and access via path-based URLs')
         if settings.DEBUG:
@@ -430,7 +486,7 @@ class Command(BaseCommand):
         )
         self.stdout.write('🌐 Main site: https://autowash-3jpr.onrender.com/')
         self.stdout.write('👤 Admin: https://autowash-3jpr.onrender.com/admin/')
-        self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
+        self.stdout.write('🔑 Login: admin@gmail.com / 123456')
         self.stdout.write('🏢 Business URLs: https://autowash-3jpr.onrender.com/business/{slug}/')
         self.stdout.write('📋 Register a business and access via path-based URLs')
         
@@ -454,7 +510,7 @@ class Command(BaseCommand):
         )
         self.stdout.write('🌐 Main site: https://app.autowash.co.ke/')
         self.stdout.write('👤 Admin: https://app.autowash.co.ke/admin/')
-        self.stdout.write('🔑 Login: admin@autowash.co.ke / 123456')
+        self.stdout.write('🔑 Login: admin@gmail.com / 123456')
         self.stdout.write('🏢 Business URLs: https://app.autowash.co.ke/business/{slug}/')
         self.stdout.write('📋 Register a business and access via path-based URLs')
         
