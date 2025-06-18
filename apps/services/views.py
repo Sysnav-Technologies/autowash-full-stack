@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
 from django.urls import reverse
-from apps.core.decorators import employee_required, ajax_required
+from apps.core.decorators import employee_required, ajax_required, owner_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
 from .models import (
     Service, ServiceCategory, ServicePackage, ServiceOrder, 
@@ -716,7 +716,8 @@ def complete_service(request, order_id):
     return redirect('services:order_detail', pk=order.pk)
 
 @login_required
-@employee_required()
+# Owner or manager required for queue management
+@employee_required(['owner', 'manager'])
 def queue_view(request):
     """Service queue management"""
     # Get current queue

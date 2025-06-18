@@ -1,0 +1,289 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}My Services{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mt-4">My Services</h1>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#filterModal">
+                <i class="fas fa-filter me-2"></i>Filters
+            </button>
+            <a href="/business/{{ request.tenant.slug }}/services/dashboard/" class="btn btn-outline-secondary">
+                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Modal -->
+    <div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filterModalLabel">Filter Services</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="get">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="">All Statuses</option>
+                                {% for value, label in status_choices %}
+                                    <option value="{{ value }}" {% if current_filters.status == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="date_from" class="form-label">From Date</label>
+                                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ current_filters.date_from }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="date_to" class="form-label">To Date</label>
+                                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ current_filters.date_to }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="/business/{{ request.tenant.slug }}/services/my-services/" class="btn btn-secondary">Reset</a>
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Services Cards (Mobile) -->
+    <div class="d-block d-lg-none">
+        {% for order in orders %}
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="badge {% if order.status == 'completed' %}bg-success{% elif order.status == 'in_progress' %}bg-warning{% else %}bg-secondary{% endif %}">
+                        {{ order.get_status_display }}
+                    </span>
+                    <span class="ms-2">#{{ order.order_number }}</span>
+                </div>
+                <div class="text-muted small">{{ order.created_at|date:"M d, Y" }}</div>
+            </div>
+            <div class="card-body">
+                <div class="d-flex mb-3">
+                    <div class="avatar avatar-sm me-3">
+                        {% if order.customer.avatar %}
+                            <img src="{{ order.customer.avatar.url }}" alt="{{ order.customer.full_name }}" class="rounded-circle">
+                        {% else %}
+                            <div class="avatar-initial bg-primary rounded-circle">{{ order.customer.initials }}</div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h6 class="mb-0">{{ order.customer.full_name }}</h6>
+                        <small class="text-muted">{{ order.customer.phone }}</small>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="fw-bold">{{ order.vehicle.registration_number }}</div>
+                    <div class="text-muted small">{{ order.vehicle.make }} {{ order.vehicle.model }}</div>
+                </div>
+                
+                <div class="mb-3">
+                    {% with order.order_items.all|slice:":3" as items %}
+                        {% for item in items %}
+                            <span class="badge bg-light text-dark mb-1">{{ item.service.name }}</span>
+                        {% endfor %}
+                        {% if order.order_items.count > 3 %}
+                            <span class="badge bg-light text-dark">+{{ order.order_items.count|add:"-3" }} more</span>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="fw-bold">KES {{ order.total_amount }}</div>
+                    <div class="d-flex gap-2">
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/" class="btn btn-sm btn-outline-primary" title="View">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        {% if order.status != 'completed' %}
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/edit/" class="btn btn-sm btn-outline-warning" title="Update">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        {% endif %}
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/receipt/" class="btn btn-sm btn-outline-secondary" title="Receipt" target="_blank">
+                            <i class="fas fa-receipt"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="card">
+            <div class="card-body text-center py-4">
+                <div class="d-flex flex-column align-items-center">
+                    <img src="{% static 'images/empty.svg' %}" alt="No services" style="height: 120px;" class="mb-3">
+                    <h5 class="text-muted">No services assigned to you</h5>
+                    <p class="text-muted">When you get assigned services, they'll appear here</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Services Table (Desktop) -->
+    <div class="card mb-4 d-none d-lg-block">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Vehicle</th>
+                            <th>Services</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Total</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td>
+                                <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/" class="fw-bold">#{{ order.order_number }}</a>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar avatar-sm me-2">
+                                        {% if order.customer.avatar %}
+                                            <img src="{{ order.customer.avatar.url }}" alt="{{ order.customer.full_name }}" class="rounded-circle">
+                                        {% else %}
+                                            <div class="avatar-initial bg-primary rounded-circle">{{ order.customer.initials }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">{{ order.customer.full_name }}</h6>
+                                        <small class="text-muted">{{ order.customer.phone }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <span class="d-block">{{ order.vehicle.registration_number }}</span>
+                                    <small class="text-muted">{{ order.vehicle.make }} {{ order.vehicle.model }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                {% with order.order_items.all|slice:":2" as items %}
+                                    {% for item in items %}
+                                        <span class="badge bg-light text-dark mb-1">{{ item.service.name }}</span>
+                                    {% endfor %}
+                                    {% if order.order_items.count > 2 %}
+                                        <span class="badge bg-light text-dark">+{{ order.order_items.count|add:"-2" }} more</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                            <td>
+                                <span class="badge {% if order.status == 'completed' %}bg-success{% elif order.status == 'in_progress' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ order.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ order.created_at|date:"M d, Y" }}</td>
+                            <td>KES {{ order.total_amount }}</td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/" class="btn btn-sm btn-outline-primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if order.status != 'completed' %}
+                                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/edit/" class="btn btn-sm btn-outline-warning" title="Update">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    {% endif %}
+                                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/receipt/" class="btn btn-sm btn-outline-secondary" title="Receipt" target="_blank">
+                                        <i class="fas fa-receipt"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <div class="d-flex flex-column align-items-center">
+                                    <img src="{% static 'images/empty.svg' %}" alt="No services" style="height: 120px;" class="mb-3">
+                                    <h5 class="text-muted">No services assigned to you</h5>
+                                    <p class="text-muted">When you get assigned services, they'll appear here</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if orders.paginator.num_pages > 1 %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if orders.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.date_from %}&date_from={{ current_filters.date_from }}{% endif %}{% if current_filters.date_to %}&date_to={{ current_filters.date_to }}{% endif %}" aria-label="First">
+                        <span aria-hidden="true">&laquo;&laquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ orders.previous_page_number }}{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.date_from %}&date_from={{ current_filters.date_from }}{% endif %}{% if current_filters.date_to %}&date_to={{ current_filters.date_to }}{% endif %}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+            {% endif %}
+
+            {% for num in orders.paginator.page_range %}
+                {% if orders.number == num %}
+                    <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
+                {% elif num > orders.number|add:'-3' and num < orders.number|add:'3' %}
+                    <li class="page-item"><a class="page-link" href="?page={{ num }}{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.date_from %}&date_from={{ current_filters.date_from }}{% endif %}{% if current_filters.date_to %}&date_to={{ current_filters.date_to }}{% endif %}">{{ num }}</a></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if orders.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ orders.next_page_number }}{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.date_from %}&date_from={{ current_filters.date_from }}{% endif %}{% if current_filters.date_to %}&date_to={{ current_filters.date_to }}{% endif %}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ orders.paginator.num_pages }}{% if current_filters.status %}&status={{ current_filters.status }}{% endif %}{% if current_filters.date_from %}&date_from={{ current_filters.date_from }}{% endif %}{% if current_filters.date_to %}&date_to={{ current_filters.date_to }}{% endif %}" aria-label="Last">
+                        <span aria-hidden="true">&raquo;&raquo;</span>
+                    </a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Initialize tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        // Bootstrap tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+
+        // Set today as default date in date filters
+        document.getElementById('date_from').addEventListener('focus', function() {
+            if (!this.value) {
+                this.valueAsDate = new Date();
+            }
+        });
+    });
+</script>
+{% endblock %}

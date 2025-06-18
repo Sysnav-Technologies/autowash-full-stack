@@ -28,7 +28,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 @login_required
-@employee_required()
+# Owner or manager required for payment dashboard
+@employee_required(['owner', 'manager'])
 def payment_dashboard_view(request):
     """Payment dashboard with key metrics"""
     today = timezone.now().date()
