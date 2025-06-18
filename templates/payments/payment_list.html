@@ -1,0 +1,459 @@
+<!-- templates/payments/payment_list.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payments - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-header {
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.filters-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.payments-table {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    color: #374151;
+    padding: 0.75rem;
+}
+
+.table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: middle;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-processing {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-completed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-verified {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-failed {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-cancelled {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.status-refunded {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.payment-method-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.5rem;
+}
+
+.action-btn {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    text-decoration: none;
+    margin-right: 0.25rem;
+}
+
+.btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.totals-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.filter-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    align-items: end;
+}
+
+@media (max-width: 768px) {
+    .table-responsive {
+        border-radius: 0.5rem;
+    }
+    
+    .filter-form {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-start">
+        <div>
+            <h1 class="h3 mb-2">
+                <i class="fas fa-credit-card text-primary me-2"></i>
+                Payments
+            </h1>
+            <p class="text-muted mb-0">Manage and track all payment transactions</p>
+        </div>
+        
+        <div class="d-flex gap-2">
+            <a href="/business/{{ request.tenant.slug }}/payments/create/" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                New Payment
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/payments/reports/" class="btn btn-outline-secondary">
+                <i class="fas fa-chart-bar"></i>
+                Reports
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Totals Summary -->
+{% if totals %}
+<div class="totals-card">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="text-center">
+                <h4 class="text-primary mb-1">KES {{ totals.total_amount|floatformat:2|default:"0.00" }}</h4>
+                <small class="text-muted">Total Amount</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <h4 class="text-success mb-1">KES {{ totals.completed_amount|floatformat:2|default:"0.00" }}</h4>
+                <small class="text-muted">Completed</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <h4 class="text-warning mb-1">KES {{ totals.pending_amount|floatformat:2|default:"0.00" }}</h4>
+                <small class="text-muted">Pending</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <h4 class="text-info mb-1">{{ payments.paginator.count }}</h4>
+                <small class="text-muted">Total Payments</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="filters-card">
+    <form method="get" class="filter-form">
+        <div class="form-group">
+            <label for="status" class="form-label">Status</label>
+            <select name="status" id="status" class="form-select form-select-sm">
+                <option value="">All Statuses</option>
+                {% for status_value, status_label in status_choices %}
+                <option value="{{ status_value }}" {% if current_filters.status == status_value %}selected{% endif %}>
+                    {{ status_label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="method" class="form-label">Payment Method</label>
+            <select name="method" id="method" class="form-select form-select-sm">
+                <option value="">All Methods</option>
+                {% for method in payment_methods %}
+                <option value="{{ method.id }}" {% if current_filters.method == method.id|stringformat:"s" %}selected{% endif %}>
+                    {{ method.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="date_from" class="form-label">From Date</label>
+            <input type="date" name="date_from" id="date_from" class="form-control form-control-sm" 
+                   value="{{ current_filters.date_from }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="date_to" class="form-label">To Date</label>
+            <input type="date" name="date_to" id="date_to" class="form-control form-control-sm" 
+                   value="{{ current_filters.date_to }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="search" class="form-label">Search</label>
+            <input type="text" name="search" id="search" class="form-control form-control-sm" 
+                   placeholder="Payment ID, customer, transaction ID..." 
+                   value="{{ current_filters.search }}">
+        </div>
+        
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fas fa-search"></i>
+                Filter
+            </button>
+            <a href="/business/{{ request.tenant.slug }}/payments/list/" class="btn btn-outline-secondary btn-sm ms-1">
+                <i class="fas fa-times"></i>
+                Clear
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Payments Table -->
+<div class="payments-table">
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Payment ID</th>
+                    <th>Date/Time</th>
+                    <th>Customer</th>
+                    <th>Amount</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Order</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr>
+                    <td>
+                        <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/" 
+                           class="text-decoration-none fw-medium">
+                            {{ payment.payment_id }}
+                        </a>
+                        {% if payment.reference_number %}
+                        <br><small class="text-muted">Ref: {{ payment.reference_number }}</small>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <div>{{ payment.created_at|date:"M d, Y" }}</div>
+                        <small class="text-muted">{{ payment.created_at|time:"H:i" }}</small>
+                    </td>
+                    
+                    <td>
+                        {% if payment.customer %}
+                        <div>{{ payment.customer.display_name }}</div>
+                        {% if payment.customer_phone %}
+                        <small class="text-muted">{{ payment.customer_phone }}</small>
+                        {% endif %}
+                        {% else %}
+                        <span class="text-muted">N/A</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <div class="fw-medium">KES {{ payment.amount|floatformat:2 }}</div>
+                        {% if payment.processing_fee > 0 %}
+                        <small class="text-muted">Fee: KES {{ payment.processing_fee|floatformat:2 }}</small>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <i class="{{ payment.payment_method.icon }} payment-method-icon"></i>
+                            {{ payment.payment_method.name }}
+                        </div>
+                    </td>
+                    
+                    <td>
+                        <span class="status-badge status-{{ payment.status }}">
+                            {{ payment.get_status_display }}
+                        </span>
+                        {% if payment.status == 'failed' and payment.failure_reason %}
+                        <br><small class="text-danger">{{ payment.failure_reason|truncatewords:5 }}</small>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        {% if payment.service_order %}
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ payment.service_order.id }}/" 
+                           class="text-decoration-none">
+                            {{ payment.service_order.order_number }}
+                        </a>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <div class="btn-group" role="group">
+                            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/" 
+                               class="action-btn btn btn-outline-primary" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            
+                            {% if payment.status == 'completed' and request.user.employee_profile.role in 'owner,manager' %}
+                            <form method="post" action="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/verify/" 
+                                  class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="action-btn btn btn-outline-success" 
+                                        title="Verify Payment">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            
+                            {% if payment.can_be_refunded and request.user.employee_profile.role in 'owner,manager' %}
+                            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/refund/" 
+                               class="action-btn btn btn-outline-warning" title="Process Refund">
+                                <i class="fas fa-undo"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-4">
+                        <div class="text-muted">
+                            <i class="fas fa-credit-card fa-3x mb-3 opacity-50"></i>
+                            <h5>No payments found</h5>
+                            <p>No payments match your current filters.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if payments.has_other_pages %}
+    <div class="d-flex justify-content-between align-items-center p-3 border-top">
+        <div class="text-muted">
+            Showing {{ payments.start_index }} to {{ payments.end_index }} of {{ payments.paginator.count }} payments
+        </div>
+        
+        <nav aria-label="Payments pagination">
+            <ul class="pagination pagination-sm mb-0">
+                {% if payments.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ payments.previous_page_number }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for num in payments.paginator.page_range %}
+                {% if payments.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > payments.number|add:'-3' and num < payments.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+                
+                {% if payments.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ payments.next_page_number }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Bulk Actions (if needed) -->
+<div class="mt-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <a href="/business/{{ request.tenant.slug }}/payments/reports/export/csv/{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" 
+               class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-download"></i>
+                Export CSV
+            </a>
+        </div>
+        
+        <div>
+            <small class="text-muted">
+                Last updated: <span id="lastUpdated">{{ "now"|date:"H:i:s" }}</span>
+            </small>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh every 30 seconds
+setInterval(function() {
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+}, 30000);
+
+// Clear filters function
+function clearFilters() {
+    const form = document.querySelector('.filter-form');
+    form.reset();
+    window.location.href = '/business/{{ request.tenant.slug }}/payments/list/';
+}
+
+// Enhanced search functionality
+document.getElementById('search').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        this.closest('form').submit();
+    }
+});
+</script>
+{% endblock %}

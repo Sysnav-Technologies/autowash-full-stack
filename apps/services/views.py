@@ -1002,71 +1002,119 @@ def process_payment(request, order_id):
     """Redirect to payments app for payment processing"""
     order = get_object_or_404(ServiceOrder, id=order_id)
     
-    # Redirect to the payments app
-    return redirect('payments:create_for_order', order_id=order.id)
+    # Check if payment can be processed
+    if not order.can_process_payment():
+        messages.error(request, 'Payment cannot be processed for this order.')
+        return redirect('services:order_detail', order_id=order.id)
+    
+    # Get tenant slug for proper URL routing
+    tenant_slug = request.tenant.slug
+    
+    # Redirect with business slug
+    return redirect(f'/business/{tenant_slug}/payments/create/{order.id}/')
 
 @login_required
 @employee_required()
 def payment_receipt(request, order_id):
-    """Generate payment receipt - Updated to work with payments app"""
+    """Generate payment receipt"""
     order = get_object_or_404(ServiceOrder, id=order_id)
     
-    # Get the latest completed payment for this order
-    try:
-        from apps.payments.models import Payment
-        latest_payment = Payment.objects.filter(
-            service_order=order,
-            status__in=['completed', 'verified']
-        ).latest('completed_at')
-    except Payment.DoesNotExist:
-        latest_payment = None
+    # Update payment status before showing receipt
+    order.update_payment_status()
+    
+    # Get the latest completed payment
+    latest_payment = order.latest_payment
+        
+    # If no payment found, redirect to payment processing
+    if not latest_payment:
+        messages.warning(request, 'No completed payment found for this order.')
+        tenant_slug = request.tenant.slug
+        return redirect(f'/business/{tenant_slug}/payments/create/{order.id}/')
     
     context = {
         'order': order,
         'payment': latest_payment,
+        'payment_summary': order.get_payment_summary(),
         'title': f'Receipt - {order.order_number}',
         'print_mode': request.GET.get('print') == 'true'
     }
     
-    # If this is a direct print request, use the minimal print template
-    if request.GET.get('print') == 'true':
-        return render(request, 'services/payment_receipt_print.html', context)
-    
-    return render(request, 'services/payment_receipt.html', context)
+    return render(request, 'services/payment_receipt_print.html', context)
 
+# ✅ Updated ServiceOrder model method
 def update_payment_status(self):
-    """Update order payment status based on payments"""
+    """Update order payment status based on payments - with real-time updates"""
     try:
         from apps.payments.models import Payment
         from decimal import Decimal
+        from django.db import transaction
         
-        # Get all completed payments for this order
-        completed_payments = Payment.objects.filter(
-            service_order=self,
-            status__in=['completed', 'verified']
-        )
+        # Use transaction to ensure consistency
+        with transaction.atomic():
+            # Get all completed payments for this order
+            completed_payments = Payment.objects.filter(
+                service_order=self,
+                status__in=['completed', 'verified']
+            )
+            
+            total_paid = completed_payments.aggregate(
+                total=models.Sum('amount')
+            )['total'] or Decimal('0')
+            
+            # Store previous status for comparison
+            old_status = self.payment_status
+            
+            # Update payment status
+            if total_paid >= self.total_amount:
+                self.payment_status = 'paid'
+            elif total_paid > 0:
+                self.payment_status = 'partial'
+            else:
+                self.payment_status = 'pending'
+            
+            # Set payment method from latest payment
+            latest_payment = completed_payments.order_by('-completed_at').first()
+            if latest_payment:
+                self.payment_method = latest_payment.payment_method.method_type
+                
+                # Update payment date when status changes to paid
+                if self.payment_status == 'paid' and old_status != 'paid':
+                    self.payment_date = latest_payment.completed_at
+            
+            # Save with specific fields to avoid conflicts
+            self.save(update_fields=['payment_status', 'payment_method', 'payment_date'])
+            
+            # ✅ Trigger any post-payment processing
+            if self.payment_status == 'paid' and old_status != 'paid':
+                self._handle_payment_completion()
         
-        total_paid = completed_payments.aggregate(
-            total=models.Sum('amount')
-        )['total'] or Decimal('0')
-        
-        if total_paid >= self.total_amount:
-            self.payment_status = 'paid'
-        elif total_paid > 0:
-            self.payment_status = 'partial'
-        else:
-            self.payment_status = 'pending'
-        
-        # Set payment method from latest payment
-        latest_payment = completed_payments.order_by('-completed_at').first()
-        if latest_payment:
-            self.payment_method = latest_payment.payment_method.method_type
-        
-        self.save(update_fields=['payment_status', 'payment_method'])
+        return True
         
     except ImportError:
         # Payments app not available
-        pass
+        return False
+    except Exception as e:
+        # Log error but don't crash
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error updating payment status for order {self.id}: {str(e)}")
+        return False
+
+def _handle_payment_completion(self):
+    """Handle actions when payment is completed"""
+    try:
+        # Update order status if needed
+        if self.status == 'pending':
+            self.status = 'in_progress'
+            self.save(update_fields=['status'])
+        
+        # Send notifications, update inventory, etc.
+        # Add your business logic here
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in payment completion handler for order {self.id}: {str(e)}")
 
 @login_required
 @employee_required()

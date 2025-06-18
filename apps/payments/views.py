@@ -213,13 +213,16 @@ def process_payment_view(request, order_id=None):
                     created_by=request.user
                 )
                 
-                # Process based on payment method type
+                # Get tenant slug for proper URL routing
+                tenant_slug = request.tenant.slug
+                
+                # Process based on payment method type with proper business slug
                 if payment_method.method_type == 'cash':
-                    return redirect('payments:process_cash', payment_id=payment.payment_id)
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/cash/')
                 elif payment_method.method_type == 'card':
-                    return redirect('payments:process_card', payment_id=payment.payment_id)
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/card/')
                 elif payment_method.method_type == 'mpesa':
-                    return redirect('payments:process_mpesa', payment_id=payment.payment_id)
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/mpesa/')
                 else:
                     # Default to manual processing
                     payment.status = 'completed'
@@ -227,7 +230,8 @@ def process_payment_view(request, order_id=None):
                     payment.save()
                     
                     messages.success(request, f'Payment {payment.payment_id} processed successfully!')
-                    return redirect('payments:detail', payment_id=payment.payment_id)
+                    # ✅ Fixed payment details redirect with business slug
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/')
                     
         except Exception as e:
             messages.error(request, f'Error processing payment: {str(e)}')
@@ -242,7 +246,6 @@ def process_payment_view(request, order_id=None):
     }
     
     return render(request, 'payments/process_payment.html', context)
-
 @login_required
 @employee_required()
 def process_cash_payment_view(request, payment_id):

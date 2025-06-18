@@ -6,6 +6,7 @@ from apps.core.utils import generate_unique_code, upload_to_path
 from django_tenants.utils import schema_context, get_public_schema_name
 from decimal import Decimal
 import uuid
+from django.db import transaction
 
 class ServiceCategory(TimeStampedModel):
     """Service categories for organizing services"""
@@ -236,8 +237,8 @@ class ServiceOrder(TimeStampedModel):
     vehicle = models.ForeignKey('customers.Vehicle', on_delete=models.CASCADE, related_name='service_orders')
     
     # Service details
-    services = models.ManyToManyField(Service, through='ServiceOrderItem')
-    package = models.ForeignKey(ServicePackage, on_delete=models.SET_NULL, null=True, blank=True)
+    services = models.ManyToManyField('Service', through='ServiceOrderItem')
+    package = models.ForeignKey('ServicePackage', on_delete=models.SET_NULL, null=True, blank=True)
     
     # Staff assignment
     assigned_attendant = models.ForeignKey(
@@ -285,6 +286,7 @@ class ServiceOrder(TimeStampedModel):
         ],
         blank=True
     )
+    payment_date = models.DateTimeField(null=True, blank=True, help_text="Date when payment was completed")
     
     # Additional information
     special_instructions = models.TextField(blank=True)
@@ -326,7 +328,184 @@ class ServiceOrder(TimeStampedModel):
     def save(self, *args, **kwargs):
         if not self.order_number:
             self.order_number = generate_unique_code('ORD', 8)
+        
+        # Call original save
+        is_new = self.pk is None
         super().save(*args, **kwargs)
+        
+        # Update payment status after saving if this is an existing order
+        # Use update_fields to prevent recursion
+        if not is_new and 'payment_status' not in kwargs.get('update_fields', []):
+            self.update_payment_status()
+    
+    def update_payment_status(self):
+        """Update order payment status based on payments - with real-time updates"""
+        try:
+            from apps.payments.models import Payment
+            
+            # Use transaction to ensure consistency
+            with transaction.atomic():
+                # Get all completed payments for this order
+                completed_payments = Payment.objects.filter(
+                    service_order=self,
+                    status__in=['completed', 'verified']
+                )
+                
+                total_paid = completed_payments.aggregate(
+                    total=models.Sum('amount')
+                )['total'] or Decimal('0')
+                
+                # Store previous status for comparison
+                old_status = self.payment_status
+                
+                # Update payment status
+                if total_paid >= self.total_amount:
+                    new_status = 'paid'
+                elif total_paid > 0:
+                    new_status = 'partial'
+                else:
+                    new_status = 'pending'
+                
+                # Set payment method from latest payment
+                latest_payment = completed_payments.order_by('-completed_at').first()
+                new_method = ''
+                new_payment_date = None
+                
+                if latest_payment:
+                    new_method = latest_payment.payment_method.method_type
+                    
+                    # Update payment date when status changes to paid
+                    if new_status == 'paid' and old_status != 'paid':
+                        new_payment_date = latest_payment.completed_at
+                
+                # Save with specific fields to avoid recursion
+                ServiceOrder.objects.filter(pk=self.pk).update(
+                    payment_status=new_status,
+                    payment_method=new_method,
+                    payment_date=new_payment_date or self.payment_date
+                )
+                
+                # Update local instance
+                self.payment_status = new_status
+                self.payment_method = new_method
+                if new_payment_date:
+                    self.payment_date = new_payment_date
+                
+                # Trigger post-payment processing
+                if new_status == 'paid' and old_status != 'paid':
+                    self._handle_payment_completion()
+            
+            return True
+            
+        except ImportError:
+            # Payments app not available
+            return False
+        except Exception as e:
+            # Log error but don't crash
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating payment status for order {self.id}: {str(e)}")
+            return False
+    
+    def _handle_payment_completion(self):
+        """Handle actions when payment is completed"""
+        try:
+            # Update order status if needed
+            if self.status == 'pending':
+                ServiceOrder.objects.filter(pk=self.pk).update(status='confirmed')
+                self.status = 'confirmed'  # Update local instance
+            
+            # You can add more business logic here:
+            # - Send SMS/Email notifications
+            # - Update inventory
+            # - Create work orders
+            # - Log audit trail
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in payment completion handler for order {self.id}: {str(e)}")
+    
+    @property
+    def total_paid(self):
+        """Get total amount paid for this order"""
+        try:
+            from apps.payments.models import Payment
+            
+            completed_payments = Payment.objects.filter(
+                service_order=self,
+                status__in=['completed', 'verified']
+            )
+            
+            total = completed_payments.aggregate(
+                total=models.Sum('amount')
+            )['total'] or Decimal('0')
+            
+            return total
+            
+        except ImportError:
+            return Decimal('0')
+    
+    @property
+    def remaining_balance(self):
+        """Get remaining balance to be paid"""
+        return self.total_amount - self.total_paid
+    
+    @property
+    def payment_progress_percentage(self):
+        """Get payment progress as percentage"""
+        if self.total_amount > 0:
+            return min(100, (self.total_paid / self.total_amount) * 100)
+        return 0
+    
+    @property
+    def has_payments(self):
+        """Check if order has any payments"""
+        try:
+            from apps.payments.models import Payment
+            return Payment.objects.filter(service_order=self).exists()
+        except ImportError:
+            return False
+    
+    @property
+    def latest_payment(self):
+        """Get the latest payment for this order"""
+        try:
+            from apps.payments.models import Payment
+            return Payment.objects.filter(
+                service_order=self,
+                status__in=['completed', 'verified']
+            ).order_by('-completed_at').first()
+        except ImportError:
+            return None
+    
+    def get_payments(self):
+        """Get all payments for this order"""
+        try:
+            from apps.payments.models import Payment
+            return Payment.objects.filter(service_order=self).order_by('-created_at')
+        except ImportError:
+            return []
+    
+    def can_process_payment(self):
+        """Check if payment can be processed for this order"""
+        return (
+            self.status not in ['cancelled', 'no_show'] and
+            self.payment_status != 'paid' and
+            self.total_amount > 0
+        )
+    
+    def get_payment_summary(self):
+        """Get payment summary for this order"""
+        return {
+            'total_amount': self.total_amount,
+            'total_paid': self.total_paid,
+            'remaining_balance': self.remaining_balance,
+            'payment_status': self.get_payment_status_display(),
+            'payment_progress': self.payment_progress_percentage,
+            'latest_payment_date': self.payment_date,
+            'payment_method': self.get_payment_method_display() if self.payment_method else None,
+        }
     
     @property
     def duration_minutes(self):
@@ -385,7 +564,6 @@ class ServiceOrder(TimeStampedModel):
         verbose_name = "Service Order"
         verbose_name_plural = "Service Orders"
         ordering = ['-created_at']
-
 class ServiceOrderItem(models.Model):
     """Individual items in a service order"""
     order = models.ForeignKey(ServiceOrder, on_delete=models.CASCADE, related_name='order_items')
