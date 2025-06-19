@@ -329,8 +329,8 @@ if RENDER:
     STATIC_ROOT = BASE_DIR / 'staticfiles'
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 elif CPANEL:
-    # cPanel configuration - typically served by Apache
-    STATIC_ROOT = BASE_DIR / 'static'
+    # cPanel configuration - FIXED for web accessibility
+    STATIC_ROOT = BASE_DIR / 'public_html' / 'static'
 else:
     # Local development
     STATIC_ROOT = BASE_DIR / 'staticfiles'
@@ -344,7 +344,7 @@ MEDIA_URL = '/media/'
 
 if CPANEL:
     # cPanel configuration
-    MEDIA_ROOT = BASE_DIR / 'media'
+    MEDIA_ROOT = BASE_DIR / 'public_html' / 'media'
 else:
     # Render and local development
     MEDIA_ROOT = BASE_DIR / 'media'
