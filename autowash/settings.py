@@ -324,17 +324,22 @@ STATIC_URL = '/static/'
 
 if RENDER:
     # Render configuration
-    STATIC_ROOT = BASE_DIR / 'staticfiles'
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 elif CPANEL:
     # cPanel configuration - FIXED for web accessibility
-    STATIC_ROOT = BASE_DIR / 'public_html' / 'static'
+    STATIC_ROOT = os.path.join(BASE_DIR, 'public_html', 'static')
 else:
     # Local development
-    STATIC_ROOT = BASE_DIR / 'staticfiles'
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    os.path.join(BASE_DIR, 'static'),
+]
+
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 ]
 
 # Media files - Environment-specific
@@ -342,13 +347,13 @@ MEDIA_URL = '/media/'
 
 if CPANEL:
     # cPanel configuration
-    MEDIA_ROOT = BASE_DIR / 'public_html' / 'media'
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'public_html', 'media')
 else:
     # Render and local development
-    MEDIA_ROOT = BASE_DIR / 'media'
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Tenant-specific media storage
-TENANT_MEDIA_ROOT = BASE_DIR / 'tenant_media'
+TENANT_MEDIA_ROOT = os.path.join(BASE_DIR, 'tenants', 'media')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
