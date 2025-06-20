@@ -1,6 +1,6 @@
 <!-- User Menu -->
-<div class="dropdown">
-    <div class="user-menu" data-bs-toggle="dropdown" aria-expanded="false">
+<div class="dropdown user-dropdown-container">
+    <div class="user-menu" data-bs-toggle="dropdown" aria-expanded="false" role="button">
         {% if employee and employee.photo %}
             <img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="user-avatar">
         {% else %}
@@ -8,13 +8,13 @@
                 {{ user.get_full_name|first|upper|default:user.username|first|upper }}
             </div>
         {% endif %}
-        <div class="user-info d-none d-md-block">
+        <div class="user-info d-none d-lg-block">
             <div class="user-name">{{ employee.full_name|default:user.get_full_name|default:user.username }}</div>
             <div class="user-role">{{ employee.get_role_display|default:"User" }}</div>
         </div>
-        <i class="fas fa-chevron-down text-muted ms-2" style="font-size: 0.75rem;"></i>
+        <i class="fas fa-chevron-down user-chevron d-none d-md-inline"></i>
     </div>
-    <ul class="dropdown-menu dropdown-menu-end user-dropdown">
+    <ul class="dropdown-menu dropdown-menu-end user-dropdown-menu">
         <li class="dropdown-header">
             <div class="d-flex align-items-center gap-3">
                 {% if employee and employee.photo %}
@@ -24,9 +24,12 @@
                         {{ user.get_full_name|first|upper|default:user.username|first|upper }}
                     </div>
                 {% endif %}
-                <div>
-                    <div class="fw-semibold">{{ employee.full_name|default:user.get_full_name|default:user.username }}</div>
+                <div class="flex-fill">
+                    <div class="fw-semibold text-truncate">{{ employee.full_name|default:user.get_full_name|default:user.username }}</div>
                     <small class="text-muted">{{ employee.get_role_display|default:"User" }}</small>
+                    {% if employee.employee_id %}
+                    <small class="text-muted d-block">ID: {{ employee.employee_id }}</small>
+                    {% endif %}
                 </div>
             </div>
         </li>
@@ -35,29 +38,29 @@
         <!-- Profile Section -->
         <li>
             <a class="dropdown-item" href="/auth/profile/">
-                <i class="fas fa-user"></i>
+                <i class="fas fa-user me-2"></i>
                 My Profile
             </a>
         </li>
         
         <!-- Personal Actions -->
         <li>
-            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/employees/attendance/">
-                <i class="fas fa-clock"></i>
+            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/employees/attendance/my/">
+                <i class="fas fa-clock me-2"></i>
                 My Attendance
             </a>
         </li>
         
         <li>
             <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/employees/leave/request/">
-                <i class="fas fa-calendar-plus"></i>
+                <i class="fas fa-calendar-plus me-2"></i>
                 Request Leave
             </a>
         </li>
         
         <li>
             <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/notifications/">
-                <i class="fas fa-bell"></i>
+                <i class="fas fa-bell me-2"></i>
                 Notifications
                 {% if unread_notifications_count > 0 %}
                 <span class="badge bg-danger ms-auto">{{ unread_notifications_count }}</span>
@@ -72,14 +75,14 @@
             <small class="text-muted">BUSINESS MANAGEMENT</small>
         </li>
         <li>
-            <a class="dropdown-item" href="/auth/business/settings/">
-                <i class="fas fa-cog"></i>
+            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/settings/business/">
+                <i class="fas fa-cog me-2"></i>
                 Business Settings
             </a>
         </li>
         <li>
             <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/reports/">
-                <i class="fas fa-chart-bar"></i>
+                <i class="fas fa-chart-bar me-2"></i>
                 Reports & Analytics
             </a>
         </li>
@@ -88,16 +91,16 @@
         <!-- Theme Toggle -->
         <li><hr class="dropdown-divider"></li>
         <li>
-            <a class="dropdown-item" href="#" onclick="toggleTheme()">
-                <i class="fas fa-moon" id="theme-icon"></i>
-                <span id="theme-text">Dark Mode</span>
-            </a>
+            <button class="dropdown-item theme-toggle-btn" type="button" onclick="toggleTheme()">
+                <i class="fas fa-moon me-2" id="user-menu-theme-icon"></i>
+                <span id="user-menu-theme-text">Dark Mode</span>
+            </button>
         </li>
         
         <!-- Help & Support -->
         <li>
-            <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#helpModal">
-                <i class="fas fa-question-circle"></i>
+            <a class="dropdown-item" href="/help/" target="_blank">
+                <i class="fas fa-question-circle me-2"></i>
                 Help & Support
             </a>
         </li>
@@ -105,8 +108,8 @@
         <!-- Logout -->
         <li><hr class="dropdown-divider"></li>
         <li>
-            <a class="dropdown-item text-danger" href="/auth/logout/">
-                <i class="fas fa-sign-out-alt"></i>
+            <a class="dropdown-item text-danger logout-item" href="/auth/logout/">
+                <i class="fas fa-sign-out-alt me-2"></i>
                 Sign Out
             </a>
         </li>
@@ -114,7 +117,11 @@
 </div>
 
 <style>
-/* User Menu */
+/* Enhanced User Menu Styles */
+.user-dropdown-container {
+    position: relative;
+}
+
 .user-menu {
     display: flex;
     align-items: center;
@@ -127,11 +134,13 @@
     cursor: pointer;
     border: 1px solid var(--gray-200);
     min-width: 0;
+    position: relative;
 }
 
 .user-menu:hover {
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
+    border-color: var(--gray-300);
 }
 
 .user-avatar {
@@ -147,6 +156,7 @@
     font-size: 0.875rem;
     flex-shrink: 0;
     border: 2px solid var(--gray-200);
+    overflow: hidden;
 }
 
 .user-avatar img {
@@ -170,6 +180,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 120px;
 }
 
 .user-role {
@@ -181,13 +192,26 @@
     text-overflow: ellipsis;
 }
 
-/* User Dropdown */
-.user-dropdown {
-    width: 280px;
+.user-chevron {
+    color: var(--gray-400);
+    font-size: 0.75rem;
+    transition: transform var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.user-menu[aria-expanded="true"] .user-chevron {
+    transform: rotate(180deg);
+}
+
+/* User Dropdown Menu */
+.user-dropdown-menu {
+    width: 300px;
     padding: 0;
     border: 1px solid var(--gray-200);
     box-shadow: var(--shadow-xl);
     border-radius: var(--radius-lg);
+    margin-top: 0.5rem;
+    z-index: 1050;
 }
 
 .dropdown-header {
@@ -209,6 +233,7 @@
     font-weight: 600;
     font-size: 1rem;
     flex-shrink: 0;
+    overflow: hidden;
 }
 
 .dropdown-user-avatar img {
@@ -222,18 +247,33 @@
     padding: 0.75rem 1.5rem;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
     color: var(--gray-700);
     font-weight: 500;
     transition: all var(--transition-fast);
+    text-decoration: none;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
 }
 
 .dropdown-item:hover {
     background: var(--gray-50);
     color: var(--gray-900);
+    text-decoration: none;
 }
 
 .dropdown-item.text-danger:hover {
+    background: var(--danger-50);
+    color: var(--danger-600);
+}
+
+.theme-toggle-btn:hover {
+    background: var(--primary-50);
+    color: var(--primary-700);
+}
+
+.logout-item:hover {
     background: var(--danger-50);
     color: var(--danger-600);
 }
@@ -249,24 +289,28 @@
     border-color: var(--gray-200);
 }
 
-/* Theme Toggle */
-#theme-icon {
-    transition: transform var(--transition-fast);
-}
-
-.dropdown-item:hover #theme-icon {
-    transform: rotate(180deg);
+/* Badge in dropdown */
+.dropdown-item .badge {
+    font-size: 0.625rem;
+    padding: 0.25rem 0.5rem;
 }
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
     .user-menu {
         padding: 0.5rem;
-        min-width: 44px;
+        gap: 0.5rem;
     }
     
-    .user-dropdown {
-        width: 260px;
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 0.75rem;
+    }
+    
+    .user-dropdown-menu {
+        width: 280px;
+        margin-top: 0.25rem;
     }
     
     .dropdown-item {
@@ -275,6 +319,15 @@
     
     .dropdown-header {
         padding: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .user-dropdown-menu {
+        width: 260px;
+        left: auto !important;
+        right: 0 !important;
+        transform: none !important;
     }
 }
 </style>

@@ -21,7 +21,8 @@
     <!-- AOS Animation -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     
-    {% include 'includes/css/styles.html' %}
+    <!-- Main CSS -->
+    <link href="{% static 'css/main.css' %}" rel="stylesheet">
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -113,16 +114,30 @@
     {% if user.is_authenticated and request.tenant and request.tenant.schema_name != 'public' %}
         <!-- Authenticated Business User Layout (Tenant) -->
         <div class="app-layout">
+            <!-- Mobile Sidebar Overlay -->
+            <div class="mobile-sidebar-overlay" id="mobileSidebarOverlay"></div>
+            
+            <!-- Sidebar -->
             {% include 'includes/sidebar/main.html' %}
             
             <!-- Main Content Area -->
             <div class="main-content" id="main-content">
+                <!-- Topbar -->
                 {% include 'includes/topbar/main.html' %}
                 
                 <!-- Page Content -->
                 <div class="content-wrapper">
+                    <!-- Messages -->
                     {% include 'includes/messages.html' %}
-                    {% block content %}{% endblock %}
+                    
+                    <!-- Main Content Block -->
+                    <div class="container-fluid px-0">
+                        <div class="row g-0">
+                            <div class="col-12">
+                                {% block content %}{% endblock %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -131,15 +146,41 @@
         <!-- Public Layout -->
         {% include 'includes/navbar/public.html' %}
         
-        <main style="padding-top: 76px;">
+        <main class="public-main">
+            <!-- Messages -->
             {% include 'includes/messages.html' %}
-            {% block public_content %}{% endblock %}
+            
+            <!-- Public Content -->
+            <div class="container-fluid">
+                {% block public_content %}{% endblock %}
+            </div>
         </main>
         
         {% include 'includes/footer/public.html' %}
     {% endif %}
     
-    {% include 'includes/js/scripts.html' %}
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <!-- AOS Animation -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    
+    <!-- Main JavaScript -->
+    <script src="{% static 'js/main.js' %}"></script>
+    
+    <!-- Topbar JavaScript -->
+    <script src="{% static 'js/topbar.js' %}"></script>
+    
+    <!-- Set tenant slug globally for JavaScript -->
+    {% if request.tenant %}
+    <script>
+        window.tenant_slug = '{{ request.tenant.slug }}';
+    </script>
+    {% endif %}
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>
