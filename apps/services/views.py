@@ -5,8 +5,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods, require_POST
-from django.db import transaction, models  # Added models import here
-from django.db.models import Q, Count, Sum, Avg, F, Case, When, Value, IntegerField  # Added missing imports
+from django.views.decorators.csrf import csrf_protect
+from django.db import transaction, models
+from django.db.models import Q, Count, Sum, Avg, F, Case, When, Value, IntegerField
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
@@ -24,6 +25,53 @@ from .forms import (
 )
 from datetime import datetime, timedelta
 import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+def get_business_url(request, url_name, **kwargs):
+    """Helper function to generate URLs with business slug"""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}"
+    
+    url_mapping = {
+        'services:list': f"{base_url}/services/",
+        'services:create': f"{base_url}/services/create/",
+        'services:detail': f"{base_url}/services/{{pk}}/",
+        'services:edit': f"{base_url}/services/{{pk}}/edit/",
+        'services:delete': f"{base_url}/services/{{pk}}/delete/",
+        'services:order_list': f"{base_url}/services/orders/",
+        'services:order_create': f"{base_url}/services/orders/create/",
+        'services:order_detail': f"{base_url}/services/orders/{{pk}}/",
+        'services:order_edit': f"{base_url}/services/orders/{{pk}}/edit/",
+        'services:quick_order': f"{base_url}/services/quick-order/",
+        'services:queue': f"{base_url}/services/queue/",
+        'services:category_list': f"{base_url}/services/categories/",
+        'services:category_create': f"{base_url}/services/categories/create/",
+        'services:category_edit': f"{base_url}/services/categories/{{pk}}/edit/",
+        'services:package_list': f"{base_url}/services/packages/",
+        'services:package_create': f"{base_url}/services/packages/create/",
+        'services:package_detail': f"{base_url}/services/packages/{{pk}}/",
+        'services:package_edit': f"{base_url}/services/packages/{{pk}}/edit/",
+        'services:bay_list': f"{base_url}/services/bays/",
+        'services:bay_create': f"{base_url}/services/bays/create/",
+        'services:bay_edit': f"{base_url}/services/bays/{{pk}}/edit/",
+        'services:attendant_dashboard': f"{base_url}/services/dashboard/",
+        'services:my_services': f"{base_url}/services/my-services/",
+        'services:reports': f"{base_url}/services/reports/",
+        'services:daily_report': f"{base_url}/services/reports/daily/",
+        'services:performance_report': f"{base_url}/services/reports/performance/",
+        'services:payment_receipt': f"{base_url}/services/orders/{{order_id}}/receipt/",
+        'payments:create': f"{base_url}/payments/create/{{order_id}}/",
+    }
+    
+    url = url_mapping.get(url_name, f"{base_url}/")
+    
+    # Replace placeholders with actual values
+    for key, value in kwargs.items():
+        url = url.replace(f"{{{key}}}", str(value))
+    
+    return url
 
 @login_required
 @employee_required()
@@ -85,7 +133,7 @@ def service_create_view(request):
             service.save()
             
             messages.success(request, f'Service "{service.name}" created successfully!')
-            return redirect('services:detail', pk=service.pk)
+            return redirect(get_business_url(request, 'services:detail', pk=service.pk))
     else:
         form = ServiceForm()
     
@@ -260,7 +308,7 @@ def order_create_view(request):
                         )
                     
                     messages.success(request, f'Order {order.order_number} created successfully!')
-                    return redirect('services:order_detail', pk=order.pk)
+                    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
                     
             except Exception as e:
                 messages.error(request, f'Error creating order: {str(e)}')
@@ -276,23 +324,6 @@ def order_create_view(request):
         'title': 'Create Service Order'
     }
     return render(request, 'services/order_form.html', context)
-
-
-import json
-import logging
-from decimal import Decimal
-from django.http import JsonResponse
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.db import transaction
-from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.http import require_http_methods
-from apps.core.decorators import employee_required
-from apps.core.utils import generate_unique_code
-from .models import Service, ServiceCategory, ServicePackage, ServiceOrder, ServiceOrderItem
-from .forms import QuickOrderForm
-
-logger = logging.getLogger(__name__)
 
 @csrf_protect
 @employee_required()
@@ -327,7 +358,7 @@ def quick_order_view(request):
                             })
                         else:
                             messages.error(request, 'Selected customer not found')
-                            return redirect('services:quick_order')
+                            return redirect(get_business_url(request, 'services:quick_order'))
                 else:
                     # New customer - validate required fields
                     customer_name = request.POST.get('customer_name', '').strip()
@@ -346,7 +377,7 @@ def quick_order_view(request):
                             })
                         else:
                             messages.error(request, error_msg)
-                            return redirect('services:quick_order')
+                            return redirect(get_business_url(request, 'services:quick_order'))
                     
                     # Create new customer
                     name_parts = customer_name.split(' ', 1)
@@ -382,7 +413,7 @@ def quick_order_view(request):
                             })
                         else:
                             messages.error(request, error_msg)
-                            return redirect('services:quick_order')
+                            return redirect(get_business_url(request, 'services:quick_order'))
                 else:
                     # New vehicle - validate required fields
                     vehicle_registration = request.POST.get('vehicle_registration', '').strip().upper()
@@ -401,7 +432,7 @@ def quick_order_view(request):
                             })
                         else:
                             messages.error(request, error_msg)
-                            return redirect('services:quick_order')
+                            return redirect(get_business_url(request, 'services:quick_order'))
                     
                     # Check if vehicle already exists
                     if Vehicle.objects.filter(registration_number=vehicle_registration).exists():
@@ -414,7 +445,7 @@ def quick_order_view(request):
                             })
                         else:
                             messages.error(request, error_msg)
-                            return redirect('services:quick_order')
+                            return redirect(get_business_url(request, 'services:quick_order'))
                     
                     # Create new vehicle
                     vehicle = Vehicle.objects.create(
@@ -507,11 +538,11 @@ def quick_order_view(request):
                         'message': f'Order {order.order_number} created successfully!',
                         'order_id': str(order.id),
                         'order_number': order.order_number,
-                        'redirect_url': f'/business/{request.tenant.slug}/services/orders/{order.id}/'
+                        'redirect_url': get_business_url(request, 'services:order_detail', pk=order.id)
                     })
                 else:
                     messages.success(request, f'Quick order {order.order_number} created successfully!')
-                    return redirect('services:order_detail', pk=order.pk)
+                    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
                 
         except ValueError as e:
             error_msg = str(e)
@@ -524,7 +555,7 @@ def quick_order_view(request):
                 })
             else:
                 messages.error(request, error_msg)
-                return redirect('services:quick_order')
+                return redirect(get_business_url(request, 'services:quick_order'))
         except Exception as e:
             error_msg = f'Error creating quick order: {str(e)}'
             logger.error(f"Exception in quick order creation: {error_msg}", exc_info=True)
@@ -536,7 +567,7 @@ def quick_order_view(request):
                 })
             else:
                 messages.error(request, error_msg)
-                return redirect('services:quick_order')
+                return redirect(get_business_url(request, 'services:quick_order'))
     
     # GET request - show the form
     # Get popular services for quick selection
@@ -653,7 +684,7 @@ def start_service(request, order_id):
     # Check if order can be started
     if order.status not in ['confirmed', 'pending']:
         messages.error(request, 'Order cannot be started.')
-        return redirect('services:order_detail', pk=order.pk)
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     # Update order status
     order.status = 'in_progress'
@@ -668,8 +699,8 @@ def start_service(request, order_id):
     # Update queue entry
     if hasattr(order, 'queue_entry'):
         queue_entry = order.queue_entry
-        queue_entry.status = 'in_service'
-        queue_entry.actual_start_time = timezone.now()
+        queue_entry.status = 'in_service'  # Fixed: should be 'in_service', not 'completed'
+        queue_entry.actual_start_time = timezone.now()  # Fixed: should be start_time, not end_time
         queue_entry.save()
     
     # Assign service bay if provided
@@ -681,9 +712,20 @@ def start_service(request, order_id):
         except ServiceBay.DoesNotExist:
             pass
     
+    # Send service start notification
+    if (hasattr(order.customer, 'phone') and order.customer.phone and 
+        hasattr(order.customer, 'receive_service_reminders') and 
+        order.customer.receive_service_reminders):
+        try:
+            send_sms_notification(
+                phone_number=str(order.customer.phone),
+                message=f"Your service has started! Order {order.order_number}. We'll notify you when complete."
+            )
+        except Exception as e:
+            logger.error(f"Failed to send start SMS for order {order.order_number}: {str(e)}")
+    
     messages.success(request, f'Service started for order {order.order_number}')
-    return redirect('services:order_detail', pk=order.pk)
-
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 @login_required
 @employee_required()
 @require_POST
@@ -694,7 +736,7 @@ def complete_service(request, order_id):
     # Check if order can be completed
     if order.status != 'in_progress':
         messages.error(request, 'Order is not in progress.')
-        return redirect('services:order_detail', pk=order.pk)
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     # Update order status
     order.status = 'completed'
@@ -717,19 +759,24 @@ def complete_service(request, order_id):
         queue_entry.save()
     
     # Free service bay
-    if order.current_bay.exists():
+    if hasattr(order, 'current_bay') and order.current_bay.exists():
         bay = order.current_bay.first()
         bay.complete_service()
     
     # Send completion notification
-    if order.customer.phone and order.customer.receive_service_reminders:
-        send_sms_notification(
-            phone_number=str(order.customer.phone),
-            message=f"Your service is complete! Order {order.order_number}. Total: KES {order.total_amount}. Thank you for choosing us!"
-        )
+    if (hasattr(order.customer, 'phone') and order.customer.phone and 
+        hasattr(order.customer, 'receive_service_reminders') and 
+        order.customer.receive_service_reminders):
+        try:
+            send_sms_notification(
+                phone_number=str(order.customer.phone),
+                message=f"Your service is complete! Order {order.order_number}. Total: KES {order.total_amount}. Thank you for choosing us!"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send completion SMS for order {order.order_number}: {str(e)}")
     
     messages.success(request, f'Service completed for order {order.order_number}')
-    return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 @login_required
 # Owner or manager required for queue management
