@@ -1,5 +1,3 @@
-# apps/core/middleware.py - Fixed version with path-based tenant routing and session handling
-
 from django.utils import timezone
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth import get_user_model

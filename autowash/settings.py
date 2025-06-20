@@ -1,5 +1,3 @@
-# Fixed settings.py - Replace all emoji characters with ASCII equivalents
-
 import os
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'

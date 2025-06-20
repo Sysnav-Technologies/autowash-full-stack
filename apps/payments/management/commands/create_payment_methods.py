@@ -1,5 +1,3 @@
-# apps/payments/management/commands/create_payment_methods.py
-
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django_tenants.utils import get_tenant_model, schema_context, get_public_schema_name

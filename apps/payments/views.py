@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -187,9 +188,23 @@ def payment_detail_view(request, payment_id):
 
 @login_required
 @employee_required()
+def payment_receipt_view(request, payment_id):
+    """Generate payment receipt"""
+    payment = get_object_or_404(Payment, payment_id=payment_id)
+    
+    context = {
+        'payment': payment,
+        'title': f'Receipt - {payment.payment_id}'
+    }
+    
+    return render(request, 'payments/receipt.html', context)
+
+@login_required
+@employee_required()
 def process_payment_view(request, order_id=None):
-    """Process payment for service order"""
+    """Process payment for service order with proper URL handling"""
     from apps.services.models import ServiceOrder
+    from decimal import Decimal
     
     service_order = None
     if order_id:
@@ -197,27 +212,84 @@ def process_payment_view(request, order_id=None):
     
     if request.method == 'POST':
         payment_method_id = request.POST.get('payment_method')
+        
+        if not payment_method_id:
+            messages.error(request, 'Please select a payment method.')
+            return render(request, 'payments/process_payment.html', {
+                'service_order': service_order,
+                'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                'title': 'Process Payment'
+            })
+            
         payment_method = get_object_or_404(PaymentMethod, id=payment_method_id)
         
         try:
+            amount = Decimal(str(request.POST.get('amount', 0)))
+        except (ValueError, TypeError):
+            messages.error(request, 'Please enter a valid amount.')
+            return render(request, 'payments/process_payment.html', {
+                'service_order': service_order,
+                'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                'title': 'Process Payment'
+            })
+        
+        payment_type = request.POST.get('payment_type', 'full')
+        
+        # Validate amount
+        if amount <= 0:
+            messages.error(request, 'Payment amount must be greater than zero.')
+            return render(request, 'payments/process_payment.html', {
+                'service_order': service_order,
+                'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                'title': 'Process Payment'
+            })
+        
+        # Validate amount for partial payments
+        if service_order:
+            balance_due = getattr(service_order, 'balance_due', service_order.total_amount)
+            if payment_type == 'partial' and amount > balance_due:
+                messages.error(request, f'Payment amount (KES {amount}) cannot exceed remaining balance (KES {balance_due}).')
+                return render(request, 'payments/process_payment.html', {
+                    'service_order': service_order,
+                    'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                    'title': 'Process Payment'
+                })
+            elif payment_type == 'full' and amount != balance_due:
+                messages.error(request, f'For full payment, amount must be KES {balance_due}.')
+                return render(request, 'payments/process_payment.html', {
+                    'service_order': service_order,
+                    'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                    'title': 'Process Payment'
+                })
+        
+        try:
             with transaction.atomic():
-                # Create payment record
-                payment = Payment.objects.create(
-                    service_order=service_order,
-                    customer=service_order.customer if service_order else None,
-                    payment_method=payment_method,
-                    amount=request.POST.get('amount'),
-                    description=request.POST.get('description', ''),
-                    customer_phone=request.POST.get('customer_phone', ''),
-                    customer_email=request.POST.get('customer_email', ''),
-                    processed_by=request.employee,
-                    created_by=request.user
-                )
+                # Create payment record - removed is_partial_payment field
+                payment_data = {
+                    'service_order': service_order,
+                    'customer': service_order.customer if service_order else None,
+                    'payment_method': payment_method,
+                    'amount': amount,
+                    'description': request.POST.get('description', f'Payment for {service_order.order_number}' if service_order else 'Manual payment'),
+                    'customer_phone': request.POST.get('customer_phone', ''),
+                    'customer_email': request.POST.get('customer_email', ''),
+                    'processed_by': request.employee,
+                    'created_by': request.user
+                }
+                
+                payment = Payment.objects.create(**payment_data)
+                
+                # Add metadata for partial payments using the metadata field
+                if service_order and payment_type == 'partial':
+                    payment.metadata = payment.metadata or {}
+                    payment.metadata['is_partial_payment'] = True
+                    payment.metadata['payment_type'] = 'partial'
+                    payment.save()
                 
                 # Get tenant slug for proper URL routing
                 tenant_slug = request.tenant.slug
                 
-                # Process based on payment method type with proper business slug
+                # Process based on payment method type
                 if payment_method.method_type == 'cash':
                     return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/cash/')
                 elif payment_method.method_type == 'card':
@@ -225,17 +297,21 @@ def process_payment_view(request, order_id=None):
                 elif payment_method.method_type == 'mpesa':
                     return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/mpesa/')
                 else:
-                    # Default to manual processing
+                    # Default to manual processing for other methods
                     payment.status = 'completed'
                     payment.completed_at = timezone.now()
                     payment.save()
                     
+                    # Update service order payment status if applicable
+                    if service_order and hasattr(service_order, 'update_payment_status'):
+                        service_order.update_payment_status()
+                    
                     messages.success(request, f'Payment {payment.payment_id} processed successfully!')
-                    # ✅ Fixed payment details redirect with business slug
-                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/')
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/receipt/')
                     
         except Exception as e:
             messages.error(request, f'Error processing payment: {str(e)}')
+            logger.error(f"Payment processing error: {e}")
     
     # Get active payment methods
     payment_methods = PaymentMethod.objects.filter(is_active=True).order_by('display_order')
@@ -247,46 +323,212 @@ def process_payment_view(request, order_id=None):
     }
     
     return render(request, 'payments/process_payment.html', context)
+
 @login_required
 @employee_required()
-def process_cash_payment_view(request, payment_id):
-    """Process cash payment"""
+def payment_success_view(request, payment_id):
+    """Payment success page with receipt option"""
     payment = get_object_or_404(Payment, payment_id=payment_id)
     
-    if request.method == 'POST':
-        form = CashPaymentForm(request.POST)
-        if form.is_valid():
-            try:
-                with transaction.atomic():
-                    # Create cash transaction details
-                    cash_details = CashTransaction.objects.create(
-                        payment=payment,
-                        amount_tendered=form.cleaned_data['amount_tendered'],
-                        change_given=form.cleaned_data['change_given'],
-                        cashier=request.employee,
-                        **{f"notes_{denom}": form.cleaned_data.get(f'notes_{denom}', 0) for denom in ['1000', '500', '200', '100', '50']},
-                        **{f"coins_{denom}": form.cleaned_data.get(f'coins_{denom}', 0) for denom in ['40', '20', '10', '5', '1']}
-                    )
-                    
-                    # Complete payment
-                    payment.complete_payment(user=request.user)
-                    
-                    messages.success(request, f'Cash payment {payment.payment_id} completed successfully!')
-                    return redirect('payments:detail', payment_id=payment.payment_id)
-                    
-            except Exception as e:
-                messages.error(request, f'Error processing cash payment: {str(e)}')
-    else:
-        # Pre-fill form with payment amount
-        initial_data = {
-            'amount_tendered': payment.amount,
-            'change_given': 0
-        }
-        form = CashPaymentForm(initial=initial_data)
+    if payment.status not in ['completed', 'verified']:
+        messages.warning(request, 'Payment is not yet completed.')
+        return redirect('payments:detail', payment_id=payment_id)
     
     context = {
         'payment': payment,
-        'form': form,
+        'show_receipt_options': True,
+        'title': f'Payment Successful - {payment.payment_id}'
+    }
+    
+    return render(request, 'payments/payment_success.html', context)
+
+# Partial Payment Processing Views
+@login_required
+@employee_required()
+def process_partial_payment(request, partial_id):
+    """Process a specific partial payment"""
+    payment = get_object_or_404(Payment, payment_id=partial_id)
+    
+    if not payment.service_order:
+        messages.error(request, 'Invalid partial payment - no associated service order.')
+        return redirect('payments:list')
+    
+    service_order = payment.service_order
+    
+    # Redirect based on payment method
+    tenant_slug = request.tenant.slug
+    
+    if payment.payment_method.method_type == 'cash':
+        return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/cash/')
+    elif payment.payment_method.method_type == 'card':
+        return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/card/')
+    elif payment.payment_method.method_type == 'mpesa':
+        return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/mpesa/')
+    else:
+        # Complete other payment methods immediately
+        try:
+            payment.status = 'completed'
+            payment.completed_at = timezone.now()
+            payment.save()
+            
+            # Update service order payment status
+            service_order.update_payment_status()
+            
+            messages.success(request, f'Partial payment {payment.payment_id} completed successfully!')
+            return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/receipt/')
+        except Exception as e:
+            messages.error(request, f'Error completing payment: {str(e)}')
+            return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/')
+
+@login_required
+@employee_required()
+def create_partial_payment_view(request, payment_id):
+    """Create a partial payment for remaining balance"""
+    original_payment = get_object_or_404(Payment, payment_id=payment_id)
+    service_order = original_payment.service_order
+    
+    if not service_order or service_order.balance_due <= 0:
+        messages.error(request, 'No remaining balance for partial payment.')
+        return redirect('payments:detail', payment_id=payment_id)
+    
+    if request.method == 'POST':
+        payment_method_id = request.POST.get('payment_method')
+        amount = Decimal(request.POST.get('amount', 0))
+        
+        if amount > service_order.balance_due:
+            messages.error(request, 'Payment amount cannot exceed remaining balance.')
+            return redirect('payments:partial_payment', payment_id=payment_id)
+        
+        try:
+            with transaction.atomic():
+                # Create new partial payment
+                payment = Payment.objects.create(
+                    service_order=service_order,
+                    customer=service_order.customer,
+                    payment_method_id=payment_method_id,
+                    amount=amount,
+                    description=f'Partial payment for {service_order.order_number}',
+                    customer_phone=request.POST.get('customer_phone', ''),
+                    customer_email=request.POST.get('customer_email', ''),
+                    processed_by=request.employee,
+                    created_by=request.user,
+                    is_partial_payment=True,
+                    parent_payment=original_payment
+                )
+                
+                # Redirect to appropriate payment processing
+                tenant_slug = request.tenant.slug
+                payment_method = payment.payment_method
+                
+                if payment_method.method_type == 'cash':
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/cash/')
+                elif payment_method.method_type == 'card':
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/card/')
+                elif payment_method.method_type == 'mpesa':
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/mpesa/')
+                else:
+                    payment.complete_payment(user=request.user)
+                    messages.success(request, f'Partial payment {payment.payment_id} processed successfully!')
+                    return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/')
+                    
+        except Exception as e:
+            messages.error(request, f'Error processing partial payment: {str(e)}')
+    
+    # Get active payment methods
+    payment_methods = PaymentMethod.objects.filter(is_active=True).order_by('display_order')
+    
+    context = {
+        'original_payment': original_payment,
+        'service_order': service_order,
+        'payment_methods': payment_methods,
+        'max_amount': service_order.balance_due,
+        'title': f'Partial Payment - {service_order.order_number}'
+    }
+    
+    return render(request, 'payments/partial_payment.html', context)
+@login_required
+@employee_required()
+def partial_payment_history(request, order_id):
+    """View all partial payments for a service order"""
+    from apps.services.models import ServiceOrder
+    
+    service_order = get_object_or_404(ServiceOrder, pk=order_id)
+    
+    # Get all payments for this order
+    payments = Payment.objects.filter(
+        service_order=service_order
+    ).select_related('payment_method', 'processed_by').order_by('-created_at')
+    
+    # Calculate payment summary
+    total_paid = payments.filter(status__in=['completed', 'verified']).aggregate(
+        total=Sum('amount')
+    )['total'] or 0
+    
+    context = {
+        'service_order': service_order,
+        'payments': payments,
+        'total_paid': total_paid,
+        'balance_due': service_order.balance_due,
+        'title': f'Payment History - {service_order.order_number}'
+    }
+    
+    return render(request, 'payments/partial_payment_history.html', context)
+@login_required
+@employee_required()
+def process_cash_payment_view(request, payment_id):
+    """Process cash payment with success redirect"""
+    payment = get_object_or_404(Payment, payment_id=payment_id)
+    
+    if request.method == 'POST':
+        try:
+            # Get form data directly from POST (no form class needed)
+            amount_tendered = Decimal(str(request.POST.get('amount_tendered', 0)))
+            change_given = Decimal(str(request.POST.get('change_given', 0)))
+            
+            # Validate amounts
+            if amount_tendered < payment.amount:
+                messages.error(request, 'Amount tendered cannot be less than payment amount.')
+                return render(request, 'payments/process_cash.html', {
+                    'payment': payment,
+                    'title': f'Cash Payment - {payment.payment_id}'
+                })
+            
+            with transaction.atomic():
+                # Create cash transaction details
+                cash_details = CashTransaction.objects.create(
+                    payment=payment,
+                    amount_tendered=amount_tendered,
+                    change_given=change_given,
+                    cashier=request.employee,
+                    till_number=request.POST.get('till_number', ''),
+                    # Denomination breakdown (all default to 0 if not provided)
+                    notes_1000=int(request.POST.get('notes_1000', 0) or 0),
+                    notes_500=int(request.POST.get('notes_500', 0) or 0),
+                    notes_200=int(request.POST.get('notes_200', 0) or 0),
+                    notes_100=int(request.POST.get('notes_100', 0) or 0),
+                    notes_50=int(request.POST.get('notes_50', 0) or 0),
+                    coins_40=int(request.POST.get('coins_40', 0) or 0),
+                    coins_20=int(request.POST.get('coins_20', 0) or 0),
+                    coins_10=int(request.POST.get('coins_10', 0) or 0),
+                    coins_5=int(request.POST.get('coins_5', 0) or 0),
+                    coins_1=int(request.POST.get('coins_1', 0) or 0),
+                )
+                
+                # Complete payment
+                payment.complete_payment(user=request.user)
+                
+                messages.success(request, f'Cash payment {payment.payment_id} completed successfully!')
+                
+                # Redirect to receipt with print option
+                return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/receipt/?print=true')
+                
+        except (ValueError, TypeError) as e:
+            messages.error(request, 'Invalid amount entered. Please check your input.')
+        except Exception as e:
+            messages.error(request, f'Error processing cash payment: {str(e)}')
+    
+    context = {
+        'payment': payment,
         'title': f'Cash Payment - {payment.payment_id}'
     }
     
@@ -295,7 +537,7 @@ def process_cash_payment_view(request, payment_id):
 @login_required
 @employee_required()
 def process_mpesa_payment_view(request, payment_id):
-    """Process M-Pesa payment"""
+    """Process M-Pesa payment with proper success handling"""
     payment = get_object_or_404(Payment, payment_id=payment_id)
     
     if request.method == 'POST':
@@ -327,7 +569,7 @@ def process_mpesa_payment_view(request, payment_id):
                 
                 if success:
                     messages.success(request, result['customer_message'])
-                    return redirect('payments:mpesa_status', payment_id=payment.payment_id)
+                    return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/status/')
                 else:
                     messages.error(request, f'M-Pesa payment failed: {result}')
                     

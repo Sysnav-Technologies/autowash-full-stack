@@ -1,0 +1,567 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Receipt - {{ payment.payment_id }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Receipt Container */
+.receipt-container {
+    max-width: 320px;
+    margin: 20px auto;
+    background: white;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Receipt Paper */
+.receipt {
+    width: 100%;
+    background: white;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 15px 20px;
+    color: #333;
+}
+
+/* Receipt Header */
+.receipt-header {
+    text-align: center;
+    border-bottom: 1px dashed #ccc;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+
+.business-name {
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    letter-spacing: 1px;
+}
+
+.business-info {
+    font-size: 10px;
+    line-height: 1.3;
+    color: #666;
+}
+
+/* Receipt Info */
+.receipt-info {
+    margin-bottom: 15px;
+    font-size: 11px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+/* Items Section */
+.items-section {
+    border-bottom: 1px dashed #ccc;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+.item-header {
+    font-weight: bold;
+    border-bottom: 1px solid #333;
+    padding-bottom: 3px;
+    margin-bottom: 8px;
+    font-size: 11px;
+}
+
+.item-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 11px;
+}
+
+.item-name {
+    flex: 1;
+    padding-right: 10px;
+}
+
+.item-amount {
+    font-weight: bold;
+    min-width: 60px;
+    text-align: right;
+}
+
+/* Totals Section */
+.totals-section {
+    border-bottom: 1px dashed #ccc;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11px;
+}
+
+.total-row.grand-total {
+    font-weight: bold;
+    font-size: 14px;
+    border-top: 1px solid #333;
+    padding-top: 5px;
+    margin-top: 8px;
+}
+
+/* Payment Details */
+.payment-details {
+    margin-bottom: 15px;
+    font-size: 11px;
+}
+
+.payment-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+/* Payment Messages */
+.payment-message {
+    text-align: center;
+    padding: 8px;
+    border-radius: 4px;
+    margin: 8px 0;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.message-partial {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px dashed #fcd34d;
+}
+
+.message-complete {
+    background: #d4edda;
+    color: #155724;
+    border: 1px dashed #a7f3d0;
+}
+
+/* Payment History */
+.payment-history {
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    border-radius: 4px;
+    padding: 6px;
+    margin: 6px 0;
+    font-size: 10px;
+}
+
+.payment-history-header {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.payment-history-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: 1px dotted #ccc;
+}
+
+.payment-history-item:last-child {
+    border-bottom: none;
+}
+
+.payment-current {
+    background: #e7f3ff;
+    font-weight: bold;
+}
+
+/* Status Indicators */
+.status-paid {
+    background: #d4edda;
+    color: #155724;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.status-partial {
+    background: #fff3cd;
+    color: #856404;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Footer */
+.receipt-footer {
+    text-align: center;
+    font-size: 10px;
+    color: #666;
+    border-top: 1px dashed #ccc;
+    padding-top: 15px;
+    line-height: 1.3;
+}
+
+.thank-you {
+    font-weight: bold;
+    font-size: 12px;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+/* Barcode */
+.barcode-section {
+    text-align: center;
+    margin: 15px 0;
+    padding: 10px 0;
+    border-top: 1px dashed #ccc;
+    border-bottom: 1px dashed #ccc;
+}
+
+.barcode {
+    font-family: 'Libre Barcode 128', monospace;
+    font-size: 24px;
+    text-align: center;
+    margin: 10px 0;
+    letter-spacing: 1px;
+}
+
+/* Dotted Lines */
+.dotted-line {
+    border-bottom: 1px dashed #ccc;
+    margin: 8px 0;
+}
+
+.double-line {
+    border-bottom: 2px solid #333;
+    margin: 5px 0;
+}
+
+/* Action Buttons */
+.action-buttons {
+    padding: 20px;
+    background: #f8f9fa;
+    text-align: center;
+    border-top: 1px solid #eee;
+}
+
+.btn-receipt {
+    margin: 0 5px;
+    padding: 8px 16px;
+    font-size: 12px;
+}
+
+/* Print Styles */
+@media print {
+    body * { visibility: hidden; }
+    .receipt-container, .receipt-container * { visibility: visible; }
+    .receipt-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm;
+        max-width: none;
+        margin: 0;
+        box-shadow: none;
+        border-radius: 0;
+    }
+    .action-buttons { display: none !important; }
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+    .receipt-container {
+        margin: 10px;
+        max-width: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Action Buttons -->
+<div class="action-buttons no-print">
+    <button onclick="window.print()" class="btn btn-primary btn-receipt">
+        <i class="fas fa-print"></i> Print
+    </button>
+    <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/" class="btn btn-outline-secondary btn-receipt">
+        <i class="fas fa-arrow-left"></i> Back
+    </a>
+</div>
+
+<div class="receipt-container">
+    <div class="receipt">
+        <!-- Header -->
+        <div class="receipt-header">
+            <div class="business-name">{{ request.tenant.name|default:"AUTOWASH SERVICES" }}</div>
+            <div class="business-info">
+                {{ request.tenant.address|default:"123 Main Street" }}<br>
+                {{ request.tenant.city|default:"Nairobi" }}, {{ request.tenant.country|default:"Kenya" }}<br>
+                Tel: {{ request.tenant.phone|default:"+254 700 000 000" }}<br>
+                {% if request.tenant.email %}Email: {{ request.tenant.email }}<br>{% endif %}
+                {% if request.tenant.tax_number %}VAT: {{ request.tenant.tax_number }}{% endif %}
+            </div>
+        </div>
+
+        <!-- Receipt Info -->
+        <div class="receipt-info">
+            <div class="info-row">
+                <span>Receipt #:</span>
+                <span>{{ payment.payment_id }}</span>
+            </div>
+            <div class="info-row">
+                <span>Date/Time:</span>
+                <span>{{ payment.completed_at|date:"d/m/Y H:i"|default:payment.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            <div class="info-row">
+                <span>Cashier:</span>
+                <span>{{ payment.processed_by.user.get_full_name|default:"CASHIER" }}</span>
+            </div>
+            {% if payment.customer %}
+            <div class="info-row">
+                <span>Customer:</span>
+                <span>{{ payment.customer.display_name|upper }}</span>
+            </div>
+            {% endif %}
+            {% if payment.service_order %}
+            <div class="info-row">
+                <span>Order #:</span>
+                <span>{{ payment.service_order.order_number }}</span>
+            </div>
+            {% if payment.service_order.vehicle %}
+            <div class="info-row">
+                <span>Vehicle:</span>
+                <span>{{ payment.service_order.vehicle.registration_number|upper }}</span>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Services -->
+        {% if payment.service_order and payment.service_order.order_items.exists %}
+        <div class="items-section">
+            <div class="item-header">SERVICES RENDERED</div>
+            {% for item in payment.service_order.order_items.all %}
+            <div class="item-row">
+                <div class="item-name">{{ item.service.name|upper }}{% if item.quantity > 1 %} x{{ item.quantity }}{% endif %}</div>
+                <div class="item-amount">{{ item.total_price|floatformat:2 }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Order Totals -->
+        {% if payment.service_order %}
+        <div class="totals-section">
+            <div class="total-row">
+                <span>Services Subtotal:</span>
+                <span>KES {{ payment.service_order.subtotal|floatformat:2 }}</span>
+            </div>
+            {% if payment.service_order.discount_amount > 0 %}
+            <div class="total-row">
+                <span>Discount:</span>
+                <span>-KES {{ payment.service_order.discount_amount|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            {% if payment.service_order.tax_amount > 0 %}
+            <div class="total-row">
+                <span>VAT (16%):</span>
+                <span>KES {{ payment.service_order.tax_amount|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="total-row">
+                <span><strong>Order Total:</strong></span>
+                <span><strong>KES {{ payment.service_order.total_amount|floatformat:2 }}</strong></span>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Payment Breakdown -->
+        {% if payment.service_order %}
+        {% with all_payments=payment.service_order.get_completed_payments %}
+        <div class="payment-details">
+            {% if all_payments.count > 1 %}
+            <!-- Multiple Payments -->
+            <div class="payment-history">
+                <div class="payment-history-header">PAYMENT HISTORY</div>
+                {% for pay in all_payments %}
+                <div class="payment-history-item {% if pay.payment_id == payment.payment_id %}payment-current{% endif %}">
+                    <span>{{ pay.created_at|date:"M d" }} - {{ pay.payment_method.name }}{% if pay.payment_id == payment.payment_id %} (THIS){% endif %}:</span>
+                    <span>KES {{ pay.amount|floatformat:2 }}</span>
+                </div>
+                {% endfor %}
+                <div class="dotted-line"></div>
+                <div class="payment-history-item" style="font-weight: bold;">
+                    <span>TOTAL PAID:</span>
+                    <span>KES {{ payment.service_order.total_paid|floatformat:2 }}</span>
+                </div>
+            </div>
+            {% else %}
+            <!-- Single Payment -->
+            <div class="payment-row">
+                <span>Payment Amount:</span>
+                <span><strong>KES {{ payment.amount|floatformat:2 }}</strong></span>
+            </div>
+            {% endif %}
+
+            <!-- Payment Method Details -->
+            <div class="payment-row">
+                <span>Payment Method:</span>
+                <span>{{ payment.payment_method.name|upper }}</span>
+            </div>
+            
+            <!-- Cash Details -->
+            {% if payment.payment_method.method_type == 'cash' and payment.cash_details %}
+            <div class="payment-row">
+                <span>Amount Tendered:</span>
+                <span>KES {{ payment.cash_details.amount_tendered|floatformat:2 }}</span>
+            </div>
+            <div class="payment-row">
+                <span>Change Given:</span>
+                <span>KES {{ payment.cash_details.change_given|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            
+            <!-- M-Pesa Details -->
+            {% if payment.payment_method.method_type == 'mpesa' and payment.mpesa_details %}
+            <div class="payment-row">
+                <span>M-Pesa Number:</span>
+                <span>{{ payment.mpesa_details.phone_number }}</span>
+            </div>
+            {% if payment.mpesa_details.mpesa_receipt_number %}
+            <div class="payment-row">
+                <span>M-Pesa Receipt:</span>
+                <span>{{ payment.mpesa_details.mpesa_receipt_number }}</span>
+            </div>
+            {% endif %}
+            {% endif %}
+
+            <!-- Payment Status & Balance -->
+            {% if payment.service_order.remaining_balance > 0 %}
+            <div class="dotted-line"></div>
+            <div class="payment-row">
+                <span><strong>Balance Due:</strong></span>
+                <span><strong>KES {{ payment.service_order.remaining_balance|floatformat:2 }}</strong></span>
+            </div>
+            <div class="payment-row">
+                <span>Status:</span>
+                <span class="status-partial">PARTIAL PAYMENT</span>
+            </div>
+            
+            <div class="payment-message message-partial">
+                ⚠️ PARTIAL PAYMENT RECEIVED<br>
+                Please pay remaining balance:<br>
+                <strong>KES {{ payment.service_order.remaining_balance|floatformat:2 }}</strong>
+            </div>
+            {% else %}
+            <div class="dotted-line"></div>
+            <div class="payment-row">
+                <span>Status:</span>
+                <span class="status-paid">FULLY PAID</span>
+            </div>
+            
+            <div class="payment-message message-complete">
+                ✅ PAYMENT COMPLETE<br>
+            </div>
+            {% endif %}
+        </div>
+        {% endwith %}
+        {% else %}
+        <!-- Standalone Payment (No Service Order) -->
+        <div class="payment-details">
+            <div class="payment-row">
+                <span>Payment Amount:</span>
+                <span><strong>KES {{ payment.amount|floatformat:2 }}</strong></span>
+            </div>
+            <div class="payment-row">
+                <span>Payment Method:</span>
+                <span>{{ payment.payment_method.name|upper }}</span>
+            </div>
+            <div class="payment-row">
+                <span>Status:</span>
+                <span class="status-paid">COMPLETED</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Barcode -->
+        <div class="barcode-section">
+            <div class="barcode">{{ payment.payment_id }}</div>
+            <div style="font-size: 10px; color: #666;">{{ payment.payment_id }}</div>
+        </div>
+
+        <!-- Footer -->
+        <div class="receipt-footer">
+            <div class="thank-you">THANK YOU FOR YOUR BUSINESS!</div>
+            <div>
+                Service Excellence Guaranteed<br>
+                Visit us again soon!<br>
+                <br>
+                Follow us: @{{ request.tenant.slug|default:"autowash" }}<br>
+                Support: {{ request.tenant.phone|default:"+254 700 000 000" }}
+            </div>
+            <div class="dotted-line"></div>
+            <div style="font-size: 9px; color: #999;">
+                Printed: {{ "now"|date:"d/m/Y H:i" }}<br>
+                Receipt is valid for 30 days<br>
+                Keep this receipt for warranty claims
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Continue Button -->
+<div class="action-buttons no-print">
+    {% if payment.service_order %}
+    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ payment.service_order.id }}/" class="btn btn-primary btn-receipt">
+        <i class="fas fa-eye"></i> View Order
+    </a>
+    {% if payment.service_order.remaining_balance > 0 %}
+    <a href="/business/{{ request.tenant.slug }}/payments/partial/create/{{ payment.service_order.id }}/" class="btn btn-warning btn-receipt">
+        <i class="fas fa-plus"></i> Pay Balance (KES {{ payment.service_order.remaining_balance|floatformat:2 }})
+    </a>
+    {% endif %}
+    {% endif %}
+    <a href="/business/{{ request.tenant.slug }}/payments/" class="btn btn-outline-secondary btn-receipt">
+        <i class="fas fa-list"></i> All Payments
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-print on load if requested
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('print') === 'true') {
+    setTimeout(() => {
+        window.print();
+    }, 500);
+}
+
+// Receipt data for external integrations
+window.receiptData = {
+    payment_id: "{{ payment.payment_id }}",
+    amount: {{ payment.amount }},
+    customer: "{{ payment.customer.display_name|default:'' }}",
+    date: "{{ payment.completed_at|date:'c'|default:payment.created_at|date:'c' }}",
+    method: "{{ payment.payment_method.name }}",
+    {% if payment.service_order %}
+    order_total: {{ payment.service_order.total_amount }},
+    total_paid: {{ payment.service_order.total_paid }},
+    remaining_balance: {{ payment.service_order.remaining_balance }},
+    is_partial: {{ payment.service_order.remaining_balance|yesno:"true,false" }}
+    {% endif %}
+};
+
+console.log('Receipt Data:', window.receiptData);
+</script>
+{% endblock %}

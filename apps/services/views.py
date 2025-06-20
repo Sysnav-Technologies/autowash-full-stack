@@ -13,6 +13,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from apps.core.decorators import employee_required, ajax_required, owner_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
+from apps.payments.models import Payment
 from .models import (
     Service, ServiceCategory, ServicePackage, ServiceOrder, 
     ServiceOrderItem, ServiceQueue, ServiceBay
@@ -616,13 +617,28 @@ def order_detail_view(request, pk):
         role__in=['attendant', 'supervisor'],
         is_active=True
     )
-    
+
+    # Get latest completed payment for this order
+    payment = None
+    payment_id = None
+    try:
+        payment = Payment.objects.filter(
+            service_order=order,
+            status__in=['completed', 'verified']
+        ).order_by('-completed_at').first()
+        payment_id = payment.payment_id if payment else None
+    except ImportError:
+        payment = None
+        payment_id = None
+
     context = {
         'order': order,
         'order_items': order_items,
         'queue_entry': queue_entry,
         'available_bays': available_bays,
         'available_attendants': available_attendants,
+        'payment': payment,
+        'payment_id': payment_id,
         'title': f'Order {order.order_number}'
     }
     return render(request, 'services/order_detail.html', context)

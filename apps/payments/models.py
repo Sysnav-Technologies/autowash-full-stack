@@ -1,5 +1,3 @@
-# apps/payments/models.py - COMPLETE FIXED VERSION
-
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -119,7 +117,7 @@ class PaymentMethod(TimeStampedModel):
         ordering = ['display_order', 'name']
 
 class Payment(TimeStampedModel):
-    """Payment transactions - FIXED to remove User FKs"""
+    """Payment transactions - UPDATED with metadata field"""
     
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -206,9 +204,31 @@ class Payment(TimeStampedModel):
     created_by_user_id = models.IntegerField(null=True, blank=True, help_text="User ID from public schema")
     updated_by_user_id = models.IntegerField(null=True, blank=True, help_text="User ID from public schema")
     
+    # ADDED: Metadata field for storing additional payment information
+    metadata = models.JSONField(
+        default=dict, 
+        blank=True, 
+        help_text="Additional payment metadata (partial payments, custom data, etc.)"
+    )
+    
+    # ADDED: Partial payment support fields
+    is_partial_payment = models.BooleanField(
+        default=False, 
+        help_text="Indicates if this is a partial payment"
+    )
+    parent_payment = models.ForeignKey(
+        'self', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='child_payments',
+        help_text="Reference to original payment if this is a follow-up partial payment"
+    )
+    
     def __str__(self):
         customer_name = self.customer.display_name if self.customer else "No Customer"
-        return f"Payment {self.payment_id} - {customer_name} - KES {self.amount}"
+        partial_indicator = " (Partial)" if self.is_partial_payment else ""
+        return f"Payment {self.payment_id} - {customer_name} - KES {self.amount}{partial_indicator}"
     
     def save(self, *args, **kwargs):
         # Generate payment ID if not set
@@ -273,6 +293,38 @@ class Payment(TimeStampedModel):
             total=models.Sum('amount')
         )['total'] or Decimal('0')
     
+    @property
+    def payment_type_display(self):
+        """Get display name for payment type including partial payment info"""
+        if self.is_partial_payment:
+            if self.metadata and self.metadata.get('payment_sequence'):
+                sequence = self.metadata.get('payment_sequence')
+                return f"Partial Payment #{sequence}"
+            return "Partial Payment"
+        return self.get_payment_type_display()
+    
+    def get_all_related_payments(self):
+        """Get all payments related to the same service order"""
+        if not self.service_order:
+            return Payment.objects.filter(id=self.id)
+        
+        return Payment.objects.filter(
+            service_order=self.service_order
+        ).order_by('created_at')
+    
+    def get_remaining_balance(self):
+        """Get remaining balance for the service order"""
+        if not self.service_order:
+            return Decimal('0')
+        
+        total_paid = self.get_all_related_payments().filter(
+            status__in=['completed', 'verified']
+        ).aggregate(
+            total=models.Sum('amount')
+        )['total'] or Decimal('0')
+        
+        return self.service_order.total_amount - total_paid
+    
     def complete_payment(self, transaction_id=None, user=None):
         """Mark payment as completed"""
         from django.utils import timezone
@@ -313,7 +365,11 @@ class Payment(TimeStampedModel):
         
         try:
             if self.customer.phone and getattr(self.customer, 'receive_service_reminders', True):
-                message = f"Payment confirmed! KES {self.amount} received for order {self.service_order.order_number if self.service_order else 'N/A'}. Thank you!"
+                payment_type = "Partial payment" if self.is_partial_payment else "Payment"
+                remaining = self.get_remaining_balance()
+                balance_msg = f" Balance due: KES {remaining}" if remaining > 0 else ""
+                
+                message = f"{payment_type} confirmed! KES {self.amount} received for order {self.service_order.order_number if self.service_order else 'N/A'}.{balance_msg} Thank you!"
                 send_sms_notification(str(self.customer.phone), message)
         except Exception:
             pass  # Don't break if SMS fails
@@ -321,7 +377,8 @@ class Payment(TimeStampedModel):
         try:
             if self.customer.email and getattr(self.customer, 'receive_marketing_email', True):
                 subject = "Payment Confirmation"
-                message = f"Your payment of KES {self.amount} has been confirmed."
+                payment_type = "partial payment" if self.is_partial_payment else "payment"
+                message = f"Your {payment_type} of KES {self.amount} has been confirmed."
                 send_email_notification(subject, message, [self.customer.email])
         except Exception:
             pass  # Don't break if email fails

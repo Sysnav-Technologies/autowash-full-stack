@@ -1,5 +1,3 @@
-# Create a new file: apps/core/serializers.py
-
 import json
 import uuid
 from decimal import Decimal

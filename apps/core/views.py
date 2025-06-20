@@ -1,5 +1,3 @@
-# Create this file as: apps/core/views.py (or add to existing file)
-
 from django.http import HttpResponse
 from django.conf import settings
 from django.db import connection

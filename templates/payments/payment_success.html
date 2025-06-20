@@ -1,0 +1,181 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payment Successful - {{ payment.payment_id }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.success-container { max-width: 600px; margin: 2rem auto; text-align: center; }
+.success-icon { width: 100px; height: 100px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 2rem; }
+.success-icon i { font-size: 3rem; color: #16a34a; }
+.success-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 2rem; margin-bottom: 1.5rem; }
+.payment-details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin: 1rem 0; text-align: left; }
+.detail-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.detail-row:last-child { margin-bottom: 0; }
+.status-badge { padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; text-transform: uppercase; font-size: 0.875rem; }
+.status-completed { background: #dcfce7; color: #166534; }
+.action-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 2rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="success-container">
+    <div class="success-card">
+        <!-- Success Icon -->
+        <div class="success-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        
+        <!-- Success Message -->
+        <h2 class="text-success mb-3">Payment Successful!</h2>
+        <p class="text-muted mb-4">Your payment has been processed successfully.</p>
+        
+        <!-- Payment Details -->
+        <div class="payment-details">
+            <div class="detail-row">
+                <span>Payment ID:</span>
+                <strong>{{ payment.payment_id }}</strong>
+            </div>
+            <div class="detail-row">
+                <span>Amount:</span>
+                <strong class="text-success">KES {{ payment.amount|floatformat:2 }}</strong>
+            </div>
+            <div class="detail-row">
+                <span>Method:</span>
+                <span>{{ payment.payment_method.name }}</span>
+            </div>
+            <div class="detail-row">
+                <span>Date:</span>
+                <span>{{ payment.completed_at|date:"M d, Y H:i" }}</span>
+            </div>
+            {% if payment.transaction_id %}
+            <div class="detail-row">
+                <span>Transaction ID:</span>
+                <span>{{ payment.transaction_id }}</span>
+            </div>
+            {% endif %}
+            <div class="detail-row">
+                <span>Status:</span>
+                <span class="status-badge status-completed">{{ payment.get_status_display }}</span>
+            </div>
+        </div>
+        
+        <!-- Order Information -->
+        {% if payment.service_order %}
+        <div class="payment-details">
+            <h6 class="mb-3">Order Information</h6>
+            <div class="detail-row">
+                <span>Order Number:</span>
+                <strong>{{ payment.service_order.order_number }}</strong>
+            </div>
+            <div class="detail-row">
+                <span>Customer:</span>
+                <span>{{ payment.service_order.customer.display_name }}</span>
+            </div>
+            {% if payment.service_order.vehicle %}
+            <div class="detail-row">
+                <span>Vehicle:</span>
+                <span>{{ payment.service_order.vehicle.registration_number }}</span>
+            </div>
+            {% endif %}
+            <div class="detail-row">
+                <span>Order Total:</span>
+                <span>KES {{ payment.service_order.total_amount|floatformat:2 }}</span>
+            </div>
+            <div class="detail-row">
+                <span>Total Paid:</span>
+                <span class="text-success">KES {{ payment.service_order.paid_amount|floatformat:2 }}</span>
+            </div>
+            <div class="detail-row">
+                <span>Balance Due:</span>
+                <span class="{% if payment.service_order.balance_due > 0 %}text-warning{% else %}text-success{% endif %}">
+                    KES {{ payment.service_order.balance_due|floatformat:2 }}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/" 
+               class="btn btn-primary btn-lg">
+                <i class="fas fa-receipt me-2"></i>View Receipt
+            </a>
+            
+            <button onclick="window.print()" class="btn btn-outline-primary btn-lg">
+                <i class="fas fa-print me-2"></i>Print Receipt
+            </button>
+            
+            {% if payment.service_order %}
+            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ payment.service_order.id }}/" 
+               class="btn btn-outline-secondary btn-lg">
+                <i class="fas fa-eye me-2"></i>View Order
+            </a>
+            
+            {% if payment.service_order.balance_due > 0 %}
+            <a href="/business/{{ request.tenant.slug }}/payments/partial/create/{{ payment.service_order.id }}/" 
+               class="btn btn-warning btn-lg">
+                <i class="fas fa-plus me-2"></i>Pay Remaining Balance
+            </a>
+            {% endif %}
+            {% endif %}
+            
+            <a href="/business/{{ request.tenant.slug }}/payments/" 
+               class="btn btn-outline-secondary btn-lg">
+                <i class="fas fa-list me-2"></i>All Payments
+            </a>
+        </div>
+        
+        <!-- Next Steps -->
+        {% if payment.service_order and payment.service_order.balance_due > 0 %}
+        <div class="alert alert-warning mt-3">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Partial Payment Complete:</strong> 
+            Remaining balance of KES {{ payment.service_order.balance_due|floatformat:2 }} can be paid later.
+        </div>
+        {% elif payment.service_order and payment.service_order.balance_due == 0 %}
+        <div class="alert alert-success mt-3">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong>Payment Complete:</strong> 
+            Order is fully paid and ready for processing.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Auto-print script -->
+<script>
+// Auto-print if requested
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('print') === 'true') {
+    setTimeout(() => {
+        window.print();
+    }, 1000);
+}
+
+// Celebrate animation
+document.addEventListener('DOMContentLoaded', function() {
+    const icon = document.querySelector('.success-icon');
+    icon.style.animation = 'bounce 0.6s ease-in-out';
+    
+    // Add confetti effect (optional)
+    if (typeof confetti !== 'undefined') {
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
+    }
+});
+
+// CSS animation
+const style = document.createElement('style');
+style.textContent = `
+@keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-15px); }
+}
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

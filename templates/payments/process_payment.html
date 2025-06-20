@@ -1,4 +1,3 @@
-<!-- templates/payments/process_payment.html -->
 {% extends 'base/base.html' %}
 {% load static %}
 
@@ -6,671 +5,440 @@
 
 {% block extra_css %}
 <style>
-.payment-header {
-    background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-    border: 1px solid #0284c7;
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.payment-method-card {
-    background: white;
-    border: 2px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    cursor: pointer;
-    transition: all 0.15s ease-in-out;
-    margin-bottom: 1rem;
-    text-align: center;
-}
-
-.payment-method-card:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
-}
-
-.payment-method-card.selected {
-    border-color: #3b82f6;
-    background: #eff6ff;
-}
-
-.payment-method-card.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: #f9fafb;
-}
-
-.method-icon {
-    width: 4rem;
-    height: 4rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 1rem;
-    font-size: 1.5rem;
-    color: white;
-}
-
-.method-name {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-}
-
-.method-description {
-    font-size: 0.875rem;
-    color: #6b7280;
-    margin-bottom: 1rem;
-}
-
-.method-features {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.feature-badge {
-    background: #f3f4f6;
-    color: #374151;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.order-summary {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    position: sticky;
-    top: 2rem;
-}
-
-.summary-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #f3f4f6;
-}
-
-.summary-row:last-child {
-    border-bottom: none;
-    font-weight: 600;
-    font-size: 1.125rem;
-}
-
-.payment-form {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    margin-top: 2rem;
-    display: none;
-}
-
-.payment-form.active {
-    display: block;
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 0.5rem;
-}
-
-.form-control {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    transition: border-color 0.15s ease-in-out;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.payment-info {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.info-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.info-item:last-child {
-    margin-bottom: 0;
-}
-
-.processing-fee-info {
-    background: #fef3c7;
-    border: 1px solid #fcd34d;
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-    margin-top: 1rem;
-    font-size: 0.875rem;
-}
-
-@media (max-width: 768px) {
-    .payment-method-card {
-        margin-bottom: 0.75rem;
-    }
-    
-    .method-features {
-        justify-content: center;
-        gap: 0.5rem;
-    }
-    
-    .order-summary {
-        position: static;
-        margin-top: 1.5rem;
-    }
-}
+.payment-container { max-width: 1200px; margin: 0 auto; }
+.payment-header { background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; }
+.method-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.method-card { background: white; border: 2px solid #e5e7eb; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+.method-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
+.method-card.selected { border-color: #3b82f6; background: #eff6ff; }
+.method-icon { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white; }
+.summary-table { background: white; border: 1px solid #e5e7eb; border-radius: 8px; }
+.summary-table td, .summary-table th { padding: 0.75rem; border-bottom: 1px solid #f3f4f6; }
+.summary-table tr:last-child td { border-bottom: none; }
+.form-section { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; }
+.payment-form { display: none; }
+.payment-form.active { display: block; }
+.partial-payment { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 6px; padding: 0.75rem; margin-bottom: 1rem; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="payment-header">
-    <div class="d-flex justify-content-between align-items-start">
-        <div>
-            <h1 class="h3 mb-2">
-                <i class="fas fa-credit-card text-primary me-2"></i>
-                Process Payment
-            </h1>
-            {% if service_order %}
-            <p class="text-muted mb-0">
-                For Order: {{ service_order.order_number }} 
-                {% if service_order.customer %}
-                • Customer: {{ service_order.customer.display_name }}
+<div class="payment-container">
+    <!-- Header -->
+    <div class="payment-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h3 class="mb-1">Process Payment</h3>
+                {% if service_order %}
+                <p class="text-muted mb-0">Order: {{ service_order.order_number }} • Customer: {{ service_order.customer.display_name }}</p>
                 {% endif %}
-            </p>
-            {% else %}
-            <p class="text-muted mb-0">Create a new payment transaction</p>
-            {% endif %}
-        </div>
-        
-        <div class="d-flex gap-2">
-            {% if service_order %}
-            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ service_order.id }}/" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i>
-                Back to Order
+            </div>
+            <a href="{% if service_order %}/business/{{ request.tenant.slug }}/services/orders/{{ service_order.id }}/{% else %}/business/{{ request.tenant.slug }}/payments/list/{% endif %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back
             </a>
-            {% else %}
-            <a href="/business/{{ request.tenant.slug }}/payments/list/" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i>
-                Back to Payments
-            </a>
-            {% endif %}
         </div>
     </div>
-</div>
 
-<form method="post" id="paymentForm">
-    {% csrf_token %}
-    
-    <div class="row">
-        <div class="col-lg-8">
-            <!-- Payment Information -->
-            {% if service_order %}
-            <div class="payment-info">
-                <h5 class="mb-3">
-                    <i class="fas fa-info-circle text-primary me-2"></i>
-                    Order Information
-                </h5>
-                
-                <div class="info-item">
-                    <span>Order Number:</span>
-                    <strong>{{ service_order.order_number }}</strong>
-                </div>
-                
-                {% if service_order.customer %}
-                <div class="info-item">
-                    <span>Customer:</span>
-                    <strong>{{ service_order.customer.display_name }}</strong>
+    <form method="post" id="paymentForm">
+        {% csrf_token %}
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Order Summary -->
+                {% if service_order %}
+                <div class="form-section mb-3">
+                    <h5 class="mb-3">Order Details</h5>
+                    <table class="table summary-table">
+                        <tr>
+                            <td><strong>Order Number:</strong></td>
+                            <td>{{ service_order.order_number }}</td>
+                            <td><strong>Vehicle:</strong></td>
+                            <td>{% if service_order.vehicle %}{{ service_order.vehicle.registration_number }}{% else %}N/A{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Total Amount:</strong></td>
+                            <td class="text-success"><strong>KES {{ service_order.total_amount|floatformat:2 }}</strong></td>
+                            <td><strong>Paid Amount:</strong></td>
+                            <td class="text-info">KES {{ service_order.paid_amount|default:0|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Balance Due:</strong></td>
+                            <td class="text-warning"><strong>KES {{ service_order.balance_due|default:service_order.total_amount|floatformat:2 }}</strong></td>
+                            <td><strong>Payment Status:</strong></td>
+                            <td><span class="badge bg-{{ service_order.payment_status|default:'warning' }}">{{ service_order.get_payment_status_display|default:'Pending' }}</span></td>
+                        </tr>
+                    </table>
+                    
+                    <!-- Existing Payments -->
+                    {% if service_order.payments.exists %}
+                    <div class="partial-payment">
+                        <h6><i class="fas fa-receipt me-2"></i>Previous Payments</h6>
+                        <div class="row">
+                            {% for payment in service_order.payments.all %}
+                            <div class="col-md-6">
+                                <small>{{ payment.payment_id }} - KES {{ payment.amount|floatformat:2 }} ({{ payment.get_status_display }})</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endif %}
-                
-                {% if service_order.vehicle %}
-                <div class="info-item">
-                    <span>Vehicle:</span>
-                    <strong>{{ service_order.vehicle.registration_number }} ({{ service_order.vehicle.make }} {{ service_order.vehicle.model }})</strong>
-                </div>
-                {% endif %}
-                
-                <div class="info-item">
-                    <span>Total Amount:</span>
-                    <strong class="text-success">KES {{ service_order.total_amount|floatformat:2 }}</strong>
-                </div>
-                
-                <div class="info-item">
-                    <span>Payment Status:</span>
-                    <span class="badge bg-warning">{{ service_order.get_payment_status_display }}</span>
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- Payment Method Selection -->
-            <div class="mb-4">
-                <h5 class="mb-3">
-                    <i class="fas fa-credit-card text-primary me-2"></i>
-                    Select Payment Method
-                </h5>
-                
-                <div class="row">
-                    {% for method in payment_methods %}
-                    <div class="col-md-6 col-lg-4">
-                        <div class="payment-method-card {% if not method.is_active %}disabled{% endif %}" 
-                             onclick="selectPaymentMethod('{{ method.id }}', '{{ method.method_type }}', {{ method.is_active|yesno:'true,false' }})"
-                             data-method-id="{{ method.id }}"
-                             data-method-type="{{ method.method_type }}">
-                            
+
+                <!-- Payment Method Selection -->
+                <div class="form-section mb-3">
+                    <h5 class="mb-3">Select Payment Method</h5>
+                    {% if payment_methods %}
+                    <div class="method-grid">
+                        {% for method in payment_methods %}
+                        <div class="method-card" onclick="selectMethod('{{ method.id }}')" data-method="{{ method.id }}">
                             <div class="method-icon" style="background-color: {{ method.color }}">
                                 <i class="{{ method.icon }}"></i>
                             </div>
-                            
-                            <h6 class="method-name">{{ method.name }}</h6>
-                            
-                            <p class="method-description">{{ method.description|default:"Secure payment method"|truncatewords:8 }}</p>
-                            
-                            <div class="method-features">
-                                {% if method.is_online %}
-                                <span class="feature-badge">Online</span>
-                                {% else %}
-                                <span class="feature-badge">Offline</span>
-                                {% endif %}
-                                
-                                {% if method.processing_fee_percentage > 0 or method.fixed_processing_fee > 0 %}
-                                <span class="feature-badge">Fee: 
-                                    {% if method.processing_fee_percentage > 0 %}
-                                        {{ method.processing_fee_percentage }}%
-                                    {% endif %}
-                                    {% if method.fixed_processing_fee > 0 %}
-                                        +KES {{ method.fixed_processing_fee }}
-                                    {% endif %}
-                                </span>
-                                {% else %}
-                                <span class="feature-badge">No Fee</span>
-                                {% endif %}
-                                
-                                {% if method.requires_verification %}
-                                <span class="feature-badge">Verified</span>
-                                {% endif %}
-                            </div>
-                            
-                            {% if not method.is_active %}
-                            <div class="mt-2">
-                                <small class="text-danger">Currently unavailable</small>
+                            <h6>{{ method.name }}</h6>
+                            <small class="text-muted">{{ method.description|truncatewords:5 }}</small>
+                            {% if method.processing_fee_percentage > 0 or method.fixed_processing_fee > 0 %}
+                            <div class="mt-1">
+                                <small class="text-warning">
+                                    Fee: {% if method.processing_fee_percentage > 0 %}{{ method.processing_fee_percentage }}%{% endif %}
+                                    {% if method.fixed_processing_fee > 0 %}+KES {{ method.fixed_processing_fee }}{% endif %}
+                                </small>
                             </div>
                             {% endif %}
                         </div>
+                        {% endfor %}
                     </div>
-                    {% empty %}
-                    <div class="col-12">
-                        <div class="text-center py-4">
-                            <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
-                            <h5 class="text-muted">No Payment Methods Available</h5>
-                            <p class="text-muted">Please contact administrator to configure payment methods.</p>
-                        </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        No payment methods are currently active. Please contact administrator.
                     </div>
-                    {% endfor %}
+                    {% endif %}
                 </div>
-            </div>
-            
-            <!-- Payment Details Form -->
-            <div class="payment-form" id="paymentDetailsForm">
-                <h5 class="mb-3">
-                    <i class="fas fa-edit text-primary me-2"></i>
-                    Payment Details
-                </h5>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="amount" class="form-label">Amount *</label>
-                            <input type="number" 
-                                   class="form-control" 
-                                   id="amount" 
-                                   name="amount" 
-                                   step="0.01" 
-                                   min="0" 
-                                   value="{{ service_order.total_amount|default:'0' }}" 
-                                   required>
+
+                <!-- Payment Form -->
+                <div class="payment-form form-section" id="paymentFormSection">
+                    <h5 class="mb-3">Payment Details</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Amount *</label>
+                            <input type="number" class="form-control" name="amount" id="amount" 
+                                   value="{% if service_order %}{{ service_order.balance_due|default:service_order.total_amount }}{% else %}0{% endif %}" 
+                                   step="0.01" min="0" oninput="updatePaymentType()" required>
+                            {% if service_order %}
+                            <small class="text-muted">Balance Due: KES {{ service_order.balance_due|default:service_order.total_amount|floatformat:2 }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Type</label>
+                            <select class="form-control" name="payment_type" id="payment_type" onchange="updateAmount()">
+                                <option value="full">Full Payment</option>
+                                {% if service_order %}
+                                <option value="partial">Partial Payment</option>
+                                {% endif %}
+                            </select>
                         </div>
                     </div>
-                    
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="customer_phone" class="form-label">Customer Phone</label>
-                            <input type="tel" 
-                                   class="form-control" 
-                                   id="customer_phone" 
-                                   name="customer_phone" 
-                                   value="{{ service_order.customer.phone|default:'' }}"
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Customer Phone</label>
+                            <input type="tel" class="form-control" name="customer_phone" 
+                                   value="{% if service_order and service_order.customer and service_order.customer.phone %}{{ service_order.customer.phone }}{% endif %}"
                                    placeholder="+254712345678">
                         </div>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="customer_email" class="form-label">Customer Email</label>
-                            <input type="email" 
-                                   class="form-control" 
-                                   id="customer_email" 
-                                   name="customer_email" 
-                                   value="{{ service_order.customer.email|default:'' }}"
+                        <div class="col-md-6">
+                            <label class="form-label">Customer Email</label>
+                            <input type="email" class="form-control" name="customer_email" 
+                                   value="{% if service_order and service_order.customer and service_order.customer.email %}{{ service_order.customer.email }}{% endif %}"
                                    placeholder="customer@example.com">
                         </div>
                     </div>
-                    
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="payment_method" class="form-label">Selected Method</label>
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="selected_method_display" 
-                                   readonly 
-                                   placeholder="Please select a payment method">
-                            <input type="hidden" id="payment_method" name="payment_method">
-                        </div>
+                    <div class="mt-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" name="description" 
+                               value="{% if service_order %}Payment for {{ service_order.order_number }}{% endif %}">
                     </div>
+                    <input type="hidden" name="payment_method" id="payment_method">
                 </div>
-                
-                <div class="form-group">
-                    <label for="description" class="form-label">Description</label>
-                    <textarea class="form-control" 
-                              id="description" 
-                              name="description" 
-                              rows="3" 
-                              placeholder="Payment description...">{% if service_order %}Payment for service order {{ service_order.order_number }}{% endif %}</textarea>
-                </div>
-                
-                <!-- Processing Fee Information -->
-                <div id="processingFeeInfo" class="processing-fee-info" style="display: none;">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span>Processing Fee:</span>
-                        <strong id="processingFeeAmount">KES 0.00</strong>
+            </div>
+
+            <!-- Payment Summary -->
+            <div class="col-lg-4">
+                <div class="form-section">
+                    <h5 class="mb-3">Payment Summary</h5>
+                    <table class="table summary-table">
+                        {% if service_order %}
+                        <tr>
+                            <td>Order Total:</td>
+                            <td><strong>KES {{ service_order.total_amount|floatformat:2 }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Previous Payments:</td>
+                            <td>KES {{ service_order.paid_amount|default:0|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td>Balance Due:</td>
+                            <td class="text-warning"><strong>KES {{ service_order.balance_due|default:service_order.total_amount|floatformat:2 }}</strong></td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td>Processing Fee:</td>
+                            <td id="processing_fee">KES 0.00</td>
+                        </tr>
+                        <tr class="table-success">
+                            <td><strong>Amount to Pay:</strong></td>
+                            <td><strong id="total_amount">KES {% if service_order %}{{ service_order.balance_due|default:service_order.total_amount|floatformat:2 }}{% else %}0.00{% endif %}</strong></td>
+                        </tr>
+                    </table>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="submit" class="btn btn-success btn-lg" id="processBtn" disabled>
+                            <i class="fas fa-credit-card me-2"></i>Process Payment
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+                            <i class="fas fa-undo me-2"></i>Reset
+                        </button>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center mt-1">
-                        <span>Net Amount:</span>
-                        <strong id="netAmount">KES 0.00</strong>
+
+                    <!-- Selected Method Info -->
+                    <div id="methodInfo" class="mt-3 text-center" style="display: none;">
+                        <div id="methodIcon" class="method-icon mx-auto mb-2"></div>
+                        <h6 id="methodName"></h6>
+                        <small id="methodDesc" class="text-muted"></small>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <div class="col-lg-4">
-            <!-- Order Summary -->
-            <div class="order-summary">
-                <h5 class="mb-3">
-                    <i class="fas fa-calculator text-primary me-2"></i>
-                    Payment Summary
-                </h5>
-                
-                <div id="paymentSummary">
-                    {% if service_order %}
-                    <div class="summary-row">
-                        <span>Order Total:</span>
-                        <strong>KES {{ service_order.total_amount|floatformat:2 }}</strong>
-                    </div>
-                    
-                    {% if service_order.tax_amount > 0 %}
-                    <div class="summary-row">
-                        <span>Tax ({{ service_order.tax_percentage }}%):</span>
-                        <span>KES {{ service_order.tax_amount|floatformat:2 }}</span>
-                    </div>
-                    {% endif %}
-                    
-                    {% if service_order.discount_amount > 0 %}
-                    <div class="summary-row">
-                        <span>Discount:</span>
-                        <span class="text-success">-KES {{ service_order.discount_amount|floatformat:2 }}</span>
-                    </div>
-                    {% endif %}
-                    {% endif %}
-                    
-                    <div class="summary-row">
-                        <span>Processing Fee:</span>
-                        <span id="summaryProcessingFee">KES 0.00</span>
-                    </div>
-                    
-                    <div class="summary-row">
-                        <span>Total to Pay:</span>
-                        <strong class="text-success" id="summaryTotal">KES {{ service_order.total_amount|floatformat:2|default:'0.00' }}</strong>
-                    </div>
-                </div>
-                
-                <hr>
-                
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-success btn-lg" id="processPaymentBtn" disabled>
-                        <i class="fas fa-credit-card me-2"></i>
-                        Process Payment
-                    </button>
-                    
-                    <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
-                        <i class="fas fa-undo me-2"></i>
-                        Reset
-                    </button>
-                </div>
-                
-                <!-- Payment Method Info -->
-                <div id="selectedMethodInfo" class="mt-3" style="display: none;">
-                    <div class="text-center">
-                        <div id="methodIcon" class="method-icon mx-auto mb-2" style="width: 3rem; height: 3rem; font-size: 1rem;"></div>
-                        <h6 id="methodName" class="mb-1"></h6>
-                        <small id="methodDescription" class="text-muted"></small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</form>
+    </form>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 let selectedMethod = null;
-let paymentMethods = {};
-
-// Initialize payment methods data
-{% for method in payment_methods %}
-paymentMethods['{{ method.id }}'] = {
-    id: '{{ method.id }}',
-    name: '{{ method.name }}',
-    type: '{{ method.method_type }}',
-    description: '{{ method.description|default:"Secure payment method" }}',
-    icon: '{{ method.icon }}',
-    color: '{{ method.color }}',
-    processingFeePercentage: {{ method.processing_fee_percentage }},
-    fixedProcessingFee: {{ method.fixed_processing_fee }},
-    isActive: {{ method.is_active|yesno:'true,false' }},
-    isOnline: {{ method.is_online|yesno:'true,false' }},
-    requiresVerification: {{ method.requires_verification|yesno:'true,false' }}
+const methods = {
+    {% for method in payment_methods %}
+    '{{ method.id }}': {
+        name: '{{ method.name }}',
+        type: '{{ method.method_type }}',
+        icon: '{{ method.icon }}',
+        color: '{{ method.color }}',
+        description: '{{ method.description }}',
+        fee_percentage: {{ method.processing_fee_percentage|default:0 }},
+        fixed_fee: {{ method.fixed_processing_fee|default:0 }}
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
 };
-{% endfor %}
 
-function selectPaymentMethod(methodId, methodType, isActive) {
-    if (!isActive) {
-        showToast('This payment method is currently unavailable', 'warning');
+{% if service_order %}
+const orderBalance = {{ service_order.balance_due|default:service_order.total_amount|default:0 }};
+{% else %}
+const orderBalance = 0;
+{% endif %}
+
+function selectMethod(id) {
+    console.log('Selecting method:', id);
+    
+    // Remove previous selection
+    const allCards = document.querySelectorAll('.method-card');
+    allCards.forEach(card => card.classList.remove('selected'));
+    
+    // Select current method
+    const selectedCard = document.querySelector('[data-method="' + id + '"]');
+    if (selectedCard) {
+        selectedCard.classList.add('selected');
+    }
+    
+    // Get method data
+    selectedMethod = methods[id];
+    if (!selectedMethod) {
+        console.error('Method not found:', id);
         return;
     }
     
-    // Remove previous selection
-    document.querySelectorAll('.payment-method-card').forEach(card => {
-        card.classList.remove('selected');
-    });
-    
-    // Select current method
-    document.querySelector(`[data-method-id="${methodId}"]`).classList.add('selected');
-    
-    // Store selected method
-    selectedMethod = paymentMethods[methodId];
+    console.log('Selected method:', selectedMethod);
     
     // Update form
-    document.getElementById('payment_method').value = methodId;
-    document.getElementById('selected_method_display').value = selectedMethod.name;
+    const paymentMethodInput = document.getElementById('payment_method');
+    const paymentForm = document.getElementById('paymentFormSection');
+    const processBtn = document.getElementById('processBtn');
     
-    // Show payment form
-    document.getElementById('paymentDetailsForm').classList.add('active');
+    if (paymentMethodInput) paymentMethodInput.value = id;
+    if (paymentForm) paymentForm.classList.add('active');
+    if (processBtn) processBtn.disabled = false;
     
-    // Update processing fee
-    updateProcessingFee();
+    // Update method info display
+    updateMethodInfo();
     
-    // Update method info in summary
-    updateSelectedMethodInfo();
-    
-    // Enable submit button
-    document.getElementById('processPaymentBtn').disabled = false;
-    
-    // Scroll to form
-    document.getElementById('paymentDetailsForm').scrollIntoView({ behavior: 'smooth' });
+    // Update fees
+    updateFees();
 }
 
-function updateProcessingFee() {
+function updateMethodInfo() {
     if (!selectedMethod) return;
     
-    const amount = parseFloat(document.getElementById('amount').value) || 0;
-    const percentageFee = amount * (selectedMethod.processingFeePercentage / 100);
-    const totalFee = percentageFee + selectedMethod.fixedProcessingFee;
-    const netAmount = amount - totalFee;
-    
-    // Update processing fee info
-    const feeInfo = document.getElementById('processingFeeInfo');
-    const feeAmount = document.getElementById('processingFeeAmount');
-    const netAmountEl = document.getElementById('netAmount');
-    
-    if (totalFee > 0) {
-        feeInfo.style.display = 'block';
-        feeAmount.textContent = `KES ${totalFee.toFixed(2)}`;
-        netAmountEl.textContent = `KES ${netAmount.toFixed(2)}`;
-    } else {
-        feeInfo.style.display = 'none';
-    }
-    
-    // Update summary
-    document.getElementById('summaryProcessingFee').textContent = `KES ${totalFee.toFixed(2)}`;
-    document.getElementById('summaryTotal').textContent = `KES ${amount.toFixed(2)}`;
-}
-
-function updateSelectedMethodInfo() {
-    if (!selectedMethod) return;
-    
-    const infoDiv = document.getElementById('selectedMethodInfo');
+    const info = document.getElementById('methodInfo');
     const iconDiv = document.getElementById('methodIcon');
     const nameEl = document.getElementById('methodName');
-    const descEl = document.getElementById('methodDescription');
+    const descEl = document.getElementById('methodDesc');
     
-    iconDiv.style.backgroundColor = selectedMethod.color;
-    iconDiv.innerHTML = `<i class="${selectedMethod.icon}"></i>`;
-    nameEl.textContent = selectedMethod.name;
-    descEl.textContent = selectedMethod.description;
+    if (iconDiv) {
+        iconDiv.style.backgroundColor = selectedMethod.color;
+        iconDiv.innerHTML = '<i class="' + selectedMethod.icon + '"></i>';
+    }
+    if (nameEl) nameEl.textContent = selectedMethod.name;
+    if (descEl) descEl.textContent = selectedMethod.description;
+    if (info) info.style.display = 'block';
+}
+
+function updatePaymentType() {
+    if (!orderBalance) return;
     
-    infoDiv.style.display = 'block';
+    const amountInput = document.getElementById('amount');
+    const paymentTypeSelect = document.getElementById('payment_type');
+    
+    if (!amountInput || !paymentTypeSelect) return;
+    
+    const amount = parseFloat(amountInput.value) || 0;
+    
+    if (amount === orderBalance) {
+        paymentTypeSelect.value = 'full';
+    } else if (amount < orderBalance && amount > 0) {
+        paymentTypeSelect.value = 'partial';
+    }
+    
+    updateFees();
+}
+
+function updateAmount() {
+    if (!orderBalance) return;
+    
+    const paymentTypeSelect = document.getElementById('payment_type');
+    const amountInput = document.getElementById('amount');
+    
+    if (!paymentTypeSelect || !amountInput) return;
+    
+    const paymentType = paymentTypeSelect.value;
+    
+    if (paymentType === 'full') {
+        amountInput.value = orderBalance.toFixed(2);
+        amountInput.max = orderBalance;
+    } else if (paymentType === 'partial') {
+        amountInput.max = orderBalance;
+        if (parseFloat(amountInput.value) > orderBalance) {
+            amountInput.value = orderBalance.toFixed(2);
+        }
+    }
+    
+    updateFees();
+}
+
+function updateFees() {
+    if (!selectedMethod) return;
+    
+    const amountInput = document.getElementById('amount');
+    const processingFeeEl = document.getElementById('processing_fee');
+    const totalAmountEl = document.getElementById('total_amount');
+    const processBtn = document.getElementById('processBtn');
+    
+    if (!amountInput) return;
+    
+    const amount = parseFloat(amountInput.value) || 0;
+    const percentageFee = amount * (selectedMethod.fee_percentage / 100);
+    const totalFee = percentageFee + selectedMethod.fixed_fee;
+    
+    if (processingFeeEl) processingFeeEl.textContent = 'KES ' + totalFee.toFixed(2);
+    if (totalAmountEl) totalAmountEl.textContent = 'KES ' + amount.toFixed(2);
+    
+    // Validate amount
+    if (processBtn) {
+        if (amount > 0 && amount <= orderBalance && selectedMethod) {
+            processBtn.disabled = false;
+            processBtn.className = 'btn btn-success btn-lg';
+            processBtn.innerHTML = '<i class="fas fa-credit-card me-2"></i>Process Payment';
+        } else if (amount > orderBalance) {
+            processBtn.disabled = true;
+            processBtn.className = 'btn btn-danger btn-lg';
+            processBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Amount Exceeds Balance';
+        } else {
+            processBtn.disabled = !selectedMethod;
+            processBtn.className = 'btn btn-secondary btn-lg';
+            processBtn.innerHTML = '<i class="fas fa-credit-card me-2"></i>Process Payment';
+        }
+    }
 }
 
 function resetForm() {
-    // Clear selection
+    const allCards = document.querySelectorAll('.method-card');
+    const paymentForm = document.getElementById('paymentFormSection');
+    const methodInfo = document.getElementById('methodInfo');
+    const processBtn = document.getElementById('processBtn');
+    const amountInput = document.getElementById('amount');
+    const paymentTypeSelect = document.getElementById('payment_type');
+    
+    allCards.forEach(card => card.classList.remove('selected'));
+    if (paymentForm) paymentForm.classList.remove('active');
+    if (methodInfo) methodInfo.style.display = 'none';
+    if (processBtn) processBtn.disabled = true;
+    
     selectedMethod = null;
-    document.querySelectorAll('.payment-method-card').forEach(card => {
-        card.classList.remove('selected');
-    });
     
-    // Hide forms
-    document.getElementById('paymentDetailsForm').classList.remove('active');
-    document.getElementById('selectedMethodInfo').style.display = 'none';
-    document.getElementById('processingFeeInfo').style.display = 'none';
+    // Reset form values
+    if (orderBalance && amountInput && paymentTypeSelect) {
+        amountInput.value = orderBalance.toFixed(2);
+        paymentTypeSelect.value = 'full';
+    }
     
-    // Reset form fields
-    document.getElementById('paymentForm').reset();
-    document.getElementById('payment_method').value = '';
-    document.getElementById('selected_method_display').value = '';
-    
-    // Disable submit button
-    document.getElementById('processPaymentBtn').disabled = true;
-    
-    // Reset summary
-    document.getElementById('summaryProcessingFee').textContent = 'KES 0.00';
-    {% if service_order %}
-    document.getElementById('summaryTotal').textContent = 'KES {{ service_order.total_amount|floatformat:2 }}';
-    {% else %}
-    document.getElementById('summaryTotal').textContent = 'KES 0.00';
-    {% endif %}
+    updateFees();
 }
 
 // Event listeners
-document.getElementById('amount').addEventListener('input', updateProcessingFee);
-
-// Form submission
-document.getElementById('paymentForm').addEventListener('submit', function(e) {
-    if (!selectedMethod) {
-        e.preventDefault();
-        showToast('Please select a payment method', 'error');
-        return;
-    }
-    
-    const amount = parseFloat(document.getElementById('amount').value);
-    if (!amount || amount <= 0) {
-        e.preventDefault();
-        showToast('Please enter a valid amount', 'error');
-        return;
-    }
-    
-    // Show loading state
-    const btn = document.getElementById('processPaymentBtn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
-    btn.disabled = true;
-    
-    // Let form submit normally
-});
-
-function showToast(message, type) {
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type === 'error' ? 'danger' : type} position-fixed`;
-    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    toast.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
-    `;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-        }
-    }, 5000);
-}
-
-// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    {% if service_order %}
-    // Pre-fill amount if service order exists
-    updateProcessingFee();
-    {% endif %}
+    console.log('DOM loaded, methods:', methods);
+    
+    const amountInput = document.getElementById('amount');
+    const paymentTypeSelect = document.getElementById('payment_type');
+    const form = document.getElementById('paymentForm');
+    
+    if (amountInput) {
+        amountInput.addEventListener('input', updatePaymentType);
+    }
+    
+    if (paymentTypeSelect) {
+        paymentTypeSelect.addEventListener('change', updateAmount);
+    }
+    
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!selectedMethod) {
+                e.preventDefault();
+                alert('Please select a payment method');
+                return false;
+            }
+            
+            const amount = parseFloat(document.getElementById('amount').value);
+            if (!amount || amount <= 0) {
+                e.preventDefault();
+                alert('Please enter a valid amount');
+                return false;
+            }
+            
+            if (orderBalance && amount > orderBalance) {
+                e.preventDefault();
+                alert('Payment amount cannot exceed balance due');
+                return false;
+            }
+            
+            const btn = document.getElementById('processBtn');
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                btn.disabled = true;
+            }
+        });
+    }
+    
+    // Initialize
+    updateAmount();
 });
 </script>
 {% endblock %}

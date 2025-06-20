@@ -1,5 +1,3 @@
-# apps/core/decorators.py - Fixed for path-based tenant routing
-
 from functools import wraps
 from django.http import HttpResponseForbidden, HttpResponseRedirect
 from django.contrib.auth.decorators import login_required

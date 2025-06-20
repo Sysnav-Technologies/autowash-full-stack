@@ -1,5 +1,3 @@
-# apps/core/context_processors.py - COMPLETE FIX
-
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.models import AnonymousUser

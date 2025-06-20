@@ -339,7 +339,7 @@ class ServiceOrder(TimeStampedModel):
             self.update_payment_status()
     
     def update_payment_status(self):
-        """Update order payment status based on payments - with real-time updates"""
+        """Update order payment status based on payments - FIXED version with proper rounding"""
         try:
             from apps.payments.models import Payment
             
@@ -358,10 +358,12 @@ class ServiceOrder(TimeStampedModel):
                 # Store previous status for comparison
                 old_status = self.payment_status
                 
-                # Update payment status
-                if total_paid >= self.total_amount:
+                # FIXED: Better payment status logic with proper decimal comparison
+                remaining = self.total_amount - total_paid
+                
+                if remaining <= Decimal('0.01'):  # Account for rounding errors
                     new_status = 'paid'
-                elif total_paid > 0:
+                elif total_paid > Decimal('0'):
                     new_status = 'partial'
                 else:
                     new_status = 'pending'
@@ -448,14 +450,26 @@ class ServiceOrder(TimeStampedModel):
     
     @property
     def remaining_balance(self):
-        """Get remaining balance to be paid"""
-        return self.total_amount - self.total_paid
+        """Get remaining balance to be paid - FIXED calculation"""
+        remaining = self.total_amount - self.total_paid
+        # Ensure we don't return negative values due to rounding
+        return max(Decimal('0'), remaining)
+    
+    @property
+    def balance_due(self):
+        """Alias for remaining_balance for backward compatibility"""
+        return self.remaining_balance
+    
+    @property 
+    def paid_amount(self):
+        """Alias for total_paid for backward compatibility"""
+        return self.total_paid
     
     @property
     def payment_progress_percentage(self):
         """Get payment progress as percentage"""
         if self.total_amount > 0:
-            return min(100, (self.total_paid / self.total_amount) * 100)
+            return min(100, float((self.total_paid / self.total_amount) * 100))
         return 0
     
     @property
@@ -479,6 +493,16 @@ class ServiceOrder(TimeStampedModel):
         except ImportError:
             return None
     
+    @property
+    def is_fully_paid(self):
+        """Check if order is fully paid"""
+        return self.payment_status == 'paid'
+    
+    @property
+    def is_partially_paid(self):
+        """Check if order is partially paid"""
+        return self.payment_status == 'partial'
+    
     def get_payments(self):
         """Get all payments for this order"""
         try:
@@ -487,17 +511,54 @@ class ServiceOrder(TimeStampedModel):
         except ImportError:
             return []
     
+    def get_completed_payments(self):
+        """Get only completed/verified payments for this order"""
+        try:
+            from apps.payments.models import Payment
+            return Payment.objects.filter(
+                service_order=self,
+                status__in=['completed', 'verified']
+            ).order_by('completed_at', 'created_at')  # Order by completion date, then creation date
+        except ImportError:
+            return []
+    
+    def get_payment_breakdown(self):
+        """Get detailed payment breakdown for receipts"""
+        payments = self.get_completed_payments()
+        breakdown = []
+        
+        for payment in payments:
+            breakdown.append({
+                'date': payment.completed_at or payment.created_at,
+                'amount': payment.amount,
+                'method': payment.payment_method.name,
+                'payment_id': payment.payment_id,
+                'is_current': False  # Will be set by calling view if needed
+            })
+        
+        return {
+            'payments': breakdown,
+            'total_paid': self.total_paid,
+            'remaining_balance': self.remaining_balance,
+            'payment_count': len(breakdown),
+            'is_fully_paid': self.remaining_balance <= Decimal('0.01')
+        }
+    
     def can_process_payment(self):
         """Check if payment can be processed for this order"""
         return (
             self.status not in ['cancelled', 'no_show'] and
             self.payment_status != 'paid' and
-            self.total_amount > 0
+            self.total_amount > 0 and
+            self.remaining_balance > 0
         )
     
     def get_payment_summary(self):
-        """Get payment summary for this order"""
+        """Get comprehensive payment summary for this order"""
+        payments = self.get_completed_payments()
+        
         return {
+            'order_number': self.order_number,
             'total_amount': self.total_amount,
             'total_paid': self.total_paid,
             'remaining_balance': self.remaining_balance,
@@ -505,7 +566,33 @@ class ServiceOrder(TimeStampedModel):
             'payment_progress': self.payment_progress_percentage,
             'latest_payment_date': self.payment_date,
             'payment_method': self.get_payment_method_display() if self.payment_method else None,
+            'payment_count': payments.count(),
+            'is_fully_paid': self.is_fully_paid,
+            'is_partially_paid': self.is_partially_paid,
+            'can_process_payment': self.can_process_payment(),
         }
+    
+    def get_previous_payments_total(self, exclude_payment=None):
+        """Get total of previous payments, optionally excluding a specific payment"""
+        try:
+            from apps.payments.models import Payment
+            
+            payments = Payment.objects.filter(
+                service_order=self,
+                status__in=['completed', 'verified']
+            )
+            
+            if exclude_payment:
+                payments = payments.exclude(id=exclude_payment.id)
+            
+            total = payments.aggregate(
+                total=models.Sum('amount')
+            )['total'] or Decimal('0')
+            
+            return total
+            
+        except ImportError:
+            return Decimal('0')
     
     @property
     def duration_minutes(self):
@@ -555,10 +642,16 @@ class ServiceOrder(TimeStampedModel):
         discounted_amount = self.subtotal - self.discount_amount
         
         # Calculate tax (assuming 16% VAT for Kenya)
-        self.tax_amount = discounted_amount * Decimal('0.16')
+        tax_rate = Decimal('0.16')
+        self.tax_amount = discounted_amount * tax_rate
         
         # Calculate total
         self.total_amount = discounted_amount + self.tax_amount
+    
+    def recalculate_and_save(self):
+        """Recalculate totals and save the order"""
+        self.calculate_totals()
+        self.save()
     
     class Meta:
         verbose_name = "Service Order"
