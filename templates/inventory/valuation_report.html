@@ -1,0 +1,662 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load humanize %}
+{% load inventory_filters %}
+{% block title %}Inventory Valuation Report - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+<style>
+.valuation-summary {
+    background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
+    color: white;
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.valuation-amount {
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.valuation-label {
+    font-size: 1.125rem;
+    opacity: 0.9;
+}
+
+.category-section {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.category-header {
+    background: var(--gray-50);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.category-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.category-stats {
+    display: flex;
+    gap: 2rem;
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.toast-notification {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 1000;
+    min-width: 300px;
+    border-left: 4px solid var(--primary-500);
+}
+
+.toast-success {
+    border-left-color: var(--success-500);
+}
+
+.toast-error {
+    border-left-color: var(--danger-500);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+@media print {
+    .filter-controls,
+    .page-actions,
+    .btn,
+    .dropdown {
+        display: none !important;
+    }
+    
+    .valuation-summary {
+        background: var(--gray-100) !important;
+        color: var(--gray-900) !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <div class="page-breadcrumb">
+            <a href="/business/{{ request.tenant.slug }}/inventory/" class="breadcrumb-link">Inventory</a>
+            <i class="fas fa-chevron-right"></i>
+            <a href="/business/{{ request.tenant.slug }}/inventory/reports/" class="breadcrumb-link">Reports</a>
+            <i class="fas fa-chevron-right"></i>
+            <span class="breadcrumb-current">Valuation Report</span>
+        </div>
+        <h1 class="page-title">
+            <i class="fas fa-calculator"></i>
+            Inventory Valuation Report
+        </h1>
+        <div class="page-actions">
+            <button class="btn btn-outline-primary" onclick="window.print()">
+                <i class="fas fa-print"></i>
+                Print Report
+            </button>
+            <a href="/business/{{ request.tenant.slug }}/inventory/reports/export/csv/?type=valuation" class="btn btn-outline-success">
+                <i class="fas fa-file-csv"></i>
+                Export CSV
+            </a>
+            <button class="btn btn-outline-info" onclick="exportToPDF()">
+                <i class="fas fa-file-pdf"></i>
+                Export PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Report Header -->
+<div class="valuation-summary">
+    <div class="valuation-amount">{{ total_value|currency_format }}</div>
+    <div class="valuation-label">Total Inventory Value</div>
+    <div class="mt-3">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <div class="stat-value text-white">{{ total_items|intcomma }}</div>
+                <div class="stat-label opacity-75">Total Items</div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-value text-white">{{ categories|length }}</div>
+                <div class="stat-label opacity-75">Categories</div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-value text-white">{{ report_date|date:"M d, Y" }}</div>
+                <div class="stat-label opacity-75">Report Date</div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-value text-white">{{ items_with_stock|default:total_items|intcomma }}</div>
+                <div class="stat-label opacity-75">Items in Stock</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="filter-controls mb-4">
+    <form method="GET" class="row g-3">
+        <div class="col-md-3">
+            <label class="form-label">Valuation Method</label>
+            <select name="method" class="form-select">
+                <option value="current_cost" {% if request.GET.method == 'current_cost' %}selected{% endif %}>Current Cost</option>
+                <option value="average_cost" {% if request.GET.method == 'average_cost' %}selected{% endif %}>Average Cost</option>
+                <option value="fifo" {% if request.GET.method == 'fifo' %}selected{% endif %}>FIFO</option>
+                <option value="lifo" {% if request.GET.method == 'lifo' %}selected{% endif %}>LIFO</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Include Zero Stock</label>
+            <select name="include_zero" class="form-select">
+                <option value="false" {% if request.GET.include_zero != 'true' %}selected{% endif %}>No</option>
+                <option value="true" {% if request.GET.include_zero == 'true' %}selected{% endif %}>Yes</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Category</label>
+            <select name="category" class="form-select">
+                <option value="">All Categories</option>
+                {% for category in all_categories %}
+                    <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:"s" %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <button type="submit" class="btn btn-primary d-block">
+                <i class="fas fa-filter"></i>
+                Apply Filters
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Category Breakdown -->
+{% if categories %}
+    {% for category_name, category_data in categories.items %}
+        <div class="category-section">
+            <div class="category-header">
+                <div class="category-name">
+                    <i class="fas fa-tag"></i>
+                    {{ category_name }}
+                </div>
+                <div class="category-stats">
+                    <span><strong>{{ category_data.items|length }}</strong> items</span>
+                    <span><strong>{{ category_data.total_quantity|floatformat:0 }}</strong> total quantity</span>
+                    <span><strong>{{ category_data.total_value|currency_format }}</strong> total value</span>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>SKU</th>
+                            <th>Quantity</th>
+                            <th>Unit</th>
+                            <th>Unit Cost</th>
+                            <th>Total Value</th>
+                            <th>% of Category</th>
+                            <th>Last Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item_data in category_data.items %}
+                            {% with item=item_data.item value=item_data.value %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if item.image %}
+                                            <img src="{{ item.image.url }}" alt="{{ item.name }}" class="rounded me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                                        {% else %}
+                                            <div class="bg-light rounded d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+                                                <i class="fas fa-box text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <div class="fw-bold">
+                                                <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/" class="text-decoration-none">
+                                                    {{ item.name }}
+                                                </a>
+                                            </div>
+                                            {% if item.description %}
+                                                <small class="text-muted">{{ item.description|truncatechars:50 }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <code>{{ item.sku }}</code>
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ item.current_stock }}</span>
+                                    {% if item.current_stock <= item.minimum_stock_level %}
+                                        <i class="fas fa-exclamation-triangle text-warning ms-1" title="Low stock"></i>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.unit.abbreviation }}</td>
+                                <td>{{ item.unit_cost|currency_format }}</td>
+                                <td>
+                                    <strong>{{ value|currency_format }}</strong>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                            <div class="progress-bar bg-primary" 
+                                                 style="width: {% if category_data.total_value > 0 %}{% widthratio value category_data.total_value 100 %}{% else %}0{% endif %}%">
+                                            </div>
+                                        </div>
+                                        <small>{% if category_data.total_value > 0 %}{% widthratio value category_data.total_value 100 %}{% else %}0{% endif %}%</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <small>{{ item.updated_at|date:"M d, Y" }}</small>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="5">Category Total</th>
+                            <th><strong>{{ category_data.total_value|currency_format }}</strong></th>
+                            <th>{% if total_value > 0 %}{% widthratio category_data.total_value total_value 100 %}{% else %}0{% endif %}%</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    {% endfor %}
+    
+    <!-- Summary Analytics -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie"></i>
+                        Value Distribution by Category
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="categoryChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar"></i>
+                        Top 10 Most Valuable Items
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="top-items-list">
+                        {% for item in top_valuable_items|slice:":10" %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold">{{ item.name }}</div>
+                                    <small class="text-muted">{{ item.current_stock }} {{ item.unit.abbreviation }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">{{ item.stock_value|currency_format }}</div>
+                                    <small class="text-muted">{% if total_value > 0 %}{% widthratio item.stock_value total_value 100 %}{% else %}0{% endif %}%</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detailed Summary -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-table"></i>
+                Valuation Summary
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="table-responsive">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>Total Items:</strong></td>
+                                <td class="text-end">{{ total_items|intcomma }} items</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total Categories:</strong></td>
+                                <td class="text-end">{{ categories|length }} categories</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total Inventory Value:</strong></td>
+                                <td class="text-end"><strong>{{ total_value|currency_format }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Average Item Value:</strong></td>
+                                <td class="text-end">{% if total_items > 0 %}{{ total_value|multiply:1|divide:total_items|currency_format }}{% else %}KES 0.00{% endif %}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Highest Value Category:</strong></td>
+                                <td class="text-end">
+                                    {% for cat_name, cat_data in categories.items %}
+                                        {% if forloop.first %}{{ cat_name }} ({{ cat_data.total_value|currency_format }}){% endif %}
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Low Stock Items Value:</strong></td>
+                                <td class="text-end">{{ low_stock_value|default:0|currency_format }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded p-3 bg-light">
+                        <h6 class="mb-3">Valuation Notes</h6>
+                        <ul class="list-unstyled small">
+                            <li class="mb-2">
+                                <i class="fas fa-info-circle text-info me-1"></i>
+                                Values based on current unit costs
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-calendar text-primary me-1"></i>
+                                Report generated on {{ report_date|date:"F d, Y" }}
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-clock text-secondary me-1"></i>
+                                Last updated: {{ report_date|date:"H:i" }}
+                            </li>
+                            <li>
+                                <i class="fas fa-calculator text-success me-1"></i>
+                                All amounts in KES
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% else %}
+    <!-- No Items -->
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-box-open fa-4x text-muted mb-4"></i>
+            <h3 class="text-muted">No Inventory Items Found</h3>
+            <p class="text-muted mb-4">
+                {% if request.GET.category or request.GET.include_zero == 'false' %}
+                    No items match the selected filters. Try adjusting your filter criteria.
+                {% else %}
+                    Start by adding some inventory items to generate a valuation report.
+                {% endif %}
+            </p>
+            <div class="d-flex justify-content-center gap-3">
+                {% if request.GET.category or request.GET.include_zero == 'false' %}
+                    <a href="/business/{{ request.tenant.slug }}/inventory/reports/valuation/" class="btn btn-primary">
+                        <i class="fas fa-filter"></i>
+                        Clear Filters
+                    </a>
+                {% endif %}
+                <a href="/business/{{ request.tenant.slug }}/inventory/items/create/" class="btn btn-success">
+                    <i class="fas fa-plus"></i>
+                    Add First Item
+                </a>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize category distribution chart
+    {% if categories %}
+    initializeCategoryChart();
+    {% endif %}
+    
+    // Auto-refresh data every 5 minutes
+    setInterval(function() {
+        const currentTime = new Date().toLocaleTimeString();
+        console.log('Auto-refresh at', currentTime);
+        // Could implement live updates here
+    }, 300000);
+});
+
+function initializeCategoryChart() {
+    const ctx = document.getElementById('categoryChart');
+    if (!ctx) return;
+    
+    const categoryData = {
+        labels: [
+            {% for cat_name, cat_data in categories.items %}
+                '{{ cat_name }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for cat_name, cat_data in categories.items %}
+                    {{ cat_data.total_value|floatformat:0 }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+                '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280'
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+        }]
+    };
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: categoryData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${context.label}: KES ${value.toLocaleString()} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function exportToPDF() {
+    // Show loading state
+    const btn = event.target.closest('button');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+    btn.disabled = true;
+    
+    // Generate PDF export
+    fetch(`/business/{{ request.tenant.slug }}/inventory/reports/export/pdf/?type=valuation`, {
+        method: 'GET',
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.blob();
+        }
+        throw new Error('Export failed');
+    })
+    .then(blob => {
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `inventory_valuation_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        // Show success message
+        showToast('PDF exported successfully', 'success');
+    })
+    .catch(error => {
+        console.error('Export error:', error);
+        showToast('Error exporting PDF', 'error');
+    })
+    .finally(() => {
+        // Restore button state
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 4000);
+}
+
+// Print optimization
+window.addEventListener('beforeprint', function() {
+    // Hide non-essential elements for printing
+    document.querySelectorAll('.btn, .dropdown, .filter-controls').forEach(el => {
+        el.style.display = 'none';
+    });
+});
+
+window.addEventListener('afterprint', function() {
+    // Restore elements after printing
+    document.querySelectorAll('.btn, .dropdown, .filter-controls').forEach(el => {
+        el.style.display = '';
+    });
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl+P for print
+    if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+    }
+    
+    // Ctrl+E for export CSV
+    if (e.ctrlKey && e.key === 'e') {
+        e.preventDefault();
+        window.location.href = '/business/{{ request.tenant.slug }}/inventory/reports/export/csv/?type=valuation';
+    }
+    
+    // Ctrl+Shift+P for PDF export
+    if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        exportToPDF();
+    }
+});
+
+// Data refresh functionality
+function refreshData() {
+    showToast('Refreshing data...', 'info');
+    location.reload();
+}
+
+// Format numbers for display
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-KE', {
+        style: 'currency',
+        currency: 'KES',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount);
+}
+
+// Add refresh button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const refreshInterval = 5 * 60 * 1000; // 5 minutes
+    
+    setInterval(function() {
+        // Check if page is visible before refreshing
+        if (!document.hidden) {
+            showToast('Data auto-refreshed', 'info');
+            // Could implement AJAX refresh here instead of full page reload
+        }
+    }, refreshInterval);
+});
+</script>
+{% endblock %}

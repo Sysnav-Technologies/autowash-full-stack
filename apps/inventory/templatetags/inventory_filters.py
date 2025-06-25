@@ -115,3 +115,79 @@ def days_ago(date_value):
         return 0
     except:
         return 0
+
+@register.filter
+def divide(value, arg):
+    """Divide two values"""
+    try:
+        return float(value) / float(arg)
+    except (ValueError, TypeError, ZeroDivisionError):
+        return 0
+
+@register.filter
+def get_item(dictionary, key):
+    """Get item from dictionary"""
+    return dictionary.get(key)
+
+@register.filter
+def length_is(value, arg):
+    """Check if length equals argument"""
+    try:
+        return len(value) == int(arg)
+    except (TypeError, ValueError):
+        return False
+
+@register.filter
+def first_item(items):
+    """Get first item from list/queryset"""
+    try:
+        return items[0] if items else None
+    except (IndexError, TypeError):
+        return None
+
+@register.filter
+def format_percentage(value, decimal_places=1):
+    """Format value as percentage"""
+    try:
+        return f"{float(value):.{decimal_places}f}%"
+    except (ValueError, TypeError):
+        return "0.0%"
+
+@register.filter
+def abs_value(value):
+    """Get absolute value"""
+    try:
+        return abs(float(value))
+    except (ValueError, TypeError):
+        return 0
+
+@register.filter
+def round_to(value, decimal_places):
+    """Round to specified decimal places"""
+    try:
+        return round(float(value), int(decimal_places))
+    except (ValueError, TypeError):
+        return 0
+
+@register.filter
+def default_if_none(value, default):
+    """Return default if value is None"""
+    return default if value is None else value
+
+@register.simple_tag
+def percentage_of(part, whole):
+    """Calculate percentage of part to whole"""
+    try:
+        if whole and whole > 0:
+            return round((float(part) / float(whole)) * 100, 1)
+        return 0
+    except (ValueError, TypeError, ZeroDivisionError):
+        return 0
+
+@register.simple_tag
+def multiply_values(value1, value2):
+    """Multiply two values"""
+    try:
+        return float(value1) * float(value2)
+    except (ValueError, TypeError):
+        return 0
