@@ -18,10 +18,11 @@ from .models import (
 )
 from .forms import (
     InventoryItemForm, InventoryCategoryForm, UnitForm, 
-    StockAdjustmentForm, StockTakeForm, ItemSearchForm
+    StockAdjustmentForm, StockTakeForm, ItemSearchForm, UnitSearchForm
 )
 from datetime import datetime, timedelta
 import json
+
 
 @login_required
 @employee_required()
@@ -72,16 +73,36 @@ def inventory_dashboard_view(request):
         total_cost=Sum(F('quantity') * F('unit_cost'))
     ).order_by('-total_consumed')[:5]
     
-    # Category breakdown
-    category_stats = InventoryCategory.objects.filter(
-        is_active=True
-    ).annotate(
-        item_count=Count('items', filter=Q(items__is_active=True)),
-        total_value=Sum(
-            F('items__current_stock') * F('items__unit_cost'),
-            filter=Q(items__is_active=True)
+    # Category breakdown - FIXED VERSION
+    category_stats = []
+    categories = InventoryCategory.objects.filter(is_active=True)
+    
+    for category in categories:
+        # Calculate statistics for each category
+        category_items = InventoryItem.objects.filter(
+            category=category,
+            is_active=True
         )
-    ).filter(item_count__gt=0)[:10]
+        
+        item_count = category_items.count()
+        if item_count > 0:  # Only include categories with items
+            total_value = category_items.aggregate(
+                total=Sum(F('current_stock') * F('unit_cost'))
+            )['total'] or 0
+            
+            # Create a dictionary with category data
+            category_data = {
+                'id': category.id,
+                'name': category.name,
+                'description': category.description,
+                'item_count': item_count,
+                'total_value': total_value,
+                'parent': category.parent
+            }
+            category_stats.append(category_data)
+    
+    # Sort by item count descending and limit to top 10
+    category_stats = sorted(category_stats, key=lambda x: x['item_count'], reverse=True)[:10]
     
     context = {
         'total_items': total_items,
@@ -849,3 +870,263 @@ def update_stock_count(request, stock_take_id, item_id):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
+
+
+# UNIT VIEWS
+# views.py - Add these views to your inventory views
+
+@login_required
+@employee_required()
+def unit_list_view(request):
+    """List units of measurement with filtering"""
+    units = Unit.objects.all()
+    
+    # Search and filters
+    search_form = UnitSearchForm(request.GET)
+    if search_form.is_valid():
+        search_query = search_form.cleaned_data.get('search')
+        status = search_form.cleaned_data.get('status')
+        category = search_form.cleaned_data.get('category')
+        
+        if search_query:
+            units = units.filter(
+                Q(name__icontains=search_query) |
+                Q(abbreviation__icontains=search_query) |
+                Q(description__icontains=search_query)
+            )
+        
+        if status == 'active':
+            units = units.filter(is_active=True)
+        elif status == 'inactive':
+            units = units.filter(is_active=False)
+        
+        if category:
+            # Filter by category based on common unit patterns
+            category_filters = {
+                'liquid': ['ml', 'L', 'gal', 'qt', 'pt', 'fl oz', 'bbl', 'drm'],
+                'solid': ['g', 'kg', 'lb', 'oz', 'bag', 'pail', 'bx'],
+                'count': ['pcs', 'ea', 'pr', 'set', 'dz', 'gr'],
+                'equipment': ['fltr', 'nzl', 'pump', 'gun', 'hose'],
+                'measurement': ['psi', 'bar', 'gpm', 'A', 'V', 'W', '°F', '°C'],
+                'time': ['sec', 'min', 'hr', 'cyc', 'wash', 'use'],
+                'specialty': ['pH', 'ppm', '%', 'ratio', 'coat', 'app']
+            }
+            
+            if category in category_filters:
+                units = units.filter(abbreviation__in=category_filters[category])
+    
+    # Sorting
+    sort_by = request.GET.get('sort', 'name')
+    if sort_by in ['name', 'abbreviation', 'created_at']:
+        if request.GET.get('order') == 'desc':
+            sort_by = f'-{sort_by}'
+        units = units.order_by(sort_by)
+    
+    # Pagination
+    paginator = Paginator(units, 25)
+    page = request.GET.get('page')
+    units_page = paginator.get_page(page)
+    
+    # Statistics
+    stats = {
+        'total_units': Unit.objects.count(),
+        'active_units': Unit.objects.filter(is_active=True).count(),
+        'inactive_units': Unit.objects.filter(is_active=False).count(),
+        'filtered_count': units.count(),
+    }
+    
+    context = {
+        'units': units_page,
+        'search_form': search_form,
+        'stats': stats,
+        'title': 'Units of Measurement'
+    }
+    return render(request, 'inventory/unit_list.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def unit_create_view(request):
+    """Create new unit of measurement"""
+    if request.method == 'POST':
+        form = UnitForm(request.POST)
+        if form.is_valid():
+            unit = form.save()
+            messages.success(request, f'Unit "{unit.name} ({unit.abbreviation})" created successfully!')
+            return redirect('inventory:unit_list')
+    else:
+        form = UnitForm()
+    
+    context = {
+        'form': form,
+        'title': 'Create Unit of Measurement'
+    }
+    return render(request, 'inventory/unit_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def unit_edit_view(request, pk):
+    """Edit unit of measurement"""
+    unit = get_object_or_404(Unit, pk=pk)
+    
+    if request.method == 'POST':
+        form = UnitForm(request.POST, instance=unit)
+        if form.is_valid():
+            unit = form.save()
+            messages.success(request, f'Unit "{unit.name} ({unit.abbreviation})" updated successfully!')
+            return redirect('inventory:unit_list')
+    else:
+        form = UnitForm(instance=unit)
+    
+    context = {
+        'form': form,
+        'unit': unit,
+        'title': f'Edit Unit - {unit.name}'
+    }
+    return render(request, 'inventory/unit_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def unit_detail_view(request, pk):
+    """Unit detail view with usage statistics"""
+    unit = get_object_or_404(Unit, pk=pk)
+    
+    # Get items using this unit
+    items_using_unit = InventoryItem.objects.filter(unit=unit, is_active=True)
+    
+    # Statistics
+    stats = {
+        'items_count': items_using_unit.count(),
+        'total_stock_value': items_using_unit.aggregate(
+            total=Sum(F('current_stock') * F('unit_cost'))
+        )['total'] or 0,
+        'total_stock_quantity': items_using_unit.aggregate(
+            total=Sum('current_stock')
+        )['total'] or 0,
+        'avg_unit_cost': items_using_unit.aggregate(
+            avg=Avg('unit_cost')
+        )['avg'] or 0,
+    }
+    
+    # Recent items added with this unit
+    recent_items = items_using_unit.order_by('-created_at')[:10]
+    
+    context = {
+        'unit': unit,
+        'items_using_unit': items_using_unit[:20],  # Show first 20
+        'recent_items': recent_items,
+        'stats': stats,
+        'title': f'Unit Details - {unit.name}'
+    }
+    return render(request, 'inventory/unit_detail.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+@require_POST
+def unit_toggle_status(request, pk):
+    """Toggle unit active status"""
+    unit = get_object_or_404(Unit, pk=pk)
+    
+    # Check if unit is being used by any active items
+    if not unit.is_active:
+        # Activating unit - safe to do
+        unit.is_active = True
+        unit.save()
+        messages.success(request, f'Unit "{unit.name}" has been activated.')
+    else:
+        # Deactivating unit - check for usage
+        items_using_unit = InventoryItem.objects.filter(unit=unit, is_active=True)
+        if items_using_unit.exists():
+            messages.error(
+                request, 
+                f'Cannot deactivate unit "{unit.name}". It is currently used by {items_using_unit.count()} active items.'
+            )
+        else:
+            unit.is_active = False
+            unit.save()
+            messages.success(request, f'Unit "{unit.name}" has been deactivated.')
+    
+    return redirect('inventory:unit_list')
+
+@login_required
+@employee_required(['owner', 'manager'])
+@require_POST
+def unit_delete_view(request, pk):
+    """Delete unit of measurement"""
+    unit = get_object_or_404(Unit, pk=pk)
+    
+    # Check if unit is being used
+    items_using_unit = InventoryItem.objects.filter(unit=unit)
+    if items_using_unit.exists():
+        messages.error(
+            request,
+            f'Cannot delete unit "{unit.name}". It is used by {items_using_unit.count()} items. '
+            'Please reassign those items to different units first.'
+        )
+    else:
+        unit_name = str(unit)
+        unit.delete()
+        messages.success(request, f'Unit "{unit_name}" has been deleted.')
+    
+    return redirect('inventory:unit_list')
+
+@login_required
+@employee_required()
+@ajax_required
+def unit_search_ajax(request):
+    """AJAX search for units"""
+    query = request.GET.get('q', '').strip()
+    units = []
+    
+    if len(query) >= 1:
+        units_qs = Unit.objects.filter(
+            Q(name__icontains=query) | Q(abbreviation__icontains=query),
+            is_active=True
+        )[:10]
+        
+        units = [
+            {
+                'id': unit.id,
+                'name': unit.name,
+                'abbreviation': unit.abbreviation,
+                'display': f"{unit.name} ({unit.abbreviation})",
+                'description': unit.description
+            }
+            for unit in units_qs
+        ]
+    
+    return JsonResponse({'units': units})
+
+@login_required
+@employee_required(['owner', 'manager'])
+def populate_car_wash_units_view(request):
+    """Populate database with car wash units"""
+    if request.method == 'POST':
+        from django.core.management import call_command
+        from io import StringIO
+        
+        try:
+            # Capture command output
+            out = StringIO()
+            call_command('populate_car_wash_units', stdout=out)
+            output = out.getvalue()
+            
+            messages.success(request, 'Car wash units populated successfully!')
+            
+            # Return JSON response for AJAX calls
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Units populated successfully',
+                    'output': output
+                })
+                
+        except Exception as e:
+            messages.error(request, f'Error populating units: {str(e)}')
+            
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+    
+    return redirect('inventory:unit_list')

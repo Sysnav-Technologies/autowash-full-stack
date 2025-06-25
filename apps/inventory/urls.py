@@ -39,6 +39,16 @@ urlpatterns = [
     # Alerts
     path('alerts/', views.alerts_view, name='alerts'),
     path('alerts/<int:alert_id>/resolve/', views.resolve_alert, name='resolve_alert'),
+
+    # Units
+    path('units/', views.unit_list_view, name='unit_list'),
+    path('units/create/', views.unit_create_view, name='unit_create'),
+    path('units/<uuid:pk>/', views.unit_detail_view, name='unit_detail'),
+    path('units/<uuid:pk>/edit/', views.unit_edit_view, name='unit_edit'),
+    path('units/<uuid:pk>/toggle/', views.unit_toggle_status, name='unit_toggle_status'),
+    path('units/<uuid:pk>/delete/', views.unit_delete_view, name='unit_delete'),
+    path('units/populate/', views.populate_car_wash_units_view, name='populate_car_wash_units'),
+    path('ajax/units/search/', views.unit_search_ajax, name='unit_search'),
     
     # AJAX endpoints
     path('ajax/items/search/', views.item_search_ajax, name='item_search'),

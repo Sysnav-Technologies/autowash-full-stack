@@ -99,10 +99,13 @@ class InventoryItemForm(forms.ModelForm):
         self.fields['category'].queryset = InventoryCategory.objects.filter(is_active=True)
         self.fields['unit'].queryset = Unit.objects.filter(is_active=True)
         
-        # Filter active suppliers
+        # Filter active suppliers - FIXED to use correct filtering
         try:
             from apps.suppliers.models import Supplier
-            self.fields['primary_supplier'].queryset = Supplier.objects.filter(is_active=True)
+            self.fields['primary_supplier'].queryset = Supplier.objects.filter(
+                is_deleted=False,
+                status='active'
+            )
         except ImportError:
             self.fields['primary_supplier'].widget = forms.HiddenInput()
         
@@ -460,10 +463,13 @@ class BulkItemUpdateForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Set supplier queryset
+        # Set supplier queryset - FIXED to use correct filtering
         try:
             from apps.suppliers.models import Supplier
-            self.fields['new_supplier'].queryset = Supplier.objects.filter(is_active=True)
+            self.fields['new_supplier'].queryset = Supplier.objects.filter(
+                is_deleted=False,
+                status='active'
+            )
         except ImportError:
             del self.fields['update_supplier']
             del self.fields['new_supplier']
@@ -521,3 +527,126 @@ class BulkItemUpdateForm(forms.Form):
                 raise ValidationError(f"Please provide a value for {value_field.replace('_', ' ')}")
         
         return cleaned_data
+    
+# forms.py - Add this to your inventory forms
+
+class UnitForm(forms.ModelForm):
+    """Unit of measurement form"""
+    
+    class Meta:
+        model = Unit
+        fields = ['name', 'abbreviation', 'description', 'is_active']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter unit name (e.g., Liter, Kilogram)',
+                'maxlength': 50
+            }),
+            'abbreviation': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter abbreviation (e.g., L, kg)',
+                'maxlength': 10,
+                'style': 'text-transform: uppercase;'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Describe when and how this unit is used...'
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Add crispy forms helper
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Row(
+                Column('name', css_class='form-group col-md-8'),
+                Column('abbreviation', css_class='form-group col-md-4'),
+            ),
+            'description',
+            'is_active',
+            FormActions(
+                Submit('submit', 'Save Unit', css_class='btn btn-primary'),
+                HTML('<a href="{% url \'inventory:unit_list\' %}" class="btn btn-secondary ms-2">Cancel</a>')
+            )
+        )
+    
+    def clean_name(self):
+        name = self.cleaned_data['name'].strip().title()
+        
+        # Check for duplicate names (case-insensitive)
+        existing = Unit.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        
+        if existing.exists():
+            raise ValidationError("A unit with this name already exists.")
+        
+        return name
+    
+    def clean_abbreviation(self):
+        abbreviation = self.cleaned_data['abbreviation'].strip().upper()
+        
+        # Validate length
+        if len(abbreviation) < 1:
+            raise ValidationError("Abbreviation cannot be empty.")
+        
+        # Check for duplicate abbreviations (case-insensitive)
+        existing = Unit.objects.filter(abbreviation__iexact=abbreviation)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        
+        if existing.exists():
+            raise ValidationError("A unit with this abbreviation already exists.")
+        
+        return abbreviation
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        name = cleaned_data.get('name', '')
+        abbreviation = cleaned_data.get('abbreviation', '')
+        
+        # Ensure name and abbreviation are not the same
+        if name.lower() == abbreviation.lower():
+            raise ValidationError("Name and abbreviation should be different.")
+        
+        return cleaned_data
+
+class UnitSearchForm(forms.Form):
+    """Unit search and filter form"""
+    search = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Search by name or abbreviation...',
+            'class': 'form-control'
+        })
+    )
+    status = forms.ChoiceField(
+        choices=[
+            ('', 'All Units'),
+            ('active', 'Active Only'),
+            ('inactive', 'Inactive Only'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    category = forms.ChoiceField(
+        choices=[
+            ('', 'All Categories'),
+            ('liquid', 'Liquids & Chemicals'),
+            ('solid', 'Solids & Materials'),
+            ('count', 'Counting Units'),
+            ('equipment', 'Equipment Parts'),
+            ('measurement', 'Measurements'),
+            ('time', 'Time & Usage'),
+            ('specialty', 'Specialty Units'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
