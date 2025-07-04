@@ -22,15 +22,12 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 # Environment Detection
 RENDER = config('RENDER', default=False, cast=bool)
 CPANEL = config('CPANEL', default=False, cast=bool)
-# CPANEL = True
 
 # SMART ALLOWED_HOSTS based on environment
 if not RENDER and not CPANEL:
-    # Local development
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
     print("[LOCAL] Running in LOCAL DEVELOPMENT mode")
 elif RENDER:
-    # Production on Render
     ALLOWED_HOSTS = [
         '.onrender.com',                 
         'autowash-3jpr.onrender.com',      
@@ -38,36 +35,23 @@ elif RENDER:
         'www.autowash.co.ke',               
         '*.autowash.co.ke',                
     ]
-    
-    # Render automatically sets this environment variable
     render_external_hostname = config('RENDER_EXTERNAL_HOSTNAME', default='')
-    if render_external_hostname and render_external_hostname not in ALLOWED_HOSTS:
+    if render_external_hostname:
         ALLOWED_HOSTS.append(render_external_hostname)
         print(f"[RENDER] Added Render hostname: {render_external_hostname}")
-    
-    if DEBUG:
-        print("[RENDER] RENDER with DEBUG ENABLED")
-    else:
-        print("[RENDER] RENDER PRODUCTION mode")
+    print("[RENDER] RENDER with DEBUG ENABLED" if DEBUG else "[RENDER] RENDER PRODUCTION mode")
 elif CPANEL:
-    # Production on cPanel
     ALLOWED_HOSTS = [
         'app.autowash.co.ke',
         'autowash.co.ke',                   
         'www.autowash.co.ke',               
         '*.autowash.co.ke',
     ]
-    
-    # Add cPanel domain if specified
     cpanel_domain = config('CPANEL_DOMAIN', default='')
-    if cpanel_domain and cpanel_domain not in ALLOWED_HOSTS:
+    if cpanel_domain:
         ALLOWED_HOSTS.append(cpanel_domain)
         print(f"[CPANEL] Added cPanel domain: {cpanel_domain}")
-    
-    if DEBUG:
-        print("[CPANEL] CPANEL with DEBUG ENABLED")
-    else:
-        print("[CPANEL] CPANEL PRODUCTION mode")
+    print("[CPANEL] CPANEL with DEBUG ENABLED" if DEBUG else "[CPANEL] CPANEL PRODUCTION mode")
 
 # Multi-tenant Apps Configuration
 SHARED_APPS = [
@@ -79,8 +63,6 @@ SHARED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
-    
-    # Third party apps
     'crispy_forms',
     'crispy_bootstrap5',
     'phonenumber_field',
@@ -97,8 +79,6 @@ SHARED_APPS = [
     'django_celery_results',
     'channels',
     'django.contrib.humanize',
-    
-    # Shared apps (public schema)
     'apps.core',
     'apps.accounts',
     'apps.subscriptions',
@@ -110,8 +90,6 @@ TENANT_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.admin',
-    
-    # Tenant specific apps
     'apps.businesses',
     'apps.employees',
     'apps.customers',
@@ -124,17 +102,14 @@ TENANT_APPS = [
     'apps.notification',
 ]
 
-# Add debug toolbar when debugging is enabled - NOT in production environments
 if DEBUG and not RENDER and not CPANEL:
-    # Only in local development
     SHARED_APPS.append('debug_toolbar')
 elif DEBUG and (RENDER or CPANEL):
-    # Production with debug - be selective
     SHARED_APPS.append('debug_toolbar')
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
-# Tenant Configuration - PATH-BASED ROUTING
+# Tenant Configuration
 TENANT_MODEL = "accounts.Business"
 TENANT_DOMAIN_MODEL = "accounts.Domain"
 PUBLIC_SCHEMA_URLCONF = 'autowash.urls_public'
@@ -143,37 +118,80 @@ PUBLIC_SCHEMA_NAME = 'public'
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
 # PATH-BASED TENANT ROUTING CONFIGURATION
-if not RENDER and not CPANEL:
-    # Local development
-    public_domain = 'localhost:8000'
-elif RENDER:
-    # Render environment
-    public_domain = 'autowash-3jpr.onrender.com'
-elif CPANEL:
-    # cPanel environment
-    public_domain = 'app.autowash.co.ke'
+public_domain = 'localhost:8000' if not RENDER and not CPANEL else \
+               'autowash-3jpr.onrender.com' if RENDER else \
+               'app.autowash.co.ke'
 
 TENANT_ROUTING = {
-    'ROUTING_METHOD': 'path',  # Use path-based instead of subdomain
-    'TENANT_URL_PREFIX': 'business',  # URL prefix for tenant routes
+    'ROUTING_METHOD': 'path',
+    'TENANT_URL_PREFIX': 'business',
     'PUBLIC_TENANT_DOMAIN': public_domain,
 }
 
-# Enhanced Session Configuration for Multi-tenant setup
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-SESSION_COOKIE_NAME = 'autowash_sessionid'
-SESSION_COOKIE_AGE = 86400
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_SAVE_EVERY_REQUEST = False
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-
-# Session sharing across schemas
-SESSION_COOKIE_DOMAIN = None
-SESSION_COOKIE_PATH = '/'
-
+# ====================== ENHANCED SESSION & CSRF CONFIGURATION ======================
+# Session Configuration
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'  # Better performance
+SESSION_COOKIE_NAME = f"autowash_sessionid_{config('SITE_ID', 'default')}"  # Unique per tenant
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_COOKIE_DOMAIN = None  # Set to .yourdomain.com for cross-subdomain if needed
+SESSION_COOKIE_SECURE = not DEBUG  # HTTPS only in production
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access
+SESSION_COOKIE_SAMESITE = 'Lax'  # Balance security and usability
+SESSION_COOKIE_PATH = '/'  # Available across entire domain
+SESSION_SAVE_EVERY_REQUEST = False  # Better performance
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Persistent sessions
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 SESSION_CACHE_ALIAS = 'default'
+
+# CSRF Configuration
+CSRF_COOKIE_NAME = f"autowash_csrftoken_{config('SITE_ID', 'default')}"  # Unique per tenant
+CSRF_COOKIE_AGE = 31449600  # 1 year in seconds
+CSRF_COOKIE_DOMAIN = None  # Set to .yourdomain.com for cross-subdomain if needed
+CSRF_COOKIE_SECURE = not DEBUG  # HTTPS only in production
+CSRF_COOKIE_HTTPONLY = False  # Must be False for AJAX to work
+CSRF_COOKIE_SAMESITE = 'Lax'  # Same as session cookie
+CSRF_COOKIE_PATH = '/'  # Available across entire domain
+CSRF_USE_SESSIONS = False  # Store in cookie (default)
+CSRF_FAILURE_VIEW = 'apps.core.views.csrf_failure'  # Custom CSRF failure view
+
+# Allowed Origins
+if not RENDER and not CPANEL:
+    # Local development
+    CSRF_TRUSTED_ORIGINS = [
+        'http://localhost',
+        'http://127.0.0.1',
+        'http://*.localhost',
+        'http://testserver'
+    ]
+elif RENDER:
+    # Production on Render
+    CSRF_TRUSTED_ORIGINS = [
+        'https://autowash-3jpr.onrender.com',
+        'https://autowash.co.ke',
+        'https://www.autowash.co.ke',
+        'https://*.autowash.co.ke'
+    ]
+    render_external_hostname = config('RENDER_EXTERNAL_HOSTNAME', default='')
+    if render_external_hostname:
+        CSRF_TRUSTED_ORIGINS.append(f'https://{render_external_hostname}')
+elif CPANEL:
+    # Production on cPanel
+    CSRF_TRUSTED_ORIGINS = [
+        'https://app.autowash.co.ke',
+        'https://autowash.co.ke',
+        'https://www.autowash.co.ke',
+        'https://*.autowash.co.ke'
+    ]
+    cpanel_domain = config('CPANEL_DOMAIN', default='')
+    if cpanel_domain:
+        CSRF_TRUSTED_ORIGINS.append(f'https://{cpanel_domain}')
+
+if RENDER or CPANEL:
+    CSRF_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS]
+
+# For AJAX requests
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
+CSRF_HEADER_DOMAIN = None
 
 # Database session table configuration
 DATABASE_ROUTERS = (
@@ -181,13 +199,12 @@ DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
 
-# Updated MIDDLEWARE configuration
+# ====================== MIDDLEWARE CONFIGURATION ======================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
 ]
 
-# Add WhiteNoise only for Render (cPanel serves static files differently)
 if RENDER:
     MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
 
@@ -196,7 +213,7 @@ MIDDLEWARE.extend([
     'apps.core.middleware.SimpleSessionFixMiddleware',
     'apps.core.middleware.PathBasedTenantMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',  # CSRF protection
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.core.middleware.SharedAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -208,11 +225,12 @@ MIDDLEWARE.extend([
     'allauth.account.middleware.AccountMiddleware',
 ])
 
-# Add debug toolbar middleware only in development
 if DEBUG and not RENDER and not CPANEL:
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 elif DEBUG and (RENDER or CPANEL):
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+
+
 
 TEMPLATES = [
     {

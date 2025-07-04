@@ -9,6 +9,18 @@ import os
 import datetime
 import traceback
 
+from django.shortcuts import render
+from django.views.decorators.csrf import requires_csrf_token
+from django.template import RequestContext
+
+@requires_csrf_token
+def csrf_failure(request, reason=""):
+    context = {
+        'reason': reason,
+        'request_path': request.path,
+    }
+    return render(request, '403_csrf.html', context, status=403)
+
 User = get_user_model()
 
 def health_check(request):
