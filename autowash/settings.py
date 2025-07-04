@@ -130,7 +130,7 @@ TENANT_ROUTING = {
 
 # ====================== ENHANCED SESSION & CSRF CONFIGURATION ======================
 # Session Configuration
-SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'  # Better performance
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Better performance
 SESSION_COOKIE_NAME = f"autowash_sessionid_{config('SITE_ID', 'default')}"  # Unique per tenant
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_COOKIE_DOMAIN = None  # Set to .yourdomain.com for cross-subdomain if needed
@@ -296,7 +296,8 @@ elif CPANEL:
     print("[DATABASE] Using CPANEL PostgreSQL database")
 
 # Redis & Channels
-redis_url = config('REDIS_URL', default='redis://localhost:6379/1')
+redis_url = ''
+# config('REDIS_URL', default='redis://localhost:6379/1')
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -319,7 +320,7 @@ else:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-            'LOCATION': 'cache_table',
+            'LOCATION': 'django_cache_table',
         }
     }
     print("[CACHE] Using database cache")
