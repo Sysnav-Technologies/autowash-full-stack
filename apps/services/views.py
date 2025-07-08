@@ -14,6 +14,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from apps.core.decorators import employee_required, ajax_required, owner_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
+from django.db.models.functions import Extract
 from apps.payments.models import Payment
 from .models import (
     Service, ServiceCategory, ServicePackage, ServiceOrder, 
@@ -162,22 +163,35 @@ def service_detail_view(request, pk):
             service=service,
             order__status='completed'
         ).aggregate(total=Sum('total_price'))['total'] or 0,
+        # FIXED: Calculate average duration using database fields
         'avg_duration': ServiceOrderItem.objects.filter(
             service=service,
-            completed_at__isnull=False
-        ).exclude(started_at__isnull=True).extra(
-            select={'duration': 'EXTRACT(EPOCH FROM (completed_at - started_at))/60'}
-        ).aggregate(avg=Avg('duration'))['avg'] or 0,
+            completed_at__isnull=False,
+            started_at__isnull=False
+        ).aggregate(
+            avg=Avg(
+                Extract(F('completed_at') - F('started_at'), 'epoch') / 60.0
+            )
+        )['avg'] or 0,
     }
+    
+    # ADDED: Split compatible vehicle types for template
+    compatible_vehicle_types = []
+    if service.compatible_vehicle_types:
+        compatible_vehicle_types = [
+            vehicle_type.strip().title() 
+            for vehicle_type in service.compatible_vehicle_types.split(',')
+            if vehicle_type.strip()
+        ]
     
     context = {
         'service': service,
         'recent_orders': recent_orders,
         'stats': stats,
+        'compatible_vehicle_types': compatible_vehicle_types,  # Added this
         'title': f'Service - {service.name}'
     }
     return render(request, 'services/service_detail.html', context)
-
 @login_required
 @employee_required()
 def order_list_view(request):
