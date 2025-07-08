@@ -1,0 +1,942 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="bay-management">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <div class="breadcrumb-nav">
+                <a href="/business/{{ request.tenant.slug }}/services/" class="breadcrumb-link">
+                    <i class="fas fa-car-wash"></i>
+                    Services
+                </a>
+                <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                <span class="breadcrumb-current">Service Bays</span>
+            </div>
+            <h1 class="page-title">
+                <i class="fas fa-warehouse"></i>
+                Service Bays
+            </h1>
+            <p class="page-subtitle">Manage washing stations and service areas</p>
+        </div>
+        <div class="page-actions">
+            {% if user_role in 'owner,manager' %}
+            <a href="/business/{{ request.tenant.slug }}/services/bays/create/" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                Add Service Bay
+            </a>
+            {% endif %}
+            <button class="btn btn-outline-secondary" onclick="refreshBayStatus()">
+                <i class="fas fa-sync-alt"></i>
+                Refresh Status
+            </button>
+        </div>
+    </div>
+
+    <!-- Bay Status Overview -->
+    <div class="bay-overview">
+        <div class="overview-stats">
+            <div class="stat-card available">
+                <div class="stat-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="available-count">
+                        {{ bays|length|add:"-1" }}
+                    </div>
+                    <div class="stat-label">Available</div>
+                </div>
+            </div>
+            
+            <div class="stat-card occupied">
+                <div class="stat-icon">
+                    <i class="fas fa-car"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="occupied-count">0</div>
+                    <div class="stat-label">Occupied</div>
+                </div>
+            </div>
+            
+            <div class="stat-card maintenance">
+                <div class="stat-icon">
+                    <i class="fas fa-tools"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="maintenance-count">0</div>
+                    <div class="stat-label">Maintenance</div>
+                </div>
+            </div>
+            
+            <div class="stat-card total">
+                <div class="stat-icon">
+                    <i class="fas fa-warehouse"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ bays|length }}</div>
+                    <div class="stat-label">Total Bays</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Bays Grid -->
+    <div class="bays-grid" id="bays-grid">
+        {% for bay in bays %}
+        <div class="bay-card {% if bay.is_occupied %}occupied{% elif not bay.is_active %}inactive{% else %}available{% endif %}" 
+             data-bay-id="{{ bay.id }}" data-bay-number="{{ bay.bay_number }}">
+            
+            <!-- Bay Header -->
+            <div class="bay-header">
+                <div class="bay-number">
+                    <span class="bay-label">Bay</span>
+                    <span class="number">{{ bay.bay_number }}</span>
+                </div>
+                <div class="bay-status">
+                    {% if bay.is_occupied %}
+                        <span class="status-badge occupied">
+                            <i class="fas fa-car"></i>
+                            Occupied
+                        </span>
+                    {% elif not bay.is_active %}
+                        <span class="status-badge inactive">
+                            <i class="fas fa-times-circle"></i>
+                            Inactive
+                        </span>
+                    {% else %}
+                        <span class="status-badge available">
+                            <i class="fas fa-check-circle"></i>
+                            Available
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Bay Info -->
+            <div class="bay-info">
+                <h3 class="bay-name">{{ bay.name }}</h3>
+                {% if bay.description %}
+                    <p class="bay-description">{{ bay.description|truncatewords:10 }}</p>
+                {% endif %}
+                
+                <div class="bay-specs">
+                    <div class="spec-item">
+                        <i class="fas fa-car"></i>
+                        <span>{{ bay.get_max_vehicle_size_display }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Service -->
+            {% if bay.current_order %}
+            <div class="current-service">
+                <div class="service-header">
+                    <i class="fas fa-clock"></i>
+                    <strong>Current Service</strong>
+                </div>
+                <div class="service-details">
+                    <div class="order-info">
+                        <div class="order-number">{{ bay.current_order.order_number }}</div>
+                        <div class="customer-name">{{ bay.current_order.customer.display_name }}</div>
+                        <div class="vehicle-info">
+                            {{ bay.current_order.vehicle.registration_number }} - {{ bay.current_order.vehicle.make }} {{ bay.current_order.vehicle.model }}
+                        </div>
+                    </div>
+                    {% if bay.current_order.actual_start_time %}
+                        <div class="service-time">
+                            Started: {{ bay.current_order.actual_start_time|time:"H:i" }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Bay Features -->
+            <div class="bay-features">
+                <div class="features-list">
+                    {% if bay.has_pressure_washer %}
+                        <span class="feature-badge active">
+                            <i class="fas fa-tint"></i>
+                            Pressure Washer
+                        </span>
+                    {% endif %}
+                    {% if bay.has_vacuum %}
+                        <span class="feature-badge active">
+                            <i class="fas fa-wind"></i>
+                            Vacuum
+                        </span>
+                    {% endif %}
+                    {% if bay.has_lift %}
+                        <span class="feature-badge active">
+                            <i class="fas fa-arrow-up"></i>
+                            Lift
+                        </span>
+                    {% endif %}
+                    {% if bay.has_drainage %}
+                        <span class="feature-badge active">
+                            <i class="fas fa-water"></i>
+                            Drainage
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Bay Actions -->
+            <div class="bay-actions">
+                {% if bay.is_occupied and bay.current_order %}
+                    <button class="btn btn-success btn-sm" onclick="completeService('{{ bay.current_order.id }}')">
+                        <i class="fas fa-check"></i>
+                        Complete Service
+                    </button>
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ bay.current_order.id }}/" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-eye"></i>
+                        View Order
+                    </a>
+                {% elif bay.is_available %}
+                    <button class="btn btn-primary btn-sm" onclick="assignOrderToBay('{{ bay.id }}')">
+                        <i class="fas fa-plus"></i>
+                        Assign Order
+                    </button>
+                {% endif %}
+                
+                {% if user_role in 'owner,manager' %}
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/bays/{{ bay.id }}/edit/">
+                                <i class="fas fa-edit"></i> Edit Bay
+                            </a>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" onclick="toggleBayStatus('{{ bay.id }}', {{ bay.is_active|yesno:'false,true' }})">
+                                {% if bay.is_active %}
+                                    <i class="fas fa-pause"></i> Deactivate
+                                {% else %}
+                                    <i class="fas fa-play"></i> Activate
+                                {% endif %}
+                            </button>
+                        </li>
+                        {% if bay.is_occupied %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button class="dropdown-item text-warning" onclick="freeBay('{{ bay.id }}')">
+                                <i class="fas fa-exclamation-triangle"></i> Force Free Bay
+                            </button>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="fas fa-warehouse"></i>
+            </div>
+            <h3>No Service Bays</h3>
+            <p>Set up your first service bay to start managing vehicle washing stations.</p>
+            {% if user_role in 'owner,manager' %}
+            <a href="/business/{{ request.tenant.slug }}/services/bays/create/" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                Add First Service Bay
+            </a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Assign Order Modal -->
+<div class="modal fade" id="assignOrderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Assign Order to Bay</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assignOrderForm">
+                    <input type="hidden" id="selectedBayId" name="bay_id">
+                    <div class="mb-3">
+                        <label for="orderSelect" class="form-label">Select Order</label>
+                        <select class="form-select" id="orderSelect" name="order_id" required>
+                            <option value="">Choose an order...</option>
+                        </select>
+                    </div>
+                    <div class="selected-bay-info">
+                        <strong>Bay:</strong> <span id="selectedBayName"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitAssignment()">Assign Order</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Bay Management Styles */
+.bay-management {
+    padding: 0;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.breadcrumb-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.breadcrumb-link {
+    color: var(--primary-600);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.breadcrumb-link:hover {
+    color: var(--primary-700);
+}
+
+.breadcrumb-separator {
+    color: var(--gray-400);
+    font-size: 0.75rem;
+}
+
+.breadcrumb-current {
+    color: var(--gray-600);
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-subtitle {
+    color: var(--gray-600);
+    font-size: 1.125rem;
+}
+
+.page-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Bay Overview */
+.bay-overview {
+    margin-bottom: 2rem;
+}
+
+.overview-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.stat-card.available .stat-icon {
+    background: var(--success-100);
+    color: var(--success-600);
+}
+
+.stat-card.occupied .stat-icon {
+    background: var(--warning-100);
+    color: var(--warning-600);
+}
+
+.stat-card.maintenance .stat-icon {
+    background: var(--error-100);
+    color: var(--error-600);
+}
+
+.stat-card.total .stat-icon {
+    background: var(--primary-100);
+    color: var(--primary-600);
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.stat-card.available .stat-number {
+    color: var(--success-600);
+}
+
+.stat-card.occupied .stat-number {
+    color: var(--warning-600);
+}
+
+.stat-card.maintenance .stat-number {
+    color: var(--error-600);
+}
+
+.stat-card.total .stat-number {
+    color: var(--primary-600);
+}
+
+.stat-label {
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+/* Bays Grid */
+.bays-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+.bay-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.bay-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.bay-card.available {
+    border-left: 4px solid var(--success-500);
+}
+
+.bay-card.occupied {
+    border-left: 4px solid var(--warning-500);
+}
+
+.bay-card.inactive {
+    border-left: 4px solid var(--gray-400);
+    opacity: 0.7;
+}
+
+.bay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1.5rem 1rem;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.bay-number {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.bay-label {
+    color: var(--gray-500);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-badge.available {
+    background: var(--success-100);
+    color: var(--success-700);
+}
+
+.status-badge.occupied {
+    background: var(--warning-100);
+    color: var(--warning-700);
+}
+
+.status-badge.inactive {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
+.bay-info {
+    padding: 1rem 1.5rem;
+}
+
+.bay-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+}
+
+.bay-description {
+    color: var(--gray-600);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.bay-specs {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.spec-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.spec-item i {
+    color: var(--primary-500);
+}
+
+.current-service {
+    padding: 1rem 1.5rem;
+    background: var(--warning-50);
+    border-top: 1px solid var(--warning-200);
+    border-bottom: 1px solid var(--warning-200);
+}
+
+.service-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--warning-700);
+    font-size: 0.875rem;
+}
+
+.order-info {
+    margin-bottom: 0.5rem;
+}
+
+.order-number {
+    font-weight: 600;
+    color: var(--gray-900);
+    font-size: 0.875rem;
+}
+
+.customer-name {
+    color: var(--gray-700);
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.vehicle-info {
+    color: var(--gray-600);
+    font-size: 0.75rem;
+}
+
+.service-time {
+    color: var(--warning-700);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.bay-features {
+    padding: 1rem 1.5rem;
+}
+
+.features-list {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.feature-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.feature-badge.active {
+    background: var(--info-100);
+    color: var(--info-700);
+}
+
+.bay-actions {
+    padding: 1rem 1.5rem;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.bay-actions .btn-sm {
+    flex: 1;
+    min-width: auto;
+}
+
+/* Empty State */
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 2px dashed var(--gray-300);
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: var(--gray-400);
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--gray-600);
+    margin-bottom: 2rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Modal Styles */
+.selected-bay-info {
+    padding: 0.75rem;
+    background: var(--primary-50);
+    border-radius: var(--radius-md);
+    color: var(--primary-700);
+    margin-top: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .overview-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    .bays-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .bay-actions {
+        flex-direction: column;
+    }
+    
+    .bay-actions .btn-sm {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+// Bay management functions
+function refreshBayStatus() {
+    // Refresh bay status via AJAX
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/bay/status/`)
+        .then(response => response.json())
+        .then(data => {
+            updateBayDisplay(data);
+        })
+        .catch(error => {
+            console.error('Error refreshing bay status:', error);
+            showAlert('Error refreshing bay status', 'error');
+        });
+}
+
+function updateBayDisplay(data) {
+    // Update bay cards based on status data
+    data.bays.forEach(bay => {
+        const bayCard = document.querySelector(`[data-bay-id="${bay.id}"]`);
+        if (bayCard) {
+            // Update status classes
+            bayCard.className = bayCard.className.replace(/\b(available|occupied|inactive)\b/g, '');
+            if (bay.is_occupied) {
+                bayCard.classList.add('occupied');
+            } else if (!bay.is_available) {
+                bayCard.classList.add('inactive');
+            } else {
+                bayCard.classList.add('available');
+            }
+            
+            // Update status badge
+            const statusBadge = bayCard.querySelector('.status-badge');
+            if (statusBadge) {
+                statusBadge.className = 'status-badge';
+                if (bay.is_occupied) {
+                    statusBadge.classList.add('occupied');
+                    statusBadge.innerHTML = '<i class="fas fa-car"></i> Occupied';
+                } else if (!bay.is_available) {
+                    statusBadge.classList.add('inactive');
+                    statusBadge.innerHTML = '<i class="fas fa-times-circle"></i> Inactive';
+                } else {
+                    statusBadge.classList.add('available');
+                    statusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Available';
+                }
+            }
+        }
+    });
+    
+    // Update overview stats
+    updateOverviewStats(data.bays);
+}
+
+function updateOverviewStats(bays) {
+    let availableCount = 0;
+    let occupiedCount = 0;
+    let maintenanceCount = 0;
+    
+    bays.forEach(bay => {
+        if (bay.is_occupied) {
+            occupiedCount++;
+        } else if (bay.is_available) {
+            availableCount++;
+        } else {
+            maintenanceCount++;
+        }
+    });
+    
+    document.getElementById('available-count').textContent = availableCount;
+    document.getElementById('occupied-count').textContent = occupiedCount;
+    document.getElementById('maintenance-count').textContent = maintenanceCount;
+}
+
+function assignOrderToBay(bayId) {
+    // Get available orders for assignment
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/available-orders/`)
+        .then(response => response.json())
+        .then(data => {
+            const orderSelect = document.getElementById('orderSelect');
+            orderSelect.innerHTML = '<option value="">Choose an order...</option>';
+            
+            data.orders.forEach(order => {
+                const option = document.createElement('option');
+                option.value = order.id;
+                option.textContent = `${order.order_number} - ${order.customer_name} (${order.vehicle_registration})`;
+                orderSelect.appendChild(option);
+            });
+            
+            document.getElementById('selectedBayId').value = bayId;
+            const bayCard = document.querySelector(`[data-bay-id="${bayId}"]`);
+            const bayNumber = bayCard.getAttribute('data-bay-number');
+            const bayName = bayCard.querySelector('.bay-name').textContent;
+            document.getElementById('selectedBayName').textContent = `Bay ${bayNumber} - ${bayName}`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('assignOrderModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error loading orders:', error);
+            showAlert('Error loading available orders', 'error');
+        });
+}
+
+function submitAssignment() {
+    const formData = new FormData(document.getElementById('assignOrderForm'));
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/orders/${formData.get('order_id')}/assign-bay/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCsrfToken()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('assignOrderModal'));
+            modal.hide();
+            refreshBayStatus();
+        } else {
+            showAlert(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error assigning order:', error);
+        showAlert('Error assigning order to bay', 'error');
+    });
+}
+
+function completeService(orderId) {
+    if (confirm('Mark this service as completed?')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/complete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken()
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                showAlert('Service completed successfully', 'success');
+                refreshBayStatus();
+            } else {
+                showAlert('Error completing service', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error completing service:', error);
+            showAlert('Error completing service', 'error');
+        });
+    }
+}
+
+function toggleBayStatus(bayId, activate) {
+    const action = activate ? 'activate' : 'deactivate';
+    if (confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} this service bay?`)) {
+        fetch(`/business/{{ request.tenant.slug }}/services/bays/${bayId}/toggle-status/`, {
+            method: 'POST',
+            body: JSON.stringify({ is_active: activate }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                refreshBayStatus();
+            } else {
+                showAlert(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error toggling bay status:', error);
+            showAlert('Error updating bay status', 'error');
+        });
+    }
+}
+
+function freeBay(bayId) {
+    if (confirm('Force free this service bay? This will end any current service.')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/bays/${bayId}/force-free/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken()
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                refreshBayStatus();
+            } else {
+                showAlert(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error freeing bay:', error);
+            showAlert('Error freeing service bay', 'error');
+        });
+    }
+}
+
+// Utility functions
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+}
+
+function showAlert(message, type) {
+    // Create and show alert
+    const alertContainer = document.getElementById('alert-container') || createAlertContainer();
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    alertContainer.appendChild(alert);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+function createAlertContainer() {
+    const container = document.createElement('div');
+    container.id = 'alert-container';
+    container.style.position = 'fixed';
+    container.style.top = '20px';
+    container.style.right = '20px';
+    container.style.zIndex = '9999';
+    container.style.maxWidth = '400px';
+    document.body.appendChild(container);
+    return container;
+}
+
+// Auto-refresh bay status every 30 seconds
+setInterval(refreshBayStatus, 30000);
+
+// Refresh on page load
+document.addEventListener('DOMContentLoaded', function() {
+    refreshBayStatus();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,716 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="package-detail">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <div class="breadcrumb-nav">
+                <a href="/business/{{ request.tenant.slug }}/services/" class="breadcrumb-link">
+                    <i class="fas fa-car-wash"></i>
+                    Services
+                </a>
+                <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                <a href="/business/{{ request.tenant.slug }}/services/packages/" class="breadcrumb-link">
+                    Packages
+                </a>
+                <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                <span class="breadcrumb-current">{{ package.name }}</span>
+            </div>
+            <h1 class="page-title">{{ package.name }}</h1>
+            <div class="package-meta">
+                {% if package.is_popular %}
+                    <span class="package-badge popular">
+                        <i class="fas fa-star"></i>
+                        Popular
+                    </span>
+                {% endif %}
+                {% if package.discount_percentage > 0 %}
+                    <span class="package-badge discount">
+                        <i class="fas fa-tag"></i>
+                        {{ package.discount_percentage|floatformat:0 }}% OFF
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="page-actions">
+            {% if user_role in 'owner,manager' %}
+            <a href="/business/{{ request.tenant.slug }}/services/packages/{{ package.id }}/edit/" class="btn btn-outline-primary">
+                <i class="fas fa-edit"></i>
+                Edit Package
+            </a>
+            {% endif %}
+            <button class="btn btn-primary" onclick="addPackageToOrder('{{ package.id }}')">
+                <i class="fas fa-plus"></i>
+                Add to Order
+            </button>
+        </div>
+    </div>
+
+    <div class="package-content">
+        <div class="row">
+            <!-- Main Content -->
+            <div class="col-lg-8">
+                <!-- Package Image -->
+                <div class="package-image-section">
+                    {% if package.image %}
+                        <img src="{{ package.image.url }}" alt="{{ package.name }}" class="package-main-image">
+                    {% else %}
+                        <div class="package-placeholder-large">
+                            <i class="fas fa-box"></i>
+                            <p>No image available</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Description -->
+                <div class="content-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-info-circle"></i>
+                        Package Description
+                    </h3>
+                    <div class="package-description">
+                        {{ package.description|linebreaks }}
+                    </div>
+                </div>
+
+                <!-- Included Services -->
+                <div class="content-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-list-check"></i>
+                        Included Services
+                    </h3>
+                    <div class="services-list">
+                        {% for package_service in package_services %}
+                        <div class="service-item">
+                            <div class="service-info">
+                                <div class="service-name">
+                                    <strong>{{ package_service.service.name }}</strong>
+                                    {% if package_service.quantity > 1 %}
+                                        <span class="quantity-badge">x{{ package_service.quantity }}</span>
+                                    {% endif %}
+                                    {% if package_service.is_optional %}
+                                        <span class="optional-badge">Optional</span>
+                                    {% endif %}
+                                </div>
+                                <div class="service-description">
+                                    {{ package_service.service.description|truncatewords:15 }}
+                                </div>
+                                <div class="service-meta">
+                                    <span class="duration">
+                                        <i class="fas fa-clock"></i>
+                                        {{ package_service.service.estimated_duration }} min
+                                    </span>
+                                    <span class="category">
+                                        <i class="{{ package_service.service.category.icon }}"></i>
+                                        {{ package_service.service.category.name }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="service-pricing">
+                                {% if package_service.custom_price %}
+                                    <div class="package-price">KES {{ package_service.custom_price }}</div>
+                                    {% if package_service.custom_price != package_service.service.base_price %}
+                                        <div class="regular-price">
+                                            Regular: KES {{ package_service.service.base_price }}
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <div class="package-price">KES {{ package_service.service.base_price }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Package Details -->
+                <div class="content-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-cogs"></i>
+                        Package Details
+                    </h3>
+                    <div class="details-grid">
+                        <div class="detail-card">
+                            <div class="detail-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="detail-content">
+                                <h5>Total Duration</h5>
+                                <p>{{ package.estimated_duration }} minutes</p>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-card">
+                            <div class="detail-icon">
+                                <i class="fas fa-cogs"></i>
+                            </div>
+                            <div class="detail-content">
+                                <h5>Services Included</h5>
+                                <p>{{ package.service_count }} service{{ package.service_count|pluralize }}</p>
+                            </div>
+                        </div>
+                        
+                        {% if package.valid_from or package.valid_until %}
+                        <div class="detail-card">
+                            <div class="detail-icon">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                            <div class="detail-content">
+                                <h5>Validity Period</h5>
+                                {% if package.valid_from and package.valid_until %}
+                                    <p>{{ package.valid_from|date:"M d" }} - {{ package.valid_until|date:"M d, Y" }}</p>
+                                {% elif package.valid_from %}
+                                    <p>From {{ package.valid_from|date:"M d, Y" }}</p>
+                                {% elif package.valid_until %}
+                                    <p>Until {{ package.valid_until|date:"M d, Y" }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Pricing Card -->
+                <div class="pricing-card">
+                    <h3 class="pricing-title">
+                        <i class="fas fa-money-bill-wave"></i>
+                        Package Pricing
+                    </h3>
+                    
+                    {% if package.discount_percentage > 0 %}
+                        <div class="price-breakdown">
+                            <div class="original-pricing">
+                                <span class="label">Regular Price:</span>
+                                <span class="original-price">KES {{ package.original_price|floatformat:0 }}</span>
+                            </div>
+                            <div class="discount-info">
+                                <span class="label">Discount ({{ package.discount_percentage|floatformat:0 }}%):</span>
+                                <span class="discount-amount">-KES {{ package.savings_amount|floatformat:0 }}</span>
+                            </div>
+                            <hr>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="price-display">
+                        <div class="main-price">
+                            KES {{ package.total_price|floatformat:0 }}
+                        </div>
+                        {% if package.discount_percentage > 0 %}
+                            <div class="savings-highlight">
+                                You save KES {{ package.savings_amount|floatformat:0 }}!
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="pricing-note">
+                        <i class="fas fa-info-circle"></i>
+                        Package price is fixed regardless of individual service pricing changes
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="actions-card">
+                    <h3 class="actions-title">
+                        <i class="fas fa-bolt"></i>
+                        Quick Actions
+                    </h3>
+                    <div class="action-buttons">
+                        <button class="btn btn-success btn-block" onclick="addPackageToOrder('{{ package.id }}')">
+                            <i class="fas fa-plus"></i>
+                            Add to Order
+                        </button>
+                        <button class="btn btn-outline-primary btn-block" onclick="createCustomPackage('{{ package.id }}')">
+                            <i class="fas fa-copy"></i>
+                            Duplicate Package
+                        </button>
+                        {% if user_role in 'owner,manager' %}
+                        <button class="btn btn-outline-info btn-block" onclick="viewPackageAnalytics('{{ package.id }}')">
+                            <i class="fas fa-chart-line"></i>
+                            View Analytics
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Package Status -->
+                <div class="status-card">
+                    <h3 class="status-title">
+                        <i class="fas fa-info"></i>
+                        Package Status
+                    </h3>
+                    <div class="status-info">
+                        <div class="status-item">
+                            <span class="status-label">Status:</span>
+                            <span class="status-value {% if package.is_active %}active{% else %}inactive{% endif %}">
+                                {% if package.is_active %}
+                                    <i class="fas fa-check-circle"></i> Active
+                                {% else %}
+                                    <i class="fas fa-times-circle"></i> Inactive
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        {% if package.valid_from or package.valid_until %}
+                        <div class="status-item">
+                            <span class="status-label">Validity:</span>
+                            <span class="status-value">
+                                {% now "Y-m-d" as today %}
+                                {% if package.valid_from and package.valid_from|date:"Y-m-d" > today %}
+                                    <i class="fas fa-clock"></i> Not yet active
+                                {% elif package.valid_until and package.valid_until|date:"Y-m-d" < today %}
+                                    <i class="fas fa-exclamation-triangle"></i> Expired
+                                {% else %}
+                                    <i class="fas fa-check-circle"></i> Valid
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Package Detail Styles */
+.package-detail {
+    padding: 0;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.breadcrumb-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.breadcrumb-link {
+    color: var(--primary-600);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.breadcrumb-link:hover {
+    color: var(--primary-700);
+}
+
+.breadcrumb-separator {
+    color: var(--gray-400);
+    font-size: 0.75rem;
+}
+
+.breadcrumb-current {
+    color: var(--gray-600);
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.package-meta {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.package-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.package-badge.popular {
+    background: var(--warning-100);
+    color: var(--warning-700);
+}
+
+.package-badge.discount {
+    background: var(--error-100);
+    color: var(--error-700);
+}
+
+.page-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Main Content */
+.package-image-section {
+    margin-bottom: 2rem;
+}
+
+.package-main-image {
+    width: 100%;
+    max-height: 400px;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.package-placeholder-large {
+    width: 100%;
+    height: 400px;
+    background: linear-gradient(135deg, var(--gray-100), var(--gray-50));
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-400);
+    border: 2px dashed var(--gray-300);
+}
+
+.package-placeholder-large i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.content-section {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-title i {
+    color: var(--primary-600);
+}
+
+.package-description {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--gray-700);
+}
+
+/* Services List */
+.services-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.service-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.5rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+}
+
+.service-info {
+    flex: 1;
+}
+
+.service-name {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.service-name strong {
+    color: var(--gray-900);
+    font-size: 1.125rem;
+}
+
+.quantity-badge {
+    background: var(--primary-100);
+    color: var(--primary-700);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.optional-badge {
+    background: var(--warning-100);
+    color: var(--warning-700);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.service-description {
+    color: var(--gray-600);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+}
+
+.service-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+}
+
+.service-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--gray-600);
+}
+
+.service-meta i {
+    color: var(--primary-500);
+}
+
+.service-pricing {
+    text-align: right;
+    flex-shrink: 0;
+    margin-left: 1rem;
+}
+
+.package-price {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--primary-600);
+    margin-bottom: 0.25rem;
+}
+
+.regular-price {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    text-decoration: line-through;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.detail-card {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+}
+
+.detail-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--primary-100);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-600);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.detail-content h5 {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--gray-900);
+}
+
+.detail-content p {
+    margin-bottom: 0;
+    color: var(--gray-700);
+}
+
+/* Sidebar Cards */
+.pricing-card, .actions-card, .status-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+}
+
+.pricing-title, .actions-title, .status-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pricing-title i, .actions-title i, .status-title i {
+    color: var(--primary-600);
+}
+
+.price-breakdown {
+    margin-bottom: 1rem;
+}
+
+.original-pricing, .discount-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.label {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.original-price {
+    color: var(--gray-500);
+    text-decoration: line-through;
+}
+
+.discount-amount {
+    color: var(--error-600);
+    font-weight: 500;
+}
+
+.main-price {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-600);
+    margin-bottom: 0.5rem;
+}
+
+.savings-highlight {
+    color: var(--success-600);
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.pricing-note {
+    background: var(--info-50);
+    border: 1px solid var(--info-200);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--info-700);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.btn-block {
+    width: 100%;
+    justify-content: center;
+}
+
+.status-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.status-label {
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.status-value {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 600;
+}
+
+.status-value.active {
+    color: var(--success-600);
+}
+
+.status-value.inactive {
+    color: var(--error-600);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .page-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .service-item {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .service-pricing {
+        text-align: left;
+        margin-left: 0;
+    }
+    
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function addPackageToOrder(packageId) {
+    // Navigate to quick order with package pre-selected
+    window.location.href = `/business/{{ request.tenant.slug }}/services/orders/quick/?package=${packageId}`;
+}
+
+function createCustomPackage(packageId) {
+    // Navigate to package creation with this package as template
+    window.location.href = `/business/{{ request.tenant.slug }}/services/packages/create/?template=${packageId}`;
+}
+
+function viewPackageAnalytics(packageId) {
+    // Navigate to analytics page for this package
+    window.location.href = `/business/{{ request.tenant.slug }}/reports/analytics/?module=packages&package=${packageId}`;
+}
+</script>
+{% endblock %}

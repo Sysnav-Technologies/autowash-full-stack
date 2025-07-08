@@ -1,0 +1,1373 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="package-form-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <div class="breadcrumb-nav">
+                <a href="/business/{{ request.tenant.slug }}/services/" class="breadcrumb-link">
+                    <i class="fas fa-car-wash"></i>
+                    Services
+                </a>
+                <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                <a href="/business/{{ request.tenant.slug }}/services/packages/" class="breadcrumb-link">
+                    Packages
+                </a>
+                <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                <span class="breadcrumb-current">
+                    {% if package %}Edit {{ package.name }}{% else %}Create Package{% endif %}
+                </span>
+            </div>
+            <h1 class="page-title">
+                <i class="fas fa-box"></i>
+                {% if package %}Edit Service Package{% else %}Create Service Package{% endif %}
+            </h1>
+            <p class="page-subtitle">
+                {% if package %}Update package details and services{% else %}Bundle services together for better value{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="form-container">
+        <form method="post" enctype="multipart/form-data" class="package-form-content">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-lg-8">
+                    <!-- Basic Information -->
+                    <div class="form-card">
+                        <div class="form-header">
+                            <h3 class="form-title">
+                                <i class="fas fa-info-circle"></i>
+                                Basic Information
+                            </h3>
+                        </div>
+                        
+                        <div class="card-content">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="form-group">
+                                        <label for="name" class="form-label required">
+                                            <i class="fas fa-tag"></i>
+                                            Package Name
+                                        </label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               id="name" 
+                                               name="name" 
+                                               value="{{ package.name|default:'' }}" 
+                                               placeholder="e.g., Premium Wash & Wax Package"
+                                               required>
+                                        <div class="form-help">Enter a descriptive name for this package</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            <i class="fas fa-star"></i>
+                                            Package Features
+                                        </label>
+                                        <div class="feature-toggles">
+                                            <div class="form-check">
+                                                <input class="form-check-input" 
+                                                       type="checkbox" 
+                                                       id="is_popular" 
+                                                       name="is_popular"
+                                                       {% if package.is_popular %}checked{% endif %}>
+                                                <label class="form-check-label" for="is_popular">
+                                                    Mark as Popular
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" 
+                                                       type="checkbox" 
+                                                       id="is_active" 
+                                                       name="is_active"
+                                                       {% if package.is_active or not package %}checked{% endif %}>
+                                                <label class="form-check-label" for="is_active">
+                                                    Package Active
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="description" class="form-label required">
+                                    <i class="fas fa-align-left"></i>
+                                    Description
+                                </label>
+                                <textarea class="form-control" 
+                                          id="description" 
+                                          name="description" 
+                                          rows="4" 
+                                          placeholder="Describe what's included in this package..."
+                                          required>{{ package.description|default:'' }}</textarea>
+                                <div class="form-help">Detailed description of the package and its benefits</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="image" class="form-label">
+                                    <i class="fas fa-image"></i>
+                                    Package Image
+                                </label>
+                                <input type="file" 
+                                       class="form-control" 
+                                       id="image" 
+                                       name="image" 
+                                       accept="image/*">
+                                {% if package.image %}
+                                    <div class="current-image">
+                                        <img src="{{ package.image.url }}" alt="Current image" class="img-thumbnail">
+                                        <small class="text-muted">Current image (upload new to replace)</small>
+                                    </div>
+                                {% endif %}
+                                <div class="form-help">Upload an image to represent this package (optional)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Package Services -->
+                    <div class="form-card">
+                        <div class="form-header">
+                            <h3 class="form-title">
+                                <i class="fas fa-list-check"></i>
+                                Included Services
+                            </h3>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="showServiceSelector()">
+                                <i class="fas fa-plus"></i>
+                                Add Service
+                            </button>
+                        </div>
+                        
+                        <div class="card-content">
+                            <div id="selectedServices" class="selected-services">
+                                <!-- Services will be added here dynamically -->
+                            </div>
+                            
+                            <div id="emptyServicesMessage" class="empty-services">
+                                <div class="empty-icon">
+                                    <i class="fas fa-plus-circle"></i>
+                                </div>
+                                <p>No services added yet. Click "Add Service" to include services in this package.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing & Duration -->
+                    <div class="form-card">
+                        <div class="form-header">
+                            <h3 class="form-title">
+                                <i class="fas fa-money-bill-wave"></i>
+                                Pricing & Duration
+                            </h3>
+                        </div>
+                        
+                        <div class="card-content">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="total_price" class="form-label required">
+                                            <i class="fas fa-tag"></i>
+                                            Package Price (KES)
+                                        </label>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="total_price" 
+                                               name="total_price" 
+                                               value="{{ package.total_price|default:'0' }}" 
+                                               min="0" 
+                                               step="0.01"
+                                               required>
+                                        <div class="form-help">Final price customers will pay for this package</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="discount_percentage" class="form-label">
+                                            <i class="fas fa-percent"></i>
+                                            Discount Percentage
+                                        </label>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="discount_percentage" 
+                                               name="discount_percentage" 
+                                               value="{{ package.discount_percentage|default:'0' }}" 
+                                               min="0" 
+                                               max="100" 
+                                               step="0.1">
+                                        <div class="form-help">Discount percentage for marketing display</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="estimated_duration" class="form-label required">
+                                    <i class="fas fa-clock"></i>
+                                    Estimated Duration (minutes)
+                                </label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="estimated_duration" 
+                                       name="estimated_duration" 
+                                       value="{{ package.estimated_duration|default:'0' }}" 
+                                       min="1"
+                                       required>
+                                <div class="form-help">Total time needed to complete all services in this package</div>
+                            </div>
+
+                            <!-- Price Breakdown -->
+                            <div class="price-breakdown" id="priceBreakdown">
+                                <h5>Price Breakdown</h5>
+                                <div class="breakdown-content">
+                                    <div class="breakdown-item">
+                                        <span>Individual Services Total:</span>
+                                        <span id="servicesTotal">KES 0</span>
+                                    </div>
+                                    <div class="breakdown-item">
+                                        <span>Package Price:</span>
+                                        <span id="packagePrice">KES 0</span>
+                                    </div>
+                                    <div class="breakdown-item savings">
+                                        <span>Customer Savings:</span>
+                                        <span id="customerSavings">KES 0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Validity Period -->
+                    <div class="form-card">
+                        <div class="form-header">
+                            <h3 class="form-title">
+                                <i class="fas fa-calendar-alt"></i>
+                                Validity Period (Optional)
+                            </h3>
+                        </div>
+                        
+                        <div class="card-content">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="valid_from" class="form-label">
+                                            <i class="fas fa-calendar-plus"></i>
+                                            Valid From
+                                        </label>
+                                        <input type="date" 
+                                               class="form-control" 
+                                               id="valid_from" 
+                                               name="valid_from" 
+                                               value="{{ package.valid_from|date:'Y-m-d'|default:'' }}">
+                                        <div class="form-help">When this package becomes available</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="valid_until" class="form-label">
+                                            <i class="fas fa-calendar-minus"></i>
+                                            Valid Until
+                                        </label>
+                                        <input type="date" 
+                                               class="form-control" 
+                                               id="valid_until" 
+                                               name="valid_until" 
+                                               value="{{ package.valid_until|date:'Y-m-d'|default:'' }}">
+                                        <div class="form-help">When this package expires</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="form-actions">
+                        <a href="/business/{{ request.tenant.slug }}/services/packages/" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            {% if package %}Update Package{% else %}Create Package{% endif %}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="col-lg-4">
+                    <!-- Package Preview -->
+                    <div class="preview-card">
+                        <h3 class="preview-title">
+                            <i class="fas fa-eye"></i>
+                            Package Preview
+                        </h3>
+                        
+                        <div class="package-preview" id="packagePreview">
+                            <div class="preview-image">
+                                <div class="preview-placeholder" id="previewImage">
+                                    <i class="fas fa-box"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="preview-content">
+                                <h4 class="preview-name" id="previewName">New Package</h4>
+                                <p class="preview-description" id="previewDescription">Package description...</p>
+                                
+                                <div class="preview-stats">
+                                    <div class="preview-stat">
+                                        <i class="fas fa-cogs"></i>
+                                        <span id="previewServiceCount">0 Services</span>
+                                    </div>
+                                    <div class="preview-stat">
+                                        <i class="fas fa-clock"></i>
+                                        <span id="previewDuration">0 min</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="preview-pricing">
+                                    <div class="preview-price" id="previewPrice">KES 0</div>
+                                    <div class="preview-savings" id="previewSavings">Save KES 0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Service Calculator -->
+                    <div class="calculator-card">
+                        <h3 class="calculator-title">
+                            <i class="fas fa-calculator"></i>
+                            Quick Calculator
+                        </h3>
+                        
+                        <div class="calculator-content">
+                            <button type="button" class="btn btn-outline-primary btn-sm btn-block" onclick="calculateFromServices()">
+                                <i class="fas fa-magic"></i>
+                                Auto-Calculate Price
+                            </button>
+                            <p class="calculator-help">Automatically set package price based on included services</p>
+                            
+                            <button type="button" class="btn btn-outline-info btn-sm btn-block" onclick="calculateDuration()">
+                                <i class="fas fa-clock"></i>
+                                Auto-Calculate Duration
+                            </button>
+                            <p class="calculator-help">Set duration based on service times</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Service Selector Modal -->
+<div class="modal fade" id="serviceSelectorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Services to Package</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="service-search">
+                    <input type="text" 
+                           class="form-control" 
+                           id="serviceSearch" 
+                           placeholder="Search services...">
+                </div>
+                
+                <div class="service-categories" id="serviceCategories">
+                    <!-- Categories and services will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="addSelectedServices()">Add Selected Services</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden field to store services data -->
+<input type="hidden" id="servicesData" name="services_data" value="">
+
+<style>
+/* CSS Variables */
+:root {
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-500: #3b82f6;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --success-100: #dcfce7;
+    --success-600: #16a34a;
+    --warning-100: #fef3c7;
+    --warning-600: #d97706;
+    --error-100: #fee2e2;
+    --error-500: #ef4444;
+    --info-100: #dbeafe;
+    --info-600: #2563eb;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+/* Package Form Styles */
+.package-form-page {
+    padding: 0;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.breadcrumb-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.breadcrumb-link {
+    color: var(--primary-600);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.breadcrumb-link:hover {
+    color: var(--primary-700);
+}
+
+.breadcrumb-separator {
+    color: var(--gray-400);
+    font-size: 0.75rem;
+}
+
+.breadcrumb-current {
+    color: var(--gray-600);
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-subtitle {
+    color: var(--gray-600);
+    font-size: 1.125rem;
+}
+
+/* Form Container */
+.form-container {
+    max-width: 1200px;
+}
+
+.form-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.form-header {
+    background: var(--gray-50);
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.form-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-title i {
+    color: var(--primary-600);
+}
+
+.card-content {
+    padding: 2rem;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.form-label.required::after {
+    content: '*';
+    color: var(--error-500);
+    margin-left: 0.25rem;
+}
+
+.form-label i {
+    color: var(--primary-500);
+    width: 16px;
+}
+
+.form-control, .form-select {
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-100);
+    outline: none;
+}
+
+.form-help {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-top: 0.375rem;
+}
+
+.feature-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-check-input {
+    margin: 0;
+}
+
+.current-image {
+    margin-top: 0.75rem;
+}
+
+.img-thumbnail {
+    max-width: 200px;
+    max-height: 150px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+}
+
+/* Selected Services */
+.selected-services {
+    min-height: 100px;
+}
+
+.service-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.5rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    margin-bottom: 1rem;
+}
+
+.service-info {
+    flex: 1;
+}
+
+.service-name {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.service-name strong {
+    color: var(--gray-900);
+    font-size: 1.125rem;
+}
+
+.service-category {
+    background: var(--info-100);
+    color: var(--info-600);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.service-details {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.service-details span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.service-details i {
+    color: var(--primary-500);
+}
+
+.service-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    flex-shrink: 0;
+    margin-left: 1rem;
+}
+
+.quantity-control, .price-control, .optional-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.quantity-control label, .price-control label {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.quantity-input, .price-input {
+    width: 80px;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.remove-service {
+    margin-top: 1.5rem;
+}
+
+.empty-services {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--gray-500);
+}
+
+.empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: var(--gray-400);
+}
+
+/* Price Breakdown */
+.price-breakdown {
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.price-breakdown h5 {
+    margin-bottom: 1rem;
+    color: var(--gray-900);
+}
+
+.breakdown-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+}
+
+.breakdown-item.savings {
+    border-top: 1px solid var(--gray-200);
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    color: var(--success-600);
+    font-weight: 600;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: var(--primary-600);
+    color: white;
+    border-color: var(--primary-600);
+}
+
+.btn-primary:hover {
+    background: var(--primary-700);
+    border-color: var(--primary-700);
+}
+
+.btn-outline-secondary {
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--gray-50);
+    color: var(--gray-700);
+}
+
+.btn-outline-primary {
+    color: var(--primary-600);
+    border-color: var(--primary-300);
+}
+
+.btn-outline-primary:hover {
+    background: var(--primary-50);
+    color: var(--primary-700);
+}
+
+.btn-outline-info {
+    color: var(--info-600);
+    border-color: var(--info-300);
+}
+
+.btn-outline-info:hover {
+    background: var(--info-50);
+    color: var(--info-700);
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-block {
+    width: 100%;
+    justify-content: center;
+}
+
+/* Sidebar Cards */
+.preview-card, .calculator-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    margin-bottom: 2rem;
+}
+
+.preview-title, .calculator-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+    padding: 1.5rem 1.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.preview-title i, .calculator-title i {
+    color: var(--primary-600);
+}
+
+/* Package Preview */
+.package-preview {
+    padding: 0 1.5rem 1.5rem;
+}
+
+.preview-image {
+    margin-bottom: 1rem;
+}
+
+.preview-placeholder {
+    width: 100%;
+    height: 150px;
+    background: var(--gray-100);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-400);
+    font-size: 2rem;
+    border: 2px dashed var(--gray-300);
+}
+
+.preview-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+}
+
+.preview-description {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.preview-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.preview-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.preview-stat i {
+    color: var(--primary-500);
+}
+
+.preview-pricing {
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+.preview-price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-600);
+    margin-bottom: 0.25rem;
+}
+
+.preview-savings {
+    color: var(--success-600);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Calculator Content */
+.calculator-content {
+    padding: 0 1.5rem 1.5rem;
+}
+
+.calculator-help {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin: 0.5rem 0 1rem;
+    line-height: 1.4;
+}
+
+/* Modal Styles */
+.modal-dialog {
+    max-width: 800px;
+}
+
+.service-search {
+    margin-bottom: 1.5rem;
+}
+
+.service-categories {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.category-section {
+    margin-bottom: 1.5rem;
+}
+
+.category-header {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.service-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.service-option:hover {
+    background: var(--gray-50);
+    border-color: var(--primary-300);
+}
+
+.service-option.selected {
+    background: var(--primary-50);
+    border-color: var(--primary-500);
+}
+
+.service-option-info {
+    flex: 1;
+}
+
+.service-option-name {
+    font-weight: 500;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+}
+
+.service-option-details {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.service-option-price {
+    font-weight: 600;
+    color: var(--primary-600);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .form-actions {
+        flex-direction: column-reverse;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .service-item {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .service-controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        margin-left: 0;
+    }
+    
+    .preview-stats {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form elements
+    const nameInput = document.getElementById('name');
+    const descriptionInput = document.getElementById('description');
+    const totalPriceInput = document.getElementById('total_price');
+    const estimatedDurationInput = document.getElementById('estimated_duration');
+    const imageInput = document.getElementById('image');
+    
+    // Preview elements
+    const previewName = document.getElementById('previewName');
+    const previewDescription = document.getElementById('previewDescription');
+    const previewServiceCount = document.getElementById('previewServiceCount');
+    const previewDuration = document.getElementById('previewDuration');
+    const previewPrice = document.getElementById('previewPrice');
+    const previewSavings = document.getElementById('previewSavings');
+    const previewImage = document.getElementById('previewImage');
+    
+    // Price breakdown elements
+    const servicesTotal = document.getElementById('servicesTotal');
+    const packagePrice = document.getElementById('packagePrice');
+    const customerSavings = document.getElementById('customerSavings');
+    
+    // Services management
+    let selectedServices = [];
+    
+    // Update preview function
+    function updatePreview() {
+        // Update name
+        const name = nameInput.value.trim() || 'New Package';
+        previewName.textContent = name;
+        
+        // Update description
+        const description = descriptionInput.value.trim() || 'Package description...';
+        previewDescription.textContent = description.length > 80 ? 
+            description.substring(0, 80) + '...' : description;
+        
+        // Update service count
+        previewServiceCount.textContent = `${selectedServices.length} Service${selectedServices.length !== 1 ? 's' : ''}`;
+        
+        // Update duration
+        const duration = estimatedDurationInput.value || '0';
+        previewDuration.textContent = `${duration} min`;
+        
+        // Update price
+        const price = totalPriceInput.value || '0';
+        previewPrice.textContent = `KES ${parseFloat(price).toLocaleString()}`;
+        
+        // Update savings
+        updatePriceBreakdown();
+    }
+    
+    function updatePriceBreakdown() {
+        const packagePriceValue = parseFloat(totalPriceInput.value) || 0;
+        const servicesValue = calculateServicesTotal();
+        const savings = Math.max(0, servicesValue - packagePriceValue);
+        
+        servicesTotal.textContent = `KES ${servicesValue.toLocaleString()}`;
+        packagePrice.textContent = `KES ${packagePriceValue.toLocaleString()}`;
+        customerSavings.textContent = `KES ${savings.toLocaleString()}`;
+        previewSavings.textContent = savings > 0 ? `Save KES ${savings.toLocaleString()}` : 'No savings';
+    }
+    
+    function calculateServicesTotal() {
+        return selectedServices.reduce((total, service) => {
+            return total + (parseFloat(service.price) * parseInt(service.quantity));
+        }, 0);
+    }
+    
+    function calculateServicesDuration() {
+        return selectedServices.reduce((total, service) => {
+            return total + (parseInt(service.duration) * parseInt(service.quantity));
+        }, 0);
+    }
+    
+    // Event listeners
+    if (nameInput) nameInput.addEventListener('input', updatePreview);
+    if (descriptionInput) descriptionInput.addEventListener('input', updatePreview);
+    if (totalPriceInput) totalPriceInput.addEventListener('input', updatePreview);
+    if (estimatedDurationInput) estimatedDurationInput.addEventListener('input', updatePreview);
+    
+    // Image preview
+    if (imageInput) {
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.innerHTML = `<img src="${e.target.result}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-md);">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+    
+    // Initialize preview
+    updatePreview();
+    
+    // Make functions global for onclick handlers
+    window.showServiceSelector = showServiceSelector;
+    window.addSelectedServices = addSelectedServices;
+    window.calculateFromServices = calculateFromServices;
+    window.calculateDuration = calculateDuration;
+});
+
+function showServiceSelector() {
+    // Load services via AJAX and show modal
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/services-list/`)
+        .then(response => response.json())
+        .then(data => {
+            populateServiceSelector(data.services);
+            const modal = new bootstrap.Modal(document.getElementById('serviceSelectorModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error loading services:', error);
+            alert('Error loading services. Please try again.');
+        });
+}
+
+function populateServiceSelector(services) {
+    const container = document.getElementById('serviceCategories');
+    container.innerHTML = '';
+    
+    // Group services by category
+    const categorizedServices = {};
+    services.forEach(service => {
+        const categoryName = service.category || 'Uncategorized';
+        if (!categorizedServices[categoryName]) {
+            categorizedServices[categoryName] = [];
+        }
+        categorizedServices[categoryName].push(service);
+    });
+    
+    // Create category sections
+    Object.keys(categorizedServices).forEach(categoryName => {
+        const categorySection = document.createElement('div');
+        categorySection.className = 'category-section';
+        
+        const categoryHeader = document.createElement('div');
+        categoryHeader.className = 'category-header';
+        categoryHeader.textContent = categoryName;
+        categorySection.appendChild(categoryHeader);
+        
+        categorizedServices[categoryName].forEach(service => {
+            const serviceOption = document.createElement('div');
+            serviceOption.className = 'service-option';
+            serviceOption.dataset.serviceId = service.id;
+            
+            serviceOption.innerHTML = `
+                <input type="checkbox" class="form-check-input service-checkbox" value="${service.id}">
+                <div class="service-option-info">
+                    <div class="service-option-name">${service.name}</div>
+                    <div class="service-option-details">
+                        <span><i class="fas fa-clock"></i> ${service.estimated_duration} min</span>
+                        <span class="service-option-price">KES ${parseFloat(service.base_price).toLocaleString()}</span>
+                    </div>
+                </div>
+            `;
+            
+            serviceOption.addEventListener('click', function(e) {
+                if (e.target.type !== 'checkbox') {
+                    const checkbox = serviceOption.querySelector('.service-checkbox');
+                    checkbox.checked = !checkbox.checked;
+                }
+                serviceOption.classList.toggle('selected', serviceOption.querySelector('.service-checkbox').checked);
+            });
+            
+            categorySection.appendChild(serviceOption);
+        });
+        
+        container.appendChild(categorySection);
+    });
+    
+    // Add search functionality
+    const searchInput = document.getElementById('serviceSearch');
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const serviceOptions = container.querySelectorAll('.service-option');
+        
+        serviceOptions.forEach(option => {
+            const serviceName = option.querySelector('.service-option-name').textContent.toLowerCase();
+            const isVisible = serviceName.includes(searchTerm);
+            option.style.display = isVisible ? 'flex' : 'none';
+        });
+    });
+}
+
+function addSelectedServices() {
+    const selectedCheckboxes = document.querySelectorAll('.service-checkbox:checked');
+    const selectedServicesContainer = document.getElementById('selectedServices');
+    const emptyMessage = document.getElementById('emptyServicesMessage');
+    
+    selectedCheckboxes.forEach(checkbox => {
+        const serviceId = checkbox.value;
+        const serviceOption = checkbox.closest('.service-option');
+        const serviceName = serviceOption.querySelector('.service-option-name').textContent;
+        const servicePrice = serviceOption.querySelector('.service-option-price').textContent.replace('KES ', '').replace(',', '');
+        const serviceDuration = serviceOption.querySelector('.service-option-details span').textContent.match(/\d+/)[0];
+        
+        // Check if service already added
+        if (document.querySelector(`[data-service-id="${serviceId}"]`)) {
+            return; // Skip if already added
+        }
+        
+        addServiceToPackage({
+            id: serviceId,
+            name: serviceName,
+            price: parseFloat(servicePrice),
+            duration: parseInt(serviceDuration),
+            quantity: 1,
+            is_optional: false
+        });
+    });
+    
+    // Hide modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('serviceSelectorModal'));
+    modal.hide();
+    
+    // Update UI
+    if (selectedServicesContainer.children.length > 0) {
+        emptyMessage.classList.add('d-none');
+    }
+    
+    updatePreview();
+}
+
+function addServiceToPackage(service) {
+    const container = document.getElementById('selectedServices');
+    
+    const serviceElement = document.createElement('div');
+    serviceElement.className = 'service-item';
+    serviceElement.dataset.serviceId = service.id;
+    
+    serviceElement.innerHTML = `
+        <div class="service-info">
+            <div class="service-name">
+                <strong>${service.name}</strong>
+                <span class="service-category">Service</span>
+            </div>
+            <div class="service-details">
+                <span class="service-duration">
+                    <i class="fas fa-clock"></i>
+                    ${service.duration} min
+                </span>
+                <span class="service-base-price">
+                    Base: KES ${service.price.toLocaleString()}
+                </span>
+            </div>
+        </div>
+        
+        <div class="service-controls">
+            <div class="quantity-control">
+                <label>Quantity:</label>
+                <input type="number" 
+                       class="form-control form-control-sm quantity-input" 
+                       value="${service.quantity}" 
+                       min="1" 
+                       max="10">
+            </div>
+            
+            <div class="price-control">
+                <label>Package Price:</label>
+                <input type="number" 
+                       class="form-control form-control-sm price-input" 
+                       value="${service.price}" 
+                       min="0" 
+                       step="0.01">
+            </div>
+            
+            <div class="optional-control">
+                <div class="form-check">
+                    <input class="form-check-input optional-checkbox" 
+                           type="checkbox" 
+                           ${service.is_optional ? 'checked' : ''}>
+                    <label class="form-check-label">Optional</label>
+                </div>
+            </div>
+            
+            <button type="button" class="btn btn-outline-danger btn-sm remove-service">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    // Add event listeners
+    const quantityInput = serviceElement.querySelector('.quantity-input');
+    const priceInput = serviceElement.querySelector('.price-input');
+    const optionalCheckbox = serviceElement.querySelector('.optional-checkbox');
+    const removeButton = serviceElement.querySelector('.remove-service');
+    
+    quantityInput.addEventListener('change', updateSelectedServices);
+    priceInput.addEventListener('input', updateSelectedServices);
+    optionalCheckbox.addEventListener('change', updateSelectedServices);
+    
+    removeButton.addEventListener('click', function() {
+        serviceElement.remove();
+        updateSelectedServices();
+        
+        // Show empty message if no services left
+        const remainingServices = document.querySelectorAll('.service-item');
+        if (remainingServices.length === 0) {
+            document.getElementById('emptyServicesMessage').classList.remove('d-none');
+        }
+    });
+    
+    container.appendChild(serviceElement);
+    updateSelectedServices();
+}
+
+function updateSelectedServices() {
+    const serviceItems = document.querySelectorAll('.service-item');
+    selectedServices = [];
+    
+    serviceItems.forEach(item => {
+        const serviceId = item.dataset.serviceId;
+        const quantity = parseInt(item.querySelector('.quantity-input').value);
+        const price = parseFloat(item.querySelector('.price-input').value);
+        const isOptional = item.querySelector('.optional-checkbox').checked;
+        const name = item.querySelector('.service-name strong').textContent;
+        const duration = parseInt(item.querySelector('.service-duration').textContent.match(/\d+/)[0]);
+        
+        selectedServices.push({
+            id: serviceId,
+            name: name,
+            quantity: quantity,
+            price: price,
+            duration: duration,
+            is_optional: isOptional
+        });
+    });
+    
+    // Update hidden field
+    document.getElementById('servicesData').value = JSON.stringify(selectedServices);
+    
+    updatePreview();
+}
+
+function calculateFromServices() {
+    const total = calculateServicesTotal();
+    const discount = total * 0.1; // 10% discount as example
+    const packagePrice = Math.max(0, total - discount);
+    
+    document.getElementById('total_price').value = packagePrice.toFixed(2);
+    updatePreview();
+}
+
+function calculateDuration() {
+    const total = calculateServicesDuration();
+    document.getElementById('estimated_duration').value = total;
+    updatePreview();
+}
+</script>
+{% endblock %}

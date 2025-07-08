@@ -1,0 +1,937 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="bay-form-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <div class="breadcrumb-nav">
+                <a href="/business/{{ request.tenant.slug }}/services/" class="breadcrumb-link">
+                    <i class="fas fa-car-wash"></i>
+                    Services
+                </a>
+                <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                <a href="/business/{{ request.tenant.slug }}/services/bays/" class="breadcrumb-link">
+                    Service Bays
+                </a>
+                <i class="fas fa-chevron-right breadcrumb-separator"></i>
+                <span class="breadcrumb-current">
+                    {% if bay %}Edit {{ bay.name }}{% else %}Create Bay{% endif %}
+                </span>
+            </div>
+            <h1 class="page-title">
+                <i class="fas fa-warehouse"></i>
+                {% if bay %}Edit Service Bay{% else %}Create Service Bay{% endif %}
+            </h1>
+            <p class="page-subtitle">
+                {% if bay %}Update the details for {{ bay.name }}{% else %}Set up a new washing station{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="form-container">
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Main Form -->
+                <div class="form-card">
+                    <div class="form-header">
+                        <h3 class="form-title">
+                            <i class="fas fa-info-circle"></i>
+                            Basic Information
+                        </h3>
+                    </div>
+                    
+                    <form method="post" class="bay-form-content">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="name" class="form-label required">
+                                        <i class="fas fa-tag"></i>
+                                        Bay Name
+                                    </label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="name" 
+                                           name="name" 
+                                           value="{{ bay.name|default:'' }}" 
+                                           placeholder="e.g., Premium Wash Bay"
+                                           required>
+                                    <div class="form-help">Enter a descriptive name for this service bay</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="bay_number" class="form-label required">
+                                        <i class="fas fa-hashtag"></i>
+                                        Bay Number
+                                    </label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="bay_number" 
+                                           name="bay_number" 
+                                           value="{{ bay.bay_number|default:'' }}" 
+                                           min="1" 
+                                           max="99"
+                                           placeholder="1"
+                                           required>
+                                    <div class="form-help">Unique number for this bay (1-99)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description" class="form-label">
+                                <i class="fas fa-align-left"></i>
+                                Description
+                            </label>
+                            <textarea class="form-control" 
+                                      id="description" 
+                                      name="description" 
+                                      rows="3" 
+                                      placeholder="Optional description of this service bay">{{ bay.description|default:'' }}</textarea>
+                            <div class="form-help">Additional details about this bay (optional)</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max_vehicle_size" class="form-label">
+                                <i class="fas fa-car"></i>
+                                Maximum Vehicle Size
+                            </label>
+                            <select class="form-select" id="max_vehicle_size" name="max_vehicle_size">
+                                <option value="small" {% if bay.max_vehicle_size == 'small' %}selected{% endif %}>
+                                    Small (Sedan, Hatchback)
+                                </option>
+                                <option value="medium" {% if bay.max_vehicle_size == 'medium' %}selected{% endif %}>
+                                    Medium (SUV, Pickup)
+                                </option>
+                                <option value="large" {% if bay.max_vehicle_size == 'large' %}selected{% endif %}>
+                                    Large (Van, Truck)
+                                </option>
+                                <option value="any" {% if bay.max_vehicle_size == 'any' or not bay %}selected{% endif %}>
+                                    Any Size
+                                </option>
+                            </select>
+                            <div class="form-help">Largest vehicle type this bay can accommodate</div>
+                        </div>
+
+                        <!-- Equipment & Features -->
+                        <div class="form-section">
+                            <h4 class="section-title">
+                                <i class="fas fa-tools"></i>
+                                Equipment & Features
+                            </h4>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check-card">
+                                        <div class="form-check">
+                                            <input class="form-check-input" 
+                                                   type="checkbox" 
+                                                   id="has_pressure_washer" 
+                                                   name="has_pressure_washer"
+                                                   {% if bay.has_pressure_washer or not bay %}checked{% endif %}>
+                                            <label class="form-check-label" for="has_pressure_washer">
+                                                <div class="check-icon">
+                                                    <i class="fas fa-tint"></i>
+                                                </div>
+                                                <div class="check-content">
+                                                    <strong>Pressure Washer</strong>
+                                                    <small>High-pressure water system</small>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-check-card">
+                                        <div class="form-check">
+                                            <input class="form-check-input" 
+                                                   type="checkbox" 
+                                                   id="has_vacuum" 
+                                                   name="has_vacuum"
+                                                   {% if bay.has_vacuum or not bay %}checked{% endif %}>
+                                            <label class="form-check-label" for="has_vacuum">
+                                                <div class="check-icon">
+                                                    <i class="fas fa-wind"></i>
+                                                </div>
+                                                <div class="check-content">
+                                                    <strong>Vacuum System</strong>
+                                                    <small>Interior cleaning equipment</small>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-check-card">
+                                        <div class="form-check">
+                                            <input class="form-check-input" 
+                                                   type="checkbox" 
+                                                   id="has_lift" 
+                                                   name="has_lift"
+                                                   {% if bay.has_lift %}checked{% endif %}>
+                                            <label class="form-check-label" for="has_lift">
+                                                <div class="check-icon">
+                                                    <i class="fas fa-arrow-up"></i>
+                                                </div>
+                                                <div class="check-content">
+                                                    <strong>Vehicle Lift</strong>
+                                                    <small>Hydraulic lifting system</small>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-check-card">
+                                        <div class="form-check">
+                                            <input class="form-check-input" 
+                                                   type="checkbox" 
+                                                   id="has_drainage" 
+                                                   name="has_drainage"
+                                                   {% if bay.has_drainage or not bay %}checked{% endif %}>
+                                            <label class="form-check-label" for="has_drainage">
+                                                <div class="check-icon">
+                                                    <i class="fas fa-water"></i>
+                                                </div>
+                                                <div class="check-content">
+                                                    <strong>Drainage System</strong>
+                                                    <small>Proper water drainage</small>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Status -->
+                        {% if bay %}
+                        <div class="form-section">
+                            <h4 class="section-title">
+                                <i class="fas fa-power-off"></i>
+                                Bay Status
+                            </h4>
+                            
+                            <div class="form-check-card active-toggle">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="is_active" 
+                                           name="is_active"
+                                           {% if bay.is_active %}checked{% endif %}>
+                                    <label class="form-check-label" for="is_active">
+                                        <div class="switch-content">
+                                            <strong>Bay Active</strong>
+                                            <small>Enable this bay for service operations</small>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Form Actions -->
+                        <div class="form-actions">
+                            <a href="/business/{{ request.tenant.slug }}/services/bays/" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i>
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                {% if bay %}Update Bay{% else %}Create Bay{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Preview Card -->
+                <div class="preview-card">
+                    <h3 class="preview-title">
+                        <i class="fas fa-eye"></i>
+                        Bay Preview
+                    </h3>
+                    
+                    <div class="bay-preview" id="bayPreview">
+                        <div class="preview-header">
+                            <div class="preview-number">
+                                <span class="preview-label">Bay</span>
+                                <span class="preview-bay-number" id="previewNumber">1</span>
+                            </div>
+                            <div class="preview-status">
+                                <span class="preview-badge available">
+                                    <i class="fas fa-check-circle"></i>
+                                    Available
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="preview-info">
+                            <h4 class="preview-name" id="previewName">New Service Bay</h4>
+                            <p class="preview-description" id="previewDescription">Bay description will appear here...</p>
+                            
+                            <div class="preview-specs">
+                                <div class="preview-spec">
+                                    <i class="fas fa-car"></i>
+                                    <span id="previewVehicleSize">Any Size</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="preview-features" id="previewFeatures">
+                            <div class="preview-feature-list">
+                                <!-- Features will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Help Card -->
+                <div class="help-card">
+                    <h3 class="help-title">
+                        <i class="fas fa-question-circle"></i>
+                        Setup Tips
+                    </h3>
+                    
+                    <div class="help-content">
+                        <div class="help-item">
+                            <div class="help-icon">
+                                <i class="fas fa-lightbulb"></i>
+                            </div>
+                            <div class="help-text">
+                                <strong>Bay Numbers</strong>
+                                <p>Use sequential numbers for easy identification by customers and staff.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="help-item">
+                            <div class="help-icon">
+                                <i class="fas fa-tools"></i>
+                            </div>
+                            <div class="help-text">
+                                <strong>Equipment</strong>
+                                <p>Mark all available equipment to help assign the right vehicles to each bay.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="help-item">
+                            <div class="help-icon">
+                                <i class="fas fa-car"></i>
+                            </div>
+                            <div class="help-text">
+                                <strong>Vehicle Size</strong>
+                                <p>Set appropriate size limits based on physical bay dimensions.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* CSS Variables */
+:root {
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-500: #3b82f6;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --success-100: #dcfce7;
+    --success-600: #16a34a;
+    --info-50: #eff6ff;
+    --info-100: #dbeafe;
+    --info-200: #bfdbfe;
+    --info-500: #3b82f6;
+    --info-600: #2563eb;
+    --info-700: #1d4ed8;
+    --error-500: #ef4444;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-full: 9999px;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* Bay Form Styles */
+.bay-form-page {
+    padding: 0;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.breadcrumb-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.breadcrumb-link {
+    color: var(--primary-600);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.breadcrumb-link:hover {
+    color: var(--primary-700);
+}
+
+.breadcrumb-separator {
+    color: var(--gray-400);
+    font-size: 0.75rem;
+}
+
+.breadcrumb-current {
+    color: var(--gray-600);
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-subtitle {
+    color: var(--gray-600);
+    font-size: 1.125rem;
+}
+
+/* Form Container */
+.form-container {
+    max-width: 1200px;
+}
+
+.form-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.form-header {
+    background: var(--gray-50);
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.form-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-title i {
+    color: var(--primary-600);
+}
+
+.bay-form-content {
+    padding: 2rem;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.form-label.required::after {
+    content: '*';
+    color: var(--error-500);
+    margin-left: 0.25rem;
+}
+
+.form-label i {
+    color: var(--primary-500);
+    width: 16px;
+}
+
+.form-control, .form-select {
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-100);
+    outline: none;
+}
+
+.form-help {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-top: 0.375rem;
+}
+
+/* Form Sections */
+.form-section {
+    margin: 2rem 0;
+    padding-top: 2rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-title i {
+    color: var(--primary-600);
+}
+
+/* Form Check Cards */
+.form-check-card {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.form-check-card:hover {
+    background: var(--gray-100);
+}
+
+.form-check-card .form-check {
+    margin: 0;
+}
+
+.form-check-card .form-check-label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    width: 100%;
+}
+
+.check-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--primary-100);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-600);
+    font-size: 1.125rem;
+    flex-shrink: 0;
+}
+
+.check-content strong {
+    display: block;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+}
+
+.check-content small {
+    color: var(--gray-600);
+}
+
+.form-check-input:checked ~ .form-check-label .check-icon {
+    background: var(--primary-500);
+    color: white;
+}
+
+.form-check-card.active-toggle {
+    background: var(--success-100);
+    border-color: var(--success-600);
+}
+
+.switch-content strong {
+    display: block;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+}
+
+.switch-content small {
+    color: var(--gray-600);
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: var(--primary-600);
+    color: white;
+    border-color: var(--primary-600);
+}
+
+.btn-primary:hover {
+    background: var(--primary-700);
+    border-color: var(--primary-700);
+}
+
+.btn-outline-secondary {
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--gray-50);
+    color: var(--gray-700);
+}
+
+/* Sidebar Cards */
+.preview-card, .help-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    margin-bottom: 2rem;
+}
+
+.preview-title, .help-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+    padding: 1.5rem 1.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.preview-title i, .help-title i {
+    color: var(--primary-600);
+}
+
+/* Bay Preview */
+.bay-preview {
+    padding: 0 1.5rem 1.5rem;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+.preview-number {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.preview-label {
+    color: var(--gray-500);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.preview-bay-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.preview-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.preview-badge.available {
+    background: var(--success-100);
+    color: var(--success-600);
+}
+
+.preview-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+}
+
+.preview-description {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.preview-specs {
+    margin-bottom: 1rem;
+}
+
+.preview-spec {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.preview-spec i {
+    color: var(--primary-500);
+    width: 16px;
+}
+
+.preview-feature-list {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.preview-feature {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--info-100);
+    color: var(--info-700);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Help Content */
+.help-content {
+    padding: 0 1.5rem 1.5rem;
+}
+
+.help-item {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.help-item:last-child {
+    margin-bottom: 0;
+}
+
+.help-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--info-100);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--info-600);
+    flex-shrink: 0;
+}
+
+.help-text strong {
+    display: block;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+}
+
+.help-text p {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .form-actions {
+        flex-direction: column-reverse;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .preview-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form elements
+    const nameInput = document.getElementById('name');
+    const bayNumberInput = document.getElementById('bay_number');
+    const descriptionInput = document.getElementById('description');
+    const maxVehicleSizeSelect = document.getElementById('max_vehicle_size');
+    
+    // Equipment checkboxes
+    const pressureWasherCheck = document.getElementById('has_pressure_washer');
+    const vacuumCheck = document.getElementById('has_vacuum');
+    const liftCheck = document.getElementById('has_lift');
+    const drainageCheck = document.getElementById('has_drainage');
+    
+    // Preview elements
+    const previewName = document.getElementById('previewName');
+    const previewNumber = document.getElementById('previewNumber');
+    const previewDescription = document.getElementById('previewDescription');
+    const previewVehicleSize = document.getElementById('previewVehicleSize');
+    const previewFeatures = document.querySelector('.preview-feature-list');
+    
+    // Vehicle size mapping
+    const vehicleSizeMap = {
+        'small': 'Small Vehicles',
+        'medium': 'Medium Vehicles', 
+        'large': 'Large Vehicles',
+        'any': 'Any Size'
+    };
+    
+    // Feature mapping
+    const featureMap = {
+        'has_pressure_washer': { icon: 'fas fa-tint', label: 'Pressure Washer' },
+        'has_vacuum': { icon: 'fas fa-wind', label: 'Vacuum' },
+        'has_lift': { icon: 'fas fa-arrow-up', label: 'Lift' },
+        'has_drainage': { icon: 'fas fa-water', label: 'Drainage' }
+    };
+    
+    // Update preview function
+    function updatePreview() {
+        // Update name
+        const name = nameInput.value.trim() || 'New Service Bay';
+        previewName.textContent = name;
+        
+        // Update bay number
+        const bayNumber = bayNumberInput.value || '1';
+        previewNumber.textContent = bayNumber;
+        
+        // Update description
+        const description = descriptionInput.value.trim() || 'Bay description will appear here...';
+        previewDescription.textContent = description;
+        
+        // Update vehicle size
+        const vehicleSize = maxVehicleSizeSelect.value;
+        previewVehicleSize.textContent = vehicleSizeMap[vehicleSize] || 'Any Size';
+        
+        // Update features
+        updateFeatures();
+    }
+    
+    function updateFeatures() {
+        previewFeatures.innerHTML = '';
+        
+        // Check each feature checkbox
+        const checkboxes = [pressureWasherCheck, vacuumCheck, liftCheck, drainageCheck];
+        const checkboxIds = ['has_pressure_washer', 'has_vacuum', 'has_lift', 'has_drainage'];
+        
+        checkboxes.forEach((checkbox, index) => {
+            if (checkbox && checkbox.checked) {
+                const feature = featureMap[checkboxIds[index]];
+                const featureElement = document.createElement('span');
+                featureElement.className = 'preview-feature';
+                featureElement.innerHTML = `
+                    <i class="${feature.icon}"></i>
+                    ${feature.label}
+                `;
+                previewFeatures.appendChild(featureElement);
+            }
+        });
+        
+        // Show message if no features selected
+        if (previewFeatures.children.length === 0) {
+            const noFeatures = document.createElement('span');
+            noFeatures.className = 'text-muted';
+            noFeatures.style.fontSize = '0.875rem';
+            noFeatures.textContent = 'No equipment selected';
+            previewFeatures.appendChild(noFeatures);
+        }
+    }
+    
+    // Add event listeners
+    if (nameInput) nameInput.addEventListener('input', updatePreview);
+    if (bayNumberInput) bayNumberInput.addEventListener('input', updatePreview);
+    if (descriptionInput) descriptionInput.addEventListener('input', updatePreview);
+    if (maxVehicleSizeSelect) maxVehicleSizeSelect.addEventListener('change', updatePreview);
+    
+    // Equipment checkboxes
+    if (pressureWasherCheck) pressureWasherCheck.addEventListener('change', updateFeatures);
+    if (vacuumCheck) vacuumCheck.addEventListener('change', updateFeatures);
+    if (liftCheck) liftCheck.addEventListener('change', updateFeatures);
+    if (drainageCheck) drainageCheck.addEventListener('change', updateFeatures);
+    
+    // Initialize preview
+    updatePreview();
+});
+</script>
+{% endblock %}

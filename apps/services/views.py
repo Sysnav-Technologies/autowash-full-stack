@@ -1918,8 +1918,8 @@ def update_queue_priority(request, queue_id):
 @employee_required(['owner', 'manager'])
 def package_list_view(request):
     """List service packages"""
-    packages = ServicePackage.objects.filter(is_active=True).annotate(
-        service_count=Count('services')
+    packages = ServicePackage.objects.filter(is_active=True).prefetch_related(
+        'services'  
     ).order_by('name')
     
     context = {
@@ -1927,7 +1927,6 @@ def package_list_view(request):
         'title': 'Service Packages'
     }
     return render(request, 'services/package_list.html', context)
-
 @login_required
 @employee_required(['owner', 'manager'])
 def package_create_view(request):
