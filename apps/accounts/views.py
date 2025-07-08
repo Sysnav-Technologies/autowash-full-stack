@@ -2,7 +2,7 @@
 
 import re
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth import login, authenticate, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -11,7 +11,10 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView, CreateView, UpdateView
 from django.utils.decorators import method_decorator
-from django.db import transaction
+from django.db import transaction, connection
+from django.views.decorators.csrf import csrf_protect
+
+
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 import uuid
@@ -448,11 +451,80 @@ def business_verification_view(request):
         messages.error(request, f'Error loading verification: {str(e)}')
         return redirect('/auth/dashboard/')
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def logout_view(request):
-    """User logout view"""
-    logout(request)
-    messages.info(request, 'You have been logged out successfully.')
+    """
+    Enhanced logout view that properly handles cross-tenant logout
+    and ensures session is completely cleared
+    """
+    if settings.DEBUG:
+        print(f"\n" + "="*50)
+        print(f"[LOGOUT] LOGOUT VIEW CALLED")
+        print(f"[LOGOUT] User: {request.user.username if request.user.is_authenticated else 'Anonymous'}")
+        print(f"[LOGOUT] Current path: {request.path}")
+        print(f"[LOGOUT] Current schema: {getattr(connection, 'schema_name', 'unknown')}")
+        print(f"[LOGOUT] Session key before logout: {request.session.session_key if hasattr(request, 'session') else 'None'}")
+        print(f"="*50)
+    
+    # Store user info before logout for message
+    was_authenticated = request.user.is_authenticated
+    username = request.user.username if was_authenticated else None
+    
+    # Clear session data manually first
+    if hasattr(request, 'session'):
+        try:
+            # Clear all session data
+            request.session.flush()  # This deletes the session data and regenerates the session key
+            if settings.DEBUG:
+                print(f"[LOGOUT] Session flushed manually")
+        except Exception as e:
+            if settings.DEBUG:
+                print(f"[LOGOUT] Error flushing session: {e}")
+    
+    # Perform Django logout
+    auth_logout(request)
+    
+    # Add success message only if user was authenticated
+    if was_authenticated:
+        messages.success(request, f'You have been logged out successfully. See you next time!')
+    
+    # Clear any preserved session data attributes
+    if hasattr(request, '_preserved_session_data'):
+        delattr(request, '_preserved_session_data')
+    
+    # Clear business context
+    if hasattr(request, 'business'):
+        request.business = None
+    if hasattr(request, 'business_slug'):
+        request.business_slug = None
+    
+    if settings.DEBUG:
+        print(f"[LOGOUT] User logged out: {username}")
+        print(f"[LOGOUT] Session key after logout: {request.session.session_key if hasattr(request, 'session') else 'None'}")
+        print(f"[LOGOUT] Redirecting to: /public/")
+    
+    # Always redirect to public schema
     return redirect('/public/')
+
+def logout_and_redirect_to_public(request):
+    """
+    Utility function to logout user and redirect to public schema
+    Useful for business context redirects
+    """
+    # Clear business context
+    if hasattr(request, 'business'):
+        request.business = None
+    if hasattr(request, 'business_slug'):
+        request.business_slug = None
+    
+    # Perform logout
+    if request.user.is_authenticated:
+        auth_logout(request)
+        messages.info(request, 'You have been logged out.')
+    
+    return redirect('/public/')
+
 
 @login_required
 def profile_view(request):

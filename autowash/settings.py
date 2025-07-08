@@ -12,21 +12,16 @@ import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 import dj_database_url
 
-# Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-# Environment Detection
 RENDER = config('RENDER', default=False, cast=bool)
 CPANEL = config('CPANEL', default=False, cast=bool)
 
-# SMART ALLOWED_HOSTS based on environment
 if not RENDER and not CPANEL:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
-    print("[LOCAL] Running in LOCAL DEVELOPMENT mode")
 elif RENDER:
     ALLOWED_HOSTS = [
         '.onrender.com',                 
@@ -38,8 +33,6 @@ elif RENDER:
     render_external_hostname = config('RENDER_EXTERNAL_HOSTNAME', default='')
     if render_external_hostname:
         ALLOWED_HOSTS.append(render_external_hostname)
-        print(f"[RENDER] Added Render hostname: {render_external_hostname}")
-    print("[RENDER] RENDER with DEBUG ENABLED" if DEBUG else "[RENDER] RENDER PRODUCTION mode")
 elif CPANEL:
     ALLOWED_HOSTS = [
         'app.autowash.co.ke',
@@ -50,10 +43,7 @@ elif CPANEL:
     cpanel_domain = config('CPANEL_DOMAIN', default='')
     if cpanel_domain:
         ALLOWED_HOSTS.append(cpanel_domain)
-        print(f"[CPANEL] Added cPanel domain: {cpanel_domain}")
-    print("[CPANEL] CPANEL with DEBUG ENABLED" if DEBUG else "[CPANEL] CPANEL PRODUCTION mode")
 
-# Multi-tenant Apps Configuration
 SHARED_APPS = [
     'django_tenants',
     'django.contrib.admin',
@@ -102,14 +92,11 @@ TENANT_APPS = [
     'apps.notification',
 ]
 
-if DEBUG and not RENDER and not CPANEL:
-    SHARED_APPS.append('debug_toolbar')
-elif DEBUG and (RENDER or CPANEL):
+if DEBUG:
     SHARED_APPS.append('debug_toolbar')
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
-# Tenant Configuration
 TENANT_MODEL = "accounts.Business"
 TENANT_DOMAIN_MODEL = "accounts.Domain"
 PUBLIC_SCHEMA_URLCONF = 'autowash.urls_public'
@@ -117,7 +104,6 @@ ROOT_URLCONF = 'autowash.urls'
 PUBLIC_SCHEMA_NAME = 'public'
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
-# PATH-BASED TENANT ROUTING CONFIGURATION
 public_domain = 'localhost:8000' if not RENDER and not CPANEL else \
                'autowash-3jpr.onrender.com' if RENDER else \
                'app.autowash.co.ke'
@@ -128,43 +114,84 @@ TENANT_ROUTING = {
     'PUBLIC_TENANT_DOMAIN': public_domain,
 }
 
-# ====================== ENHANCED SESSION & CSRF CONFIGURATION ======================
-# Session Configuration
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Better performance
-SESSION_COOKIE_NAME = f"autowash_sessionid_{config('SITE_ID', 'default')}"  # Unique per tenant
+# Disable admin session check since we handle sessions ourselves
+SILENCED_SYSTEM_CHECKS = ['admin.E410']
+
+# ULTIMATE MIDDLEWARE ORDER - Complete session fix
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+]
+
+if RENDER:
+    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
+
+MIDDLEWARE.extend([
+    # CRITICAL: Our complete session middleware replacement
+    'apps.core.middleware.TenantAwareSessionMiddleware',
+    
+    # Fake SessionMiddleware for admin compatibility (does nothing)
+    'apps.core.middleware.FakeSessionMiddleware',
+    
+    # Tenant middleware after session handling
+    'apps.core.middleware.PathBasedTenantMiddleware',
+    
+    # Standard Django middleware
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    
+    # Auth middleware after tenant middleware
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.core.middleware.SharedAuthenticationMiddleware',
+    
+    # Message and other middleware
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_ratelimit.middleware.RatelimitMiddleware',
+    
+    # Custom business context middleware
+    'apps.core.middleware.BusinessContextMiddleware',
+    'apps.core.middleware.TimezoneMiddleware',
+    'apps.core.middleware.UserActivityMiddleware',
+    
+    # AllAuth middleware at the end
+    'allauth.account.middleware.AccountMiddleware',
+])
+
+if DEBUG:
+    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+
+# Session Configuration - Enhanced for multi-tenant
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_NAME = 'autowash_sessionid'
 SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_COOKIE_DOMAIN = None  # Set to .yourdomain.com for cross-subdomain if needed
-SESSION_COOKIE_SECURE = not DEBUG  # HTTPS only in production
-SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access
-SESSION_COOKIE_SAMESITE = 'Lax'  # Balance security and usability
-SESSION_COOKIE_PATH = '/'  # Available across entire domain
-SESSION_SAVE_EVERY_REQUEST = False  # Better performance
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Persistent sessions
+SESSION_COOKIE_DOMAIN = None
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_PATH = '/'
+SESSION_SAVE_EVERY_REQUEST = False  # CRITICAL: Let our middleware handle saves
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
-SESSION_CACHE_ALIAS = 'default'
 
 # CSRF Configuration
-CSRF_COOKIE_NAME = f"autowash_csrftoken_{config('SITE_ID', 'default')}"  # Unique per tenant
-CSRF_COOKIE_AGE = 31449600  # 1 year in seconds
-CSRF_COOKIE_DOMAIN = None  # Set to .yourdomain.com for cross-subdomain if needed
-CSRF_COOKIE_SECURE = not DEBUG  # HTTPS only in production
-CSRF_COOKIE_HTTPONLY = False  # Must be False for AJAX to work
-CSRF_COOKIE_SAMESITE = 'Lax'  # Same as session cookie
-CSRF_COOKIE_PATH = '/'  # Available across entire domain
-CSRF_USE_SESSIONS = False  # Store in cookie (default)
-CSRF_FAILURE_VIEW = 'apps.core.views.csrf_failure'  # Custom CSRF failure view
+CSRF_COOKIE_NAME = 'autowash_csrftoken'
+CSRF_COOKIE_AGE = 31449600
+CSRF_COOKIE_DOMAIN = None
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_PATH = '/'
+CSRF_USE_SESSIONS = False
+CSRF_FAILURE_VIEW = 'apps.core.views.csrf_failure'
 
-# Allowed Origins
 if not RENDER and not CPANEL:
-    # Local development
     CSRF_TRUSTED_ORIGINS = [
-        'http://localhost',
-        'http://127.0.0.1',
-        'http://*.localhost',
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
         'http://testserver'
     ]
 elif RENDER:
-    # Production on Render
     CSRF_TRUSTED_ORIGINS = [
         'https://autowash-3jpr.onrender.com',
         'https://autowash.co.ke',
@@ -175,7 +202,6 @@ elif RENDER:
     if render_external_hostname:
         CSRF_TRUSTED_ORIGINS.append(f'https://{render_external_hostname}')
 elif CPANEL:
-    # Production on cPanel
     CSRF_TRUSTED_ORIGINS = [
         'https://app.autowash.co.ke',
         'https://autowash.co.ke',
@@ -186,51 +212,12 @@ elif CPANEL:
     if cpanel_domain:
         CSRF_TRUSTED_ORIGINS.append(f'https://{cpanel_domain}')
 
-if RENDER or CPANEL:
-    CSRF_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS]
-
-# For AJAX requests
 CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
-CSRF_HEADER_DOMAIN = None
 
-# Database session table configuration
+# CRITICAL: Database configuration for sessions
 DATABASE_ROUTERS = (
-    'autowash.routers.SessionRouter',
     'django_tenants.routers.TenantSyncRouter',
 )
-
-# ====================== MIDDLEWARE CONFIGURATION ======================
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-]
-
-if RENDER:
-    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
-
-MIDDLEWARE.extend([
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'apps.core.middleware.SimpleSessionFixMiddleware',
-    'apps.core.middleware.PathBasedTenantMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',  # CSRF protection
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'apps.core.middleware.SharedAuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_ratelimit.middleware.RatelimitMiddleware',
-    'apps.core.middleware.BusinessContextMiddleware',
-    'apps.core.middleware.TimezoneMiddleware',
-    'apps.core.middleware.UserActivityMiddleware',
-    'allauth.account.middleware.AccountMiddleware',
-])
-
-if DEBUG and not RENDER and not CPANEL:
-    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
-elif DEBUG and (RENDER or CPANEL):
-    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
-
-
 
 TEMPLATES = [
     {
@@ -257,7 +244,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 
-# DATABASE CONFIGURATION - FIXED for django-tenants
 database_url = config('DATABASE_URL')
 
 DATABASES = {
@@ -268,46 +254,42 @@ DATABASES = {
     )
 }
 
-# CRITICAL FIX: Always use django-tenants PostgreSQL backend
 DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
 
-# Configure SSL and connection options based on environment
 if not RENDER and not CPANEL:
-    # Local development - disable SSL for local PostgreSQL
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'disable',
         'options': '-c search_path=public'
     }
-    print("[DATABASE] Using LOCAL PostgreSQL database (SSL disabled)")
 elif RENDER:
-    # Production/Render - require SSL for external PostgreSQL + timeout settings
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'require',
         'options': '-c search_path=public -c statement_timeout=300000 -c lock_timeout=300000'
     }
     DATABASES['default']['CONN_MAX_AGE'] = 0 if DEBUG else 600
-    print("[DATABASE] Using RENDER PostgreSQL database (SSL required)")
 elif CPANEL:
-    # cPanel - typically localhost database
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'prefer',
         'options': '-c search_path=public'
     }
-    print("[DATABASE] Using CPANEL PostgreSQL database")
 
-# Redis & Channels
-redis_url = ''
-# config('REDIS_URL', default='redis://localhost:6379/1')
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [redis_url],
+redis_url = config('REDIS_URL', default='')
+if redis_url and 'redis://' in redis_url:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [redis_url],
+            },
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
-# CACHE CONFIGURATION
 if redis_url and redis_url != '' and 'redis://' in redis_url:
     CACHES = {
         'default': {
@@ -315,7 +297,6 @@ if redis_url and redis_url != '' and 'redis://' in redis_url:
             'LOCATION': redis_url.replace('/1', '/2'),
         }
     }
-    print("[CACHE] Using Redis cache")
 else:
     CACHES = {
         'default': {
@@ -323,9 +304,7 @@ else:
             'LOCATION': 'django_cache_table',
         }
     }
-    print("[CACHE] Using database cache")
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -333,24 +312,19 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images) - Environment-specific
 STATIC_URL = '/static/'
 
 if RENDER:
-    # Render configuration
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 elif CPANEL:
-    # cPanel configuration - FIXED for web accessibility
     STATIC_ROOT = os.path.join(BASE_DIR, 'public_html', 'static')
 else:
-    # Local development
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 STATICFILES_DIRS = [
@@ -362,27 +336,20 @@ STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 ]
 
-# Media files - Environment-specific
 MEDIA_URL = '/media/'
 
 if CPANEL:
-    # cPanel configuration
     MEDIA_ROOT = os.path.join(BASE_DIR, 'public_html', 'media')
 else:
-    # Render and local development
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Tenant-specific media storage
 TENANT_MEDIA_ROOT = os.path.join(BASE_DIR, 'tenants', 'media')
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Crispy Forms
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
-# Celery Configuration - Only if Redis is available
 if redis_url and 'redis://' in redis_url:
     CELERY_BROKER_URL = redis_url.replace('/1', '/0')
     CELERY_RESULT_BACKEND = redis_url.replace('/1', '/0')
@@ -391,13 +358,8 @@ if redis_url and 'redis://' in redis_url:
     CELERY_RESULT_SERIALIZER = 'json'
     CELERY_TIMEZONE = TIME_ZONE
     CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
-    print("[CELERY] Celery configured with Redis")
-else:
-    print("[CELERY] Celery disabled - No Redis available")
 
-# EMAIL CONFIGURATION based on environment
 if not RENDER and not CPANEL:
-    # Local development - Gmail SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
     EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -405,9 +367,7 @@ if not RENDER and not CPANEL:
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@localhost')
-    print("[EMAIL] Using LOCAL email configuration (Gmail SMTP)")
 else:
-    # Production - Domain email (both Render and cPanel)
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='mail.autowash.co.ke')
     EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -415,27 +375,18 @@ else:
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='noreply@autowash.co.ke')
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Autowash <noreply@autowash.co.ke>')
-    if RENDER:
-        print("[EMAIL] Using RENDER email configuration")
-    elif CPANEL:
-        print("[EMAIL] Using CPANEL email configuration")
 
-# SMS Configuration
 SMS_API_KEY = config('SMS_API_KEY', default='')
 SMS_USERNAME = config('SMS_USERNAME', default='sandbox')
 
-# M-PESA CONFIGURATION based on environment
 if not RENDER and not CPANEL:
-    # Local development - Sandbox
     MPESA_ENVIRONMENT = 'sandbox'
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
     MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
     MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
     MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='http://localhost:8000/api/mpesa/callback/')
-    print("[MPESA] Using SANDBOX M-Pesa configuration")
 else:
-    # Production - both Render and cPanel
     MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='production')
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
@@ -446,10 +397,7 @@ else:
         MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://autowash-3jpr.onrender.com/api/mpesa/callback/')
     elif CPANEL:
         MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://app.autowash.co.ke/api/mpesa/callback/')
-    
-    print("[MPESA] Using PRODUCTION M-Pesa configuration")
 
-# REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -467,45 +415,35 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Sites Framework
 SITE_ID = 1
 
-# Authentication
 LOGIN_URL = '/auth/login/'
-LOGIN_REDIRECT_URL = '/dashboard/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/public/'
 
-# AllAuth Configuration
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_LOGOUT_REDIRECT_URL = '/public/'
+ACCOUNT_LOGOUT_ON_GET = True
 
-# SMART SECURITY SETTINGS
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
 if not RENDER and not CPANEL:
-    # Local development - relaxed security
     SECURE_HSTS_SECONDS = 0
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
-    print("[SECURITY] Using LOCAL security settings (relaxed)")
 else:
     if DEBUG:
-        # Production with debugging - relaxed security for easier debugging
         SECURE_HSTS_SECONDS = 0
         SECURE_SSL_REDIRECT = False
         SESSION_COOKIE_SECURE = False
         CSRF_COOKIE_SECURE = False
-        if RENDER:
-            print("[SECURITY] Using RENDER security settings (RELAXED for debugging)")
-        elif CPANEL:
-            print("[SECURITY] Using CPANEL security settings (RELAXED for debugging)")
     else:
-        # Strict production security
         SECURE_HSTS_SECONDS = 31536000
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
         SECURE_HSTS_PRELOAD = True
@@ -517,23 +455,16 @@ else:
             SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
         elif CPANEL:
             SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-        
-        if RENDER:
-            print("[SECURITY] Using RENDER security settings (strict)")
-        elif CPANEL:
-            print("[SECURITY] Using CPANEL security settings (strict)")
 
-# Rate Limiting
 RATELIMIT_ENABLE = True
 
-# File Upload Settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
-# LOGGING CONFIGURATION
 log_dir = BASE_DIR / 'logs'
 log_dir.mkdir(exist_ok=True)
 
+# Session logging configuration - Minimal to prevent noise
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -549,48 +480,44 @@ LOGGING = {
     },
     'handlers': {
         'file': {
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO',
             'class': 'logging.FileHandler',
             'filename': log_dir / 'django.log',
             'formatter': 'verbose',
         },
         'console': {
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
     },
     'root': {
         'handlers': ['console', 'file'],
-        'level': 'DEBUG' if DEBUG else 'INFO',
+        'level': 'INFO',
     },
     'loggers': {
-        'django': {
+        'django.contrib.sessions': {
             'handlers': ['console', 'file'],
-            'level': 'INFO',
+            'level': 'ERROR',  # Only log errors, not debug info
+            'propagate': False,
+        },
+        'apps.core.middleware': {
+            'handlers': ['console', 'file'],
+            'level': 'ERROR',  # Only log errors
             'propagate': False,
         },
         'django_tenants': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
-        },
-        'apps': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO',
             'propagate': False,
         },
     },
 }
 
-# CORS CONFIGURATION based on environment
 if not RENDER and not CPANEL:
-    # Local development - allow all origins
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
-    print("[CORS] Using LOCAL CORS settings (allow all)")
 elif RENDER:
-    # Production/Render - Render-optimized CORS
     CORS_ALLOWED_ORIGINS = [
         "https://autowash.co.ke",
         "https://www.autowash.co.ke",
@@ -610,10 +537,7 @@ elif RENDER:
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_PREFLIGHT_MAX_AGE = 86400
-    
-    print("[CORS] Using RENDER CORS settings (optimized for Render)")
 elif CPANEL:
-    # Production/cPanel - cPanel-optimized CORS
     CORS_ALLOWED_ORIGINS = [
         "https://app.autowash.co.ke",
         "https://autowash.co.ke",
@@ -630,30 +554,11 @@ elif CPANEL:
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_PREFLIGHT_MAX_AGE = 86400
-    
-    print("[CORS] Using CPANEL CORS settings (optimized for cPanel)")
 
-# Sentry Configuration - Only when not debugging
-# sentry_dsn = config('SENTRY_DSN', default='')
-# if (RENDER or CPANEL) and not DEBUG and sentry_dsn:
-#     sentry_sdk.init(
-#         dsn=sentry_dsn,
-#         integrations=[DjangoIntegration()],
-#         traces_sample_rate=1.0,
-#         send_default_pii=True
-#     )
-#     print("[SENTRY] Sentry error tracking enabled")
-# elif DEBUG:
-#     print("[SENTRY] Sentry disabled (debug mode active)")
-# else:
-#     print("[SENTRY] Sentry disabled (local development or no DSN)")
-
-# Custom Settings
 BUSINESS_LOGO_UPLOAD_PATH = 'business_logos/'
 EMPLOYEE_PHOTO_UPLOAD_PATH = 'employee_photos/'
 CUSTOMER_PHOTO_UPLOAD_PATH = 'customer_photos/'
 
-# Subscription Plans
 SUBSCRIPTION_PLANS = {
     'basic': {
         'name': 'Basic Plan',
@@ -678,67 +583,20 @@ SUBSCRIPTION_PLANS = {
     }
 }
 
-# STARTUP MESSAGES based on environment
-if not RENDER and not CPANEL:
-    print("\n" + "="*70)
-    print("[LOCAL] AUTOWASH - LOCAL DEVELOPMENT ENVIRONMENT (PATH-BASED)")
-    print("="*70)
-    print("[LOCAL] Main site: http://localhost:8000")
-    print("[LOCAL] Business URLs: http://localhost:8000/business/{slug}/")
-    print("[LOCAL] Email: Gmail SMTP")
-    print("[LOCAL] M-Pesa: Sandbox")
-    print("[LOCAL] Security: Relaxed")
-    print(f"[LOCAL] Debug mode: {'Enabled' if DEBUG else 'Disabled'}")
-    print("="*70 + "\n")
-elif RENDER:
-    print("\n" + "="*70) 
-    print("[RENDER] AUTOWASH - PRODUCTION ENVIRONMENT (RENDER - PATH-BASED)")
-    print("="*70)
-    print("[RENDER] Main site: https://autowash-3jpr.onrender.com")
-    print("[RENDER] Business URLs: https://autowash-3jpr.onrender.com/business/{slug}/")
-    print("[RENDER] Email: Domain server")
-    print("[RENDER] M-Pesa: Production")
+if DEBUG:
+    def show_toolbar(request):
+        return DEBUG and (
+            request.META.get('REMOTE_ADDR') in ['127.0.0.1', '::1'] or
+            'localhost' in request.get_host()
+        )
     
-    if DEBUG:
-        print("[RENDER] DEBUG MODE: Enabled")
-        print("[RENDER] Debug toolbar: Available")
-        print("[RENDER] Enhanced logging: Enabled")
-        print("[RENDER] Security: Relaxed for debugging")
-        print("[RENDER] Sentry: Disabled")
-    else:
-        print("[RENDER] Security: Strict production mode")
-        if config('SENTRY_DSN', default=''):
-            print("[RENDER] Sentry: Enabled")
-        else:
-            print("[RENDER] Sentry: No DSN configured")
+    DEBUG_TOOLBAR_CONFIG = {
+        'SHOW_TOOLBAR_CALLBACK': show_toolbar,
+        'SHOW_COLLAPSED': True,
+        'INTERCEPT_REDIRECTS': False,
+    }
     
-    print("[RENDER] Static files: WhiteNoise")
-    print("="*70 + "\n")
-elif CPANEL:
-    print("\n" + "="*70) 
-    print("[CPANEL] AUTOWASH - PRODUCTION ENVIRONMENT (CPANEL - PATH-BASED)")
-    print("="*70)
-    print("[CPANEL] Main site: https://app.autowash.co.ke")
-    print("[CPANEL] Business URLs: https://app.autowash.co.ke/business/{slug}/")
-    print("[CPANEL] Email: Domain server")
-    print("[CPANEL] M-Pesa: Production")
-    
-    if DEBUG:
-        print("[CPANEL] DEBUG MODE: Enabled")
-        print("[CPANEL] Debug toolbar: Available")
-        print("[CPANEL] Enhanced logging: Enabled")
-        print("[CPANEL] Security: Relaxed for debugging")
-        print("[CPANEL] Sentry: Disabled")
-    else:
-        print("[CPANEL] Security: Strict production mode")
-        if config('SENTRY_DSN', default=''):
-            print("[CPANEL] Sentry: Enabled")
-        else:
-            print("[CPANEL] Sentry: No DSN configured")
-    
-    print("[CPANEL] Static files: Apache/Nginx")
-    if redis_url and 'redis://' in redis_url:
-        print("[CPANEL] Celery: Enabled with Redis")
-    else:
-        print("[CPANEL] Celery: Disabled (No Redis)")
-    print("="*70 + "\n")
+    INTERNAL_IPS = [
+        '127.0.0.1',
+        'localhost',
+    ]
