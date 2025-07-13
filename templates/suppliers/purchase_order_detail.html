@@ -1,0 +1,525 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}PO-{{ order.po_number }} - Purchase Order Details{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.purchase_order_list }}">Purchase Orders</a></li>
+<li class="breadcrumb-item active">PO-{{ order.po_number }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.order-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.info-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.info-card-header {
+    background: #f8fafc;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.progress-circle {
+    width: 80px;
+    height: 80px;
+}
+
+.progress-text {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.item-row {
+    border-bottom: 1px solid #f1f5f9;
+    padding: 1rem 1.5rem;
+}
+
+.item-row:last-child {
+    border-bottom: none;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 2rem;
+    padding-bottom: 1.5rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0.5rem;
+    width: 12px;
+    height: 12px;
+    background: #3b82f6;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px #3b82f6;
+}
+
+.timeline-item::after {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    top: 1.5rem;
+    width: 2px;
+    height: calc(100% - 1rem);
+    background: #e2e8f0;
+}
+
+.timeline-item:last-child::after {
+    display: none;
+}
+
+.timeline-item.completed::before {
+    background: #10b981;
+    box-shadow: 0 0 0 2px #10b981;
+}
+
+.timeline-item.current::before {
+    background: #f59e0b;
+    box-shadow: 0 0 0 2px #f59e0b;
+}
+
+.amount-breakdown {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Order Header -->
+<div class="order-header">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <div class="d-flex align-items-center mb-3">
+                <h1 class="h2 mb-0 me-3">PO-{{ order.po_number }}</h1>
+                <span class="status-badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% else %}primary{% endif %}">
+                    {{ order.get_status_display }}
+                </span>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-1 opacity-90">
+                        <strong>Supplier:</strong> 
+                        <a href="/business/{{ request.tenant.slug }}/suppliers/{{ order.supplier.pk }}/" class="text-white">
+                            {{ order.supplier.name }}
+                        </a>
+                    </p>
+                    <p class="mb-1 opacity-90"><strong>Order Date:</strong> {{ order.order_date }}</p>
+                    <p class="mb-0 opacity-90"><strong>Expected Delivery:</strong> {{ order.expected_delivery_date }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1 opacity-90"><strong>Total Amount:</strong> KES {{ order.total_amount|floatformat:2 }}</p>
+                    <p class="mb-1 opacity-90"><strong>Items:</strong> {{ items.count }}</p>
+                    {% if order.is_overdue %}
+                    <p class="mb-0 text-warning"><strong>⚠️ {{ order.days_overdue }} days overdue</strong></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="d-flex justify-content-end align-items-center">
+                <!-- Progress Circle -->
+                <div class="progress-circle me-3">
+                    <svg width="80" height="80" class="transform-rotate-minus-90">
+                        <circle cx="40" cy="40" r="35" stroke="rgba(255,255,255,0.3)" stroke-width="6" fill="none"></circle>
+                        <circle cx="40" cy="40" r="35" stroke="white" stroke-width="6" fill="none" 
+                                stroke-dasharray="{{ progress.completion_percentage|mul:2.2 }} 220" 
+                                stroke-linecap="round"></circle>
+                    </svg>
+                    <div class="position-absolute top-50 start-50 translate-middle text-center">
+                        <div class="progress-text">{{ progress.completion_percentage|floatformat:0 }}%</div>
+                        <div class="small opacity-75">Complete</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+    <div>
+        <a href="{{ urls.purchase_order_list }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Orders
+        </a>
+    </div>
+    <div class="d-flex gap-2">
+        {% if order.status == 'pending' %}
+        <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/approve/" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-check me-2"></i>Approve Order
+            </button>
+        </form>
+        {% elif order.status == 'approved' %}
+        <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/send/" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-info">
+                <i class="fas fa-paper-plane me-2"></i>Send to Supplier
+            </button>
+        </form>
+        {% elif order.status == 'sent' or order.status == 'acknowledged' or order.status == 'partially_received' %}
+        <a href="{{ urls.goods_receipt_create }}?po={{ order.pk }}" class="btn btn-success">
+            <i class="fas fa-truck-loading me-2"></i>Receive Goods
+        </a>
+        {% endif %}
+        <button onclick="window.print()" class="btn btn-outline-primary">
+            <i class="fas fa-print me-2"></i>Print
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Main Content -->
+    <div class="col-lg-8">
+        <!-- Order Items -->
+        <div class="info-card mb-4">
+            <div class="info-card-header">
+                <i class="fas fa-list me-2"></i>Order Items
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Item</th>
+                            <th>SKU</th>
+                            <th class="text-end">Qty Ordered</th>
+                            <th class="text-end">Qty Received</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ item.item.name }}</div>
+                                {% if item.item_description %}
+                                <small class="text-muted">{{ item.item_description }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.item_sku|default:item.item.sku }}</td>
+                            <td class="text-end">{{ item.quantity }}</td>
+                            <td class="text-end">
+                                <span class="{% if item.received_quantity >= item.quantity %}text-success{% elif item.received_quantity > 0 %}text-warning{% else %}text-muted{% endif %}">
+                                    {{ item.received_quantity }}
+                                </span>
+                            </td>
+                            <td class="text-end">KES {{ item.unit_price|floatformat:2 }}</td>
+                            <td class="text-end fw-semibold">KES {{ item.total_amount|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="5" class="text-end">Subtotal:</th>
+                            <th class="text-end">KES {{ order.subtotal|floatformat:2 }}</th>
+                        </tr>
+                        {% if order.tax_amount > 0 %}
+                        <tr>
+                            <th colspan="5" class="text-end">Tax:</th>
+                            <th class="text-end">KES {{ order.tax_amount|floatformat:2 }}</th>
+                        </tr>
+                        {% endif %}
+                        {% if order.shipping_cost > 0 %}
+                        <tr>
+                            <th colspan="5" class="text-end">Shipping:</th>
+                            <th class="text-end">KES {{ order.shipping_cost|floatformat:2 }}</th>
+                        </tr>
+                        {% endif %}
+                        {% if order.discount_amount > 0 %}
+                        <tr>
+                            <th colspan="5" class="text-end">Discount:</th>
+                            <th class="text-end text-success">-KES {{ order.discount_amount|floatformat:2 }}</th>
+                        </tr>
+                        {% endif %}
+                        <tr class="table-primary">
+                            <th colspan="5" class="text-end fs-5">Total:</th>
+                            <th class="text-end fs-5">KES {{ order.total_amount|floatformat:2 }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- Order Details -->
+        <div class="info-card mb-4">
+            <div class="info-card-header">
+                <i class="fas fa-info-circle me-2"></i>Order Details
+            </div>
+            <div class="row p-3">
+                <div class="col-md-6">
+                    <p><strong>Priority:</strong> 
+                        <span class="badge bg-{% if order.priority == 'urgent' %}danger{% elif order.priority == 'high' %}warning{% elif order.priority == 'low' %}secondary{% else %}info{% endif %}">
+                            {{ order.get_priority_display }}
+                        </span>
+                    </p>
+                    {% if order.payment_terms %}
+                    <p><strong>Payment Terms:</strong> {{ order.get_payment_terms_display }}</p>
+                    {% endif %}
+                    {% if order.delivery_terms %}
+                    <p><strong>Delivery Terms:</strong> {{ order.delivery_terms }}</p>
+                    {% endif %}
+                    {% if order.contact_person %}
+                    <p><strong>Contact Person:</strong> {{ order.contact_person }}</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    {% if order.requested_by %}
+                    <p><strong>Requested By:</strong> {{ order.requested_by.user.get_full_name }}</p>
+                    {% endif %}
+                    {% if order.approved_by %}
+                    <p><strong>Approved By:</strong> {{ order.approved_by.user.get_full_name }}</p>
+                    <p><strong>Approved At:</strong> {{ order.approved_at }}</p>
+                    {% endif %}
+                    {% if order.supplier_reference %}
+                    <p><strong>Supplier Reference:</strong> {{ order.supplier_reference }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% if order.special_instructions %}
+            <div class="border-top p-3">
+                <p class="mb-2"><strong>Special Instructions:</strong></p>
+                <p class="mb-0">{{ order.special_instructions|linebreaks }}</p>
+            </div>
+            {% endif %}
+            {% if order.delivery_address %}
+            <div class="border-top p-3">
+                <p class="mb-2"><strong>Delivery Address:</strong></p>
+                <p class="mb-0">{{ order.delivery_address|linebreaks }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Goods Receipts -->
+        {% if receipts %}
+        <div class="info-card">
+            <div class="info-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-truck-loading me-2"></i>Goods Receipts</span>
+                <a href="{{ urls.goods_receipt_create }}?po={{ order.pk }}" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-plus me-1"></i>New Receipt
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Receipt Number</th>
+                            <th>Date</th>
+                            <th>Items</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for receipt in receipts %}
+                        <tr>
+                            <td>
+                                <a href="/business/{{ request.tenant.slug }}/suppliers/receipts/{{ receipt.pk }}/" class="fw-semibold text-decoration-none">
+                                    GR-{{ receipt.receipt_number }}
+                                </a>
+                            </td>
+                            <td>{{ receipt.receipt_date }}</td>
+                            <td>{{ receipt.total_items }} items</td>
+                            <td>
+                                <span class="badge bg-{% if receipt.status == 'completed' %}success{% elif receipt.status == 'pending' %}warning{% elif receipt.status == 'discrepancy' %}danger{% else %}primary{% endif %}">
+                                    {{ receipt.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="/business/{{ request.tenant.slug }}/suppliers/receipts/{{ receipt.pk }}/" class="btn btn-sm btn-outline-primary">
+                                    View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Order Timeline -->
+        <div class="info-card mb-4">
+            <div class="info-card-header">
+                <i class="fas fa-history me-2"></i>Order Timeline
+            </div>
+            <div class="p-3">
+                <div class="timeline-item completed">
+                    <div class="fw-semibold">Order Created</div>
+                    <div class="text-muted small">{{ order.created_at }}</div>
+                    {% if order.requested_by %}
+                    <div class="text-muted small">by {{ order.requested_by.user.get_full_name }}</div>
+                    {% endif %}
+                </div>
+                
+                {% if order.approved_at %}
+                <div class="timeline-item completed">
+                    <div class="fw-semibold">Order Approved</div>
+                    <div class="text-muted small">{{ order.approved_at }}</div>
+                    {% if order.approved_by %}
+                    <div class="text-muted small">by {{ order.approved_by.user.get_full_name }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                {% if order.status == 'sent' or order.status == 'acknowledged' or order.status == 'partially_received' or order.status == 'completed' %}
+                <div class="timeline-item completed">
+                    <div class="fw-semibold">Sent to Supplier</div>
+                    <div class="text-muted small">Order transmitted</div>
+                </div>
+                {% endif %}
+                
+                {% if order.status == 'acknowledged' or order.status == 'partially_received' or order.status == 'completed' %}
+                <div class="timeline-item completed">
+                    <div class="fw-semibold">Acknowledged</div>
+                    <div class="text-muted small">Supplier confirmed order</div>
+                </div>
+                {% endif %}
+                
+                {% if order.status == 'partially_received' %}
+                <div class="timeline-item current">
+                    <div class="fw-semibold">Partially Received</div>
+                    <div class="text-muted small">{{ progress.completion_percentage|floatformat:0 }}% complete</div>
+                </div>
+                {% elif order.status == 'completed' %}
+                <div class="timeline-item completed">
+                    <div class="fw-semibold">Order Completed</div>
+                    <div class="text-muted small">{{ order.delivery_date|default:"All items received" }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Supplier Information -->
+        <div class="info-card mb-4">
+            <div class="info-card-header">
+                <i class="fas fa-truck me-2"></i>Supplier Information
+            </div>
+            <div class="p-3">
+                <h6 class="mb-2">{{ order.supplier.name }}</h6>
+                <p class="mb-1 text-muted small">{{ order.supplier.supplier_code }}</p>
+                {% if order.supplier.email %}
+                <p class="mb-1">
+                    <i class="fas fa-envelope me-1"></i>
+                    <a href="mailto:{{ order.supplier.email }}">{{ order.supplier.email }}</a>
+                </p>
+                {% endif %}
+                {% if order.supplier.phone %}
+                <p class="mb-1">
+                    <i class="fas fa-phone me-1"></i>
+                    <a href="tel:{{ order.supplier.phone }}">{{ order.supplier.phone }}</a>
+                </p>
+                {% endif %}
+                <div class="mt-3">
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/{{ order.supplier.pk }}/" class="btn btn-sm btn-outline-primary w-100">
+                        View Supplier Details
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-bolt me-2"></i>Quick Actions
+            </div>
+            <div class="p-3">
+                <div class="d-grid gap-2">
+                    {% if order.status == 'sent' or order.status == 'acknowledged' or order.status == 'partially_received' %}
+                    <a href="{{ urls.goods_receipt_create }}?po={{ order.pk }}" class="btn btn-success">
+                        <i class="fas fa-truck-loading me-2"></i>Receive Goods
+                    </a>
+                    {% endif %}
+                    <a href="{{ urls.purchase_order_create }}?supplier={{ order.supplier.pk }}" class="btn btn-outline-primary">
+                        <i class="fas fa-plus me-2"></i>New Order from Supplier
+                    </a>
+                    <a href="{{ urls.payment_create }}?supplier={{ order.supplier.pk }}" class="btn btn-outline-success">
+                        <i class="fas fa-money-bill me-2"></i>Record Payment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notes Section -->
+{% if order.notes %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-sticky-note me-2"></i>Notes
+            </div>
+            <div class="p-3">
+                <p class="mb-0">{{ order.notes|linebreaks }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // Confirmation for order actions
+    $('form[action*="/approve/"], form[action*="/send/"]').on('submit', function(e) {
+        const action = $(this).find('button').text().trim();
+        if (!confirm(`Are you sure you want to ${action.toLowerCase()}?`)) {
+            e.preventDefault();
+        }
+    });
+
+    // Auto-refresh for pending orders (every 30 seconds)
+    {% if order.status == 'pending' or order.status == 'approved' or order.status == 'sent' %}
+    setTimeout(function() {
+        location.reload();
+    }, 30000);
+    {% endif %}
+});
+</script>
+{% endblock %}
