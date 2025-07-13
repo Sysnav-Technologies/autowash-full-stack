@@ -1,23 +1,113 @@
-{% extends 'base.html' %}
+{% extends 'base/base.html' %}
 {% load static %}
+{% load math_filters %}
 
-{% block title %}Suppliers{% endblock %}
+{% block title %}Suppliers List{% endblock %}
 
 {% block breadcrumbs %}
-<li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
-<li class="breadcrumb-item"><a href="{% url 'suppliers:dashboard' %}">Suppliers</a></li>
-<li class="breadcrumb-item active">All Suppliers</li>
+<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
+<li class="breadcrumb-item active">List</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.supplier-card {
+    border-left: 4px solid #3b82f6;
+    transition: all 0.3s ease;
+    border-radius: 8px;
+}
+
+.supplier-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    border-left-color: #1d4ed8;
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+}
+
+.rating-stars {
+    color: #fbbf24;
+    font-size: 0.875rem;
+}
+
+.supplier-type-badge {
+    background: rgba(59, 130, 246, 0.1);
+    color: #1d4ed8;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.filter-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.action-buttons .btn {
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.supplier-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+    .action-buttons {
+        text-align: center;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+}
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="d-flex justify-content-between align-items-center">
-        <div>
+<!-- Page Header -->
+<div class="page-header mb-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+        <div class="mb-3 mb-md-0">
             <h1 class="h3 mb-2">Suppliers</h1>
             <p class="text-muted mb-0">Manage your supplier relationships and partnerships</p>
         </div>
-        <div>
-            <a href="{% url 'suppliers:create' %}" class="btn btn-primary">
+        <div class="d-flex gap-2">
+            <a href="{{ urls.export }}" class="btn btn-outline-secondary">
+                <i class="fas fa-download me-2"></i>Export
+            </a>
+            <a href="{{ urls.categories }}" class="btn btn-outline-primary">
+                <i class="fas fa-tags me-2"></i>Categories
+            </a>
+            <a href="{{ urls.create }}" class="btn btn-primary">
                 <i class="fas fa-plus me-2"></i>Add Supplier
             </a>
         </div>
@@ -26,201 +116,217 @@
 
 <!-- Statistics Cards -->
 <div class="row mb-4">
-    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h4 class="mb-1">{{ total_suppliers }}</h4>
-                        <small>Total Suppliers</small>
-                    </div>
-                    <i class="fas fa-truck fa-2x opacity-75"></i>
-                </div>
-            </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stats-card text-center">
+            <div class="h4 mb-1">{{ total_suppliers }}</div>
+            <div class="small opacity-90">Total Suppliers</div>
         </div>
     </div>
-    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h4 class="mb-1">{{ active_suppliers }}</h4>
-                        <small>Active Suppliers</small>
-                    </div>
-                    <i class="fas fa-check-circle fa-2x opacity-75"></i>
-                </div>
-            </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stats-card text-center">
+            <div class="h4 mb-1">{{ active_suppliers }}</div>
+            <div class="small opacity-90">Active Suppliers</div>
         </div>
     </div>
-    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h4 class="mb-1">{{ preferred_suppliers }}</h4>
-                        <small>Preferred Suppliers</small>
-                    </div>
-                    <i class="fas fa-star fa-2x opacity-75"></i>
-                </div>
-            </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stats-card text-center">
+            <div class="h4 mb-1">{{ preferred_suppliers }}</div>
+            <div class="small opacity-90">Preferred Suppliers</div>
         </div>
     </div>
-    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h4 class="mb-1">{{ suppliers|length }}</h4>
-                        <small>Showing Results</small>
-                    </div>
-                    <i class="fas fa-list fa-2x opacity-75"></i>
-                </div>
-            </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stats-card text-center">
+            <div class="h4 mb-1">{{ suppliers.paginator.count }}</div>
+            <div class="small opacity-90">Search Results</div>
         </div>
     </div>
 </div>
 
 <!-- Filters -->
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="get" class="row g-3">
-            <div class="col-md-3">
-                <label for="category" class="form-label">Category</label>
-                {{ filter_form.category }}
+<div class="filter-card">
+    <form method="get" class="row g-3">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Search</label>
+            <input type="text" name="search" class="form-control" 
+                   placeholder="Search suppliers..." 
+                   value="{{ request.GET.search }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold">Category</label>
+            <select name="category" class="form-select">
+                <option value="">All Categories</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}" 
+                        {% if request.GET.category == category.id|stringformat:"s" %}selected{% endif %}>
+                    {{ category.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold">Type</label>
+            <select name="supplier_type" class="form-select">
+                <option value="">All Types</option>
+                {% for type_key, type_label in supplier_types %}
+                <option value="{{ type_key }}" 
+                        {% if request.GET.supplier_type == type_key %}selected{% endif %}>
+                    {{ type_label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold">Status</label>
+            <select name="status" class="form-select">
+                <option value="">All Status</option>
+                {% for status_key, status_label in status_choices %}
+                <option value="{{ status_key }}" 
+                        {% if request.GET.status == status_key %}selected{% endif %}>
+                    {{ status_label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold">Sort By</label>
+            <select name="sort" class="form-select">
+                <option value="name" {% if request.GET.sort == "name" %}selected{% endif %}>Name A-Z</option>
+                <option value="-name" {% if request.GET.sort == "-name" %}selected{% endif %}>Name Z-A</option>
+                <option value="-rating" {% if request.GET.sort == "-rating" %}selected{% endif %}>Rating High-Low</option>
+                <option value="rating" {% if request.GET.sort == "rating" %}selected{% endif %}>Rating Low-High</option>
+                <option value="-total_orders" {% if request.GET.sort == "-total_orders" %}selected{% endif %}>Orders High-Low</option>
+                <option value="total_orders" {% if request.GET.sort == "total_orders" %}selected{% endif %}>Orders Low-High</option>
+            </select>
+        </div>
+        <div class="col-md-1">
+            <label class="form-label small fw-semibold">&nbsp;</label>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i>
+                </button>
             </div>
-            <div class="col-md-3">
-                <label for="supplier_type" class="form-label">Type</label>
-                {{ filter_form.supplier_type }}
-            </div>
-            <div class="col-md-2">
-                <label for="status" class="form-label">Status</label>
-                {{ filter_form.status }}
-            </div>
-            <div class="col-md-2">
-                <label for="sort" class="form-label">Sort By</label>
-                {{ filter_form.sort }}
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">&nbsp;</label>
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-outline-primary">
-                        <i class="fas fa-filter me-2"></i>Filter
-                    </button>
-                </div>
-            </div>
-        </form>
-        <form method="get" class="mt-3">
-            <div class="row">
-                <div class="col-md-10">
-                    {{ filter_form.search }}
-                </div>
-                <div class="col-md-2">
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search me-2"></i>Search
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
+        </div>
+    </form>
 </div>
 
-<!-- Suppliers Grid -->
+<!-- Suppliers List -->
 <div class="row">
     {% for supplier in suppliers %}
-    <div class="col-xl-4 col-lg-6 col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <h6 class="card-title mb-1">{{ supplier.name }}</h6>
-                    <small class="text-muted">{{ supplier.supplier_code }}</small>
-                </div>
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{% url 'suppliers:detail' supplier.pk %}">
-                            <i class="fas fa-eye me-2"></i>View Details
-                        </a></li>
-                        {% if request.employee.role in 'owner,manager' %}
-                        <li><a class="dropdown-item" href="{% url 'suppliers:edit' supplier.pk %}">
-                            <i class="fas fa-edit me-2"></i>Edit Supplier
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'suppliers:delete' supplier.pk %}">
-                            <i class="fas fa-trash me-2"></i>Delete
-                        </a></li>
-                        {% endif %}
-                    </ul>
-                </div>
-            </div>
+    <div class="col-xl-6 col-lg-6 mb-4">
+        <div class="supplier-card card h-100">
             <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-12">
-                        <div class="d-flex flex-wrap gap-1">
-                            <span class="badge bg-primary">{{ supplier.get_supplier_type_display }}</span>
-                            {% if supplier.is_preferred %}
-                            <span class="badge bg-success">Preferred</span>
-                            {% endif %}
-                            {% if supplier.is_verified %}
-                            <span class="badge bg-info">Verified</span>
-                            {% endif %}
-                            <span class="badge bg-{% if supplier.status == 'active' %}success{% elif supplier.status == 'inactive' %}secondary{% elif supplier.status == 'pending' %}warning{% else %}danger{% endif %}">
-                                {{ supplier.get_status_display }}
-                            </span>
+                <div class="d-flex align-items-start mb-3">
+                    <div class="supplier-avatar me-3">
+                        {{ supplier.name.0|upper }}
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="card-title mb-1">
+                                    <a href="/business/{{ request.tenant.slug }}/suppliers/{{ supplier.pk }}/" 
+                                       class="text-decoration-none">
+                                        {{ supplier.name }}
+                                    </a>
+                                </h5>
+                                <p class="text-muted small mb-1">{{ supplier.supplier_code }}</p>
+                                {% if supplier.business_name and supplier.business_name != supplier.name %}
+                                <p class="text-muted small mb-0">{{ supplier.business_name }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex flex-column align-items-end">
+                                {% if supplier.is_preferred %}
+                                <span class="badge bg-success mb-1">
+                                    <i class="fas fa-star me-1"></i>Preferred
+                                </span>
+                                {% endif %}
+                                <span class="status-badge bg-{% if supplier.status == 'active' %}success{% elif supplier.status == 'inactive' %}secondary{% elif supplier.status == 'pending' %}warning{% elif supplier.status == 'suspended' %}danger{% else %}dark{% endif %}">
+                                    {{ supplier.get_status_display }}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="row text-center mb-3">
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <div class="small text-muted">Category</div>
+                        <div class="fw-semibold">
+                            {% if supplier.category %}
+                            <span class="supplier-type-badge">{{ supplier.category.name }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted">Type</div>
+                        <div class="fw-semibold">{{ supplier.get_supplier_type_display }}</div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
                     <div class="col-4">
                         <div class="small text-muted">Orders</div>
                         <div class="fw-semibold">{{ supplier.total_orders }}</div>
                     </div>
                     <div class="col-4">
-                        <div class="small text-muted">Value</div>
+                        <div class="small text-muted">Total Value</div>
                         <div class="fw-semibold">KES {{ supplier.total_value|floatformat:0 }}</div>
                     </div>
                     <div class="col-4">
                         <div class="small text-muted">Rating</div>
-                        <div class="fw-semibold">{{ supplier.average_rating|floatformat:1 }}/5</div>
+                        <div class="rating-stars">
+                            {% if supplier.rating > 0 %}
+                                {% for i in "12345" %}
+                                    {% if forloop.counter <= supplier.rating %}
+                                    <i class="fas fa-star"></i>
+                                    {% else %}
+                                    <i class="far fa-star"></i>
+                                    {% endif %}
+                                {% endfor %}
+                                <span class="small text-muted ms-1">({{ supplier.rating|floatformat:1 }})</span>
+                            {% else %}
+                                <span class="text-muted small">No rating</span>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span class="small">Performance</span>
-                        <span class="small">{{ supplier.average_rating|floatformat:1 }}/5</span>
-                    </div>
-                    <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-{% if supplier.average_rating >= 4 %}success{% elif supplier.average_rating >= 3 %}primary{% elif supplier.average_rating >= 2 %}warning{% else %}danger{% endif %}" 
-                             style="width: {{ supplier.average_rating|mul:20 }}%"></div>
+                    <div class="small text-muted mb-1">Contact</div>
+                    <div class="small">
+                        {% if supplier.email %}
+                        <div><i class="fas fa-envelope me-1"></i>{{ supplier.email }}</div>
+                        {% endif %}
+                        {% if supplier.phone %}
+                        <div><i class="fas fa-phone me-1"></i>{{ supplier.phone }}</div>
+                        {% endif %}
+                        {% if not supplier.email and not supplier.phone %}
+                        <span class="text-muted">No contact information</span>
+                        {% endif %}
                     </div>
                 </div>
 
-                <div class="small text-muted mb-3">
-                    {% if supplier.email %}
-                    <div><i class="fas fa-envelope me-2"></i>{{ supplier.email }}</div>
-                    {% endif %}
-                    {% if supplier.phone %}
-                    <div><i class="fas fa-phone me-2"></i>{{ supplier.phone }}</div>
-                    {% endif %}
-                    {% if supplier.category %}
-                    <div><i class="fas fa-tag me-2"></i>{{ supplier.category.name }}</div>
-                    {% endif %}
-                    <div><i class="fas fa-clock me-2"></i>{{ supplier.lead_time_days }} days lead time</div>
-                </div>
-            </div>
-            <div class="card-footer">
-                <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                        Updated {{ supplier.updated_at|timesince }} ago
-                    </small>
-                    <a href="{% url 'suppliers:detail' supplier.pk %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-eye me-1"></i>View
-                    </a>
+                <div class="action-buttons d-flex justify-content-between align-items-center">
+                    <div>
+                        <a href="/business/{{ request.tenant.slug }}/suppliers/{{ supplier.pk }}/" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-1"></i>View
+                        </a>
+                        <a href="/business/{{ request.tenant.slug }}/suppliers/{{ supplier.pk }}/edit/" 
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-edit me-1"></i>Edit
+                        </a>
+                    </div>
+                    <div>
+                        {% if supplier.last_order_date %}
+                        <small class="text-muted">
+                            Last order: {{ supplier.last_order_date|timesince }} ago
+                        </small>
+                        {% else %}
+                        <small class="text-muted">No orders yet</small>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -230,20 +336,24 @@
         <div class="card">
             <div class="card-body text-center py-5">
                 <i class="fas fa-truck fa-4x text-muted mb-4"></i>
-                <h4>No Suppliers Found</h4>
+                <h4 class="text-muted">No Suppliers Found</h4>
                 <p class="text-muted mb-4">
                     {% if request.GET.search or request.GET.category or request.GET.supplier_type or request.GET.status %}
                     No suppliers match your current filters. Try adjusting your search criteria.
                     {% else %}
-                    Get started by adding your first supplier to manage purchase orders and inventory.
+                    You haven't added any suppliers yet. Start by adding your first supplier.
                     {% endif %}
                 </p>
-                {% if request.GET.search or request.GET.category or request.GET.supplier_type or request.GET.status %}
-                <a href="{% url 'suppliers:list' %}" class="btn btn-outline-primary me-2">Clear Filters</a>
-                {% endif %}
-                <a href="{% url 'suppliers:create' %}" class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>Add Supplier
-                </a>
+                <div>
+                    {% if request.GET.search or request.GET.category or request.GET.supplier_type or request.GET.status %}
+                    <a href="{{ urls.list }}" class="btn btn-outline-primary me-3">
+                        <i class="fas fa-times me-2"></i>Clear Filters
+                    </a>
+                    {% endif %}
+                    <a href="{{ urls.create }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Add Your First Supplier
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -251,57 +361,75 @@
 </div>
 
 <!-- Pagination -->
-{% if is_paginated %}
-<nav aria-label="Supplier pagination">
+{% if suppliers.has_other_pages %}
+<nav aria-label="Suppliers pagination" class="mt-4">
     <ul class="pagination justify-content-center">
-        {% if page_obj.has_previous %}
+        {% if suppliers.has_previous %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.supplier_type %}&supplier_type={{ request.GET.supplier_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">
-                <i class="fas fa-chevron-left"></i>
+            <a class="page-link" href="?{{ request.GET.urlencode }}&page=1">
+                <i class="fas fa-angle-double-left"></i>
+            </a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ suppliers.previous_page_number }}">
+                <i class="fas fa-angle-left"></i>
             </a>
         </li>
         {% endif %}
-        
-        {% for num in page_obj.paginator.page_range %}
-        {% if page_obj.number == num %}
+
+        {% for num in suppliers.paginator.page_range %}
+        {% if num == suppliers.number %}
         <li class="page-item active">
             <span class="page-link">{{ num }}</span>
         </li>
-        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        {% elif num > suppliers.number|add:-3 and num < suppliers.number|add:3 %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ num }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.supplier_type %}&supplier_type={{ request.GET.supplier_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">{{ num }}</a>
+            <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ num }}">{{ num }}</a>
         </li>
         {% endif %}
         {% endfor %}
-        
-        {% if page_obj.has_next %}
+
+        {% if suppliers.has_next %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.supplier_type %}&supplier_type={{ request.GET.supplier_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">
-                <i class="fas fa-chevron-right"></i>
+            <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ suppliers.next_page_number }}">
+                <i class="fas fa-angle-right"></i>
+            </a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ suppliers.paginator.num_pages }}">
+                <i class="fas fa-angle-double-right"></i>
             </a>
         </li>
         {% endif %}
     </ul>
 </nav>
-{% endif %}
 
-<!-- Bulk Actions (for future implementation) -->
-<div class="card mt-4">
-    <div class="card-body">
-        <div class="row align-items-center">
-            <div class="col-md-6">
-                <h6 class="mb-0">Need to manage multiple suppliers?</h6>
-                <small class="text-muted">Use our bulk actions and import features</small>
-            </div>
-            <div class="col-md-6 text-md-end">
-                <a href="{% url 'suppliers:categories' %}" class="btn btn-outline-primary me-2">
-                    <i class="fas fa-tags me-2"></i>Manage Categories
-                </a>
-                <a href="{% url 'suppliers:export' %}" class="btn btn-outline-success">
-                    <i class="fas fa-download me-2"></i>Export List
-                </a>
-            </div>
-        </div>
-    </div>
+<div class="text-center text-muted mt-3">
+    Showing {{ suppliers.start_index }}-{{ suppliers.end_index }} of {{ suppliers.paginator.count }} suppliers
 </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Auto-submit form on filter change
+    $('select[name="category"], select[name="supplier_type"], select[name="status"], select[name="sort"]').change(function() {
+        $(this).closest('form').submit();
+    });
+
+    // Search with debounce
+    let searchTimeout;
+    $('input[name="search"]').on('input', function() {
+        clearTimeout(searchTimeout);
+        const form = $(this).closest('form');
+        searchTimeout = setTimeout(function() {
+            form.submit();
+        }, 500);
+    });
+
+    // Tooltip initialization
+    $('[data-bs-toggle="tooltip"]').tooltip();
+});
+</script>
 {% endblock %}

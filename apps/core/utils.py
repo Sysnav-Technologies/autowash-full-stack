@@ -226,3 +226,339 @@ def get_business_performance_metrics(business, period='month'):
     }
     
     return metrics
+
+
+# Add these functions to your existing apps/core/utils.py file
+
+def send_test_sms(phone_number, message=None):
+    """Send a test SMS to verify SMS functionality"""
+    try:
+        if not message:
+            message = "Test SMS from your business management system. SMS notifications are working correctly!"
+        
+        return send_sms_notification(phone_number, message)
+    except Exception as e:
+        print(f"Test SMS failed: {e}")
+        return False
+
+def send_test_email(email_address, subject=None, message=None):
+    """Send a test email to verify email functionality"""
+    try:
+        if not subject:
+            subject = "Test Email - Business Management System"
+        
+        if not message:
+            message = """
+            This is a test email from your business management system.
+            
+            Your email notifications are configured correctly and working as expected.
+            
+            If you received this email, your email settings are properly configured.
+            
+            Best regards,
+            Your Business Management System
+            """
+        
+        return send_email_notification(
+            subject=subject,
+            message=message,
+            recipient_list=[email_address]
+        )
+    except Exception as e:
+        print(f"Test email failed: {e}")
+        return False
+
+def validate_business_settings(business):
+    """Validate business configuration completeness"""
+    validation_results = {
+        'is_complete': True,
+        'missing_fields': [],
+        'warnings': [],
+        'recommendations': []
+    }
+    
+    # Required fields check - using actual Business model field names
+    required_fields = {
+        'name': 'Business name is required',
+        'phone': 'Business phone number is required',
+        'email': 'Business email address is required'
+    }
+    
+    for field, message in required_fields.items():
+        field_value = getattr(business, field, None)
+        if not field_value or (hasattr(field_value, '__len__') and len(str(field_value).strip()) == 0):
+            validation_results['missing_fields'].append(message)
+            validation_results['is_complete'] = False
+    
+    # Optional but recommended fields - using actual Business model field names
+    recommended_fields = {
+        'logo': 'Consider adding a business logo for better branding',
+        'website': 'Adding a website URL can help customers find you online',
+        'description': 'A business description helps customers understand your services'
+    }
+    
+    for field, message in recommended_fields.items():
+        field_value = getattr(business, field, None)
+        if not field_value or (hasattr(field_value, '__len__') and len(str(field_value).strip()) == 0):
+            validation_results['recommendations'].append(message)
+    
+    # Business hours validation - using correct field names from Business model
+    if not business.opening_time or not business.closing_time:
+        validation_results['warnings'].append('Business hours are not set')
+    
+    # Address validation - check if any address fields exist and are populated
+    address_fields = ['address', 'city', 'state', 'country']  # Based on Address mixin
+    has_address = False
+    for field in address_fields:
+        if hasattr(business, field):
+            field_value = getattr(business, field, None)
+            if field_value and len(str(field_value).strip()) > 0:
+                has_address = True
+                break
+    
+    if not has_address:
+        validation_results['recommendations'].append('Adding business address information helps with location-based services')
+    
+    return validation_results
+
+def get_system_health_status():
+    """Get overall system health status"""
+    from django.db import connection
+    
+    health_status = {
+        'database': 'healthy',
+        'email': 'unknown',
+        'sms': 'unknown',
+        'storage': 'healthy',
+        'overall': 'healthy'
+    }
+    
+    # Check database connection
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        health_status['database'] = 'healthy'
+    except Exception:
+        health_status['database'] = 'unhealthy'
+        health_status['overall'] = 'unhealthy'
+    
+    # Check email configuration
+    try:
+        from django.core.mail import get_connection
+        connection = get_connection()
+        connection.open()
+        connection.close()
+        health_status['email'] = 'healthy'
+    except Exception:
+        health_status['email'] = 'unhealthy'
+    
+    # Check SMS configuration
+    if hasattr(settings, 'SMS_API_KEY') and settings.SMS_API_KEY:
+        health_status['sms'] = 'configured'
+    else:
+        health_status['sms'] = 'not_configured'
+    
+    return health_status
+
+def create_system_backup_data(business):
+    """Create a dictionary of business data for backup"""
+    backup_data = {
+        'metadata': {
+            'business_name': business.name,
+            'business_id': str(business.id),
+            'backup_date': timezone.now().isoformat(),
+            'version': '1.0'
+        },
+        'business': {
+            'name': business.name,
+            'business_type': business.business_type,
+            'description': business.description,
+            'phone': str(business.phone) if business.phone else None,
+            'email': business.email,
+            'website': business.website,
+            'address': business.address,
+            'city': business.city,
+            'state': business.state,
+            'postal_code': business.postal_code,
+            'country': business.country,
+            'created_at': business.created_at.isoformat(),
+        }
+    }
+    
+    # Add customers data if available
+    try:
+        from apps.customers.models import Customer
+        customers = Customer.objects.filter(is_active=True)
+        backup_data['customers'] = []
+        
+        for customer in customers:
+            customer_data = {
+                'customer_id': customer.customer_id,
+                'first_name': customer.first_name,
+                'last_name': customer.last_name,
+                'phone': str(customer.phone) if customer.phone else None,
+                'email': customer.email,
+                'customer_type': customer.customer_type,
+                'created_at': customer.created_at.isoformat(),
+            }
+            backup_data['customers'].append(customer_data)
+    except ImportError:
+        pass
+    
+    # Add services data if available
+    try:
+        from apps.services.models import Service, ServiceCategory
+        
+        # Service categories
+        categories = ServiceCategory.objects.filter(is_active=True)
+        backup_data['service_categories'] = []
+        
+        for category in categories:
+            category_data = {
+                'name': category.name,
+                'description': category.description,
+                'icon': category.icon,
+                'color': category.color,
+            }
+            backup_data['service_categories'].append(category_data)
+        
+        # Services
+        services = Service.objects.filter(is_active=True)
+        backup_data['services'] = []
+        
+        for service in services:
+            service_data = {
+                'name': service.name,
+                'description': service.description,
+                'category': service.category.name if service.category else None,
+                'base_price': float(service.base_price),
+                'estimated_duration': service.estimated_duration,
+                'is_popular': service.is_popular,
+                'is_premium': service.is_premium,
+            }
+            backup_data['services'].append(service_data)
+    except ImportError:
+        pass
+    
+    return backup_data
+
+def export_data_to_format(data, format_type='json'):
+    """Export data to specified format"""
+    if format_type.lower() == 'json':
+        return json.dumps(data, indent=2, default=str)
+    
+    elif format_type.lower() == 'csv':
+        import csv
+        import io
+        
+        output = io.StringIO()
+        
+        # Export customers if available
+        if 'customers' in data:
+            writer = csv.writer(output)
+            writer.writerow(['Customer ID', 'First Name', 'Last Name', 'Phone', 'Email', 'Type', 'Created Date'])
+            
+            for customer in data['customers']:
+                writer.writerow([
+                    customer.get('customer_id', ''),
+                    customer.get('first_name', ''),
+                    customer.get('last_name', ''),
+                    customer.get('phone', ''),
+                    customer.get('email', ''),
+                    customer.get('customer_type', ''),
+                    customer.get('created_at', ''),
+                ])
+        
+        return output.getvalue()
+    
+    elif format_type.lower() == 'excel':
+        try:
+            import pandas as pd
+            import io
+            
+            output = io.BytesIO()
+            
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                # Export customers
+                if 'customers' in data:
+                    customers_df = pd.DataFrame(data['customers'])
+                    customers_df.to_excel(writer, sheet_name='Customers', index=False)
+                
+                # Export services
+                if 'services' in data:
+                    services_df = pd.DataFrame(data['services'])
+                    services_df.to_excel(writer, sheet_name='Services', index=False)
+                
+                # Export business info
+                business_df = pd.DataFrame([data['business']])
+                business_df.to_excel(writer, sheet_name='Business Info', index=False)
+            
+            return output.getvalue()
+        
+        except ImportError:
+            # Fallback to CSV if pandas not available
+            return export_data_to_format(data, 'csv')
+    
+    return str(data)
+
+def generate_backup_filename(business, format_type='json'):
+    """Generate a unique backup filename"""
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+    business_slug = getattr(business, 'slug', str(business.id))
+    
+    return f"backup_{business_slug}_{timestamp}.{format_type.lower()}"
+
+def calculate_backup_size_estimate(business):
+    """Estimate backup file size"""
+    size_estimate = {
+        'customers': 0,
+        'services': 0,
+        'payments': 0,
+        'media': 0,
+        'total': 0
+    }
+    
+    try:
+        # Estimate customer data size (rough calculation)
+        from apps.customers.models import Customer
+        customer_count = Customer.objects.count()
+        size_estimate['customers'] = customer_count * 1024  # ~1KB per customer
+    except ImportError:
+        pass
+    
+    try:
+        # Estimate service data size
+        from apps.services.models import Service
+        service_count = Service.objects.count()
+        size_estimate['services'] = service_count * 512  # ~0.5KB per service
+    except ImportError:
+        pass
+    
+    try:
+        # Estimate payment data size
+        from apps.payments.models import Payment
+        payment_count = Payment.objects.count()
+        size_estimate['payments'] = payment_count * 256  # ~0.25KB per payment
+    except ImportError:
+        pass
+    
+    # Calculate total
+    size_estimate['total'] = sum([
+        size_estimate['customers'],
+        size_estimate['services'],
+        size_estimate['payments'],
+        size_estimate['media']
+    ])
+    
+    return size_estimate
+
+def format_file_size(size_in_bytes):
+    """Format file size in human readable format"""
+    if size_in_bytes < 1024:
+        return f"{size_in_bytes} B"
+    elif size_in_bytes < 1024 * 1024:
+        return f"{size_in_bytes / 1024:.1f} KB"
+    elif size_in_bytes < 1024 * 1024 * 1024:
+        return f"{size_in_bytes / (1024 * 1024):.1f} MB"
+    else:
+        return f"{size_in_bytes / (1024 * 1024 * 1024):.1f} GB"

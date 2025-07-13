@@ -58,6 +58,7 @@ SHARED_APPS = [
     'phonenumber_field',
     'django_extensions',
     'django_filters',
+    'widget_tweaks',
     'corsheaders',
     'rest_framework',
     'rest_framework.authtoken',
@@ -72,6 +73,7 @@ SHARED_APPS = [
     'apps.core',
     'apps.accounts',
     'apps.subscriptions',
+
 ]
 
 TENANT_APPS = [

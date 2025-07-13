@@ -4,6 +4,7 @@ from django.http import JsonResponse, HttpResponse, Http404
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy, reverse
 from django.db.models import Q, Sum, Count, Avg, F
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
@@ -27,14 +28,126 @@ from .forms import (
     SupplierFilterForm, PurchaseOrderFilterForm
 )
 
+def get_supplier_urls(request):
+    """Generate all supplier URLs for templates"""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/suppliers"
+    
+    return {
+        # Dashboard
+        'dashboard': f"{base_url}/",
+        'businesses_dashboard': f"/business/{tenant_slug}/dashboard/",
+        
+        # Suppliers
+        'list': f"{base_url}/list/",
+        'create': f"{base_url}/create/",
+        
+        # Categories
+        'categories': f"{base_url}/categories/",
+        
+        # Purchase Orders
+        'purchase_order_list': f"{base_url}/orders/",
+        'purchase_order_create': f"{base_url}/orders/create/",
+        
+        # Goods Receipts
+        'goods_receipt_list': f"{base_url}/receipts/",
+        'goods_receipt_create': f"{base_url}/receipts/create/",
+        
+        # Evaluations
+        'evaluation_list': f"{base_url}/evaluations/",
+        'evaluation_create': f"{base_url}/evaluations/create/",
+        
+        # Payments
+        'payment_list': f"{base_url}/payments/",
+        'payment_create': f"{base_url}/payments/create/",
+        
+        # Documents
+        'document_list': f"{base_url}/documents/",
+        'document_upload': f"{base_url}/documents/upload/",
+        
+        # Reports
+        'performance_report': f"{base_url}/performance/",
+        'export': f"{base_url}/export/",
+        
+        # AJAX
+        'ajax_purchase_order_items': f"{base_url}/ajax/purchase-order-items/",
+    }
+
+def get_business_url(request, url_name, **kwargs):
+    """Helper function to generate URLs with business slug"""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/suppliers"
+    
+    url_mapping = {
+        # Dashboard
+        'suppliers:dashboard': f"{base_url}/",
+        'businesses:dashboard': f"/business/{tenant_slug}/dashboard/",
+        
+        # Suppliers
+        'suppliers:list': f"{base_url}/list/",
+        'suppliers:create': f"{base_url}/create/",
+        'suppliers:detail': f"{base_url}/{{pk}}/",
+        'suppliers:edit': f"{base_url}/{{pk}}/edit/",
+        'suppliers:delete': f"{base_url}/{{pk}}/delete/",
+        
+        # Categories
+        'suppliers:categories': f"{base_url}/categories/",
+        
+        # Contacts
+        'suppliers:contact_add': f"{base_url}/{{supplier_id}}/contacts/add/",
+        
+        # Purchase Orders
+        'suppliers:purchase_order_list': f"{base_url}/orders/",
+        'suppliers:purchase_order_create': f"{base_url}/orders/create/",
+        'suppliers:purchase_order_detail': f"{base_url}/orders/{{pk}}/",
+        'suppliers:purchase_order_edit': f"{base_url}/orders/{{pk}}/edit/",
+        'suppliers:purchase_order_approve': f"{base_url}/orders/{{pk}}/approve/",
+        'suppliers:purchase_order_send': f"{base_url}/orders/{{pk}}/send/",
+        
+        # Goods Receipts
+        'suppliers:goods_receipt_list': f"{base_url}/receipts/",
+        'suppliers:goods_receipt_create': f"{base_url}/receipts/create/",
+        'suppliers:goods_receipt_detail': f"{base_url}/receipts/{{pk}}/",
+        'suppliers:goods_receipt_complete': f"{base_url}/receipts/{{pk}}/complete/",
+        
+        # Evaluations
+        'suppliers:evaluation_list': f"{base_url}/evaluations/",
+        'suppliers:evaluation_create': f"{base_url}/evaluations/create/",
+        
+        # Payments
+        'suppliers:payment_list': f"{base_url}/payments/",
+        'suppliers:payment_create': f"{base_url}/payments/create/",
+        'suppliers:payment_detail': f"{base_url}/payments/{{pk}}/",
+        'suppliers:payment_process': f"{base_url}/payments/{{pk}}/process/",
+        
+        # Documents
+        'suppliers:document_list': f"{base_url}/documents/",
+        'suppliers:document_upload': f"{base_url}/documents/upload/",
+        
+        # Reports
+        'suppliers:performance_report': f"{base_url}/performance/",
+        'suppliers:export': f"{base_url}/export/",
+        
+        # AJAX
+        'suppliers:ajax_purchase_order_items': f"{base_url}/ajax/purchase-order-items/",
+    }
+    
+    url = url_mapping.get(url_name, f"{base_url}/")
+    
+    # Replace placeholders with actual values
+    for key, value in kwargs.items():
+        url = url.replace(f"{{{key}}}", str(value))
+    
+    return url
+
 @login_required
 @business_required
 @employee_required(['owner', 'manager', 'supervisor'])
 def supplier_dashboard(request):
     """Supplier management dashboard"""
     # Key metrics
-    total_suppliers = Supplier.objects.filter(is_active=True).count()
-    active_suppliers = Supplier.objects.filter(status='active').count()
+    total_suppliers = Supplier.objects.filter(is_deleted=False).count()
+    active_suppliers = Supplier.objects.filter(status='active', is_deleted=False).count()
     pending_orders = PurchaseOrder.objects.filter(
         status__in=['pending', 'approved', 'sent']
     ).count()
@@ -49,12 +162,12 @@ def supplier_dashboard(request):
     
     # Top suppliers by value
     top_suppliers = Supplier.objects.filter(
-        is_active=True
+        is_deleted=False
     ).order_by('-total_value')[:5]
     
     # Supplier performance
     supplier_ratings = Supplier.objects.filter(
-        is_active=True,
+        is_deleted=False,
         rating__gt=0
     ).order_by('-rating')[:5]
     
@@ -62,8 +175,8 @@ def supplier_dashboard(request):
     six_months_ago = timezone.now().date() - timedelta(days=180)
     monthly_purchases = PurchaseOrder.objects.filter(
         order_date__gte=six_months_ago
-    ).extra(
-        select={'month': 'DATE_FORMAT(order_date, "%%Y-%%m")'}
+    ).annotate(
+        month=TruncMonth('order_date')
     ).values('month').annotate(
         total_amount=Sum('total_amount'),
         order_count=Count('id')
@@ -81,6 +194,7 @@ def supplier_dashboard(request):
         'top_suppliers': top_suppliers,
         'supplier_ratings': supplier_ratings,
         'monthly_purchases': list(monthly_purchases),
+        'urls': get_supplier_urls(request),
     }
     
     return render(request, 'suppliers/dashboard.html', context)
@@ -94,7 +208,7 @@ class SupplierListView(ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        queryset = Supplier.objects.filter(is_active=True).select_related('category')
+        queryset = Supplier.objects.filter(is_deleted=False).select_related('category')
         
         # Apply filters
         category = self.request.GET.get('category')
@@ -135,9 +249,12 @@ class SupplierListView(ListView):
         context['filter_form'] = SupplierFilterForm(self.request.GET)
         
         # Statistics
-        context['total_suppliers'] = Supplier.objects.filter(is_active=True).count()
-        context['active_suppliers'] = Supplier.objects.filter(status='active').count()
-        context['preferred_suppliers'] = Supplier.objects.filter(is_preferred=True).count()
+        context['total_suppliers'] = Supplier.objects.filter(is_deleted=False).count()
+        context['active_suppliers'] = Supplier.objects.filter(status='active', is_deleted=False).count()
+        context['preferred_suppliers'] = Supplier.objects.filter(is_preferred=True, is_deleted=False).count()
+        
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
         
         return context
 
@@ -147,6 +264,9 @@ class SupplierDetailView(DetailView):
     model = Supplier
     template_name = 'suppliers/supplier_detail.html'
     context_object_name = 'supplier'
+    
+    def get_queryset(self):
+        return Supplier.objects.filter(is_deleted=False)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -181,6 +301,9 @@ class SupplierDetailView(DetailView):
         # Contacts
         context['contacts'] = supplier.contacts.filter(is_active=True)
         
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
+        
         return context
     
     def calculate_on_time_delivery(self, supplier):
@@ -203,7 +326,14 @@ class SupplierCreateView(CreateView):
     model = Supplier
     form_class = SupplierForm
     template_name = 'suppliers/supplier_form.html'
-    success_url = reverse_lazy('suppliers:list')
+    
+    def get_success_url(self):
+        return get_business_url(self.request, 'suppliers:list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
     
     def form_valid(self, form):
         messages.success(self.request, 'Supplier created successfully!')
@@ -215,7 +345,17 @@ class SupplierUpdateView(UpdateView):
     model = Supplier
     form_class = SupplierForm
     template_name = 'suppliers/supplier_form.html'
-    success_url = reverse_lazy('suppliers:list')
+    
+    def get_queryset(self):
+        return Supplier.objects.filter(is_deleted=False)
+    
+    def get_success_url(self):
+        return get_business_url(self.request, 'suppliers:detail', pk=self.object.pk)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
     
     def form_valid(self, form):
         messages.success(self.request, 'Supplier updated successfully!')
@@ -226,15 +366,26 @@ class SupplierDeleteView(DeleteView):
     """Delete supplier (soft delete)"""
     model = Supplier
     template_name = 'suppliers/supplier_confirm_delete.html'
-    success_url = reverse_lazy('suppliers:list')
+    
+    def get_queryset(self):
+        return Supplier.objects.filter(is_deleted=False)
+    
+    def get_success_url(self):
+        return get_business_url(self.request, 'suppliers:list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
     
     def delete(self, request, *args, **kwargs):
         self.object = self.get_object()
         # Soft delete
-        self.object.is_active = False
+        self.object.is_deleted = True
+        self.object.deleted_at = timezone.now()
         self.object.save()
         messages.success(request, 'Supplier deleted successfully!')
-        return redirect(self.success_url)
+        return redirect(self.get_success_url())
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class PurchaseOrderListView(ListView):
@@ -280,7 +431,7 @@ class PurchaseOrderListView(ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['suppliers'] = Supplier.objects.filter(is_active=True, status='active')
+        context['suppliers'] = Supplier.objects.filter(is_deleted=False, status='active')
         context['status_choices'] = PurchaseOrder.STATUS_CHOICES
         context['priority_choices'] = PurchaseOrder.PRIORITY_LEVELS
         context['filter_form'] = PurchaseOrderFilterForm(self.request.GET)
@@ -293,6 +444,9 @@ class PurchaseOrderListView(ListView):
             expected_delivery_date__lt=timezone.now().date(),
             status__in=['approved', 'sent', 'acknowledged', 'partially_received']
         ).count()
+        
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
         
         return context
 
@@ -320,6 +474,9 @@ class PurchaseOrderDetailView(DetailView):
             'days_overdue': order.days_overdue if order.is_overdue else 0,
         }
         
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
+        
         return context
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
@@ -335,6 +492,9 @@ class PurchaseOrderCreateView(CreateView):
             context['items_formset'] = PurchaseOrderItemFormSet(self.request.POST)
         else:
             context['items_formset'] = PurchaseOrderItemFormSet()
+        
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
         return context
     
     def form_valid(self, form):
@@ -344,8 +504,8 @@ class PurchaseOrderCreateView(CreateView):
         if items_formset.is_valid():
             # Generate PO number
             form.instance.po_number = self.generate_po_number()
-            if hasattr(self.request, 'employee'):
-                form.instance.requested_by = self.request.employee
+            if hasattr(self.request.user, 'employee_profile'):
+                form.instance.requested_by = self.request.user.employee_profile
             
             self.object = form.save()
             items_formset.instance = self.object
@@ -355,7 +515,7 @@ class PurchaseOrderCreateView(CreateView):
             self.object.calculate_totals()
             
             messages.success(self.request, f'Purchase Order {self.object.po_number} created successfully!')
-            return redirect('suppliers:purchase_order_detail', pk=self.object.pk)
+            return redirect(get_business_url(self.request, 'suppliers:purchase_order_detail', pk=self.object.pk))
         else:
             return self.form_invalid(form)
     
@@ -395,6 +555,9 @@ class PurchaseOrderUpdateView(UpdateView):
             )
         else:
             context['items_formset'] = PurchaseOrderItemFormSet(instance=self.object)
+        
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
         return context
     
     def form_valid(self, form):
@@ -409,7 +572,7 @@ class PurchaseOrderUpdateView(UpdateView):
             self.object.calculate_totals()
             
             messages.success(self.request, 'Purchase Order updated successfully!')
-            return redirect('suppliers:purchase_order_detail', pk=self.object.pk)
+            return redirect(get_business_url(self.request, 'suppliers:purchase_order_detail', pk=self.object.pk))
         else:
             return self.form_invalid(form)
 
@@ -423,12 +586,12 @@ def approve_purchase_order(request, pk):
     
     if order.status != 'pending':
         messages.error(request, 'Only pending orders can be approved.')
-        return redirect('suppliers:purchase_order_detail', pk=pk)
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
     
     order.approve(request.user)
     messages.success(request, f'Purchase Order {order.po_number} approved successfully!')
     
-    return redirect('suppliers:purchase_order_detail', pk=pk)
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
 
 @login_required
 @business_required
@@ -440,12 +603,12 @@ def send_purchase_order(request, pk):
     
     if order.status != 'approved':
         messages.error(request, 'Only approved orders can be sent.')
-        return redirect('suppliers:purchase_order_detail', pk=pk)
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
     
     order.send_to_supplier()
     messages.success(request, f'Purchase Order {order.po_number} sent to supplier!')
     
-    return redirect('suppliers:purchase_order_detail', pk=pk)
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class GoodsReceiptListView(ListView):
@@ -476,6 +639,11 @@ class GoodsReceiptListView(ListView):
             )
         
         return queryset.order_by('-receipt_date')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class GoodsReceiptCreateView(CreateView):
@@ -516,6 +684,8 @@ class GoodsReceiptCreateView(CreateView):
             except PurchaseOrder.DoesNotExist:
                 pass
         
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
         return context
     
     def form_valid(self, form):
@@ -525,15 +695,15 @@ class GoodsReceiptCreateView(CreateView):
         if items_formset.is_valid():
             # Generate receipt number
             form.instance.receipt_number = self.generate_receipt_number()
-            if hasattr(self.request, 'employee'):
-                form.instance.received_by = self.request.employee
+            if hasattr(self.request.user, 'employee_profile'):
+                form.instance.received_by = self.request.user.employee_profile
             
             self.object = form.save()
             items_formset.instance = self.object
             items_formset.save()
             
             messages.success(self.request, f'Goods Receipt {self.object.receipt_number} created successfully!')
-            return redirect('suppliers:goods_receipt_detail', pk=self.object.pk)
+            return redirect(get_business_url(self.request, 'suppliers:goods_receipt_detail', pk=self.object.pk))
         else:
             return self.form_invalid(form)
     
@@ -571,6 +741,9 @@ class GoodsReceiptDetailView(DetailView):
         # Receipt items
         context['items'] = receipt.items.select_related('purchase_order_item__item').all()
         
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
+        
         return context
 
 @login_required
@@ -583,7 +756,7 @@ def complete_goods_receipt(request, pk):
     
     if receipt.status == 'completed':
         messages.error(request, 'Receipt is already completed.')
-        return redirect('suppliers:goods_receipt_detail', pk=pk)
+        return redirect(get_business_url(request, 'suppliers:goods_receipt_detail', pk=pk))
     
     try:
         receipt.complete_receipt()
@@ -591,7 +764,7 @@ def complete_goods_receipt(request, pk):
     except Exception as e:
         messages.error(request, f'Error completing receipt: {str(e)}')
     
-    return redirect('suppliers:goods_receipt_detail', pk=pk)
+    return redirect(get_business_url(request, 'suppliers:goods_receipt_detail', pk=pk))
 
 @login_required
 @business_required
@@ -599,7 +772,7 @@ def complete_goods_receipt(request, pk):
 def supplier_categories(request):
     """Manage supplier categories"""
     categories = SupplierCategory.objects.filter(is_active=True).annotate(
-        supplier_count=Count('suppliers', filter=Q(suppliers__is_active=True))
+        supplier_count=Count('suppliers', filter=Q(suppliers__is_deleted=False))
     )
     
     if request.method == 'POST':
@@ -607,13 +780,14 @@ def supplier_categories(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Category created successfully!')
-            return redirect('suppliers:categories')
+            return redirect(get_business_url(request, 'suppliers:categories'))
     else:
         form = SupplierCategoryForm()
     
     context = {
         'categories': categories,
-        'form': form
+        'form': form,
+        'urls': get_supplier_urls(request),
     }
     
     return render(request, 'suppliers/categories.html', context)
@@ -632,7 +806,7 @@ def export_suppliers(request):
         'Email', 'Phone', 'Total Orders', 'Total Value', 'Rating', 'Last Order Date'
     ])
     
-    suppliers = Supplier.objects.filter(is_active=True).select_related('category')
+    suppliers = Supplier.objects.filter(is_deleted=False).select_related('category')
     
     for supplier in suppliers:
         writer.writerow([
@@ -669,7 +843,7 @@ def supplier_performance_report(request):
     # Get suppliers with orders in the period
     suppliers_data = []
     
-    for supplier in Supplier.objects.filter(is_active=True):
+    for supplier in Supplier.objects.filter(is_deleted=False):
         orders = supplier.purchase_orders.filter(
             order_date__gte=start_date,
             order_date__lte=end_date
@@ -702,6 +876,7 @@ def supplier_performance_report(request):
         'total_suppliers': len(suppliers_data),
         'total_orders': sum(s['total_orders'] for s in suppliers_data),
         'total_value': sum(s['total_value'] for s in suppliers_data),
+        'urls': get_supplier_urls(request),
     }
     
     return render(request, 'suppliers/performance_report.html', context)
@@ -761,6 +936,11 @@ class SupplierEvaluationListView(ListView):
             queryset = queryset.filter(evaluation_period=period)
         
         return queryset.order_by('-period_end')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierEvaluationCreateView(CreateView):
@@ -768,11 +948,18 @@ class SupplierEvaluationCreateView(CreateView):
     model = SupplierEvaluation
     form_class = SupplierEvaluationForm
     template_name = 'suppliers/evaluation_form.html'
-    success_url = reverse_lazy('suppliers:evaluation_list')
+    
+    def get_success_url(self):
+        return get_business_url(self.request, 'suppliers:evaluation_list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
     
     def form_valid(self, form):
-        if hasattr(self.request, 'employee'):
-            form.instance.evaluated_by = self.request.employee
+        if hasattr(self.request.user, 'employee_profile'):
+            form.instance.evaluated_by = self.request.user.employee_profile
         messages.success(self.request, 'Supplier evaluation saved successfully!')
         return super().form_valid(form)
 
@@ -801,6 +988,11 @@ class SupplierPaymentListView(ListView):
             queryset = queryset.filter(payment_method=method)
         
         return queryset.order_by('-payment_date')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierPaymentCreateView(CreateView):
@@ -808,13 +1000,20 @@ class SupplierPaymentCreateView(CreateView):
     model = SupplierPayment
     form_class = SupplierPaymentForm
     template_name = 'suppliers/payment_form.html'
-    success_url = reverse_lazy('suppliers:payment_list')
+    
+    def get_success_url(self):
+        return get_business_url(self.request, 'suppliers:payment_list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
     
     def form_valid(self, form):
         # Generate payment number
         form.instance.payment_number = self.generate_payment_number()
-        if hasattr(self.request, 'employee'):
-            form.instance.processed_by = self.request.employee
+        if hasattr(self.request.user, 'employee_profile'):
+            form.instance.processed_by = self.request.user.employee_profile
         
         messages.success(self.request, 'Payment record created successfully!')
         return super().form_valid(form)
@@ -845,6 +1044,11 @@ class SupplierPaymentDetailView(DetailView):
     model = SupplierPayment
     template_name = 'suppliers/payment_detail.html'
     context_object_name = 'payment'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
 
 @login_required
 @business_required
@@ -856,7 +1060,7 @@ def process_payment(request, pk):
     
     if payment.status != 'pending':
         messages.error(request, 'Only pending payments can be processed.')
-        return redirect('suppliers:payment_detail', pk=pk)
+        return redirect(get_business_url(request, 'suppliers:payment_detail', pk=pk))
     
     try:
         payment.process_payment(request.user)
@@ -864,7 +1068,7 @@ def process_payment(request, pk):
     except Exception as e:
         messages.error(request, f'Error processing payment: {str(e)}')
     
-    return redirect('suppliers:payment_detail', pk=pk)
+    return redirect(get_business_url(request, 'suppliers:payment_detail', pk=pk))
 
 # Supplier Document Views
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
@@ -887,6 +1091,11 @@ class SupplierDocumentListView(ListView):
             queryset = queryset.filter(document_type=doc_type)
         
         return queryset.order_by('-created_at')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierDocumentCreateView(CreateView):
@@ -894,11 +1103,18 @@ class SupplierDocumentCreateView(CreateView):
     model = SupplierDocument
     form_class = SupplierDocumentForm
     template_name = 'suppliers/document_form.html'
-    success_url = reverse_lazy('suppliers:document_list')
+    
+    def get_success_url(self):
+        return get_business_url(self.request, 'suppliers:document_list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
     
     def form_valid(self, form):
-        if hasattr(self.request, 'employee'):
-            form.instance.uploaded_by = self.request.employee
+        if hasattr(self.request.user, 'employee_profile'):
+            form.instance.uploaded_by = self.request.user.employee_profile
         messages.success(self.request, 'Document uploaded successfully!')
         return super().form_valid(form)
 
@@ -917,9 +1133,14 @@ class SupplierContactCreateView(CreateView):
             initial['supplier'] = get_object_or_404(Supplier, pk=supplier_id)
         return initial
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['urls'] = get_supplier_urls(self.request)
+        return context
+    
     def form_valid(self, form):
         messages.success(self.request, 'Contact added successfully!')
         return super().form_valid(form)
     
     def get_success_url(self):
-        return reverse('suppliers:detail', kwargs={'pk': self.object.supplier.pk})
+        return get_business_url(self.request, 'suppliers:detail', pk=self.object.supplier.pk)

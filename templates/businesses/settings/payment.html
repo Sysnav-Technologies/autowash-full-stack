@@ -1,0 +1,507 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payment Settings - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/settings.css' %}">
+<style>
+.payment-method-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.payment-method-card:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.payment-method-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.payment-method-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    margin-right: 1rem;
+}
+
+.payment-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.payment-stat-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.payment-stat-card .stat-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.payment-stat-card .stat-label {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.tax-calculator {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Settings Navigation -->
+    <div class="settings-nav">
+        <ul class="nav nav-pills" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:service_settings' %}">
+                    <i class="fas fa-tools me-2"></i>Services
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active" href="{% url 'businesses:payment_settings' %}">
+                    <i class="fas fa-credit-card me-2"></i>Payments
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:notification_settings' %}">
+                    <i class="fas fa-bell me-2"></i>Notifications
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:integration_settings' %}">
+                    <i class="fas fa-plug me-2"></i>Integrations
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:backup_settings' %}">
+                    <i class="fas fa-download me-2"></i>Backup
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Payment Statistics -->
+    <div class="payment-stats-grid">
+        <div class="payment-stat-card">
+            <div class="stat-number">{{ payment_stats.active_methods }}</div>
+            <div class="stat-label">Active Payment Methods</div>
+        </div>
+        <div class="payment-stat-card">
+            <div class="stat-number">{{ payment_stats.today_payments }}</div>
+            <div class="stat-label">Payments Today</div>
+        </div>
+        <div class="payment-stat-card">
+            <div class="stat-number">KES {{ payment_stats.total_revenue_today|floatformat:0 }}</div>
+            <div class="stat-label">Revenue Today</div>
+        </div>
+        <div class="payment-stat-card">
+            <div class="stat-number">16%</div>
+            <div class="stat-label">Current Tax Rate</div>
+        </div>
+    </div>
+
+    <!-- Settings Form -->
+    <form method="post" class="settings-form">
+        {% csrf_token %}
+        
+        <div class="settings-form-card">
+            <!-- Header -->
+            <div class="settings-form-header">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h4 class="mb-1">Payment Settings</h4>
+                        <p class="text-muted mb-0">Configure tax rates, payment terms, and receipt preferences</p>
+                    </div>
+                    <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Overview
+                    </a>
+                </div>
+            </div>
+
+            <!-- Form Body -->
+            <div class="settings-form-body">
+                <!-- Tax Configuration Section -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-receipt text-primary"></i>
+                        Tax Configuration
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.default_tax_rate.id_for_label }}" class="form-label">
+                                    Default Tax Rate (%) <span class="text-danger">*</span>
+                                </label>
+                                {{ form.default_tax_rate }}
+                                <div class="form-text">VAT rate applied to services (Kenya standard: 16%)</div>
+                                {% if form.default_tax_rate.errors %}
+                                    <div class="text-danger small mt-1">{{ form.default_tax_rate.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.currency.id_for_label }}" class="form-label">
+                                    Currency
+                                </label>
+                                {{ form.currency }}
+                                <div class="form-text">Business currency for pricing and invoices</div>
+                                {% if form.currency.errors %}
+                                    <div class="text-danger small mt-1">{{ form.currency.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tax Calculator -->
+                    <div class="tax-calculator">
+                        <h6 class="mb-3">Tax Calculator Preview</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label">Service Amount (KES)</label>
+                                <input type="number" class="form-control" id="calc-amount" value="1000" min="0" step="0.01">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tax Amount</label>
+                                <input type="text" class="form-control" id="calc-tax" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Total Amount</label>
+                                <input type="text" class="form-control" id="calc-total" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Terms Section -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-file-contract text-primary"></i>
+                        Payment Terms & Policies
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.payment_terms.id_for_label }}" class="form-label">
+                            Payment Terms
+                        </label>
+                        {{ form.payment_terms }}
+                        <div class="form-text">Default payment terms displayed on invoices</div>
+                        {% if form.payment_terms.errors %}
+                            <div class="text-danger small mt-1">{{ form.payment_terms.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.late_payment_fee.id_for_label }}" class="form-label">
+                                    Late Payment Fee (KES)
+                                </label>
+                                {{ form.late_payment_fee }}
+                                <div class="form-text">Fixed fee for overdue payments</div>
+                                {% if form.late_payment_fee.errors %}
+                                    <div class="text-danger small mt-1">{{ form.late_payment_fee.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.large_payment_threshold.id_for_label }}" class="form-label">
+                                    Large Payment Threshold (KES)
+                                </label>
+                                {{ form.large_payment_threshold }}
+                                <div class="form-text">Amount requiring manager approval</div>
+                                {% if form.large_payment_threshold.errors %}
+                                    <div class="text-danger small mt-1">{{ form.large_payment_threshold.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receipt & Invoice Settings -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-print text-primary"></i>
+                        Receipt & Invoice Preferences
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check form-switch">
+                                    {{ form.auto_send_receipts }}
+                                    <label class="form-check-label" for="{{ form.auto_send_receipts.id_for_label }}">
+                                        Auto-send Receipts
+                                    </label>
+                                </div>
+                                <div class="form-text">Automatically send receipts after payment completion</div>
+                                {% if form.auto_send_receipts.errors %}
+                                    <div class="text-danger small mt-1">{{ form.auto_send_receipts.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check form-switch">
+                                    {{ form.require_payment_confirmation }}
+                                    <label class="form-check-label" for="{{ form.require_payment_confirmation.id_for_label }}">
+                                        Require Payment Confirmation
+                                    </label>
+                                </div>
+                                <div class="form-text">Require manager confirmation for large payments</div>
+                                {% if form.require_payment_confirmation.errors %}
+                                    <div class="text-danger small mt-1">{{ form.require_payment_confirmation.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Payment Methods -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-credit-card text-primary"></i>
+                        Active Payment Methods
+                        <small class="text-muted ms-2">Manage through Payment Methods settings</small>
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Cash -->
+                        <div class="col-md-6 mb-3">
+                            <div class="payment-method-card">
+                                <div class="payment-method-header">
+                                    <div class="d-flex align-items-center">
+                                        <div class="payment-method-icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                                            <i class="fas fa-money-bill-wave"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-0">Cash Payments</h6>
+                                            <small class="text-muted">Physical cash transactions</small>
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-success">Active</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Most common payment method • No processing fees
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- M-Pesa -->
+                        <div class="col-md-6 mb-3">
+                            <div class="payment-method-card">
+                                <div class="payment-method-header">
+                                    <div class="d-flex align-items-center">
+                                        <div class="payment-method-icon" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                                            <i class="fas fa-mobile-alt"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-0">M-Pesa</h6>
+                                            <small class="text-muted">Mobile money payments</small>
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-success">Active</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Instant mobile payments • 1% processing fee
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card -->
+                        <div class="col-md-6 mb-3">
+                            <div class="payment-method-card">
+                                <div class="payment-method-header">
+                                    <div class="d-flex align-items-center">
+                                        <div class="payment-method-icon" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
+                                            <i class="fas fa-credit-card"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-0">Card Payments</h6>
+                                            <small class="text-muted">Credit & debit cards</small>
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-warning">Setup Required</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Visa, Mastercard support • 2.9% processing fee
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bank Transfer -->
+                        <div class="col-md-6 mb-3">
+                            <div class="payment-method-card">
+                                <div class="payment-method-header">
+                                    <div class="d-flex align-items-center">
+                                        <div class="payment-method-icon" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+                                            <i class="fas fa-university"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-0">Bank Transfer</h6>
+                                            <small class="text-muted">Direct bank payments</small>
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Manual verification required • No processing fees
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="/business/{{ request.business.slug }}/payments/methods/" class="btn btn-outline-primary">
+                            <i class="fas fa-cog me-2"></i>Manage Payment Methods
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Actions -->
+            <div class="save-actions">
+                <div class="text-muted">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Payment settings will apply to all new transactions
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-save">
+                        <i class="fas fa-save me-2"></i>
+                        Save Payment Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tax calculator functionality
+    const amountInput = document.getElementById('calc-amount');
+    const taxInput = document.getElementById('calc-tax');
+    const totalInput = document.getElementById('calc-total');
+    const taxRateInput = document.getElementById('{{ form.default_tax_rate.id_for_label }}');
+    
+    function calculateTax() {
+        const amount = parseFloat(amountInput.value) || 0;
+        const taxRate = parseFloat(taxRateInput.value) || 16;
+        
+        const taxAmount = amount * (taxRate / 100);
+        const totalAmount = amount + taxAmount;
+        
+        taxInput.value = `KES ${taxAmount.toFixed(2)}`;
+        totalInput.value = `KES ${totalAmount.toFixed(2)}`;
+    }
+    
+    // Update calculator when inputs change
+    if (amountInput && taxRateInput) {
+        amountInput.addEventListener('input', calculateTax);
+        taxRateInput.addEventListener('input', calculateTax);
+        
+        // Initial calculation
+        calculateTax();
+    }
+    
+    // Form validation
+    const form = document.querySelector('.settings-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const taxRate = parseFloat(taxRateInput.value);
+            
+            if (taxRate < 0 || taxRate > 100) {
+                e.preventDefault();
+                alert('Tax rate must be between 0% and 100%');
+                taxRateInput.focus();
+                return false;
+            }
+            
+            // Confirm large threshold changes
+            const thresholdInput = document.getElementById('{{ form.large_payment_threshold.id_for_label }}');
+            const threshold = parseFloat(thresholdInput.value);
+            
+            if (threshold > 50000) {
+                if (!confirm(`Large payment threshold is set to KES ${threshold.toLocaleString()}. This means payments above this amount will require manager approval. Continue?`)) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
+        });
+    }
+    
+    // Payment method status tooltips
+    const paymentCards = document.querySelectorAll('.payment-method-card');
+    paymentCards.forEach(card => {
+        card.addEventListener('click', function() {
+            const badge = card.querySelector('.badge');
+            if (badge && badge.textContent.trim() === 'Setup Required') {
+                alert('This payment method requires additional setup. Visit Payment Methods settings to configure.');
+            }
+        });
+    });
+    
+    // Auto-save functionality
+    let saveTimeout;
+    const formInputs = form.querySelectorAll('input, select');
+    formInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            clearTimeout(saveTimeout);
+            
+            // Show saving indicator
+            const saveBtn = document.querySelector('.btn-save');
+            if (saveBtn) {
+                const originalText = saveBtn.innerHTML;
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Auto-saving...';
+                saveBtn.disabled = true;
+                
+                saveTimeout = setTimeout(() => {
+                    saveBtn.innerHTML = originalText;
+                    saveBtn.disabled = false;
+                }, 2000);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

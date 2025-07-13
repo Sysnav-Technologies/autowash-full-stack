@@ -1,0 +1,586 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Business Settings - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.settings-nav {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 2rem;
+}
+
+.settings-nav .nav-link {
+    color: #6b7280;
+    border: none;
+    padding: 1rem 1.5rem;
+    border-radius: 0;
+    transition: all 0.3s ease;
+}
+
+.settings-nav .nav-link:first-child {
+    border-radius: 12px 0 0 12px;
+}
+
+.settings-nav .nav-link:last-child {
+    border-radius: 0 12px 12px 0;
+}
+
+.settings-nav .nav-link.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.settings-nav .nav-link:hover:not(.active) {
+    background: #f9fafb;
+    color: #374151;
+}
+
+.settings-form-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+}
+
+.settings-form-header {
+    padding: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.settings-form-body {
+    padding: 2rem;
+}
+
+.form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.form-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.logo-upload-section {
+    background: #f9fafb;
+    border: 2px dashed #d1d5db;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.logo-upload-section:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+}
+
+.current-logo {
+    max-width: 150px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.business-hours-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.save-actions {
+    padding: 2rem;
+    border-top: 1px solid #e5e7eb;
+    background: #f9fafb;
+    border-radius: 0 0 12px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-save {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .settings-nav {
+        margin-bottom: 1rem;
+    }
+    
+    .settings-nav .nav-link {
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .settings-form-header,
+    .settings-form-body,
+    .save-actions {
+        padding: 1.5rem;
+    }
+    
+    .business-hours-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .save-actions {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Settings Navigation -->
+    <div class="settings-nav">
+        <ul class="nav nav-pills" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active" href="{% url 'businesses:business_settings' %}">
+                    <i class="fas fa-building me-2"></i>Business Profile
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:service_settings' %}">
+                    <i class="fas fa-tools me-2"></i>Services
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:payment_settings' %}">
+                    <i class="fas fa-credit-card me-2"></i>Payments
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:notification_settings' %}">
+                    <i class="fas fa-bell me-2"></i>Notifications
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:integration_settings' %}">
+                    <i class="fas fa-plug me-2"></i>Integrations
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:backup_settings' %}">
+                    <i class="fas fa-download me-2"></i>Backup
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Settings Form -->
+    <form method="post" enctype="multipart/form-data" class="settings-form">
+        {% csrf_token %}
+        
+        <div class="settings-form-card">
+            <!-- Header -->
+            <div class="settings-form-header">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h4 class="mb-1">Business Profile Settings</h4>
+                        <p class="text-muted mb-0">Update your business information, contact details, and branding</p>
+                    </div>
+                    <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Overview
+                    </a>
+                </div>
+            </div>
+
+            <!-- Form Body -->
+            <div class="settings-form-body">
+                <!-- Basic Information Section -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-info-circle text-primary"></i>
+                        Basic Information
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="{{ form.name.id_for_label }}" class="form-label">
+                                    Business Name <span class="text-danger">*</span>
+                                </label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                    <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.business_type.id_for_label }}" class="form-label">
+                                    Business Type
+                                </label>
+                                {{ form.business_type }}
+                                {% if form.business_type.errors %}
+                                    <div class="text-danger small mt-1">{{ form.business_type.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">
+                            Business Description
+                        </label>
+                        {{ form.description }}
+                        <div class="form-text">Brief description of your business and services</div>
+                        {% if form.description.errors %}
+                            <div class="text-danger small mt-1">{{ form.description.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Logo Section -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-image text-primary"></i>
+                        Business Logo
+                    </div>
+                    
+                    <div class="logo-upload-section">
+                        {% if business.logo %}
+                        <div class="mb-3">
+                            <img src="{{ business.logo.url }}" alt="Current Logo" class="current-logo">
+                            <div class="mt-2">
+                                <small class="text-muted">Current Logo</small>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <i class="fas fa-cloud-upload-alt fa-2x text-muted mb-2"></i>
+                            <div class="mb-2">
+                                <strong>Upload New Logo</strong>
+                            </div>
+                            <small class="text-muted">JPG, PNG or SVG. Max size 2MB. Recommended: 200x200px</small>
+                        </div>
+                        
+                        {{ form.logo }}
+                        {% if form.logo.errors %}
+                            <div class="text-danger small mt-2">{{ form.logo.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Contact Information Section -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-address-book text-primary"></i>
+                        Contact Information
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.phone.id_for_label }}" class="form-label">
+                                    Phone Number <span class="text-danger">*</span>
+                                </label>
+                                {{ form.phone }}
+                                {% if form.phone.errors %}
+                                    <div class="text-danger small mt-1">{{ form.phone.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.email.id_for_label }}" class="form-label">
+                                    Email Address <span class="text-danger">*</span>
+                                </label>
+                                {{ form.email }}
+                                {% if form.email.errors %}
+                                    <div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.website.id_for_label }}" class="form-label">
+                            Website URL
+                        </label>
+                        {{ form.website }}
+                        <div class="form-text">Your business website (optional)</div>
+                        {% if form.website.errors %}
+                            <div class="text-danger small mt-1">{{ form.website.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Address Section -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-map-marker-alt text-primary"></i>
+                        Business Address
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.address.id_for_label }}" class="form-label">
+                            Street Address
+                        </label>
+                        {{ form.address }}
+                        {% if form.address.errors %}
+                            <div class="text-danger small mt-1">{{ form.address.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.city.id_for_label }}" class="form-label">
+                                    City
+                                </label>
+                                {{ form.city }}
+                                {% if form.city.errors %}
+                                    <div class="text-danger small mt-1">{{ form.city.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.state.id_for_label }}" class="form-label">
+                                    County/State
+                                </label>
+                                {{ form.state }}
+                                {% if form.state.errors %}
+                                    <div class="text-danger small mt-1">{{ form.state.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.postal_code.id_for_label }}" class="form-label">
+                                    Postal Code
+                                </label>
+                                {{ form.postal_code }}
+                                {% if form.postal_code.errors %}
+                                    <div class="text-danger small mt-1">{{ form.postal_code.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.country.id_for_label }}" class="form-label">
+                            Country
+                        </label>
+                        {{ form.country }}
+                        {% if form.country.errors %}
+                            <div class="text-danger small mt-1">{{ form.country.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Operating Hours Section -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-clock text-primary"></i>
+                        Operating Hours & Timezone
+                    </div>
+                    
+                    <div class="business-hours-grid">
+                        <div class="form-group">
+                            <label for="{{ form.business_hours_start.id_for_label }}" class="form-label">
+                                Opening Time
+                            </label>
+                            {{ form.business_hours_start }}
+                            {% if form.business_hours_start.errors %}
+                                <div class="text-danger small mt-1">{{ form.business_hours_start.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.business_hours_end.id_for_label }}" class="form-label">
+                                Closing Time
+                            </label>
+                            {{ form.business_hours_end }}
+                            {% if form.business_hours_end.errors %}
+                                <div class="text-danger small mt-1">{{ form.business_hours_end.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.timezone.id_for_label }}" class="form-label">
+                            Timezone
+                        </label>
+                        {{ form.timezone }}
+                        <div class="form-text">Select your business timezone for scheduling and reports</div>
+                        {% if form.timezone.errors %}
+                            <div class="text-danger small mt-1">{{ form.timezone.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Actions -->
+            <div class="save-actions">
+                <div class="text-muted">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Changes will be saved immediately and reflected across your business profile
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-save">
+                        <i class="fas fa-save me-2"></i>
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Logo preview functionality
+    const logoInput = document.getElementById('{{ form.logo.id_for_label }}');
+    if (logoInput) {
+        logoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Create or update preview
+                    let preview = document.querySelector('.logo-preview');
+                    if (!preview) {
+                        preview = document.createElement('div');
+                        preview.className = 'logo-preview mt-3';
+                        logoInput.parentNode.appendChild(preview);
+                    }
+                    preview.innerHTML = `
+                        <img src="${e.target.result}" alt="Logo Preview" style="max-width: 150px; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                        <div class="mt-2"><small class="text-muted">New Logo Preview</small></div>
+                    `;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+    
+    // Form validation
+    const form = document.querySelector('.settings-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Add any custom validation here
+            const requiredFields = form.querySelectorAll('[required]');
+            let isValid = true;
+            
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    isValid = false;
+                    field.classList.add('is-invalid');
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+                alert('Please fill in all required fields.');
+            }
+        });
+    }
+    
+    // Auto-save draft functionality (optional)
+    let saveTimeout;
+    const formInputs = form.querySelectorAll('input, textarea, select');
+    formInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                // Save draft to localStorage
+                const formData = new FormData(form);
+                const draftData = {};
+                for (let [key, value] of formData.entries()) {
+                    if (input.type !== 'file') {
+                        draftData[key] = value;
+                    }
+                }
+                localStorage.setItem('business_settings_draft', JSON.stringify(draftData));
+            }, 1000);
+        });
+    });
+    
+    // Load draft on page load
+    const savedDraft = localStorage.getItem('business_settings_draft');
+    if (savedDraft) {
+        try {
+            const draftData = JSON.parse(savedDraft);
+            Object.keys(draftData).forEach(key => {
+                const field = form.querySelector(`[name="${key}"]`);
+                if (field && field.type !== 'file' && !field.value) {
+                    field.value = draftData[key];
+                }
+            });
+        } catch (e) {
+            console.log('Error loading draft:', e);
+        }
+    }
+    
+    // Clear draft on successful submit
+    form.addEventListener('submit', function() {
+        localStorage.removeItem('business_settings_draft');
+    });
+});
+</script>
+{% endblock %}

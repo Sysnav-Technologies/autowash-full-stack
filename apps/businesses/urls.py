@@ -26,4 +26,20 @@ urlpatterns = [
     # Debug endpoints (for troubleshooting user role issues)
     path('debug/user-context/', views.debug_user_context, name='debug_user_context'),
     path('debug/fix-employee/', views.fix_user_employee_record, name='fix_user_employee'),
+
+    # Settings section (add after existing paths)
+    path('settings/', views.settings_overview, name='settings_overview'),
+    path('settings/business/', views.business_settings_view, name='business_settings'),
+    path('settings/services/', views.service_settings_view, name='service_settings'),
+    path('settings/payment/', views.payment_settings_view, name='payment_settings'),
+    path('settings/notifications/', views.notification_settings_view, name='notification_settings'),
+    path('settings/integrations/', views.integration_settings_view, name='integration_settings'),
+    path('settings/backup/', views.backup_settings_view, name='backup_settings'),
+    path('settings/security/', views.security_settings_view, name='security_settings'),
+    path('settings/users/', views.user_management_view, name='user_management'),
+
+    # Settings API endpoints
+    path('settings/api/backup/create/', views.create_backup_ajax, name='create_backup'),
+    path('settings/api/backup/download/<str:backup_id>/', views.download_backup, name='download_backup'),
+    path('settings/api/integrations/test/<str:integration>/', views.test_integration_ajax, name='test_integration'),
 ]

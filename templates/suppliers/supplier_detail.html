@@ -1,0 +1,699 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}{{ supplier.name }} - Supplier Details{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.list }}">List</a></li>
+<li class="breadcrumb-item active">{{ supplier.name }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.supplier-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.supplier-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    border: 3px solid rgba(255,255,255,0.3);
+}
+
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.info-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.info-card-header {
+    background: #f8fafc;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.info-row {
+    display: flex;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: 500;
+    color: #64748b;
+    min-width: 140px;
+    flex-shrink: 0;
+}
+
+.info-value {
+    color: #1e293b;
+    flex-grow: 1;
+}
+
+.rating-stars {
+    color: #fbbf24;
+    font-size: 1.25rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.contact-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.contact-card:last-child {
+    margin-bottom: 0;
+}
+
+.document-item {
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.document-item:hover {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.02);
+}
+
+.progress-ring {
+    transform: rotate(-90deg);
+}
+
+.progress-ring-circle {
+    transition: stroke-dasharray 0.35s;
+    stroke: #3b82f6;
+    stroke-linecap: round;
+}
+
+@media (max-width: 768px) {
+    .supplier-header {
+        padding: 1.5rem;
+    }
+    
+    .supplier-avatar {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Supplier Header -->
+<div class="supplier-header">
+    <div class="row align-items-center">
+        <div class="col-auto">
+            <div class="supplier-avatar">
+                {{ supplier.name.0|upper }}
+            </div>
+        </div>
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h1 class="h2 mb-2">{{ supplier.name }}</h1>
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <span class="opacity-90">{{ supplier.supplier_code }}</span>
+                        {% if supplier.business_name and supplier.business_name != supplier.name %}
+                        <span class="opacity-75">• {{ supplier.business_name }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="status-badge bg-{% if supplier.status == 'active' %}success{% elif supplier.status == 'inactive' %}secondary{% elif supplier.status == 'pending' %}warning{% elif supplier.status == 'suspended' %}danger{% else %}dark{% endif %}">
+                            {{ supplier.get_status_display }}
+                        </span>
+                        {% if supplier.is_preferred %}
+                        <span class="status-badge bg-warning text-dark">
+                            <i class="fas fa-star me-1"></i>Preferred
+                        </span>
+                        {% endif %}
+                        {% if supplier.is_verified %}
+                        <span class="status-badge bg-info">
+                            <i class="fas fa-check-circle me-1"></i>Verified
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/{{ supplier.pk }}/edit/" class="btn btn-light">
+                        <i class="fas fa-edit me-2"></i>Edit
+                    </a>
+                    <div class="dropdown">
+                        <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/suppliers/{{ supplier.pk }}/contacts/add/">
+                                <i class="fas fa-user-plus me-2"></i>Add Contact
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ urls.document_upload }}?supplier={{ supplier.pk }}">
+                                <i class="fas fa-file-upload me-2"></i>Upload Document
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ urls.purchase_order_create }}?supplier={{ supplier.pk }}">
+                                <i class="fas fa-shopping-cart me-2"></i>Create Order
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="/business/{{ request.tenant.slug }}/suppliers/{{ supplier.pk }}/delete/">
+                                <i class="fas fa-trash me-2"></i>Delete
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Statistics -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card">
+            <div class="stat-value">{{ performance_metrics.total_orders }}</div>
+            <div class="stat-label">Total Orders</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card">
+            <div class="stat-value">KES {{ performance_metrics.total_value|floatformat:0 }}</div>
+            <div class="stat-label">Total Value</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card">
+            <div class="stat-value">{{ performance_metrics.on_time_delivery|floatformat:1 }}%</div>
+            <div class="stat-label">On-Time Delivery</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card">
+            <div class="stat-value">
+                {% if performance_metrics.average_rating > 0 %}
+                {{ performance_metrics.average_rating|floatformat:1 }}
+                {% else %}
+                -
+                {% endif %}
+            </div>
+            <div class="stat-label">Average Rating</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Main Content -->
+    <div class="col-lg-8 mb-4">
+        <div class="row">
+            <!-- Basic Information -->
+            <div class="col-md-6 mb-4">
+                <div class="info-card">
+                    <div class="info-card-header">
+                        <i class="fas fa-info-circle me-2"></i>Basic Information
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Category:</div>
+                        <div class="info-value">
+                            {% if supplier.category %}
+                            {{ supplier.category.name }}
+                            {% else %}
+                            <span class="text-muted">Not set</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Type:</div>
+                        <div class="info-value">{{ supplier.get_supplier_type_display }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Lead Time:</div>
+                        <div class="info-value">{{ supplier.lead_time_days }} days</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Payment Terms:</div>
+                        <div class="info-value">{{ supplier.get_payment_terms_display }}</div>
+                    </div>
+                    {% if supplier.rating > 0 %}
+                    <div class="info-row">
+                        <div class="info-label">Rating:</div>
+                        <div class="info-value">
+                            <div class="rating-stars">
+                                {% for i in "12345" %}
+                                    {% if forloop.counter <= supplier.rating %}
+                                    <i class="fas fa-star"></i>
+                                    {% else %}
+                                    <i class="far fa-star"></i>
+                                    {% endif %}
+                                {% endfor %}
+                                <span class="ms-2 text-muted">({{ supplier.rating|floatformat:1 }}/5)</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="col-md-6 mb-4">
+                <div class="info-card">
+                    <div class="info-card-header">
+                        <i class="fas fa-address-book me-2"></i>Contact Information
+                    </div>
+                    {% if supplier.email %}
+                    <div class="info-row">
+                        <div class="info-label">Email:</div>
+                        <div class="info-value">
+                            <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if supplier.phone %}
+                    <div class="info-row">
+                        <div class="info-label">Phone:</div>
+                        <div class="info-value">
+                            <a href="tel:{{ supplier.phone }}">{{ supplier.phone }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if supplier.website %}
+                    <div class="info-row">
+                        <div class="info-label">Website:</div>
+                        <div class="info-value">
+                            <a href="{{ supplier.website }}" target="_blank">{{ supplier.website }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if supplier.primary_contact_name %}
+                    <div class="info-row">
+                        <div class="info-label">Primary Contact:</div>
+                        <div class="info-value">
+                            {{ supplier.primary_contact_name }}
+                            {% if supplier.primary_contact_title %}
+                            <br><small class="text-muted">{{ supplier.primary_contact_title }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if supplier.city or supplier.state or supplier.country %}
+                    <div class="info-row">
+                        <div class="info-label">Location:</div>
+                        <div class="info-value">
+                            {% if supplier.city %}{{ supplier.city }}{% endif %}
+                            {% if supplier.state %}, {{ supplier.state }}{% endif %}
+                            {% if supplier.country %}, {{ supplier.country }}{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Financial Information -->
+            <div class="col-md-6 mb-4">
+                <div class="info-card">
+                    <div class="info-card-header">
+                        <i class="fas fa-money-bill-wave me-2"></i>Financial Information
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Credit Limit:</div>
+                        <div class="info-value">{{ supplier.currency }} {{ supplier.credit_limit|floatformat:2 }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Current Balance:</div>
+                        <div class="info-value">
+                            <span class="{% if supplier.current_balance < 0 %}text-danger{% elif supplier.current_balance > 0 %}text-success{% endif %}">
+                                {{ supplier.currency }} {{ supplier.current_balance|floatformat:2 }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Available Credit:</div>
+                        <div class="info-value">{{ supplier.currency }} {{ supplier.credit_available|floatformat:2 }}</div>
+                    </div>
+                    {% if supplier.minimum_order_value > 0 %}
+                    <div class="info-row">
+                        <div class="info-label">Min Order Value:</div>
+                        <div class="info-value">{{ supplier.currency }} {{ supplier.minimum_order_value|floatformat:2 }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Business Information -->
+            <div class="col-md-6 mb-4">
+                <div class="info-card">
+                    <div class="info-card-header">
+                        <i class="fas fa-building me-2"></i>Business Information
+                    </div>
+                    {% if supplier.registration_number %}
+                    <div class="info-row">
+                        <div class="info-label">Registration No:</div>
+                        <div class="info-value">{{ supplier.registration_number }}</div>
+                    </div>
+                    {% endif %}
+                    {% if supplier.tax_number %}
+                    <div class="info-row">
+                        <div class="info-label">Tax Number:</div>
+                        <div class="info-value">{{ supplier.tax_number }}</div>
+                    </div>
+                    {% endif %}
+                    {% if supplier.vat_number %}
+                    <div class="info-row">
+                        <div class="info-label">VAT Number:</div>
+                        <div class="info-value">{{ supplier.vat_number }}</div>
+                    </div>
+                    {% endif %}
+                    {% if supplier.delivery_terms %}
+                    <div class="info-row">
+                        <div class="info-label">Delivery Terms:</div>
+                        <div class="info-value">{{ supplier.delivery_terms }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Orders -->
+        <div class="info-card mb-4">
+            <div class="info-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-shopping-cart me-2"></i>Recent Purchase Orders</span>
+                <a href="{{ urls.purchase_order_list }}?supplier={{ supplier.pk }}" class="btn btn-sm btn-outline-primary">
+                    View All Orders
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>PO Number</th>
+                            <th>Date</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Expected Delivery</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in recent_orders %}
+                        <tr>
+                            <td>
+                                <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/" class="fw-semibold text-decoration-none">
+                                    PO-{{ order.po_number }}
+                                </a>
+                            </td>
+                            <td>{{ order.order_date }}</td>
+                            <td>{{ order.currency|default:"KES" }} {{ order.total_amount|floatformat:2 }}</td>
+                            <td>
+                                <span class="status-badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% else %}primary{% endif %}">
+                                    {{ order.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {{ order.expected_delivery_date }}
+                                {% if order.is_overdue %}
+                                <br><small class="text-danger">{{ order.days_overdue }} days overdue</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/" class="btn btn-sm btn-outline-primary">
+                                    View
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                No purchase orders found
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Quick Actions -->
+        <div class="info-card mb-4">
+            <div class="info-card-header">
+                <i class="fas fa-bolt me-2"></i>Quick Actions
+            </div>
+            <div class="p-3">
+                <div class="d-grid gap-2">
+                    <a href="{{ urls.purchase_order_create }}?supplier={{ supplier.pk }}" class="btn btn-primary">
+                        <i class="fas fa-shopping-cart me-2"></i>Create Purchase Order
+                    </a>
+                    <a href="{{ urls.evaluation_create }}?supplier={{ supplier.pk }}" class="btn btn-outline-primary">
+                        <i class="fas fa-star me-2"></i>Add Evaluation
+                    </a>
+                    <a href="{{ urls.payment_create }}?supplier={{ supplier.pk }}" class="btn btn-outline-success">
+                        <i class="fas fa-money-bill me-2"></i>Record Payment
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Outstanding Orders -->
+        {% if outstanding_orders > 0 %}
+        <div class="info-card mb-4">
+            <div class="info-card-header">
+                <i class="fas fa-exclamation-triangle me-2 text-warning"></i>Outstanding Orders
+            </div>
+            <div class="p-3 text-center">
+                <div class="h3 text-warning mb-2">{{ outstanding_orders }}</div>
+                <div class="text-muted">Orders pending delivery</div>
+                <a href="{{ urls.purchase_order_list }}?supplier={{ supplier.pk }}&status=approved,sent,acknowledged,partially_received" class="btn btn-sm btn-outline-warning mt-2">
+                    View Orders
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Contacts -->
+        <div class="info-card mb-4">
+            <div class="info-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-users me-2"></i>Contacts</span>
+                <a href="/business/{{ request.tenant.slug }}/suppliers/{{ supplier.pk }}/contacts/add/" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-plus"></i>
+                </a>
+            </div>
+            <div class="p-3">
+                {% for contact in contacts %}
+                <div class="contact-card">
+                    <div class="fw-semibold">{{ contact.name }}</div>
+                    {% if contact.title %}
+                    <div class="text-muted small">{{ contact.title }}</div>
+                    {% endif %}
+                    {% if contact.department %}
+                    <div class="text-muted small">{{ contact.department }}</div>
+                    {% endif %}
+                    <div class="mt-2">
+                        {% if contact.phone %}
+                        <div class="small">
+                            <i class="fas fa-phone me-1"></i>
+                            <a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>
+                        </div>
+                        {% endif %}
+                        {% if contact.email %}
+                        <div class="small">
+                            <i class="fas fa-envelope me-1"></i>
+                            <a href="mailto:{{ contact.email }}">{{ contact.email }}</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if contact.is_primary %}
+                    <span class="badge bg-primary mt-2">Primary</span>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-users fa-2x mb-2"></i>
+                    <p class="mb-2">No contacts added</p>
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/{{ supplier.pk }}/contacts/add/" class="btn btn-sm btn-primary">
+                        Add Contact
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="info-card mb-4">
+            <div class="info-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-file-alt me-2"></i>Documents</span>
+                <a href="{{ urls.document_upload }}?supplier={{ supplier.pk }}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-upload"></i>
+                </a>
+            </div>
+            <div class="p-3">
+                {% for document in documents %}
+                <div class="document-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">{{ document.name }}</div>
+                            <div class="text-muted small">{{ document.get_document_type_display }}</div>
+                            {% if document.expiry_date %}
+                            <div class="small">
+                                Expires: {{ document.expiry_date }}
+                                {% if document.is_expiring_soon %}
+                                <span class="text-warning">⚠️</span>
+                                {% elif document.is_expired %}
+                                <span class="text-danger">❌</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <a href="{{ document.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-download"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-file-alt fa-2x mb-2"></i>
+                    <p class="mb-2">No documents uploaded</p>
+                    <a href="{{ urls.document_upload }}?supplier={{ supplier.pk }}" class="btn btn-sm btn-primary">
+                        Upload Document
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Payments -->
+        {% if recent_payments %}
+        <div class="info-card">
+            <div class="info-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-money-bill-wave me-2"></i>Recent Payments</span>
+                <a href="{{ urls.payment_list }}?supplier={{ supplier.pk }}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="p-3">
+                {% for payment in recent_payments %}
+                <div class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                    <div>
+                        <div class="fw-semibold">{{ payment.payment_number }}</div>
+                        <div class="text-muted small">{{ payment.payment_date }}</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-semibold">{{ payment.amount|floatformat:2 }}</div>
+                        <span class="status-badge bg-{% if payment.status == 'completed' %}success{% elif payment.status == 'pending' %}warning{% elif payment.status == 'failed' %}danger{% else %}primary{% endif %}">
+                            {{ payment.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Notes Section -->
+{% if supplier.notes %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-sticky-note me-2"></i>Notes
+            </div>
+            <div class="p-3">
+                <p class="mb-0">{{ supplier.notes|linebreaks }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // Performance meter animations
+    $('.progress-ring-circle').each(function() {
+        const circle = $(this)[0];
+        const radius = circle.r.baseVal.value;
+        const circumference = radius * 2 * Math.PI;
+        const percent = $(this).data('percent') || 0;
+        
+        circle.style.strokeDasharray = `${circumference} ${circumference}`;
+        circle.style.strokeDashoffset = circumference;
+        
+        const offset = circumference - percent / 100 * circumference;
+        circle.style.strokeDashoffset = offset;
+    });
+});
+</script>
+{% endblock %}

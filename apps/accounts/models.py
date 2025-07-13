@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
@@ -6,6 +7,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from apps.core.models import TimeStampedModel, Address, ContactInfo
 from apps.core.utils import upload_to_path
 import uuid
+import os
 
 class UserProfile(TimeStampedModel):
     """Extended user profile"""
@@ -35,12 +37,29 @@ class UserProfile(TimeStampedModel):
         verbose_name = "User Profile"
         verbose_name_plural = "User Profiles"
 
+
+def business_logo_upload(instance, filename):
+    """Simple upload function for business logos"""
+    import os
+    from django.utils.text import slugify
+    
+    # Get file extension
+    name, ext = os.path.splitext(filename)
+    ext = ext.lower()
+    
+    # Create safe filename
+    safe_name = slugify(instance.name) if instance.name else 'business'
+    new_filename = f"{safe_name}_logo{ext}"
+    
+    # Return path
+    return f"business_logos/{new_filename}"
+
 class Business(TenantMixin, TimeStampedModel, Address, ContactInfo):
     """Business model with multi-tenancy support"""
     name = models.CharField(max_length=200, unique=True)
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
-    logo = models.ImageField(upload_to='business_logos/', blank=True, null=True)
+    logo = models.ImageField(upload_to=business_logo_upload, blank=True, null=True)
     
     # Business details
     business_type = models.CharField(
@@ -139,6 +158,31 @@ class Business(TenantMixin, TimeStampedModel, Address, ContactInfo):
         if self.max_customers == -1:  # Unlimited
             return True
         return self.customer_count < self.max_customers
+    
+    # Update your Business model save method in apps/accounts/models.py
+
+    def save(self, *args, **kwargs):
+        """Override save to handle logo and ensure slug"""
+        # Generate slug if not present
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name)
+            
+            # Ensure unique slug
+            original_slug = self.slug
+            counter = 1
+            while Business.objects.filter(slug=self.slug).exclude(pk=self.pk).exists():
+                self.slug = f"{original_slug}-{counter}"
+                counter += 1
+        
+        # Handle logo file if it exists
+        if self.logo:
+            # Ensure the upload directory exists
+            import os
+            upload_dir = os.path.join(settings.MEDIA_ROOT, 'business_logos', self.slug)
+            os.makedirs(upload_dir, exist_ok=True)
+        
+        super().save(*args, **kwargs)
     
     class Meta:
         verbose_name = "Business"

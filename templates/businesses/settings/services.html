@@ -1,0 +1,308 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Service Settings - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/settings.css' %}">
+<style>
+.service-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.service-stat-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.service-stat-card .stat-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.service-stat-card .stat-label {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Settings Navigation -->
+    <div class="settings-nav">
+        <ul class="nav nav-pills" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:business_settings' %}">
+                    <i class="fas fa-building me-2"></i>Business Profile
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active" href="{% url 'businesses:service_settings' %}">
+                    <i class="fas fa-tools me-2"></i>Services
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:payment_settings' %}">
+                    <i class="fas fa-credit-card me-2"></i>Payments
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:notification_settings' %}">
+                    <i class="fas fa-bell me-2"></i>Notifications
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:integration_settings' %}">
+                    <i class="fas fa-plug me-2"></i>Integrations
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" href="{% url 'businesses:backup_settings' %}">
+                    <i class="fas fa-download me-2"></i>Backup
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Service Statistics -->
+    <div class="service-stats-grid">
+        <div class="service-stat-card">
+            <div class="stat-number">{{ service_stats.total_services|default:0 }}</div>
+            <div class="stat-label">Active Services</div>
+        </div>
+        <div class="service-stat-card">
+            <div class="stat-number">{{ service_stats.total_categories|default:0 }}</div>
+            <div class="stat-label">Service Categories</div>
+        </div>
+        <div class="service-stat-card">
+            <div class="stat-number">{{ service_stats.popular_services|default:0 }}</div>
+            <div class="stat-label">Popular Services</div>
+        </div>
+        <div class="service-stat-card">
+            <div class="stat-number">45 min</div>
+            <div class="stat-label">Avg Service Duration</div>
+        </div>
+    </div>
+
+    <!-- Settings Form -->
+    <form method="post" class="settings-form">
+        {% csrf_token %}
+        
+        <div class="settings-form-card">
+            <!-- Header -->
+            <div class="settings-form-header">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h4 class="mb-1">Service Settings</h4>
+                        <p class="text-muted mb-0">Configure service delivery, quality control, and customer experience settings</p>
+                    </div>
+                    <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Overview
+                    </a>
+                </div>
+            </div>
+
+            <!-- Form Body -->
+            <div class="settings-form-body">
+                <!-- Service Delivery Configuration -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-cogs text-primary"></i>
+                        Service Delivery Configuration
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.default_service_duration.id_for_label }}" class="form-label">
+                                    Default Service Duration (minutes) <span class="text-danger">*</span>
+                                </label>
+                                {{ form.default_service_duration }}
+                                <div class="form-text">Default duration for new services (1-480 minutes)</div>
+                                {% if form.default_service_duration.errors %}
+                                    <div class="text-danger small mt-1">{{ form.default_service_duration.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check form-switch">
+                                    {{ form.auto_assign_services }}
+                                    <label class="form-check-label" for="{{ form.auto_assign_services.id_for_label }}">
+                                        Auto-assign Services
+                                    </label>
+                                </div>
+                                <div class="form-text">Automatically assign services to available attendants</div>
+                                {% if form.auto_assign_services.errors %}
+                                    <div class="text-danger small mt-1">{{ form.auto_assign_services.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Service Workflow -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-users text-primary"></i>
+                        Service Workflow
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check form-switch">
+                                    {{ form.require_customer_approval }}
+                                    <label class="form-check-label" for="{{ form.require_customer_approval.id_for_label }}">
+                                        Require Customer Approval
+                                    </label>
+                                </div>
+                                <div class="form-text">Customer must approve before service starts</div>
+                                {% if form.require_customer_approval.errors %}
+                                    <div class="text-danger small mt-1">{{ form.require_customer_approval.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check form-switch">
+                                    {{ form.send_service_reminders }}
+                                    <label class="form-check-label" for="{{ form.send_service_reminders.id_for_label }}">
+                                        Send Service Reminders
+                                    </label>
+                                </div>
+                                <div class="form-text">Automatically send appointment reminders to customers</div>
+                                {% if form.send_service_reminders.errors %}
+                                    <div class="text-danger small mt-1">{{ form.send_service_reminders.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quality Control & Rating -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-star text-primary"></i>
+                        Quality Control & Customer Rating
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check form-switch">
+                                    {{ form.service_quality_check }}
+                                    <label class="form-check-label" for="{{ form.service_quality_check.id_for_label }}">
+                                        Require Quality Check
+                                    </label>
+                                </div>
+                                <div class="form-text">Mandatory quality inspection before service completion</div>
+                                {% if form.service_quality_check.errors %}
+                                    <div class="text-danger small mt-1">{{ form.service_quality_check.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check form-switch">
+                                    {{ form.allow_service_rating }}
+                                    <label class="form-check-label" for="{{ form.allow_service_rating.id_for_label }}">
+                                        Enable Customer Ratings
+                                    </label>
+                                </div>
+                                <div class="form-text">Allow customers to rate completed services</div>
+                                {% if form.allow_service_rating.errors %}
+                                    <div class="text-danger small mt-1">{{ form.allow_service_rating.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Actions -->
+            <div class="save-actions">
+                <div class="text-muted">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Service settings will apply to all new services and appointments
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-save">
+                        <i class="fas fa-save me-2"></i>
+                        Save Service Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const form = document.querySelector('.settings-form');
+    const durationInput = document.getElementById('{{ form.default_service_duration.id_for_label }}');
+    
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const duration = parseInt(durationInput.value);
+            
+            if (duration < 1 || duration > 480) {
+                e.preventDefault();
+                alert('Service duration must be between 1 and 480 minutes');
+                durationInput.focus();
+                return false;
+            }
+        });
+    }
+    
+    // Real-time validation feedback
+    if (durationInput) {
+        durationInput.addEventListener('input', function() {
+            const value = parseInt(this.value);
+            
+            // Remove existing feedback
+            const existingFeedback = this.parentElement.querySelector('.validation-feedback');
+            if (existingFeedback) {
+                existingFeedback.remove();
+            }
+            
+            const feedback = document.createElement('div');
+            feedback.className = 'validation-feedback small mt-1';
+            
+            if (value < 1 || value > 480) {
+                feedback.textContent = 'Duration must be between 1 and 480 minutes';
+                feedback.classList.add('text-danger');
+                this.classList.add('is-invalid');
+                this.classList.remove('is-valid');
+            } else {
+                feedback.textContent = 'Valid duration';
+                feedback.classList.add('text-success');
+                this.classList.add('is-valid');
+                this.classList.remove('is-invalid');
+            }
+            
+            this.parentElement.appendChild(feedback);
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -12,7 +12,7 @@ from .models import (
 
 class SupplierForm(forms.ModelForm):
     """Form for creating and editing suppliers"""
-    
+    # 
     class Meta:
         model = Supplier
         fields = [
@@ -76,7 +76,7 @@ class SupplierForm(forms.ModelForm):
         if not self.instance.pk and not self.initial.get('supplier_code'):
             self.fields['supplier_code'].initial = self.generate_supplier_code()
         
-        # Set categories queryset
+        # Set categories queryset - SupplierCategory has is_active field
         self.fields['category'].queryset = SupplierCategory.objects.filter(is_active=True)
         self.fields['category'].empty_label = "Select Category"
     
@@ -183,9 +183,9 @@ class PurchaseOrderForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active suppliers
+        # Filter active suppliers - Changed from is_active=True to is_deleted=False
         self.fields['supplier'].queryset = Supplier.objects.filter(
-            is_active=True, 
+            is_deleted=False, 
             status='active'
         )
         
@@ -217,7 +217,7 @@ class PurchaseOrderItemForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active inventory items
+        # Filter active inventory items - assuming InventoryItem uses is_active field
         try:
             from apps.inventory.models import InventoryItem
             self.fields['item'].queryset = InventoryItem.objects.filter(is_active=True)
@@ -265,9 +265,9 @@ class GoodsReceiptForm(forms.ModelForm):
             status__in=['approved', 'sent', 'acknowledged', 'partially_received']
         )
         
-        # Filter active suppliers
+        # Filter active suppliers - Changed from is_active=True to is_deleted=False
         self.fields['supplier'].queryset = Supplier.objects.filter(
-            is_active=True,
+            is_deleted=False,
             status='active'
         )
 
@@ -338,8 +338,8 @@ class SupplierEvaluationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active suppliers
-        self.fields['supplier'].queryset = Supplier.objects.filter(is_active=True)
+        # Filter active suppliers - Changed from is_active=True to is_deleted=False
+        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)
         
         # Filter completed purchase orders
         self.fields['purchase_order'].queryset = PurchaseOrder.objects.filter(
@@ -376,8 +376,8 @@ class SupplierPaymentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active suppliers
-        self.fields['supplier'].queryset = Supplier.objects.filter(is_active=True)
+        # Filter active suppliers - Changed from is_active=True to is_deleted=False
+        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)
         
         # Filter completed purchase orders
         self.fields['purchase_orders'].queryset = PurchaseOrder.objects.filter(
@@ -410,8 +410,8 @@ class SupplierDocumentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active suppliers
-        self.fields['supplier'].queryset = Supplier.objects.filter(is_active=True)
+        # Filter active suppliers - Changed from is_active=True to is_deleted=False
+        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)
     
     def clean_expiry_date(self):
         issue_date = self.cleaned_data.get('issue_date')
@@ -426,7 +426,7 @@ class SupplierFilterForm(forms.Form):
     """Form for filtering suppliers"""
     
     category = forms.ModelChoiceField(
-        queryset=SupplierCategory.objects.filter(is_active=True),
+        queryset=SupplierCategory.objects.filter(is_active=True),  # SupplierCategory has is_active
         required=False,
         empty_label="All Categories",
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -469,7 +469,7 @@ class PurchaseOrderFilterForm(forms.Form):
     """Form for filtering purchase orders"""
     
     supplier = forms.ModelChoiceField(
-        queryset=Supplier.objects.filter(status='active'),  # Remove is_active=True
+        queryset=Supplier.objects.filter(is_deleted=False, status='active'),  # Changed from is_active=True
         required=False,
         empty_label="All Suppliers",
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -510,7 +510,7 @@ class GoodsReceiptFilterForm(forms.Form):
     """Form for filtering goods receipts"""
     
     supplier = forms.ModelChoiceField(
-        queryset=Supplier.objects.filter(status='active'),  # Remove is_active=True
+        queryset=Supplier.objects.filter(is_deleted=False, status='active'),  # Changed from is_active=True
         required=False,
         empty_label="All Suppliers",
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -567,7 +567,7 @@ class QuickSupplierForm(forms.ModelForm):
         if not self.instance.pk and not self.initial.get('supplier_code'):
             self.fields['supplier_code'].initial = self.generate_supplier_code()
         
-        # Set categories queryset
+        # Set categories queryset - SupplierCategory has is_active field
         self.fields['category'].queryset = SupplierCategory.objects.filter(is_active=True)
         self.fields['category'].empty_label = "Select Category"
     

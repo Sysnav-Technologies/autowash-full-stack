@@ -14,6 +14,13 @@ from apps.core.utils import get_business_performance_metrics
 from apps.employees.models import Department, Employee
 from .models import BusinessMetrics, BusinessGoal, BusinessAlert, QuickAction, DashboardWidget
 
+from .views_settings import (
+    settings_overview, business_settings_view, service_settings_view,
+    payment_settings_view, notification_settings_view, integration_settings_view,
+    backup_settings_view, security_settings_view, user_management_view,
+    create_backup_ajax, download_backup, test_integration_ajax
+)
+
 @login_required
 @employee_required()
 def dashboard_view(request):
