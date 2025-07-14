@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order - PO-{{ order.po_number }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .page-break {
+                page-break-before: always;
+            }
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+        }
+        
+        .header {
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .company-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        
+        .company-logo {
+            flex: 0 0 auto;
+        }
+        
+        .company-logo img {
+            max-height: 80px;
+            max-width: 200px;
+        }
+        
+        .company-details {
+            text-align: right;
+            flex: 1;
+            margin-left: 20px;
+        }
+        
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1e293b;
+            margin-bottom: 5px;
+        }
+        
+        .company-address {
+            color: #64748b;
+            line-height: 1.5;
+        }
+        
+        .document-title {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .document-title h1 {
+            font-size: 28px;
+            color: #2563eb;
+            margin-bottom: 10px;
+        }
+        
+        .po-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        
+        .po-left, .po-right {
+            width: 48%;
+        }
+        
+        .info-section {
+            margin-bottom: 20px;
+        }
+        
+        .info-section h3 {
+            background: #f1f5f9;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #1e293b;
+            border-left: 4px solid #2563eb;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 5px;
+            align-items: baseline;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #64748b;
+            min-width: 120px;
+            flex-shrink: 0;
+        }
+        
+        .info-value {
+            color: #1e293b;
+            flex: 1;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-draft { background: #f3f4f6; color: #6b7280; }
+        .status-pending { background: #fef3c7; color: #d97706; }
+        .status-approved { background: #dcfce7; color: #16a34a; }
+        .status-sent { background: #dbeafe; color: #2563eb; }
+        .status-completed { background: #dcfce7; color: #16a34a; }
+        .status-cancelled { background: #fee2e2; color: #dc2626; }
+        
+        .priority-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .priority-low { background: #f0f9ff; color: #0369a1; }
+        .priority-normal { background: #f9fafb; color: #374151; }
+        .priority-high { background: #fef3c7; color: #d97706; }
+        .priority-urgent { background: #fee2e2; color: #dc2626; }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .items-table th {
+            background: #f9fafb;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+        }
+        
+        .items-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #f3f4f6;
+            border-right: 1px solid #e5e7eb;
+            vertical-align: top;
+        }
+        
+        .items-table tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .totals-section {
+            margin-top: 30px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .totals-table {
+            width: 300px;
+            border-collapse: collapse;
+        }
+        
+        .totals-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .totals-table .label {
+            font-weight: 600;
+            color: #64748b;
+            text-align: right;
+        }
+        
+        .totals-table .amount {
+            text-align: right;
+            color: #1e293b;
+            font-weight: 500;
+        }
+        
+        .total-row {
+            background: #f1f5f9;
+            font-weight: 700;
+            font-size: 14px;
+            color: #1e293b;
+        }
+        
+        .terms-section {
+            margin-top: 40px;
+            page-break-inside: avoid;
+        }
+        
+        .terms-section h3 {
+            background: #f1f5f9;
+            padding: 8px 12px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #1e293b;
+            border-left: 4px solid #2563eb;
+        }
+        
+        .terms-content {
+            padding: 15px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            line-height: 1.6;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 11px;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .print-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 0 5px 5px 0;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn:hover {
+            background: #1d4ed8;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 100px;
+            color: rgba(0, 0, 0, 0.05);
+            font-weight: bold;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        @media screen and (max-width: 768px) {
+            .po-details {
+                flex-direction: column;
+            }
+            
+            .po-left, .po-right {
+                width: 100%;
+                margin-bottom: 20px;
+            }
+            
+            .company-info {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .company-details {
+                text-align: center;
+                margin-left: 0;
+                margin-top: 20px;
+            }
+            
+            .totals-section {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Controls -->
+    <div class="print-controls no-print">
+        <button onclick="window.print()" class="btn">
+            <i class="fas fa-print"></i> Print
+        </button>
+        <button onclick="downloadPDF()" class="btn">
+            <i class="fas fa-file-pdf"></i> Download PDF
+        </button>
+        <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </div>
+
+    <!-- Watermark for draft orders -->
+    {% if order.status == 'draft' %}
+    <div class="watermark">DRAFT</div>
+    {% elif order.status == 'cancelled' %}
+    <div class="watermark">CANCELLED</div>
+    {% endif %}
+
+    <!-- Header -->
+    <div class="header">
+        <div class="company-info">
+            <div class="company-logo">
+                <!-- Replace with your company logo -->
+                <img src="{% load static %}{% static 'images/logo.png' %}" alt="Company Logo" style="display: none;">
+                <div style="width: 60px; height: 60px; background: #2563eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px;">
+                    {{ request.tenant.name.0|upper }}
+                </div>
+            </div>
+            <div class="company-details">
+                <div class="company-name">{{ request.tenant.name|default:"Your Company Name" }}</div>
+                <div class="company-address">
+                    <!-- Replace with your company details -->
+                    123 Business Street<br>
+                    Nairobi, Kenya<br>
+                    Tel: +254 700 000 000<br>
+                    Email: info@yourcompany.com<br>
+                    PIN: P000000000A
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Title -->
+    <div class="document-title">
+        <h1>PURCHASE ORDER</h1>
+        <div style="font-size: 16px; color: #64748b;">PO-{{ order.po_number }}</div>
+    </div>
+
+    <!-- Purchase Order Details -->
+    <div class="po-details">
+        <div class="po-left">
+            <!-- Supplier Information -->
+            <div class="info-section">
+                <h3>Supplier Information</h3>
+                <div class="info-row">
+                    <span class="info-label">Supplier:</span>
+                    <span class="info-value">{{ order.supplier.name }}</span>
+                </div>
+                {% if order.supplier.business_name and order.supplier.business_name != order.supplier.name %}
+                <div class="info-row">
+                    <span class="info-label">Business Name:</span>
+                    <span class="info-value">{{ order.supplier.business_name }}</span>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="info-label">Supplier Code:</span>
+                    <span class="info-value">{{ order.supplier.supplier_code }}</span>
+                </div>
+                {% if order.supplier.email %}
+                <div class="info-row">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">{{ order.supplier.email }}</span>
+                </div>
+                {% endif %}
+                {% if order.supplier.phone %}
+                <div class="info-row">
+                    <span class="info-label">Phone:</span>
+                    <span class="info-value">{{ order.supplier.phone }}</span>
+                </div>
+                {% endif %}
+                {% if order.supplier.street_address or order.supplier.city or order.supplier.country %}
+                <div class="info-row">
+                    <span class="info-label">Address:</span>
+                    <span class="info-value">
+                        {% if order.supplier.street_address %}{{ order.supplier.street_address }}<br>{% endif %}
+                        {% if order.supplier.city %}{{ order.supplier.city }}{% endif %}
+                        {% if order.supplier.state %}, {{ order.supplier.state }}{% endif %}
+                        {% if order.supplier.postal_code %} {{ order.supplier.postal_code }}{% endif %}
+                        {% if order.supplier.country %}<br>{{ order.supplier.country }}{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+                {% if order.supplier.tax_number %}
+                <div class="info-row">
+                    <span class="info-label">Tax Number:</span>
+                    <span class="info-value">{{ order.supplier.tax_number }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Delivery Information -->
+            {% if order.delivery_address or order.contact_person %}
+            <div class="info-section">
+                <h3>Delivery Information</h3>
+                {% if order.delivery_address %}
+                <div class="info-row">
+                    <span class="info-label">Delivery Address:</span>
+                    <span class="info-value">{{ order.delivery_address|linebreaks }}</span>
+                </div>
+                {% endif %}
+                {% if order.contact_person %}
+                <div class="info-row">
+                    <span class="info-label">Contact Person:</span>
+                    <span class="info-value">{{ order.contact_person }}</span>
+                </div>
+                {% endif %}
+                {% if order.contact_phone %}
+                <div class="info-row">
+                    <span class="info-label">Contact Phone:</span>
+                    <span class="info-value">{{ order.contact_phone }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="po-right">
+            <!-- Order Information -->
+            <div class="info-section">
+                <h3>Order Information</h3>
+                <div class="info-row">
+                    <span class="info-label">Order Date:</span>
+                    <span class="info-value">{{ order.order_date|date:"F d, Y" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Expected Delivery:</span>
+                    <span class="info-value">{{ order.expected_delivery_date|date:"F d, Y" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value">
+                        <span class="status-badge status-{{ order.status }}">{{ order.get_status_display }}</span>
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Priority:</span>
+                    <span class="info-value">
+                        <span class="priority-badge priority-{{ order.priority }}">{{ order.get_priority_display }}</span>
+                    </span>
+                </div>
+                {% if order.payment_terms %}
+                <div class="info-row">
+                    <span class="info-label">Payment Terms:</span>
+                    <span class="info-value">{{ order.get_payment_terms_display }}</span>
+                </div>
+                {% endif %}
+                {% if order.delivery_terms %}
+                <div class="info-row">
+                    <span class="info-label">Delivery Terms:</span>
+                    <span class="info-value">{{ order.delivery_terms }}</span>
+                </div>
+                {% endif %}
+                {% if order.requested_by %}
+                <div class="info-row">
+                    <span class="info-label">Requested By:</span>
+                    <span class="info-value">{{ order.requested_by.user.get_full_name|default:order.requested_by.user.username }}</span>
+                </div>
+                {% endif %}
+                {% if order.approved_by %}
+                <div class="info-row">
+                    <span class="info-label">Approved By:</span>
+                    <span class="info-value">{{ order.approved_by.user.get_full_name|default:order.approved_by.user.username }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Approved Date:</span>
+                    <span class="info-value">{{ order.approved_at|date:"F d, Y" }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="width: 5%;">#</th>
+                <th style="width: 15%;">Item Code</th>
+                <th style="width: 35%;">Description</th>
+                <th style="width: 10%;" class="text-center">Qty</th>
+                <th style="width: 10%;" class="text-center">Unit</th>
+                <th style="width: 12%;" class="text-right">Unit Price</th>
+                <th style="width: 13%;" class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in order.items.all %}
+            <tr>
+                <td class="text-center">{{ forloop.counter }}</td>
+                <td>{{ item.item.sku|default:"-" }}</td>
+                <td>
+                    <div style="font-weight: 600;">{{ item.item.name }}</div>
+                    {% if item.item.description %}
+                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                        {{ item.item.description|truncatewords:15 }}
+                    </div>
+                    {% endif %}
+                    {% if item.notes %}
+                    <div style="font-size: 11px; color: #059669; margin-top: 2px; font-style: italic;">
+                        Note: {{ item.notes }}
+                    </div>
+                    {% endif %}
+                </td>
+                <td class="text-center">{{ item.quantity|floatformat:2 }}</td>
+                <td class="text-center">{{ item.item.unit|default:"PCS" }}</td>
+                <td class="text-right">{{ order.supplier.currency|default:"KES" }} {{ item.unit_price|floatformat:2 }}</td>
+                <td class="text-right">{{ order.supplier.currency|default:"KES" }} {{ item.total_amount|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center" style="padding: 20px; color: #64748b;">
+                    No items found
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Totals Section -->
+    <div class="totals-section">
+        <table class="totals-table">
+            <tr>
+                <td class="label">Subtotal:</td>
+                <td class="amount">{{ order.supplier.currency|default:"KES" }} {{ order.subtotal|floatformat:2 }}</td>
+            </tr>
+            {% if order.shipping_cost > 0 %}
+            <tr>
+                <td class="label">Shipping:</td>
+                <td class="amount">{{ order.supplier.currency|default:"KES" }} {{ order.shipping_cost|floatformat:2 }}</td>
+            </tr>
+            {% endif %}
+            {% if order.tax_amount > 0 %}
+            <tr>
+                <td class="label">Tax:</td>
+                <td class="amount">{{ order.supplier.currency|default:"KES" }} {{ order.tax_amount|floatformat:2 }}</td>
+            </tr>
+            {% endif %}
+            {% if order.discount_amount > 0 %}
+            <tr>
+                <td class="label">Discount:</td>
+                <td class="amount">-{{ order.supplier.currency|default:"KES" }} {{ order.discount_amount|floatformat:2 }}</td>
+            </tr>
+            {% endif %}
+            <tr class="total-row">
+                <td class="label">Total Amount:</td>
+                <td class="amount">{{ order.supplier.currency|default:"KES" }} {{ order.total_amount|floatformat:2 }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Terms and Conditions -->
+    {% if order.special_instructions or order.terms_and_conditions or order.notes %}
+    <div class="terms-section">
+        {% if order.special_instructions %}
+        <h3>Special Instructions</h3>
+        <div class="terms-content">
+            {{ order.special_instructions|linebreaks }}
+        </div>
+        {% endif %}
+
+        {% if order.terms_and_conditions %}
+        <h3>Terms and Conditions</h3>
+        <div class="terms-content">
+            {{ order.terms_and_conditions|linebreaks }}
+        </div>
+        {% endif %}
+
+        {% if order.notes %}
+        <h3>Internal Notes</h3>
+        <div class="terms-content">
+            {{ order.notes|linebreaks }}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Default Terms if none specified -->
+    {% if not order.terms_and_conditions %}
+    <div class="terms-section">
+        <h3>Terms and Conditions</h3>
+        <div class="terms-content">
+            <ol style="padding-left: 20px;">
+                <li>This purchase order is subject to our standard terms and conditions.</li>
+                <li>Delivery must be made on or before the specified delivery date.</li>
+                <li>All items must conform to specifications and be in good condition.</li>
+                <li>Invoice should reference this purchase order number: PO-{{ order.po_number }}</li>
+                <li>Payment will be made according to agreed payment terms.</li>
+                <li>Supplier must notify us immediately of any delays or issues.</li>
+            </ol>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>This is a computer-generated document. No signature is required.</p>
+        <p>Generated on {{ "now"|date:"F d, Y g:i A" }} | PO-{{ order.po_number }}</p>
+    </div>
+
+    <script>
+        function downloadPDF() {
+            // Hide print controls
+            document.querySelector('.print-controls').style.display = 'none';
+            
+            // Print (which will open print dialog where user can save as PDF)
+            window.print();
+            
+            // Show print controls again after a delay
+            setTimeout(() => {
+                document.querySelector('.print-controls').style.display = 'block';
+            }, 1000);
+        }
+
+        // Hide print controls when printing
+        window.addEventListener('beforeprint', () => {
+            document.querySelector('.print-controls').style.display = 'none';
+        });
+
+        window.addEventListener('afterprint', () => {
+            document.querySelector('.print-controls').style.display = 'block';
+        });
+    </script>
+</body>
+</html>

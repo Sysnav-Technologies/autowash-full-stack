@@ -1,0 +1,1118 @@
+<!-- templates/suppliers/purchase_order_form.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}{% if object %}Edit Purchase Order{% else %}Create Purchase Order{% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.purchase_order_list }}">Purchase Orders</a></li>
+<li class="breadcrumb-item active">{% if object %}Edit {{ object.po_number }}{% else %}Create Order{% endif %}</li>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+.form-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.form-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-card-header {
+    background: #f8fafc;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.items-table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.items-table th {
+    background: #f8fafc;
+    color: #374151;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.75rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.items-table td {
+    padding: 0.5rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.items-table .form-control,
+.items-table .form-select {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+}
+
+.items-table .form-control:focus,
+.items-table .form-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.btn-add-item {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-add-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    color: white;
+}
+
+.btn-remove-item {
+    background: #ef4444;
+    border: none;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.btn-remove-item:hover {
+    background: #dc2626;
+    color: white;
+}
+
+.item-row {
+    transition: all 0.3s ease;
+}
+
+.item-row.removing {
+    opacity: 0.5;
+    background-color: #fee2e2;
+}
+
+.total-row {
+    background: #f8fafc;
+    font-weight: 600;
+}
+
+.calculation-summary {
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+}
+
+.summary-label {
+    font-weight: 500;
+    color: #374151;
+}
+
+.summary-value {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.total-summary {
+    background: #3b82f6;
+    color: white;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-top: 0.5rem;
+}
+
+.select2-container--default .select2-selection--single {
+    height: 38px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 36px;
+    padding-left: 12px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 36px;
+}
+
+.form-actions {
+    background: #f8fafc;
+    padding: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    border-radius: 0 0 12px 12px;
+}
+
+.alert-info {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border: 1px solid #93c5fd;
+    color: #1e40af;
+}
+
+.duplicate-warning {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .form-header {
+        padding: 1.5rem;
+    }
+    
+    .items-table {
+        font-size: 0.8rem;
+    }
+    
+    .items-table th,
+    .items-table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .btn-add-item {
+        width: 100%;
+        margin-top: 1rem;
+    }
+}
+
+.invalid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #dc3545;
+}
+
+.role-restricted {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Form Header -->
+<div class="form-header">
+    <div class="row align-items-center">
+        <div class="col-auto">
+            <div class="bg-white bg-opacity-20 rounded-3 p-3">
+                <i class="fas fa-file-invoice fa-2x"></i>
+            </div>
+        </div>
+        <div class="col">
+            <h1 class="h2 mb-2">{% if object %}Edit Purchase Order{% else %}Create Purchase Order{% endif %}</h1>
+            <p class="mb-0 opacity-90">
+                {% if object %}
+                Update order details and items for PO-{{ object.po_number }}
+                {% else %}
+                Create a new purchase order for your supplier
+                {% endif %}
+            </p>
+            {% if object %}
+            <div class="mt-2">
+                <span class="status-badge bg-{% if object.status == 'completed' %}success{% elif object.status == 'pending' %}warning{% elif object.status == 'cancelled' %}danger{% elif object.status == 'sent' %}primary{% elif object.status == 'approved' %}info{% else %}secondary{% endif %}">
+                    {{ object.get_status_display }}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Error Messages -->
+{% if form.non_field_errors or items_formset.non_form_errors %}
+<div class="alert alert-danger">
+    <h6><i class="fas fa-exclamation-triangle me-2"></i>Please correct the following errors:</h6>
+    <ul class="mb-0">
+        {% for error in form.non_field_errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+        {% for error in items_formset.non_form_errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- Role Check - Only allow editing if user has permission -->
+{% if object and object.status not in 'draft,pending' and user_role not in 'owner,manager' %}
+<div class="alert alert-warning">
+    <i class="fas fa-lock me-2"></i>
+    This purchase order cannot be edited in its current status or you don't have permission to edit it.
+</div>
+{% endif %}
+
+<form method="post" id="purchase-order-form" {% if object and object.status not in 'draft,pending' and user_role not in 'owner,manager' %}class="role-restricted"{% endif %}>
+    {% csrf_token %}
+    
+    <div class="row">
+        <!-- Main Form -->
+        <div class="col-lg-8 mb-4">
+            <!-- Basic Information -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-info-circle me-2"></i>Order Information
+                </div>
+                <div class="p-4">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.supplier.id_for_label }}" class="form-label">
+                                Supplier <span class="text-danger">*</span>
+                            </label>
+                            {{ form.supplier|add_class:"form-select" }}
+                            {% if form.supplier.errors %}
+                                <div class="invalid-feedback">{{ form.supplier.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.priority.id_for_label }}" class="form-label">Priority</label>
+                            {{ form.priority|add_class:"form-select" }}
+                            {% if form.priority.errors %}
+                                <div class="invalid-feedback">{{ form.priority.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.expected_delivery_date.id_for_label }}" class="form-label">
+                                Expected Delivery Date <span class="text-danger">*</span>
+                            </label>
+                            {{ form.expected_delivery_date|add_class:"form-control" }}
+                            {% if form.expected_delivery_date.errors %}
+                                <div class="invalid-feedback">{{ form.expected_delivery_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.payment_terms.id_for_label }}" class="form-label">Payment Terms</label>
+                            {{ form.payment_terms|add_class:"form-select" }}
+                            {% if form.payment_terms.errors %}
+                                <div class="invalid-feedback">{{ form.payment_terms.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="form-card">
+                <div class="form-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-list me-2"></i>Order Items</span>
+                    {% if not object or object.status in 'draft,pending' or user_role in 'owner,manager' %}
+                    <button type="button" class="btn btn-add-item" id="add-item-btn">
+                        <i class="fas fa-plus me-2"></i>Add Item
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="p-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Tip:</strong> Select items from the dropdown to avoid duplicates. The system will warn you if you try to add the same item twice.
+                    </div>
+                    
+                    {{ items_formset.management_form }}
+                    
+                    <div class="table-responsive">
+                        <table class="items-table table table-bordered mb-0" id="items-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%">Item <span class="text-danger">*</span></th>
+                                    <th style="width: 15%">SKU</th>
+                                    <th style="width: 12%">Quantity <span class="text-danger">*</span></th>
+                                    <th style="width: 15%">Unit Price <span class="text-danger">*</span></th>
+                                    <th style="width: 15%">Total</th>
+                                    <th style="width: 8%">Notes</th>
+                                    {% if not object or object.status in 'draft,pending' or user_role in 'owner,manager' %}
+                                    <th style="width: 5%">Delete</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody id="items-tbody">
+                                {% for form in items_formset %}
+                                {% if form.instance.pk or form.item.value %}
+                                <tr class="item-row" data-form-index="{{ forloop.counter0 }}">
+                                    <td>
+                                        {% for hidden in form.hidden_fields %}
+                                            {{ hidden }}
+                                        {% endfor %}
+                                        {{ form.item|add_class:"form-select item-select" }}
+                                        {% if form.item.errors %}
+                                            <div class="invalid-feedback">{{ form.item.errors.0 }}</div>
+                                        {% endif %}
+                                        <div class="duplicate-warning">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            This item is already added to the order
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control item-sku" readonly placeholder="Auto-filled">
+                                    </td>
+                                    <td>
+                                        {{ form.quantity|add_class:"form-control quantity-input" }}
+                                        {% if form.quantity.errors %}
+                                            <div class="invalid-feedback">{{ form.quantity.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ form.unit_price|add_class:"form-control unit-price-input" }}
+                                        {% if form.unit_price.errors %}
+                                            <div class="invalid-feedback">{{ form.unit_price.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control item-total" readonly placeholder="0.00">
+                                    </td>
+                                    <td>
+                                        {{ form.notes|add_class:"form-control"|attr:"placeholder:Notes" }}
+                                    </td>
+                                    {% if not object or object.status in 'draft,pending' or user_role in 'owner,manager' %}
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-remove-item" title="Remove Item">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        {{ form.DELETE }}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                                
+                                <!-- Show message if no items -->
+                                {% if not object %}
+                                <tr id="no-items-row">
+                                    <td colspan="{% if user_role in 'owner,manager' %}7{% else %}6{% endif %}" class="text-center text-muted py-4">
+                                        <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                                        <div>No items added yet. Click "Add Item" to get started.</div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr class="total-row">
+                                    <td colspan="{% if not object or object.status in 'draft,pending' or user_role in 'owner,manager' %}4{% else %}5{% endif %}" class="text-end fw-semibold">Subtotal:</td>
+                                    <td id="subtotal-display" class="fw-semibold">KES 0.00</td>
+                                    <td colspan="{% if not object or object.status in 'draft,pending' or user_role in 'owner,manager' %}2{% else %}1{% endif %}"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    
+                    <!-- Calculation Summary -->
+                    <div class="calculation-summary">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.shipping_cost.id_for_label }}" class="form-label">Shipping Cost</label>
+                                        {{ form.shipping_cost|add_class:"form-control calculation-input" }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.tax_amount.id_for_label }}" class="form-label">Tax Amount</label>
+                                        {{ form.tax_amount|add_class:"form-control calculation-input" }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.discount_amount.id_for_label }}" class="form-label">Discount Amount</label>
+                                        {{ form.discount_amount|add_class:"form-control calculation-input" }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="summary-row">
+                                    <span class="summary-label">Subtotal:</span>
+                                    <span class="summary-value" id="summary-subtotal">KES 0.00</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span class="summary-label">Shipping:</span>
+                                    <span class="summary-value" id="summary-shipping">KES 0.00</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span class="summary-label">Tax:</span>
+                                    <span class="summary-value" id="summary-tax">KES 0.00</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span class="summary-label">Discount:</span>
+                                    <span class="summary-value text-success" id="summary-discount">KES 0.00</span>
+                                </div>
+                                <div class="total-summary">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="fw-bold">Total Amount:</span>
+                                        <span class="fw-bold fs-5" id="summary-total">KES 0.00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Delivery Information -->
+            <div class="form-card mb-4">
+                <div class="form-card-header">
+                    <i class="fas fa-shipping-fast me-2"></i>Delivery Information
+                </div>
+                <div class="p-4">
+                    <div class="mb-3">
+                        <label for="{{ form.delivery_address.id_for_label }}" class="form-label">Delivery Address</label>
+                        {{ form.delivery_address|add_class:"form-control" }}
+                        {% if form.delivery_address.errors %}
+                            <div class="invalid-feedback">{{ form.delivery_address.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.contact_person.id_for_label }}" class="form-label">Contact Person</label>
+                        {{ form.contact_person|add_class:"form-control" }}
+                        {% if form.contact_person.errors %}
+                            <div class="invalid-feedback">{{ form.contact_person.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.contact_phone.id_for_label }}" class="form-label">Contact Phone</label>
+                        {{ form.contact_phone|add_class:"form-control" }}
+                        {% if form.contact_phone.errors %}
+                            <div class="invalid-feedback">{{ form.contact_phone.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.delivery_terms.id_for_label }}" class="form-label">Delivery Terms</label>
+                        {{ form.delivery_terms|add_class:"form-control" }}
+                        {% if form.delivery_terms.errors %}
+                            <div class="invalid-feedback">{{ form.delivery_terms.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-sticky-note me-2"></i>Additional Information
+                </div>
+                <div class="p-4">
+                    <div class="mb-3">
+                        <label for="{{ form.special_instructions.id_for_label }}" class="form-label">Special Instructions</label>
+                        {{ form.special_instructions|add_class:"form-control" }}
+                        {% if form.special_instructions.errors %}
+                            <div class="invalid-feedback">{{ form.special_instructions.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.notes.id_for_label }}" class="form-label">Internal Notes</label>
+                        {{ form.notes|add_class:"form-control" }}
+                        {% if form.notes.errors %}
+                            <div class="invalid-feedback">{{ form.notes.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Actions -->
+    {% if not object or object.status in 'draft,pending' or user_role in 'owner,manager' %}
+    <div class="form-card">
+        <div class="form-actions">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="{{ urls.purchase_order_list }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Cancel
+                    </a>
+                </div>
+                <div class="d-flex gap-2">
+                    {% if object %}
+                        {% if object.status == 'draft' %}
+                            <button type="submit" name="save" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Update Order
+                            </button>
+                            {% if user_role in 'owner,manager' %}
+                            <button type="submit" name="submit_for_approval" class="btn btn-success">
+                                <i class="fas fa-paper-plane me-2"></i>Submit for Approval
+                            </button>
+                            {% endif %}
+                        {% elif object.status == 'pending' and user_role in 'owner,manager' %}
+                            <button type="submit" name="save" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Update Order
+                            </button>
+                        {% else %}
+                            <span class="text-muted">Order cannot be modified in current status</span>
+                        {% endif %}
+                    {% else %}
+                        <button type="submit" name="save" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Create Order
+                        </button>
+                        {% if user_role in 'owner,manager' %}
+                        <button type="submit" name="save_and_submit" class="btn btn-success">
+                            <i class="fas fa-check-circle me-2"></i>Create & Submit
+                        </button>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="form-card">
+        <div class="form-actions">
+            <div class="d-flex justify-content-center">
+                <a href="{{ urls.purchase_order_list }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Purchase Orders
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</form>
+
+<!-- Item Row Template (Hidden) -->
+<template id="item-row-template">
+    <tr class="item-row" data-form-index="__prefix__">
+        <td>
+            <select name="items-__prefix__-item" class="form-select item-select" id="id_items-__prefix__-item">
+                <option value="">Select an item...</option>
+            </select>
+            <div class="duplicate-warning">
+                <i class="fas fa-exclamation-triangle me-1"></i>
+                This item is already added to the order
+            </div>
+        </td>
+        <td>
+            <input type="text" class="form-control item-sku" readonly placeholder="Auto-filled">
+        </td>
+        <td>
+            <input type="number" name="items-__prefix__-quantity" class="form-control quantity-input" step="0.01" min="0.01" id="id_items-__prefix__-quantity">
+        </td>
+        <td>
+            <input type="number" name="items-__prefix__-unit_price" class="form-control unit-price-input" step="0.01" min="0.01" id="id_items-__prefix__-unit_price">
+        </td>
+        <td>
+            <input type="text" class="form-control item-total" readonly placeholder="0.00">
+        </td>
+        <td>
+            <input type="text" name="items-__prefix__-notes" class="form-control" placeholder="Notes" id="id_items-__prefix__-notes">
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-remove-item" title="Remove Item">
+                <i class="fas fa-trash"></i>
+            </button>
+            <input type="hidden" name="items-__prefix__-DELETE" id="id_items-__prefix__-DELETE">
+            <input type="hidden" name="items-__prefix__-id" id="id_items-__prefix__-id">
+        </td>
+    </tr>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    let formIndex = 0; // Start with 0 since we don't create empty rows
+    const maxForms = {{ items_formset.max_num }};
+    const userRole = '{{ user_role }}';
+    const canEdit = {% if not object or object.status in 'draft,pending' or user_role in 'owner,manager' %}true{% else %}false{% endif %};
+    
+    // Count existing items to set proper form index
+    $('.item-row').each(function(index) {
+        formIndex = Math.max(formIndex, parseInt($(this).data('form-index')) + 1);
+    });
+    
+    // Store inventory items data
+    let inventoryItems = {};
+    
+    // Only initialize interactive features if user can edit
+    if (canEdit) {
+        // Initialize Select2 for supplier
+        $('#id_supplier').select2({
+            placeholder: 'Select a supplier...',
+            allowClear: true
+        });
+        
+        // Initialize existing item selects
+        initializeItemSelects();
+        
+        // Load inventory items via AJAX
+        loadInventoryItems();
+        
+        // Add new item row
+        $('#add-item-btn').click(function() {
+            if (formIndex < maxForms) {
+                $('#no-items-row').remove(); // Remove the "no items" message
+                addNewItemRow();
+            } else {
+                alert('Maximum number of items reached.');
+            }
+        });
+        
+        // Remove item row
+        $(document).on('click', '.btn-remove-item', function() {
+            const row = $(this).closest('tr');
+            const deleteInput = row.find('input[name$="-DELETE"]');
+            
+            if (deleteInput.length && row.find('input[name$="-id"]').val()) {
+                // Mark for deletion if it's an existing item with ID
+                deleteInput.val('true');
+                row.addClass('removing').hide();
+            } else {
+                // Remove completely if it's a new item
+                row.remove();
+                updateFormIndex();
+            }
+            
+            // Show "no items" message if no items left
+            if ($('.item-row:visible').length === 0) {
+                const colSpan = {% if not object or object.status in 'draft,pending' or user_role in 'owner,manager' %}7{% else %}6{% endif %};
+                $('#items-tbody').append(`
+                    <tr id="no-items-row">
+                        <td colspan="${colSpan}" class="text-center text-muted py-4">
+                            <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                            <div>No items added yet. Click "Add Item" to get started.</div>
+                        </td>
+                    </tr>
+                `);
+            }
+            
+            calculateTotals();
+            checkDuplicates();
+        });
+        
+        // Handle item selection
+        $(document).on('change', '.item-select', function() {
+            const row = $(this).closest('tr');
+            const itemId = $(this).val();
+            
+            if (itemId && inventoryItems[itemId]) {
+                const item = inventoryItems[itemId];
+                
+                // Auto-fill SKU
+                row.find('.item-sku').val(item.sku || '');
+                
+                // Auto-fill unit price if available
+                if (item.cost_price) {
+                    row.find('.unit-price-input').val(parseFloat(item.cost_price).toFixed(2));
+                }
+                
+                calculateRowTotal(row);
+            } else {
+                row.find('.item-sku').val('');
+                row.find('.item-total').val('');
+            }
+            
+            checkDuplicates();
+        });
+        
+        // Handle quantity and price changes
+        $(document).on('input', '.quantity-input, .unit-price-input', function() {
+            const row = $(this).closest('tr');
+            calculateRowTotal(row);
+        });
+        
+        // Handle calculation inputs
+        $(document).on('input', '.calculation-input', function() {
+            calculateTotals();
+        });
+        
+        // Form submission validation
+        $('#purchase-order-form').on('submit', function(e) {
+            let hasErrors = false;
+            const errorMessages = [];
+            
+            // Check if supplier is selected
+            if (!$('#id_supplier').val()) {
+                hasErrors = true;
+                errorMessages.push('Please select a supplier.');
+                $('#id_supplier').addClass('is-invalid');
+            }
+            
+            // Check if expected delivery date is set
+            if (!$('#id_expected_delivery_date').val()) {
+                hasErrors = true;
+                errorMessages.push('Please set an expected delivery date.');
+                $('#id_expected_delivery_date').addClass('is-invalid');
+            }
+            
+            // Check if at least one item is added
+            const visibleRows = $('.item-row:visible').length;
+            if (visibleRows === 0) {
+                hasErrors = true;
+                errorMessages.push('Please add at least one item to the order.');
+            }
+            
+            // Validate each item row
+            $('.item-row:visible').each(function() {
+                const row = $(this);
+                const itemId = row.find('.item-select').val();
+                const quantity = row.find('.quantity-input').val();
+                const unitPrice = row.find('.unit-price-input').val();
+                
+                if (!itemId) {
+                    hasErrors = true;
+                    row.find('.item-select').addClass('is-invalid');
+                    if (errorMessages.indexOf('Please select an item for all rows.') === -1) {
+                        errorMessages.push('Please select an item for all rows.');
+                    }
+                }
+                
+                if (!quantity || parseFloat(quantity) <= 0) {
+                    hasErrors = true;
+                    row.find('.quantity-input').addClass('is-invalid');
+                    if (errorMessages.indexOf('Please enter valid quantities for all items.') === -1) {
+                        errorMessages.push('Please enter valid quantities for all items.');
+                    }
+                }
+                
+                if (!unitPrice || parseFloat(unitPrice) <= 0) {
+                    hasErrors = true;
+                    row.find('.unit-price-input').addClass('is-invalid');
+                    if (errorMessages.indexOf('Please enter valid unit prices for all items.') === -1) {
+                        errorMessages.push('Please enter valid unit prices for all items.');
+                    }
+                }
+            });
+            
+            // Check for duplicates
+            const duplicates = $('.duplicate-warning:visible').length;
+            if (duplicates > 0) {
+                hasErrors = true;
+                errorMessages.push('Please remove duplicate items from the order.');
+            }
+            
+            if (hasErrors) {
+                e.preventDefault();
+                
+                // Show error summary
+                let errorHtml = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+                errorHtml += '<h6><i class="fas fa-exclamation-triangle me-2"></i>Please correct the following errors:</h6>';
+                errorHtml += '<ul class="mb-0">';
+                errorMessages.forEach(message => {
+                    errorHtml += `<li>${message}</li>`;
+                });
+                errorHtml += '</ul>';
+                errorHtml += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                errorHtml += '</div>';
+                
+                // Remove existing error alerts
+                $('.alert-danger').remove();
+                
+                // Add new error alert at top of form
+                $('.form-header').after(errorHtml);
+                
+                // Scroll to top
+                $('html, body').animate({
+                    scrollTop: $('.alert-danger').offset().top - 100
+                }, 500);
+            }
+        });
+        
+        // Remove validation classes on input
+        $(document).on('input change', '.form-control, .form-select', function() {
+            $(this).removeClass('is-invalid');
+        });
+    }
+    
+    // Initialize calculations (always run, even in view mode)
+    calculateTotals();
+    checkDuplicates();
+    
+    function initializeItemSelects() {
+        $('.item-select').each(function() {
+            $(this).select2({
+                placeholder: 'Select an item...',
+                allowClear: true
+            });
+        });
+    }
+    
+    function loadInventoryItems() {
+        // This would typically be an AJAX call to get inventory items
+        // For now, we'll populate from the existing options
+        $('.item-select').first().find('option').each(function() {
+            if ($(this).val()) {
+                inventoryItems[$(this).val()] = {
+                    id: $(this).val(),
+                    name: $(this).text(),
+                    sku: $(this).data('sku') || '',
+                    cost_price: $(this).data('cost-price') || 0
+                };
+            }
+        });
+    }
+    
+    function addNewItemRow() {
+        const template = $('#item-row-template').html();
+        const newRow = template.replace(/__prefix__/g, formIndex);
+        
+        $('#items-tbody').append(newRow);
+        
+        // Initialize Select2 for new row
+        const newSelect = $(`#id_items-${formIndex}-item`);
+        
+        // Copy options from first select
+        const firstSelect = $('.item-select').first();
+        firstSelect.find('option').each(function() {
+            newSelect.append($(this).clone());
+        });
+        
+        newSelect.select2({
+            placeholder: 'Select an item...',
+            allowClear: true
+        });
+        
+        formIndex++;
+        updateFormIndex();
+        checkDuplicates();
+    }
+    
+    function updateFormIndex() {
+        $('#id_items-TOTAL_FORMS').val($('.item-row').length);
+    }
+    
+    function calculateRowTotal(row) {
+        const quantity = parseFloat(row.find('.quantity-input').val()) || 0;
+        const unitPrice = parseFloat(row.find('.unit-price-input').val()) || 0;
+        const total = quantity * unitPrice;
+        
+        row.find('.item-total').val(total.toFixed(2));
+        calculateTotals();
+    }
+    
+    function calculateTotals() {
+        let subtotal = 0;
+        
+        // Calculate subtotal from all visible rows
+        $('.item-row:visible').each(function() {
+            const total = parseFloat($(this).find('.item-total').val()) || 0;
+            subtotal += total;
+        });
+        
+        const shipping = parseFloat($('#id_shipping_cost').val()) || 0;
+        const tax = parseFloat($('#id_tax_amount').val()) || 0;
+        const discount = parseFloat($('#id_discount_amount').val()) || 0;
+        
+        const grandTotal = subtotal + shipping + tax - discount;
+        
+        // Update displays
+        $('#subtotal-display').text(`KES ${subtotal.toFixed(2)}`);
+        $('#summary-subtotal').text(`KES ${subtotal.toFixed(2)}`);
+        $('#summary-shipping').text(`KES ${shipping.toFixed(2)}`);
+        $('#summary-tax').text(`KES ${tax.toFixed(2)}`);
+        $('#summary-discount').text(`KES ${discount.toFixed(2)}`);
+        $('#summary-total').text(`KES ${grandTotal.toFixed(2)}`);
+    }
+    
+    function checkDuplicates() {
+        const selectedItems = {};
+        const duplicateWarnings = $('.duplicate-warning');
+        
+        // Hide all warnings first
+        duplicateWarnings.hide();
+        
+        // Check each visible row for duplicates
+        $('.item-row:visible').each(function() {
+            const row = $(this);
+            const itemSelect = row.find('.item-select');
+            const itemId = itemSelect.val();
+            
+            if (itemId) {
+                if (selectedItems[itemId]) {
+                    // Mark both rows as having duplicates
+                    selectedItems[itemId].push(row);
+                } else {
+                    selectedItems[itemId] = [row];
+                }
+            }
+        });
+        
+        // Show warnings for duplicates
+        Object.keys(selectedItems).forEach(itemId => {
+            if (selectedItems[itemId].length > 1) {
+                selectedItems[itemId].forEach(row => {
+                    row.find('.duplicate-warning').show();
+                    row.find('.item-select').addClass('is-invalid');
+                });
+            } else {
+                selectedItems[itemId][0].find('.item-select').removeClass('is-invalid');
+            }
+        });
+    }
+    
+    // Enhanced supplier selection with additional info
+    $('#id_supplier').on('change', function() {
+        const supplierId = $(this).val();
+        if (supplierId) {
+            // You could make an AJAX call here to get supplier details
+            // and auto-populate payment terms, delivery address, etc.
+            console.log('Supplier selected:', supplierId);
+        }
+    });
+    
+    // Number formatting for currency inputs
+    $(document).on('blur', '.unit-price-input, .calculation-input', function() {
+        const value = parseFloat($(this).val());
+        if (!isNaN(value)) {
+            $(this).val(value.toFixed(2));
+        }
+    });
+    
+    // Set minimum date for delivery date (today)
+    const today = new Date().toISOString().split('T')[0];
+    $('#id_expected_delivery_date').attr('min', today);
+    
+    // Initialize calculations on page load for existing items
+    $('.item-row').each(function() {
+        const row = $(this);
+        const quantity = parseFloat(row.find('.quantity-input').val()) || 0;
+        const unitPrice = parseFloat(row.find('.unit-price-input').val()) || 0;
+        
+        if (quantity && unitPrice) {
+            calculateRowTotal(row);
+        }
+        
+        // Auto-fill SKU for existing items
+        const itemSelect = row.find('.item-select');
+        const itemId = itemSelect.val();
+        if (itemId) {
+            // Get SKU from the selected option's data attribute or text
+            const selectedOption = itemSelect.find('option:selected');
+            const itemText = selectedOption.text();
+            const skuMatch = itemText.match(/\((.*?)\)/); // Extract SKU from parentheses
+            if (skuMatch) {
+                row.find('.item-sku').val(skuMatch[1]);
+            }
+        }
+    });
+    
+    // Keyboard shortcuts (only if can edit)
+    if (canEdit) {
+        $(document).keydown(function(e) {
+            // Ctrl+S or Cmd+S to save as draft
+            if ((e.ctrlKey || e.metaKey) && e.keyCode === 83) {
+                e.preventDefault();
+                $('button[name="save_draft"]').click();
+            }
+            
+            // Ctrl+Enter or Cmd+Enter to submit
+            if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
+                e.preventDefault();
+                if ($('button[name="submit_for_approval"]').length) {
+                    $('button[name="submit_for_approval"]').click();
+                }
+            }
+        });
+        
+        // Confirm before leaving with unsaved changes
+        let formChanged = false;
+        $('#purchase-order-form').on('input change', function() {
+            formChanged = true;
+        });
+        
+        $(window).on('beforeunload', function() {
+            if (formChanged) {
+                return 'You have unsaved changes. Are you sure you want to leave?';
+            }
+        });
+        
+        $('#purchase-order-form').on('submit', function() {
+            formChanged = false;
+        });
+    }
+    
+    // Role-based UI adjustments
+    if (userRole === 'supervisor') {
+        // Supervisors can view but have limited editing
+        $('.calculation-input').prop('readonly', true);
+        $('#id_priority option[value="urgent"]').remove();
+    }
+    
+    if (userRole === 'attendant') {
+        // Attendants should not see this form in normal flow
+        $('.form-header').after(`
+            <div class="alert alert-warning">
+                <i class="fas fa-info-circle me-2"></i>
+                You can view this purchase order but cannot make changes. Contact your manager for modifications.
+            </div>
+        `);
+    }
+    
+    // Status-based restrictions
+    {% if object %}
+    const orderStatus = '{{ object.status }}';
+    if (orderStatus === 'sent' || orderStatus === 'acknowledged') {
+        $('.alert-info').html(`
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Note:</strong> This order has been sent to the supplier. Major changes may require supplier notification.
+        `);
+    }
+    
+    if (orderStatus === 'completed') {
+        $('.form-header').after(`
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>
+                This purchase order has been completed. All items have been received.
+            </div>
+        `);
+    }
+    
+    if (orderStatus === 'cancelled') {
+        $('.form-header').after(`
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle me-2"></i>
+                This purchase order has been cancelled and cannot be modified.
+            </div>
+        `);
+    }
+    {% endif %}
+    
+    // Initialize tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}

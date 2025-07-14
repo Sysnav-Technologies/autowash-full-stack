@@ -1,0 +1,880 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}
+{% if object %}Edit Invoice{% else %}Create Invoice{% endif %}
+{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.invoice_list }}">Invoices</a></li>
+<li class="breadcrumb-item active">
+    {% if object %}Edit {{ object.invoice_number }}{% else %}Create Invoice{% endif %}
+</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.form-section-header {
+    background: #fee2e2;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-section-body {
+    padding: 1.5rem;
+}
+
+.formset-item {
+    background: #fefefe;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+.formset-item:last-child {
+    margin-bottom: 0;
+}
+
+.formset-delete {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+}
+
+.formset-header {
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.add-item-btn {
+    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    border: none;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.add-item-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+    color: white;
+}
+
+.total-section {
+    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.total-row:last-child {
+    border-bottom: none;
+    font-weight: 700;
+    font-size: 1.125rem;
+    padding-top: 1rem;
+}
+
+.po-info {
+    background: #f0f9ff;
+    border: 1px solid #0ea5e9;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.po-item {
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.po-item:hover {
+    border-color: #dc2626;
+    background: #fef2f2;
+}
+
+.po-item.selected {
+    border-color: #dc2626;
+    background: #fee2e2;
+}
+
+.error-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.error-list li {
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.required {
+    color: #dc2626;
+}
+
+.empty-form {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .form-section-body {
+        padding: 1rem;
+    }
+    
+    .formset-item {
+        padding: 0.75rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-2">
+            {% if object %}
+            Edit Invoice {{ object.invoice_number }}
+            {% else %}
+            Create Invoice
+            {% endif %}
+        </h1>
+        <p class="text-muted mb-0">
+            {% if object %}
+            Update invoice details and items
+            {% else %}
+            Create a new invoice from supplier
+            {% endif %}
+        </p>
+    </div>
+    <div>
+        <a href="{{ urls.invoice_list }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Invoices
+        </a>
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" id="invoice-form">
+    {% csrf_token %}
+    
+    <div class="row">
+        <!-- Main Form -->
+        <div class="col-lg-8">
+            <!-- Invoice Information -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <i class="fas fa-file-invoice"></i>
+                    Invoice Information
+                </div>
+                <div class="form-section-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    {{ form.supplier.label }}
+                                    <span class="required">*</span>
+                                </label>
+                                {{ form.supplier|add_class:"form-select" }}
+                                {% if form.supplier.errors %}
+                                <ul class="error-list">
+                                    {% for error in form.supplier.errors %}
+                                    <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">{{ form.purchase_order.label }}</label>
+                                {{ form.purchase_order|add_class:"form-select" }}
+                                {% if form.purchase_order.errors %}
+                                <ul class="error-list">
+                                    {% for error in form.purchase_order.errors %}
+                                    <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                                {% if purchase_order %}
+                                <div class="po-info">
+                                    <strong>PO Details:</strong> PO-{{ purchase_order.po_number }}<br>
+                                    <strong>Amount:</strong> {{ purchase_order.total_amount|floatformat:2 }}<br>
+                                    <strong>Status:</strong> {{ purchase_order.get_status_display }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    {{ form.supplier_invoice_number.label }}
+                                    <span class="required">*</span>
+                                </label>
+                                {{ form.supplier_invoice_number|add_class:"form-control" }}
+                                {% if form.supplier_invoice_number.errors %}
+                                <ul class="error-list">
+                                    {% for error in form.supplier_invoice_number.errors %}
+                                    <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">{{ form.currency.label }}</label>
+                                {{ form.currency|add_class:"form-control" }}
+                                {% if form.currency.errors %}
+                                <ul class="error-list">
+                                    {% for error in form.currency.errors %}
+                                    <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    {{ form.invoice_date.label }}
+                                    <span class="required">*</span>
+                                </label>
+                                {{ form.invoice_date|add_class:"form-control" }}
+                                {% if form.invoice_date.errors %}
+                                <ul class="error-list">
+                                    {% for error in form.invoice_date.errors %}
+                                    <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    {{ form.due_date.label }}
+                                    <span class="required">*</span>
+                                </label>
+                                {{ form.due_date|add_class:"form-control" }}
+                                {% if form.due_date.errors %}
+                                <ul class="error-list">
+                                    {% for error in form.due_date.errors %}
+                                    <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">{{ form.description.label }}</label>
+                        {{ form.description|add_class:"form-control" }}
+                        {% if form.description.errors %}
+                        <ul class="error-list">
+                            {% for error in form.description.errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">{{ form.invoice_file.label }}</label>
+                        {{ form.invoice_file|add_class:"form-control" }}
+                        {% if form.invoice_file.errors %}
+                        <ul class="error-list">
+                            {% for error in form.invoice_file.errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                        <small class="form-text text-muted">Upload the original invoice file (PDF, JPG, PNG)</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Import from PO -->
+            {% if po_items %}
+            <div class="form-section">
+                <div class="form-section-header">
+                    <i class="fas fa-download"></i>
+                    Import Items from Purchase Order
+                </div>
+                <div class="form-section-body">
+                    <p class="text-muted mb-3">Select items from PO-{{ purchase_order.po_number }} to add to this invoice:</p>
+                    <div id="po-items-container">
+                        {% for po_item in po_items %}
+                        <div class="po-item" data-item-name="{{ po_item.item.name }}" 
+                             data-quantity="{{ po_item.quantity }}" 
+                             data-unit-price="{{ po_item.unit_price }}"
+                             data-item-code="{{ po_item.item.sku|default:'' }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ po_item.item.name }}</strong>
+                                    {% if po_item.item.sku %}
+                                    <span class="text-muted">({{ po_item.item.sku }})</span>
+                                    {% endif %}
+                                    <br>
+                                    <small class="text-muted">{{ po_item.item.description|truncatewords:15 }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <div>Qty: {{ po_item.quantity|floatformat:2 }}</div>
+                                    <div>@ {{ po_item.unit_price|floatformat:2 }}</div>
+                                    <div><strong>{{ po_item.total_amount|floatformat:2 }}</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-primary" id="import-selected">
+                            <i class="fas fa-download me-2"></i>Import Selected Items
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="select-all-po-items">
+                            <i class="fas fa-check-square me-2"></i>Select All
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Invoice Items -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <i class="fas fa-list"></i>
+                    Invoice Items
+                    <span class="ms-auto">
+                        <button type="button" class="btn btn-sm btn-primary add-item-btn" id="add-item">
+                            <i class="fas fa-plus me-1"></i>Add Item
+                        </button>
+                    </span>
+                </div>
+                <div class="form-section-body">
+                    <div id="formset-container">
+                        {{ items_formset.management_form }}
+                        
+                        {% for form in items_formset %}
+                        <div class="formset-item" data-form-index="{{ forloop.counter0 }}">
+                            {% if not forloop.first %}
+                            <div class="formset-delete">
+                                <button type="button" class="btn btn-sm btn-outline-danger delete-item">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="formset-header">
+                                Item #{{ forloop.counter }}
+                            </div>
+                            
+                            <!-- Hidden fields -->
+                            {% for hidden in form.hidden_fields %}
+                                {{ hidden }}
+                            {% endfor %}
+                            
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            {{ form.description.label }}
+                                            <span class="required">*</span>
+                                        </label>
+                                        {{ form.description|add_class:"form-control" }}
+                                        {% if form.description.errors %}
+                                        <ul class="error-list">
+                                            {% for error in form.description.errors %}
+                                            <li>{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="form-label">{{ form.item_code.label }}</label>
+                                        {{ form.item_code|add_class:"form-control" }}
+                                        {% if form.item_code.errors %}
+                                        <ul class="error-list">
+                                            {% for error in form.item_code.errors %}
+                                            <li>{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            {{ form.quantity.label }}
+                                            <span class="required">*</span>
+                                        </label>
+                                        {{ form.quantity|add_class:"form-control quantity-field" }}
+                                        {% if form.quantity.errors %}
+                                        <ul class="error-list">
+                                            {% for error in form.quantity.errors %}
+                                            <li>{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            {{ form.unit_price.label }}
+                                            <span class="required">*</span>
+                                        </label>
+                                        {{ form.unit_price|add_class:"form-control unit-price-field" }}
+                                        {% if form.unit_price.errors %}
+                                        <ul class="error-list">
+                                            {% for error in form.unit_price.errors %}
+                                            <li>{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Total Amount</label>
+                                        <div class="form-control bg-light item-total">KES 0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label class="form-label">{{ form.notes.label }}</label>
+                                        {{ form.notes|add_class:"form-control" }}
+                                        {% if form.notes.errors %}
+                                        <ul class="error-list">
+                                            {% for error in form.notes.errors %}
+                                            <li>{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Empty form template -->
+                    <div id="empty-form-template" class="empty-form">
+                        <div class="formset-item" data-form-index="__prefix__">
+                            <div class="formset-delete">
+                                <button type="button" class="btn btn-sm btn-outline-danger delete-item">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <div class="formset-header">New Item</div>
+                            {{ items_formset.empty_form.as_p }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <i class="fas fa-sticky-note"></i>
+                    Additional Information
+                </div>
+                <div class="form-section-body">
+                    <div class="form-group">
+                        <label class="form-label">{{ form.notes.label }}</label>
+                        {{ form.notes|add_class:"form-control" }}
+                        {% if form.notes.errors %}
+                        <ul class="error-list">
+                            {% for error in form.notes.errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Invoice Totals -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <i class="fas fa-calculator"></i>
+                    Invoice Totals
+                </div>
+                <div class="form-section-body">
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">{{ form.subtotal.label }}</label>
+                            {{ form.subtotal|add_class:"form-control amount-field" }}
+                            {% if form.subtotal.errors %}
+                            <ul class="error-list">
+                                {% for error in form.subtotal.errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label">{{ form.shipping_cost.label }}</label>
+                            {{ form.shipping_cost|add_class:"form-control amount-field" }}
+                            {% if form.shipping_cost.errors %}
+                            <ul class="error-list">
+                                {% for error in form.shipping_cost.errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">{{ form.tax_amount.label }}</label>
+                            {{ form.tax_amount|add_class:"form-control amount-field" }}
+                            {% if form.tax_amount.errors %}
+                            <ul class="error-list">
+                                {% for error in form.tax_amount.errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">{{ form.discount_amount.label }}</label>
+                        {{ form.discount_amount|add_class:"form-control amount-field" }}
+                        {% if form.discount_amount.errors %}
+                        <ul class="error-list">
+                            {% for error in form.discount_amount.errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            {{ form.total_amount.label }}
+                            <span class="required">*</span>
+                        </label>
+                        {{ form.total_amount|add_class:"form-control" }}
+                        {% if form.total_amount.errors %}
+                        <ul class="error-list">
+                            {% for error in form.total_amount.errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="total-section">
+                        <div class="total-row">
+                            <span>Subtotal:</span>
+                            <span id="calculated-subtotal">KES 0.00</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Shipping:</span>
+                            <span id="shipping-total">KES 0.00</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Tax:</span>
+                            <span id="tax-total">KES 0.00</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Discount:</span>
+                            <span id="discount-total">KES 0.00</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Total Amount:</span>
+                            <span id="grand-total">KES 0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Form Actions -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <i class="fas fa-cog"></i>
+                    Actions
+                </div>
+                <div class="form-section-body">
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Invoice
+                        </button>
+                        <a href="{{ urls.invoice_list }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-2"></i>Cancel
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Help Text -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <i class="fas fa-question-circle"></i>
+                    Help
+                </div>
+                <div class="form-section-body">
+                    <ul class="list-unstyled small text-muted">
+                        <li class="mb-2">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Upload the original invoice file for record keeping
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Link to a purchase order to auto-populate items
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Enter supplier's invoice number for reference
+                        </li>
+                        <li>
+                            <i class="fas fa-info-circle me-2"></i>
+                            Invoice will need verification and approval before payment
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let formIndex = {{ items_formset.forms|length }};
+    
+    // Calculate totals
+    function calculateTotals() {
+        let subtotal = 0;
+        
+        // Calculate subtotal from all items
+        $('.formset-item:visible').each(function() {
+            const quantity = parseFloat($(this).find('.quantity-field').val()) || 0;
+            const unitPrice = parseFloat($(this).find('.unit-price-field').val()) || 0;
+            const itemTotal = quantity * unitPrice;
+            
+            $(this).find('.item-total').text('KES ' + itemTotal.toFixed(2));
+            subtotal += itemTotal;
+        });
+        
+        // Update subtotal field
+        $('#id_subtotal').val(subtotal.toFixed(2));
+        
+        // Get additional amounts
+        const shipping = parseFloat($('#id_shipping_cost').val()) || 0;
+        const tax = parseFloat($('#id_tax_amount').val()) || 0;
+        const discount = parseFloat($('#id_discount_amount').val()) || 0;
+        
+        // Calculate grand total
+        const grandTotal = subtotal + shipping + tax - discount;
+        
+        // Update total amount field
+        $('#id_total_amount').val(grandTotal.toFixed(2));
+        
+        // Update display
+        $('#calculated-subtotal').text('KES ' + subtotal.toFixed(2));
+        $('#shipping-total').text('KES ' + shipping.toFixed(2));
+        $('#tax-total').text('KES ' + tax.toFixed(2));
+        $('#discount-total').text('KES ' + discount.toFixed(2));
+        $('#grand-total').text('KES ' + grandTotal.toFixed(2));
+    }
+    
+    // Add new item
+    $('#add-item').click(function() {
+        const emptyForm = $('#empty-form-template .formset-item').clone();
+        const formHtml = emptyForm.html().replace(/__prefix__/g, formIndex);
+        
+        const newForm = $('<div class="formset-item" data-form-index="' + formIndex + '"></div>');
+        newForm.html(formHtml);
+        
+        // Add delete button
+        newForm.prepend(`
+            <div class="formset-delete">
+                <button type="button" class="btn btn-sm btn-outline-danger delete-item">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `);
+        
+        // Update form header
+        newForm.find('.formset-header').text('Item #' + (formIndex + 1));
+        
+        // Add classes to form fields
+        newForm.find('input[type="text"]').addClass('form-control');
+        newForm.find('input[type="number"]').addClass('form-control');
+        newForm.find('textarea').addClass('form-control');
+        
+        // Add specific classes for calculation
+        newForm.find('input[name$="-quantity"]').addClass('quantity-field');
+        newForm.find('input[name$="-unit_price"]').addClass('unit-price-field');
+        
+        // Add item total display
+        newForm.find('.item-total').text('KES 0.00');
+        
+        $('#formset-container').append(newForm);
+        
+        // Update management form
+        const totalForms = $('#id_items-TOTAL_FORMS');
+        totalForms.val(parseInt(totalForms.val()) + 1);
+        
+        formIndex++;
+        updateFormNumbers();
+    });
+    
+    // Delete item
+    $(document).on('click', '.delete-item', function() {
+        const formItem = $(this).closest('.formset-item');
+        
+        // Mark for deletion if it's an existing form
+        const deleteField = formItem.find('input[name$="-DELETE"]');
+        if (deleteField.length) {
+            deleteField.prop('checked', true);
+            formItem.hide();
+        } else {
+            // Remove new form completely
+            formItem.remove();
+            
+            // Update management form
+            const totalForms = $('#id_items-TOTAL_FORMS');
+            totalForms.val(parseInt(totalForms.val()) - 1);
+        }
+        
+        updateFormNumbers();
+        calculateTotals();
+    });
+    
+    // Update form numbers
+    function updateFormNumbers() {
+        $('.formset-item:visible').each(function(index) {
+            $(this).find('.formset-header').text('Item #' + (index + 1));
+        });
+    }
+    
+    // PO Item selection
+    $('.po-item').click(function() {
+        $(this).toggleClass('selected');
+    });
+    
+    $('#select-all-po-items').click(function() {
+        $('.po-item').addClass('selected');
+    });
+    
+    // Import selected PO items
+    $('#import-selected').click(function() {
+        $('.po-item.selected').each(function() {
+            const itemName = $(this).data('item-name');
+            const quantity = $(this).data('quantity');
+            const unitPrice = $(this).data('unit-price');
+            const itemCode = $(this).data('item-code');
+            
+            // Add new item form
+            $('#add-item').click();
+            
+            // Fill in the data
+            const lastForm = $('.formset-item').last();
+            lastForm.find('input[name$="-description"]').val(itemName);
+            lastForm.find('input[name$="-quantity"]').val(quantity);
+            lastForm.find('input[name$="-unit_price"]').val(unitPrice);
+            lastForm.find('input[name$="-item_code"]').val(itemCode);
+        });
+        
+        // Clear selections
+        $('.po-item').removeClass('selected');
+        calculateTotals();
+    });
+    
+    // Event listeners
+    $(document).on('input', '.quantity-field, .unit-price-field, .amount-field', calculateTotals);
+    
+    // Form validation
+    $('#invoice-form').submit(function(e) {
+        let hasItems = false;
+        
+        $('.formset-item:visible').each(function() {
+            const description = $(this).find('input[name$="-description"]').val();
+            const quantity = $(this).find('input[name$="-quantity"]').val();
+            const unitPrice = $(this).find('input[name$="-unit_price"]').val();
+            
+            if (description && quantity && unitPrice) {
+                hasItems = true;
+                return false; // break the loop
+            }
+        });
+        
+        if (!hasItems) {
+            e.preventDefault();
+            alert('Please add at least one item to the invoice.');
+            return false;
+        }
+    });
+    
+    // Initialize
+    calculateTotals();
+});
+</script>
+{% endblock %}

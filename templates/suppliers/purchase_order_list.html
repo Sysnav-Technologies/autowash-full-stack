@@ -1,6 +1,6 @@
+<!-- templates/suppliers/purchase_order_list.html -->
 {% extends 'base/base.html' %}
 {% load static %}
-{% load math_filters %}
 
 {% block title %}Purchase Orders{% endblock %}
 
@@ -13,468 +13,532 @@
 {% block extra_css %}
 <style>
 .order-card {
-    border-left: 4px solid #3b82f6;
+    border-left: 4px solid var(--bs-primary);
     transition: all 0.3s ease;
-    border-radius: 8px;
 }
 
 .order-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    border-left-color: #1d4ed8;
-}
-
-.order-card.overdue {
-    border-left-color: #ef4444;
-}
-
-.order-card.completed {
-    border-left-color: #10b981;
 }
 
 .status-badge {
     font-size: 0.75rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
+    padding: 0.35rem 0.65rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
 }
 
 .priority-badge {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 12px;
-    font-weight: 500;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
 }
 
-.stats-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 12px;
-    padding: 1rem;
-    text-align: center;
+.progress-thin {
+    height: 4px;
+}
+
+.order-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
 }
 
 .filter-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 1rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+}
+
+.stats-row {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+}
+
+/* Status-specific styles */
+.status-draft { border-left-color: #6c757d; }
+.status-pending { border-left-color: #ffc107; }
+.status-approved { border-left-color: #17a2b8; }
+.status-sent { border-left-color: #007bff; }
+.status-acknowledged { border-left-color: #28a745; }
+.status-partially_received { border-left-color: #fd7e14; }
+.status-completed { border-left-color: #28a745; }
+.status-cancelled { border-left-color: #dc3545; }
+.status-on_hold { border-left-color: #6c757d; }
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #6c757d;
     margin-bottom: 1rem;
-}
-
-.progress-bar {
-    height: 6px;
-    border-radius: 3px;
-}
-
-.order-meta {
-    font-size: 0.875rem;
-    color: #64748b;
-}
-
-.order-amount {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.overdue-indicator {
-    color: #ef4444;
-    font-weight: 600;
-    font-size: 0.8rem;
-}
-
-.supplier-link {
-    color: #3b82f6;
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.supplier-link:hover {
-    color: #1d4ed8;
-    text-decoration: underline;
-}
-
-.action-buttons .btn {
-    margin-right: 0.25rem;
-    margin-bottom: 0.25rem;
-}
-
-.table-responsive {
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.table th {
-    background: #f8fafc;
-    border-top: none;
-    color: #374151;
-    font-weight: 600;
-    font-size: 0.875rem;
-}
-
-.order-number {
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.completion-ring {
-    width: 40px;
-    height: 40px;
-}
-
-@media (max-width: 768px) {
-    .action-buttons {
-        text-align: center;
-    }
-    
-    .order-card .card-body {
-        padding: 1rem;
-    }
-    
-    .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-    }
-    
-    .filter-card .row {
-        --bs-gutter-x: 0.5rem;
-    }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Page Header -->
-<div class="page-header mb-4">
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-        <div class="mb-3 mb-md-0">
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
             <h1 class="h3 mb-2">Purchase Orders</h1>
             <p class="text-muted mb-0">Manage purchase orders and track deliveries</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{{ urls.goods_receipt_create }}" class="btn btn-outline-success">
-                <i class="fas fa-truck-loading me-2"></i>Receive Goods
-            </a>
-            <a href="{{ urls.purchase_order_create }}" class="btn btn-primary">
-                <i class="fas fa-plus me-2"></i>Create Order
-            </a>
+        <div>
+            {% if user_role in 'owner,manager' %}
+            <div class="btn-group">
+                <a href="/business/{{ request.tenant.slug }}/suppliers/orders/create/" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Create Order
+                </a>
+                <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ urls.goods_receipt_create }}">
+                        <i class="fas fa-truck-loading me-2"></i>Record Receipt
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ urls.invoice_create }}">
+                        <i class="fas fa-file-invoice me-2"></i>Add Invoice
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ urls.performance_report }}">
+                        <i class="fas fa-chart-line me-2"></i>Performance Report
+                    </a></li>
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
-<!-- Statistics Cards -->
-<div class="row mb-4">
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stats-card">
-            <div class="h4 mb-1">{{ total_orders }}</div>
-            <div class="small opacity-90">Total Orders</div>
+<!-- Statistics -->
+<div class="stats-row">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stat-item">
+                <div class="stat-value">{{ total_orders }}</div>
+                <div class="stat-label">Total Orders</div>
+            </div>
         </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stats-card">
-            <div class="h4 mb-1">{{ pending_orders }}</div>
-            <div class="small opacity-90">Pending Orders</div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <div class="stat-value">{{ pending_orders }}</div>
+                <div class="stat-label">Pending Orders</div>
+            </div>
         </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stats-card">
-            <div class="h4 mb-1 {% if overdue_orders > 0 %}text-warning{% endif %}">{{ overdue_orders }}</div>
-            <div class="small opacity-90">Overdue Orders</div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <div class="stat-value">{{ overdue_orders }}</div>
+                <div class="stat-label">Overdue Orders</div>
+            </div>
         </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stats-card">
-            <div class="h4 mb-1">{{ orders.paginator.count }}</div>
-            <div class="small opacity-90">Search Results</div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <div class="stat-value" id="totalValue">KES 0</div>
+                <div class="stat-label">Total Value</div>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Filters -->
-<div class="filter-card">
-    <form method="get" class="row g-3">
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold">Search</label>
-            <input type="text" name="search" class="form-control" 
-                   placeholder="PO number, supplier..." 
-                   value="{{ request.GET.search }}">
+<div class="card filter-card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-filter me-2"></i>Filter Orders
+        </h5>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+            <i class="fas fa-chevron-down"></i>
+        </button>
+    </div>
+    <div class="collapse show" id="filterCollapse">
+        <div class="card-body">
+            <form method="GET" class="filter-form" id="filterForm">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="supplier" class="form-label">Supplier</label>
+                        <select name="supplier" id="supplier" class="form-select">
+                            <option value="">All Suppliers</option>
+                            {% for supplier in suppliers %}
+                            <option value="{{ supplier.id }}" {% if request.GET.supplier == supplier.id|stringformat:"s" %}selected{% endif %}>
+                                {{ supplier.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="">All Status</option>
+                            {% for status_value, status_label in status_choices %}
+                            <option value="{{ status_value }}" {% if request.GET.status == status_value %}selected{% endif %}>
+                                {{ status_label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="priority" class="form-label">Priority</label>
+                        <select name="priority" id="priority" class="form-select">
+                            <option value="">All Priorities</option>
+                            {% for priority_value, priority_label in priority_choices %}
+                            <option value="{{ priority_value }}" {% if request.GET.priority == priority_value %}selected{% endif %}>
+                                {{ priority_label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" name="search" id="search" class="form-control" 
+                               placeholder="PO number, supplier..." value="{{ request.GET.search }}">
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="date_from" class="form-label">From Date</label>
+                        <input type="date" name="date_from" id="date_from" class="form-control" value="{{ request.GET.date_from }}">
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="date_to" class="form-label">To Date</label>
+                        <input type="date" name="date_to" id="date_to" class="form-control" value="{{ request.GET.date_to }}">
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-2"></i>Apply Filters
+                            </button>
+                            <a href="/business/{{ request.tenant.slug }}/suppliers/orders/" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-2"></i>Clear
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold">Supplier</label>
-            <select name="supplier" class="form-select">
-                <option value="">All Suppliers</option>
-                {% for supplier in suppliers %}
-                <option value="{{ supplier.id }}" 
-                        {% if request.GET.supplier == supplier.id|stringformat:"s" %}selected{% endif %}>
-                    {{ supplier.name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold">Status</label>
-            <select name="status" class="form-select">
-                <option value="">All Status</option>
-                {% for status_key, status_label in status_choices %}
-                <option value="{{ status_key }}" 
-                        {% if request.GET.status == status_key %}selected{% endif %}>
-                    {{ status_label }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold">Priority</label>
-            <select name="priority" class="form-select">
-                <option value="">All Priorities</option>
-                {% for priority_key, priority_label in priority_choices %}
-                <option value="{{ priority_key }}" 
-                        {% if request.GET.priority == priority_key %}selected{% endif %}>
-                    {{ priority_label }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold">Date From</label>
-            <input type="date" name="date_from" class="form-control" value="{{ request.GET.date_from }}">
-        </div>
-        <div class="col-md-1">
-            <label class="form-label small fw-semibold">&nbsp;</label>
-            <div class="d-grid">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-search"></i>
-                </button>
-            </div>
-        </div>
-    </form>
+    </div>
 </div>
 
 <!-- Orders List -->
-<div class="row">
-    {% for order in orders %}
-    <div class="col-xl-6 col-lg-6 mb-4">
-        <div class="order-card card h-100 
-                    {% if order.is_overdue %}overdue{% elif order.status == 'completed' %}completed{% endif %}">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start mb-3">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title mb-1">
-                            <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/" 
-                               class="text-decoration-none order-number">
-                                PO-{{ order.po_number }}
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            Purchase Orders
+            <span class="badge bg-secondary">{{ orders.paginator.count }}</span>
+        </h5>
+    </div>
+    
+    <div class="card-body">
+        {% if orders %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>PO Number</th>
+                        <th>Supplier</th>
+                        <th>Order Date</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Progress</th>
+                        <th>Expected Delivery</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr class="{% if order.is_overdue %}table-warning{% endif %}">
+                        <td>
+                            <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/" class="text-decoration-none fw-bold">
+                                {{ order.po_number }}
                             </a>
-                        </h5>
-                        <p class="order-meta mb-1">
-                            <a href="/business/{{ request.tenant.slug }}/suppliers/{{ order.supplier.pk }}/" 
-                               class="supplier-link">{{ order.supplier.name }}</a>
-                        </p>
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <span class="status-badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% elif order.status == 'draft' %}secondary{% else %}primary{% endif %}">
+                            {% if order.supplier_reference %}
+                            <br><small class="text-muted">Ref: {{ order.supplier_reference }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div>
+                                    <div class="fw-semibold">{{ order.supplier.name }}</div>
+                                    {% if order.supplier.supplier_code %}
+                                    <small class="text-muted">{{ order.supplier.supplier_code }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div>{{ order.order_date|date:"M d, Y" }}</div>
+                            <small class="text-muted">{{ order.created_at|timesince }} ago</small>
+                        </td>
+                        <td>
+                            <div class="fw-bold">KES {{ order.total_amount|floatformat:0 }}</div>
+                            <small class="text-muted">{{ order.items.count }} item{{ order.items.count|pluralize }}</small>
+                        </td>
+                        <td>
+                            <span class="status-badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% elif order.status == 'sent' %}primary{% elif order.status == 'approved' %}info{% else %}secondary{% endif %}">
                                 {{ order.get_status_display }}
                             </span>
-                            <span class="priority-badge bg-{% if order.priority == 'urgent' %}danger{% elif order.priority == 'high' %}warning{% elif order.priority == 'low' %}secondary{% else %}info{% endif %}">
-                                {{ order.get_priority_display }}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="text-end">
-                        <div class="order-amount">KES {{ order.total_amount|floatformat:2 }}</div>
-                        <div class="order-meta">{{ order.order_date }}</div>
-                        {% if order.is_overdue %}
-                        <div class="overdue-indicator mt-1">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            {{ order.days_overdue }} days overdue
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- Order Progress -->
-                {% if order.status != 'draft' and order.status != 'cancelled' %}
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="small text-muted">Progress</span>
-                        <span class="small fw-semibold">{{ order.completion_percentage|floatformat:0 }}%</span>
-                    </div>
-                    <div class="progress">
-                        <div class="progress-bar bg-{% if order.completion_percentage == 100 %}success{% elif order.completion_percentage > 0 %}warning{% else %}secondary{% endif %}"
-                             style="width: {{ order.completion_percentage }}%"></div>
-                    </div>
-                </div>
+                        </td>
+                        <td>
+                            {% if order.priority == 'urgent' %}
+                            <span class="priority-badge bg-danger text-white">URGENT</span>
+                            {% elif order.priority == 'high' %}
+                            <span class="priority-badge bg-warning text-dark">HIGH</span>
+                            {% elif order.priority == 'normal' %}
+                            <span class="priority-badge bg-secondary text-white">NORMAL</span>
+                            {% else %}
+                            <span class="priority-badge bg-light text-dark">LOW</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="progress me-2" style="width: 60px; height: 8px;">
+                                    <div class="progress-bar {% if order.completion_percentage >= 100 %}bg-success{% elif order.completion_percentage >= 50 %}bg-info{% else %}bg-warning{% endif %}" 
+                                         style="width: {{ order.completion_percentage }}%"></div>
+                                </div>
+                                <small class="text-muted">{{ order.completion_percentage|floatformat:0 }}%</small>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="{% if order.is_overdue %}text-danger fw-bold{% endif %}">
+                                {{ order.expected_delivery_date|date:"M d, Y" }}
+                            </div>
+                            {% if order.is_overdue %}
+                            <small class="text-danger">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                {{ order.days_overdue }} day{{ order.days_overdue|pluralize }} overdue
+                            </small>
+                            {% elif order.expected_delivery_date %}
+                            <small class="text-muted">
+                                {{ order.expected_delivery_date|timeuntil }} remaining
+                            </small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/" 
+                                   class="btn btn-sm btn-outline-primary" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                
+                                {% if user_role in 'owner,manager' and order.status in 'draft,pending' %}
+                                <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/edit/" 
+                                   class="btn btn-sm btn-outline-secondary" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% endif %}
+                                
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" 
+                                            type="button" data-bs-toggle="dropdown" title="More Actions">
+                                        <span class="visually-hidden">Toggle Dropdown</span>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/print/">
+                                            <i class="fas fa-print me-2"></i>Print
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/pdf/">
+                                            <i class="fas fa-file-pdf me-2"></i>Download PDF
+                                        </a></li>
+                                        
+                                        {% if order.status == 'draft' %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/submit/" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item text-warning">
+                                                    <i class="fas fa-paper-plane me-2"></i>Submit for Approval
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if order.status == 'pending' and user_role in 'owner,manager' %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/approve/" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item text-success">
+                                                    <i class="fas fa-check me-2"></i>Approve Order
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if order.status == 'approved' %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/send/" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item text-primary">
+                                                    <i class="fas fa-share me-2"></i>Send to Supplier
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if order.status == 'sent' %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/acknowledge/" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item text-info">
+                                                    <i class="fas fa-handshake me-2"></i>Mark Acknowledged
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if order.status in 'sent,acknowledged,partially_received' %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/suppliers/receipts/create/?po={{ order.pk }}">
+                                            <i class="fas fa-truck-loading me-2"></i>Record Receipt
+                                        </a></li>
+                                        {% endif %}
+                                        
+                                        {% if order.status == 'completed' %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/create-invoice/">
+                                            <i class="fas fa-file-invoice me-2"></i>Create Invoice
+                                        </a></li>
+                                        {% endif %}
+                                        
+                                        {% if order.status in 'draft,pending,approved' and user_role in 'owner,manager' %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/cancel/" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to cancel this order?')">
+                                                    <i class="fas fa-times me-2"></i>Cancel Order
+                                                </button>
+                                            </form>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if orders.has_other_pages %}
+        <div class="d-flex justify-content-center">
+            <nav aria-label="Orders pagination">
+                <ul class="pagination">
+                    {% if orders.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ orders.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in orders.paginator.page_range %}
+                    {% if orders.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% elif num > orders.number|add:'-3' and num < orders.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    
+                    {% if orders.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ orders.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-shopping-cart"></i>
+            <h5>No Purchase Orders Found</h5>
+            <p class="text-muted">
+                {% if request.GET.search or request.GET.supplier or request.GET.status %}
+                No orders match your current filters.
+                {% else %}
+                You haven't created any purchase orders yet.
                 {% endif %}
-
-                <!-- Order Details -->
-                <div class="row order-meta mb-3">
-                    <div class="col-6">
-                        <div class="small text-muted">Expected Delivery:</div>
-                        <div class="fw-semibold">{{ order.expected_delivery_date }}</div>
-                    </div>
-                    <div class="col-6">
-                        <div class="small text-muted">Items:</div>
-                        <div class="fw-semibold">{{ order.items.count }} item{{ order.items.count|pluralize }}</div>
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="action-buttons d-flex justify-content-between align-items-center">
-                    <div>
-                        <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/" 
-                           class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-eye me-1"></i>View
-                        </a>
-                        {% if order.status == 'pending' %}
-                        <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/approve/" style="display: inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-success">
-                                <i class="fas fa-check me-1"></i>Approve
-                            </button>
-                        </form>
-                        {% elif order.status == 'approved' %}
-                        <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/send/" style="display: inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-info">
-                                <i class="fas fa-paper-plane me-1"></i>Send
-                            </button>
-                        </form>
-                        {% elif order.status == 'sent' or order.status == 'acknowledged' or order.status == 'partially_received' %}
-                        <a href="{{ urls.goods_receipt_create }}?po={{ order.pk }}" class="btn btn-sm btn-success">
-                            <i class="fas fa-truck-loading me-1"></i>Receive
-                        </a>
-                        {% endif %}
-                    </div>
-                    <div class="text-end">
-                        {% if order.created_at %}
-                        <small class="text-muted">
-                            Created {{ order.created_at|timesince }} ago
-                        </small>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+            </p>
+            {% if user_role in 'owner,manager' %}
+            <a href="/business/{{ request.tenant.slug }}/suppliers/orders/create/" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Create Your First Order
+            </a>
+            {% endif %}
         </div>
+        {% endif %}
     </div>
-    {% empty %}
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body text-center py-5">
-                <i class="fas fa-shopping-cart fa-4x text-muted mb-4"></i>
-                <h4 class="text-muted">No Purchase Orders Found</h4>
-                <p class="text-muted mb-4">
-                    {% if request.GET.search or request.GET.supplier or request.GET.status or request.GET.priority %}
-                    No orders match your current filters. Try adjusting your search criteria.
-                    {% else %}
-                    You haven't created any purchase orders yet. Start by creating your first order.
-                    {% endif %}
-                </p>
-                <div>
-                    {% if request.GET.search or request.GET.supplier or request.GET.status or request.GET.priority %}
-                    <a href="{{ urls.purchase_order_list }}" class="btn btn-outline-primary me-3">
-                        <i class="fas fa-times me-2"></i>Clear Filters
-                    </a>
-                    {% endif %}
-                    <a href="{{ urls.purchase_order_create }}" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>Create Your First Order
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
 </div>
-
-<!-- Pagination -->
-{% if orders.has_other_pages %}
-<nav aria-label="Orders pagination" class="mt-4">
-    <ul class="pagination justify-content-center">
-        {% if orders.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?{{ request.GET.urlencode }}&page=1">
-                <i class="fas fa-angle-double-left"></i>
-            </a>
-        </li>
-        <li class="page-item">
-            <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ orders.previous_page_number }}">
-                <i class="fas fa-angle-left"></i>
-            </a>
-        </li>
-        {% endif %}
-
-        {% for num in orders.paginator.page_range %}
-        {% if num == orders.number %}
-        <li class="page-item active">
-            <span class="page-link">{{ num }}</span>
-        </li>
-        {% elif num > orders.number|add:-3 and num < orders.number|add:3 %}
-        <li class="page-item">
-            <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ num }}">{{ num }}</a>
-        </li>
-        {% endif %}
-        {% endfor %}
-
-        {% if orders.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ orders.next_page_number }}">
-                <i class="fas fa-angle-right"></i>
-            </a>
-        </li>
-        <li class="page-item">
-            <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ orders.paginator.num_pages }}">
-                <i class="fas fa-angle-double-right"></i>
-            </a>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-
-<div class="text-center text-muted mt-3">
-    Showing {{ orders.start_index }}-{{ orders.end_index }} of {{ orders.paginator.count }} orders
-</div>
-{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
 $(document).ready(function() {
-    // Auto-submit form on filter change
-    $('select[name="supplier"], select[name="status"], select[name="priority"]').change(function() {
-        $(this).closest('form').submit();
+    // Calculate total value
+    let totalValue = 0;
+    {% for order in orders %}
+    totalValue += {{ order.total_amount|default:0 }};
+    {% endfor %}
+    
+    // Display total value
+    document.getElementById('totalValue').textContent = 'KES ' + totalValue.toLocaleString();
+    
+    // Auto-submit filters
+    $('#supplier, #status, #priority').change(function() {
+        this.form.submit();
     });
-
+    
     // Search with debounce
     let searchTimeout;
-    $('input[name="search"]').on('input', function() {
+    $('#search').on('input', function() {
         clearTimeout(searchTimeout);
-        const form = $(this).closest('form');
-        searchTimeout = setTimeout(function() {
-            form.submit();
+        searchTimeout = setTimeout(() => {
+            // Don't auto-submit search
         }, 500);
     });
-
-    // Confirmation for order actions
-    $('form[action*="/approve/"], form[action*="/send/"]').on('submit', function(e) {
-        const action = $(this).find('button').text().trim();
-        if (!confirm(`Are you sure you want to ${action.toLowerCase()} this order?`)) {
-            e.preventDefault();
-        }
+    
+    // Date filters auto-submit
+    $('#date_from, #date_to').change(function() {
+        this.form.submit();
     });
-
-    // Tooltip initialization
-    $('[data-bs-toggle="tooltip"]').tooltip();
-
-    // Add hover effects for order cards
-    $('.order-card').hover(
-        function() {
-            $(this).addClass('shadow-lg');
-        },
-        function() {
-            $(this).removeClass('shadow-lg');
-        }
-    );
 });
 </script>
 {% endblock %}

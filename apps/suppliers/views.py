@@ -17,12 +17,12 @@ import csv
 
 from apps.core.decorators import business_required, employee_required, manager_required
 from .models import (
-    Supplier, SupplierCategory, PurchaseOrder, PurchaseOrderItem,
+    Invoice, Supplier, SupplierCategory, PurchaseOrder, PurchaseOrderItem,
     GoodsReceipt, GoodsReceiptItem, SupplierEvaluation, SupplierPayment,
     SupplierDocument, SupplierContact
 )
 from .forms import (
-    SupplierForm, SupplierCategoryForm, PurchaseOrderForm, PurchaseOrderItemFormSet,
+    InvoiceForm, InvoiceItemFormSet, SupplierForm, SupplierCategoryForm, PurchaseOrderForm, PurchaseOrderItemFormSet,
     GoodsReceiptForm, GoodsReceiptItemFormSet, SupplierEvaluationForm,
     SupplierPaymentForm, SupplierDocumentForm, SupplierContactForm, 
     SupplierFilterForm, PurchaseOrderFilterForm
@@ -52,6 +52,10 @@ def get_supplier_urls(request):
         # Goods Receipts
         'goods_receipt_list': f"{base_url}/receipts/",
         'goods_receipt_create': f"{base_url}/receipts/create/",
+        
+        # Invoices
+        'invoice_list': f"{base_url}/invoices/",
+        'invoice_create': f"{base_url}/invoices/create/",
         
         # Evaluations
         'evaluation_list': f"{base_url}/evaluations/",
@@ -103,12 +107,21 @@ def get_business_url(request, url_name, **kwargs):
         'suppliers:purchase_order_edit': f"{base_url}/orders/{{pk}}/edit/",
         'suppliers:purchase_order_approve': f"{base_url}/orders/{{pk}}/approve/",
         'suppliers:purchase_order_send': f"{base_url}/orders/{{pk}}/send/",
+        'suppliers:purchase_order_print': f"{base_url}/orders/{{pk}}/print/",
+        'suppliers:purchase_order_pdf': f"{base_url}/orders/{{pk}}/pdf/",
         
         # Goods Receipts
         'suppliers:goods_receipt_list': f"{base_url}/receipts/",
         'suppliers:goods_receipt_create': f"{base_url}/receipts/create/",
         'suppliers:goods_receipt_detail': f"{base_url}/receipts/{{pk}}/",
         'suppliers:goods_receipt_complete': f"{base_url}/receipts/{{pk}}/complete/",
+        
+        # Invoices
+        'suppliers:invoice_list': f"{base_url}/invoices/",
+        'suppliers:invoice_create': f"{base_url}/invoices/create/",
+        'suppliers:invoice_detail': f"{base_url}/invoices/{{pk}}/",
+        'suppliers:invoice_print': f"{base_url}/invoices/{{pk}}/print/",
+        'suppliers:invoice_pdf': f"{base_url}/invoices/{{pk}}/pdf/",
         
         # Evaluations
         'suppliers:evaluation_list': f"{base_url}/evaluations/",
@@ -130,6 +143,7 @@ def get_business_url(request, url_name, **kwargs):
         
         # AJAX
         'suppliers:ajax_purchase_order_items': f"{base_url}/ajax/purchase-order-items/",
+        'suppliers:create_invoice_from_po': f"{base_url}/orders/{{po_pk}}/create-invoice/",
     }
     
     url = url_mapping.get(url_name, f"{base_url}/")
@@ -452,7 +466,7 @@ class PurchaseOrderListView(ListView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class PurchaseOrderDetailView(DetailView):
-    """Purchase order detail view"""
+    """Purchase order detail view with status-based actions"""
     model = PurchaseOrder
     template_name = 'suppliers/purchase_order_detail.html'
     context_object_name = 'order'
@@ -460,6 +474,11 @@ class PurchaseOrderDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         order = self.object
+        
+        # Get user role
+        user_role = None
+        if hasattr(self.request.user, 'employee_profile') and self.request.user.employee_profile:
+            user_role = self.request.user.employee_profile.role
         
         # Order items
         context['items'] = order.items.select_related('item').all()
@@ -474,11 +493,29 @@ class PurchaseOrderDetailView(DetailView):
             'days_overdue': order.days_overdue if order.is_overdue else 0,
         }
         
+        # User role for template conditions
+        context['user_role'] = user_role
+        
+        # Status-based actions
+        context['can_edit'] = order.status in ['draft', 'pending']
+        context['can_approve'] = (
+            order.status in ['draft', 'pending'] and 
+            user_role in ['owner', 'manager']
+        )
+        context['can_send'] = order.status == 'approved'
+        context['can_acknowledge'] = order.status == 'sent'
+        context['can_receive'] = order.status in ['sent', 'acknowledged', 'partially_received']
+        context['can_cancel'] = order.status in ['draft', 'pending', 'approved']
+        context['can_create_invoice'] = order.status == 'completed'
+        
+        # Print URLs
+        context['print_url'] = f"/business/{self.request.tenant.slug}/suppliers/orders/{order.pk}/print/"
+        context['pdf_url'] = f"/business/{self.request.tenant.slug}/suppliers/orders/{order.pk}/pdf/"
+        
         # URLs
         context['urls'] = get_supplier_urls(self.request)
         
         return context
-
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class PurchaseOrderCreateView(CreateView):
     """Create purchase order"""
@@ -541,10 +578,14 @@ class PurchaseOrderCreateView(CreateView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class PurchaseOrderUpdateView(UpdateView):
-    """Update purchase order"""
+    """Update purchase order - only allowed for draft and pending orders"""
     model = PurchaseOrder
     form_class = PurchaseOrderForm
     template_name = 'suppliers/purchase_order_form.html'
+    
+    def get_queryset(self):
+        # Only allow editing of draft and pending orders
+        return PurchaseOrder.objects.filter(status__in=['draft', 'pending'])
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -555,6 +596,12 @@ class PurchaseOrderUpdateView(UpdateView):
             )
         else:
             context['items_formset'] = PurchaseOrderItemFormSet(instance=self.object)
+        
+        # Get user role for template conditions
+        user_role = None
+        if hasattr(self.request.user, 'employee_profile') and self.request.user.employee_profile:
+            user_role = self.request.user.employee_profile.role
+        context['user_role'] = user_role
         
         # URLs
         context['urls'] = get_supplier_urls(self.request)
@@ -575,21 +622,92 @@ class PurchaseOrderUpdateView(UpdateView):
             return redirect(get_business_url(self.request, 'suppliers:purchase_order_detail', pk=self.object.pk))
         else:
             return self.form_invalid(form)
+    
+    def get_success_url(self):
+        return get_business_url(self.request, 'suppliers:purchase_order_detail', pk=self.object.pk)
+        
 
 @login_required
 @business_required
-@employee_required(['owner', 'manager'])
-@require_http_methods(["POST"])
-def approve_purchase_order(request, pk):
-    """Approve purchase order"""
+@employee_required(['owner', 'manager', 'supervisor'])
+def purchase_order_print(request, pk):
+    """Print purchase order"""
     order = get_object_or_404(PurchaseOrder, pk=pk)
     
-    if order.status != 'pending':
-        messages.error(request, 'Only pending orders can be approved.')
+    context = {
+        'order': order,
+        'items': order.items.select_related('item').all(),
+    }
+    
+    return render(request, 'suppliers/purchase_order_print.html', context)
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def purchase_order_pdf(request, pk):
+    """Generate PDF for purchase order"""
+    try:
+        from weasyprint import HTML, CSS
+        from django.template.loader import render_to_string
+        
+        order = get_object_or_404(PurchaseOrder, pk=pk)
+        
+        # Render HTML template
+        html_string = render_to_string('suppliers/purchase_order_print.html', {
+            'order': order,
+            'items': order.items.select_related('item').all(),
+            'request': request,
+        })
+        
+        # Create PDF
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
+        pdf = html.write_pdf()
+        
+        # Return PDF response
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="PO-{order.po_number}.pdf"'
+        return response
+        
+    except ImportError:
+        # Fallback if weasyprint is not installed
+        messages.error(request, 'PDF generation is not available. Please install weasyprint.')
+        return redirect('suppliers:purchase_order_detail', pk=pk)
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+@require_http_methods(["POST"])
+def approve_purchase_order(request, pk):
+    """Approve purchase order - managers can approve directly from draft"""
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    
+    # # Check if user has approval permissions
+    # user_role = getattr(request.user.e, 'role', None) if hasattr(request.user, 'employee_profile') else None
+    # can_approve = user_role in ['owner', 'manager']
+    
+    # if not can_approve:
+    #     messages.error(request, 'You do not have permission to approve purchase orders.')
+    #     return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    if order.status not in ['draft', 'pending']:
+        messages.error(request, 'Only draft or pending orders can be approved.')
         return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
     
+    # Validate that order has items
+    if not order.items.exists():
+        messages.error(request, 'Cannot approve an order without items.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    # Approve the order
     order.approve(request.user)
-    messages.success(request, f'Purchase Order {order.po_number} approved successfully!')
+    
+    # Check if should automatically send to supplier
+    auto_send = request.POST.get('auto_send', 'false').lower() == 'true'
+    if auto_send:
+        order.send_to_supplier()
+        messages.success(request, f'Purchase Order {order.po_number} approved and sent to supplier!')
+    else:
+        messages.success(request, f'Purchase Order {order.po_number} approved successfully!')
     
     return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
 
@@ -1144,3 +1262,517 @@ class SupplierContactCreateView(CreateView):
     
     def get_success_url(self):
         return get_business_url(self.request, 'suppliers:detail', pk=self.object.supplier.pk)
+    
+
+@method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
+class InvoiceListView(ListView):
+    """List invoices"""
+    model = Invoice
+    template_name = 'suppliers/invoice_list.html'
+    context_object_name = 'invoices'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        queryset = Invoice.objects.select_related('supplier', 'purchase_order')
+        
+        # Apply filters
+        status = self.request.GET.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
+        
+        payment_status = self.request.GET.get('payment_status')
+        if payment_status:
+            queryset = queryset.filter(payment_status=payment_status)
+        
+        supplier = self.request.GET.get('supplier')
+        if supplier:
+            queryset = queryset.filter(supplier_id=supplier)
+        
+        # Date range filter
+        date_from = self.request.GET.get('date_from')
+        date_to = self.request.GET.get('date_to')
+        if date_from:
+            queryset = queryset.filter(invoice_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(invoice_date__lte=date_to)
+        
+        search = self.request.GET.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(invoice_number__icontains=search) |
+                Q(supplier_invoice_number__icontains=search) |
+                Q(supplier__name__icontains=search)
+            )
+        
+        return queryset.order_by('-invoice_date')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['suppliers'] = Supplier.objects.filter(is_deleted=False, status='active')
+        context['status_choices'] = Invoice.STATUS_CHOICES
+        context['payment_status_choices'] = Invoice.PAYMENT_STATUS_CHOICES
+        
+        # Statistics
+        invoices = Invoice.objects.all()
+        context['total_invoices'] = invoices.count()
+        context['pending_approval'] = invoices.filter(status='received').count()
+        context['overdue_invoices'] = invoices.filter(
+            due_date__lt=timezone.now().date(),
+            payment_status__in=['pending', 'partial']
+        ).count()
+        context['total_outstanding'] = invoices.filter(
+            payment_status__in=['pending', 'partial']
+        ).aggregate(Sum('outstanding_amount'))['outstanding_amount'] or 0
+        
+        context['urls'] = get_supplier_urls(self.request)
+        return context
+
+@method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
+class InvoiceDetailView(DetailView):
+    """Invoice detail view"""
+    model = Invoice
+    template_name = 'suppliers/invoice_detail.html'
+    context_object_name = 'invoice'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        invoice = self.object
+        
+        # Invoice items
+        context['items'] = invoice.items.all()
+        
+        # Related payments
+        context['payments'] = invoice.supplier.payments.filter(
+            purchase_orders__in=[invoice.purchase_order] if invoice.purchase_order else []
+        ).order_by('-payment_date')[:5]
+        
+        # Print URLs
+        context['print_url'] = get_business_url(self.request, 'suppliers:invoice_print', pk=invoice.pk)
+        context['pdf_url'] = get_business_url(self.request, 'suppliers:invoice_pdf', pk=invoice.pk)
+        
+        context['urls'] = get_supplier_urls(self.request)
+        return context
+
+@method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
+class InvoiceCreateView(CreateView):
+    """Create invoice"""
+    model = Invoice
+    form_class = InvoiceForm
+    template_name = 'suppliers/invoice_form.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        if self.request.POST:
+            context['items_formset'] = InvoiceItemFormSet(self.request.POST)
+        else:
+            context['items_formset'] = InvoiceItemFormSet()
+            
+        # Pre-populate from PO if specified
+        po_id = self.request.GET.get('po')
+        if po_id and not self.request.POST:
+            try:
+                po = PurchaseOrder.objects.get(pk=po_id)
+                context['purchase_order'] = po
+                context['po_items'] = po.items.all()
+            except PurchaseOrder.DoesNotExist:
+                pass
+        
+        context['urls'] = get_supplier_urls(self.request)
+        return context
+    
+    def form_valid(self, form):
+        context = self.get_context_data()
+        items_formset = context['items_formset']
+        
+        if items_formset.is_valid():
+            # Generate invoice number
+            form.instance.invoice_number = self.generate_invoice_number()
+            form.instance.received_date = timezone.now().date()
+            
+            self.object = form.save()
+            items_formset.instance = self.object
+            items_formset.save()
+            
+            # Calculate totals
+            self.calculate_invoice_totals()
+            
+            messages.success(self.request, f'Invoice {self.object.invoice_number} created successfully!')
+            return redirect(get_business_url(self.request, 'suppliers:invoice_detail', pk=self.object.pk))
+        else:
+            return self.form_invalid(form)
+    
+    def generate_invoice_number(self):
+        """Generate unique invoice number"""
+        today = timezone.now()
+        prefix = f"INV{today.strftime('%Y%m')}"
+        
+        last_invoice = Invoice.objects.filter(
+            invoice_number__startswith=prefix
+        ).order_by('-invoice_number').first()
+        
+        if last_invoice:
+            try:
+                last_num = int(last_invoice.invoice_number[-4:])
+                new_num = last_num + 1
+            except (ValueError, IndexError):
+                new_num = 1
+        else:
+            new_num = 1
+        
+        return f"{prefix}{new_num:04d}"
+    
+    def calculate_invoice_totals(self):
+        """Calculate and update invoice totals"""
+        items = self.object.items.all()
+        self.object.subtotal = sum(item.total_amount for item in items)
+        self.object.save()
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager'])
+@require_http_methods(["POST"])
+def verify_invoice(request, pk):
+    """Verify invoice"""
+    invoice = get_object_or_404(Invoice, pk=pk)
+    
+    if invoice.status != 'received':
+        messages.error(request, 'Only received invoices can be verified.')
+        return redirect(get_business_url(request, 'suppliers:invoice_detail', pk=pk))
+    
+    invoice.verify_invoice(request.user)
+    messages.success(request, f'Invoice {invoice.invoice_number} verified successfully!')
+    
+    return redirect(get_business_url(request, 'suppliers:invoice_detail', pk=pk))
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager'])
+@require_http_methods(["POST"])
+def approve_invoice(request, pk):
+    """Approve invoice for payment"""
+    invoice = get_object_or_404(Invoice, pk=pk)
+    
+    if invoice.status != 'verified':
+        messages.error(request, 'Only verified invoices can be approved.')
+        return redirect(get_business_url(request, 'suppliers:invoice_detail', pk=pk))
+    
+    invoice.approve_invoice(request.user)
+    messages.success(request, f'Invoice {invoice.invoice_number} approved for payment!')
+    
+    return redirect(get_business_url(request, 'suppliers:invoice_detail', pk=pk))
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def invoice_print(request, pk):
+    """Print invoice"""
+    invoice = get_object_or_404(Invoice, pk=pk)
+    
+    context = {
+        'invoice': invoice,
+        'items': invoice.items.all(),
+    }
+    
+    return render(request, 'suppliers/invoice_print.html', context)
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def invoice_pdf(request, pk):
+    """Generate PDF for invoice"""
+    try:
+        from weasyprint import HTML, CSS
+        from django.template.loader import render_to_string
+        
+        invoice = get_object_or_404(Invoice, pk=pk)
+        
+        # Render HTML template
+        html_string = render_to_string('suppliers/invoice_print.html', {
+            'invoice': invoice,
+            'items': invoice.items.all(),
+            'request': request,
+        })
+        
+        # Create PDF
+        html = HTML(string=html_string, base_url=request.build_absolute_uri())
+        pdf = html.write_pdf()
+        
+        # Return PDF response
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Invoice-{invoice.invoice_number}.pdf"'
+        return response
+        
+    except ImportError:
+        # Fallback if weasyprint is not installed
+        messages.error(request, 'PDF generation is not available. Please install weasyprint.')
+        return redirect('suppliers:invoice_detail', pk=pk)
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager'])
+def create_invoice_from_po(request, po_pk):
+    """Create invoice from purchase order"""
+    po = get_object_or_404(PurchaseOrder, pk=po_pk)
+    
+    if po.status != 'completed':
+        messages.error(request, 'Can only create invoices from completed purchase orders.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=po_pk))
+    
+    # Check if invoice already exists for this PO
+    existing_invoice = Invoice.objects.filter(purchase_order=po).first()
+    if existing_invoice:
+        messages.info(request, f'Invoice already exists for this PO: {existing_invoice.invoice_number}')
+        return redirect(get_business_url(request, 'suppliers:invoice_detail', pk=existing_invoice.pk))
+    
+    # Redirect to invoice creation with PO pre-selected
+    return redirect(f"{get_business_url(request, 'suppliers:invoice_create')}?po={po.pk}")
+
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+@require_http_methods(["POST"])
+def submit_purchase_order(request, pk):
+    """Submit purchase order for approval"""
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    
+    if order.status != 'draft':
+        messages.error(request, 'Only draft orders can be submitted for approval.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    # Validate that order has items
+    if not order.items.exists():
+        messages.error(request, 'Cannot submit an order without items.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    # Update status to pending
+    order.status = 'pending'
+    order.save()
+    
+    messages.success(request, f'Purchase Order {order.po_number} submitted for approval!')
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager'])
+@require_http_methods(["POST"])
+def cancel_purchase_order(request, pk):
+    """Cancel purchase order"""
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    
+    if order.status not in ['draft', 'pending', 'approved']:
+        messages.error(request, 'Cannot cancel an order that has been sent to supplier.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    order.status = 'cancelled'
+    order.save()
+    
+    messages.success(request, f'Purchase Order {order.po_number} has been cancelled.')
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+@require_http_methods(["POST"])
+def acknowledge_purchase_order(request, pk):
+    """Mark purchase order as acknowledged by supplier"""
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    
+    if order.status != 'sent':
+        messages.error(request, 'Only sent orders can be acknowledged.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    order.acknowledge_receipt()
+    messages.success(request, f'Purchase Order {order.po_number} marked as acknowledged by supplier!')
+    
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def purchase_order_status_update(request, pk):
+    """Generic status update view with validation"""
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    new_status = request.POST.get('status')
+    
+    if not new_status:
+        messages.error(request, 'No status provided.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    # Define valid status transitions
+    valid_transitions = {
+        'draft': ['pending', 'cancelled'],
+        'pending': ['approved', 'cancelled', 'draft'],
+        'approved': ['sent', 'cancelled'],
+        'sent': ['acknowledged', 'cancelled'],
+        'acknowledged': ['partially_received', 'completed', 'cancelled'],
+        'partially_received': ['completed', 'cancelled'],
+        'completed': [],
+        'cancelled': [],
+        'on_hold': ['pending', 'cancelled'],
+    }
+    
+    if new_status not in valid_transitions.get(order.status, []):
+        messages.error(request, f'Invalid status transition from {order.get_status_display()} to {new_status}.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    # Perform status-specific actions
+    old_status = order.status
+    order.status = new_status
+    
+    if new_status == 'approved' and hasattr(request.user, 'employee_profile'):
+        order.approved_by = request.user.employee_profile
+        order.approved_at = timezone.now()
+    
+    order.save()
+    
+    # Status change notifications
+    status_messages = {
+        'pending': f'Purchase Order {order.po_number} submitted for approval.',
+        'approved': f'Purchase Order {order.po_number} has been approved.',
+        'sent': f'Purchase Order {order.po_number} has been sent to supplier.',
+        'acknowledged': f'Purchase Order {order.po_number} acknowledged by supplier.',
+        'completed': f'Purchase Order {order.po_number} has been completed.',
+        'cancelled': f'Purchase Order {order.po_number} has been cancelled.',
+        'on_hold': f'Purchase Order {order.po_number} has been put on hold.',
+    }
+    
+    message = status_messages.get(new_status, f'Purchase Order {order.po_number} status updated to {order.get_status_display()}.')
+    messages.success(request, message)
+    
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+
+# Enhanced PurchaseOrderDetailView with status-based context
+@method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
+class PurchaseOrderDetailView(DetailView):
+    """Purchase order detail view with status-based actions"""
+    model = PurchaseOrder
+    template_name = 'suppliers/purchase_order_detail.html'
+    context_object_name = 'order'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        order = self.object
+        
+        # Order items
+        context['items'] = order.items.select_related('item').all()
+        
+        # Receipts
+        context['receipts'] = order.receipts.order_by('-receipt_date')
+        
+        # Progress tracking
+        context['progress'] = {
+            'completion_percentage': order.completion_percentage,
+            'is_overdue': order.is_overdue,
+            'days_overdue': order.days_overdue if order.is_overdue else 0,
+        }
+        
+        # Status-based actions
+        context['can_edit'] = order.status in ['draft', 'pending']
+        context['can_approve'] = (
+            order.status == 'pending' and 
+            self.request.user.has_perm('suppliers.can_approve_purchase_orders')
+        )
+        context['can_send'] = order.status == 'approved'
+        context['can_acknowledge'] = order.status == 'sent'
+        context['can_receive'] = order.status in ['sent', 'acknowledged', 'partially_received']
+        context['can_cancel'] = order.status in ['draft', 'pending', 'approved']
+        context['can_create_invoice'] = order.status == 'completed'
+        
+        # Available status transitions
+        context['available_statuses'] = self.get_available_statuses(order.status)
+        
+        # Print URLs
+        context['print_url'] = get_business_url(self.request, 'suppliers:purchase_order_print', pk=order.pk)
+        context['pdf_url'] = get_business_url(self.request, 'suppliers:purchase_order_pdf', pk=order.pk)
+        
+        # URLs
+        context['urls'] = get_supplier_urls(self.request)
+        
+        return context
+    
+    def get_available_statuses(self, current_status):
+        """Get available status transitions for current status"""
+        transitions = {
+            'draft': [
+                ('pending', 'Submit for Approval', 'warning'),
+                ('cancelled', 'Cancel Order', 'danger'),
+            ],
+            'pending': [
+                ('approved', 'Approve Order', 'success'),
+                ('draft', 'Return to Draft', 'secondary'),
+                ('cancelled', 'Cancel Order', 'danger'),
+            ],
+            'approved': [
+                ('sent', 'Send to Supplier', 'primary'),
+                ('cancelled', 'Cancel Order', 'danger'),
+            ],
+            'sent': [
+                ('acknowledged', 'Mark as Acknowledged', 'info'),
+                ('cancelled', 'Cancel Order', 'danger'),
+            ],
+            'acknowledged': [
+                ('partially_received', 'Mark Partial Receipt', 'warning'),
+                ('completed', 'Mark as Completed', 'success'),
+                ('cancelled', 'Cancel Order', 'danger'),
+            ],
+            'partially_received': [
+                ('completed', 'Mark as Completed', 'success'),
+                ('cancelled', 'Cancel Order', 'danger'),
+            ],
+            'on_hold': [
+                ('pending', 'Resume Order', 'warning'),
+                ('cancelled', 'Cancel Order', 'danger'),
+            ],
+        }
+        
+        return transitions.get(current_status, [])
+
+# Add email notification function (optional)
+def send_purchase_order_notification(order, action, user):
+    """Send email notifications for purchase order actions"""
+    from django.core.mail import send_mail
+    from django.template.loader import render_to_string
+    from django.conf import settings
+    
+    # Define notification settings
+    notifications = {
+        'submitted': {
+            'subject': f'Purchase Order {order.po_number} - Approval Required',
+            'template': 'suppliers/emails/po_submitted.html',
+            'recipients': ['manager@company.com'],  # Replace with actual manager emails
+        },
+        'approved': {
+            'subject': f'Purchase Order {order.po_number} - Approved',
+            'template': 'suppliers/emails/po_approved.html',
+            'recipients': [order.requested_by.user.email] if order.requested_by else [],
+        },
+        'sent': {
+            'subject': f'Purchase Order {order.po_number} - New Order',
+            'template': 'suppliers/emails/po_sent.html',
+            'recipients': [order.supplier.email] if order.supplier.email else [],
+        },
+    }
+    
+    if action in notifications:
+        notification = notifications[action]
+        
+        try:
+            html_message = render_to_string(notification['template'], {
+                'order': order,
+                'user': user,
+                'company': 'Your Company Name',  # Replace with your company name
+            })
+            
+            send_mail(
+                subject=notification['subject'],
+                message='',  # Plain text version
+                html_message=html_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=notification['recipients'],
+                fail_silently=True,
+            )
+        except Exception as e:
+            # Log the error but don't fail the request
+            print(f"Failed to send notification: {e}")

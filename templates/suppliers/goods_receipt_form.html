@@ -1,0 +1,1250 @@
+<!-- templates/suppliers/goods_receipt_auto_form.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}{% if object %}Edit Goods Receipt{% else %}Receive Goods{% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.goods_receipt_list }}">Goods Receipts</a></li>
+<li class="breadcrumb-item active">{% if object %}Edit {{ object.receipt_number }}{% else %}Receive Goods{% endif %}</li>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+.form-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.auto-filled-card {
+    background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
+    border: 1px solid #4fc3f7;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.auto-filled-header {
+    background: rgba(79, 195, 247, 0.2);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(79, 195, 247, 0.3);
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    color: #0277bd;
+}
+
+.form-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-card-header {
+    background: #f8fafc;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.items-table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.items-table th {
+    background: #f8fafc;
+    color: #374151;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.75rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.items-table td {
+    padding: 0.5rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.readonly-field {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+.auto-calculated {
+    background: #ecfdf5;
+    border: 1px solid #bbf7d0;
+    color: #059669;
+    font-weight: 500;
+}
+
+.variance-indicator {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.variance-positive { background: #d1fae5; color: #065f46; }
+.variance-negative { background: #fee2e2; color: #991b1b; }
+.variance-zero { background: #f3f4f6; color: #374151; }
+
+.po-status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-approved { background: #dbeafe; color: #1e40af; }
+.status-sent { background: #e0f2fe; color: #0277bd; }
+.status-acknowledged { background: #f0f9ff; color: #0369a1; }
+.status-partially_received { background: #fef3c7; color: #92400e; }
+
+.quick-actions {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.supplier-locked {
+    background: #fffbeb;
+    border: 1px solid #fbbf24;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: 12px;
+}
+
+.form-actions {
+    background: #f8fafc;
+    padding: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    border-radius: 0 0 12px 12px;
+}
+
+.item-row.highlight {
+    background: #f0fdf4;
+    border-left: 3px solid #10b981;
+}
+
+.auto-fill-controls {
+    background: #f0f9ff;
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.select2-container--default .select2-selection--single {
+    height: 38px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 36px;
+    padding-left: 12px;
+}
+
+@media (max-width: 768px) {
+    .form-header {
+        padding: 1.5rem;
+    }
+    
+    .items-table {
+        font-size: 0.8rem;
+    }
+    
+    .items-table th,
+    .items-table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .auto-fill-controls .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Form Header -->
+<div class="form-header">
+    <div class="row align-items-center">
+        <div class="col-auto">
+            <div class="bg-white bg-opacity-20 rounded-3 p-3">
+                <i class="fas fa-truck-loading fa-2x"></i>
+            </div>
+        </div>
+        <div class="col">
+            <h1 class="h2 mb-2">
+                {% if object %}Edit Goods Receipt{% else %}Receive Goods{% endif %}
+                {% if purchase_order %} - PO-{{ purchase_order.po_number }}{% endif %}
+            </h1>
+            <p class="mb-0 opacity-90">
+                {% if object %}
+                Update receipt details for GR-{{ object.receipt_number }}
+                {% else %}
+                Record goods received from supplier with pre-filled information
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Error Messages -->
+{% if form.non_field_errors or items_formset.non_form_errors %}
+<div class="alert alert-danger">
+    <h6><i class="fas fa-exclamation-triangle me-2"></i>Please correct the following errors:</h6>
+    <ul class="mb-0">
+        {% for error in form.non_field_errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+        {% for error in items_formset.non_form_errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- Purchase Order Selection (Only if no PO pre-selected) -->
+{% if not purchase_order %}
+<div class="form-card">
+    <div class="form-card-header">
+        <i class="fas fa-search me-2"></i>Select Purchase Order
+    </div>
+    <div class="p-4">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Auto-Fill Mode:</strong> Select a purchase order to automatically populate all information including supplier details and pending items.
+        </div>
+        
+        <div class="row">
+            <div class="col-md-8">
+                <label for="po-selector" class="form-label">Purchase Order <span class="text-danger">*</span></label>
+                <select id="po-selector" class="form-select">
+                    <option value="">Select a purchase order to receive goods...</option>
+                    {% for po in available_pos %}
+                    <option value="{{ po.pk }}" 
+                            data-supplier="{{ po.supplier.name }}"
+                            data-supplier-id="{{ po.supplier.pk }}"
+                            data-items="{{ po.items.count }}"
+                            data-total="{{ po.total_amount }}"
+                            data-status="{{ po.status }}">
+                        PO-{{ po.po_number }} - {{ po.supplier.name }} 
+                        ({{ po.items.count }} items, KES {{ po.total_amount|floatformat:0 }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="form-text">Only purchase orders that can receive goods are shown</div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="button" class="btn btn-primary w-100" id="load-po-btn" disabled>
+                    <i class="fas fa-download me-2"></i>Load Purchase Order
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<form method="post" id="goods-receipt-form" {% if not purchase_order %}style="display: none;"{% endif %}>
+    {% csrf_token %}
+    
+    <!-- Auto-Filled Purchase Order Information -->
+    {% if purchase_order %}
+    <div class="auto-filled-card">
+        <div class="auto-filled-header d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-file-invoice me-2"></i>Purchase Order Information (Auto-Filled)
+            </div>
+            <span class="po-status-badge status-{{ purchase_order.status }}">
+                {{ purchase_order.get_status_display }}
+            </span>
+        </div>
+        <div class="p-4">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <div class="small text-muted">Purchase Order</div>
+                    <div class="fw-semibold fs-5">PO-{{ purchase_order.po_number }}</div>
+                    <div class="small text-muted">{{ purchase_order.order_date|date:"M d, Y" }}</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="small text-muted">Expected Delivery</div>
+                    <div class="fw-semibold">{{ purchase_order.expected_delivery_date|date:"M d, Y" }}</div>
+                    {% if purchase_order.is_overdue %}
+                    <div class="small text-danger">{{ purchase_order.days_overdue }} days overdue</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="small text-muted">Total Value</div>
+                    <div class="fw-semibold">KES {{ purchase_order.total_amount|floatformat:2 }}</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="small text-muted">Items to Receive</div>
+                    <div class="fw-semibold">{{ pending_items|length }} items</div>
+                    <div class="small text-muted">{{ purchase_order.completion_percentage|floatformat:1 }}% completed</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Auto-Filled Supplier Information (Read-Only) -->
+    {% if purchase_order %}
+    <div class="supplier-locked">
+        <div class="d-flex align-items-center mb-3">
+            <i class="fas fa-lock text-warning me-2"></i>
+            <h6 class="mb-0 text-warning">Supplier Information (Locked from Purchase Order)</h6>
+        </div>
+        <div class="row">
+            <div class="col-md-4 mb-2">
+                <div class="small text-muted">Supplier Name</div>
+                <div class="fw-semibold">{{ purchase_order.supplier.name }}</div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <div class="small text-muted">Supplier Code</div>
+                <div>{{ purchase_order.supplier.supplier_code }}</div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <div class="small text-muted">Contact</div>
+                <div>{{ purchase_order.supplier.email|default:"No email" }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Main Form -->
+        <div class="col-lg-8 mb-4">
+            <!-- Receipt Information -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-info-circle me-2"></i>Receipt Information
+                </div>
+                <div class="p-4">
+                    <!-- Hidden fields for auto-filled data -->
+                    {% if purchase_order %}
+                    <input type="hidden" name="purchase_order" value="{{ purchase_order.pk }}" id="id_purchase_order">
+                    <input type="hidden" name="supplier" value="{{ purchase_order.supplier.pk }}" id="id_supplier">
+                    {% endif %}
+                    
+                    <div class="row">
+                        {% if not purchase_order %}
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.purchase_order.id_for_label }}" class="form-label">
+                                Purchase Order <span class="text-danger">*</span>
+                            </label>
+                            {{ form.purchase_order|add_class:"form-select readonly-field" }}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.supplier.id_for_label }}" class="form-label">
+                                Supplier <span class="text-danger">*</span>
+                            </label>
+                            {{ form.supplier|add_class:"form-select readonly-field" }}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.receipt_date.id_for_label }}" class="form-label">
+                                Receipt Date <span class="text-danger">*</span>
+                            </label>
+                            {{ form.receipt_date|add_class:"form-control" }}
+                            {% if form.receipt_date.errors %}
+                                <div class="invalid-feedback">{{ form.receipt_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.delivery_note_number.id_for_label }}" class="form-label">Delivery Note Number</label>
+                            {{ form.delivery_note_number|add_class:"form-control" }}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.vehicle_number.id_for_label }}" class="form-label">Vehicle Number</label>
+                            {{ form.vehicle_number|add_class:"form-control" }}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.driver_name.id_for_label }}" class="form-label">Driver Name</label>
+                            {{ form.driver_name|add_class:"form-control" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto-Fill Controls -->
+            {% if pending_items %}
+            <div class="auto-fill-controls">
+                <h6 class="mb-3">
+                    <i class="fas fa-magic me-2"></i>Quick Actions for {{ pending_items|length }} Pending Items
+                </h6>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <button type="button" class="btn btn-success w-100" onclick="receiveAllItems()">
+                            <i class="fas fa-check-double me-2"></i>Receive All Items (Full Quantities)
+                        </button>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <button type="button" class="btn btn-primary w-100" onclick="customReceiveItems()">
+                            <i class="fas fa-edit me-2"></i>Custom Quantities
+                        </button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <button type="button" class="btn btn-warning w-100" onclick="partialReceiveItems()">
+                            <i class="fas fa-percent me-2"></i>Partial Receive (75%)
+                        </button>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <button type="button" class="btn btn-info w-100" onclick="clearAllItems()">
+                            <i class="fas fa-eraser me-2"></i>Clear All
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Receipt Items (Auto-Populated) -->
+            <div class="form-card">
+                <div class="form-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-list me-2"></i>Items to Receive</span>
+                    <span class="badge bg-primary ms-2" id="items-count">{{ pending_items|length|default:0 }}</span>
+                </div>
+                <div class="p-3">
+                    {{ items_formset.management_form }}
+                    
+                    <div class="table-responsive">
+                        <table class="items-table table table-bordered mb-0" id="items-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 25%">Item</th>
+                                    <th style="width: 10%">Expected</th>
+                                    <th style="width: 12%">Received <span class="text-danger">*</span></th>
+                                    <th style="width: 10%">Damaged</th>
+                                    <th style="width: 8%">Variance</th>
+                                    <th style="width: 8%">Quality</th>
+                                    <th style="width: 15%">Batch/Lot</th>
+                                    <th style="width: 12%">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="items-tbody">
+                                <!-- Items will be auto-populated here -->
+                                {% if not pending_items %}
+                                <tr id="no-items-row">
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        <i class="fas fa-info-circle fa-2x mb-2"></i>
+                                        <div>Select a purchase order to load items automatically</div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Quality Check Summary -->
+            <div class="form-card mb-4">
+                <div class="form-card-header">
+                    <i class="fas fa-clipboard-check me-2"></i>Quality Check Summary
+                </div>
+                <div class="p-4">
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.quality_check_passed|add_class:"form-check-input" }}
+                            <label for="{{ form.quality_check_passed.id_for_label }}" class="form-check-label fw-semibold">
+                                Overall Quality Check Passed
+                            </label>
+                        </div>
+                        <div class="form-text">This will be auto-updated based on individual item quality checks</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.quality_notes.id_for_label }}" class="form-label">Quality Notes</label>
+                        {{ form.quality_notes|add_class:"form-control" }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Receipt Statistics -->
+            <div class="form-card mb-4">
+                <div class="form-card-header">
+                    <i class="fas fa-chart-bar me-2"></i>Receipt Statistics
+                </div>
+                <div class="p-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Items:</span>
+                        <span class="fw-semibold" id="total-items">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Expected:</span>
+                        <span class="fw-semibold" id="total-expected">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Received:</span>
+                        <span class="fw-semibold text-success" id="total-received">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Damaged:</span>
+                        <span class="fw-semibold text-danger" id="total-damaged">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted">Quality Issues:</span>
+                        <span class="fw-semibold text-warning" id="quality-issues">0</span>
+                    </div>
+                    
+                    <div class="progress mb-2" style="height: 8px;">
+                        <div class="progress-bar bg-success" id="receive-progress" style="width: 0%"></div>
+                    </div>
+                    <div class="text-center">
+                        <small class="text-muted">Completion: <span id="completion-percentage">0%</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-sticky-note me-2"></i>Additional Information
+                </div>
+                <div class="p-4">
+                    <div class="mb-3">
+                        <label for="{{ form.notes.id_for_label }}" class="form-label">General Notes</label>
+                        {{ form.notes|add_class:"form-control" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="form-card">
+        <div class="form-actions">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="{{ urls.goods_receipt_list }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Cancel
+                    </a>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" name="save_draft" class="btn btn-secondary">
+                        <i class="fas fa-save me-2"></i>Save as Draft
+                    </button>
+                    <button type="submit" name="save_and_complete" class="btn btn-success">
+                        <i class="fas fa-check-circle me-2"></i>Save & Complete Receipt
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Loading Overlay Template -->
+<div id="loading-template" style="display: none;">
+    <div class="loading-overlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="mt-2 small text-muted">Loading purchase order data...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    let purchaseOrderData = null;
+    let pendingItems = [];
+    let formIndex = 0;
+    
+    // Initialize the form based on whether PO is pre-selected
+    {% if purchase_order %}
+        // PO is pre-selected, auto-populate items
+        purchaseOrderData = {
+            id: '{{ purchase_order.pk }}',
+            po_number: '{{ purchase_order.po_number }}',
+            supplier_id: '{{ purchase_order.supplier.pk }}',
+            supplier_name: '{{ purchase_order.supplier.name|escapejs }}'
+        };
+        
+        pendingItems = [
+            {% for item in pending_items %}
+            {
+                id: '{{ item.id }}',
+                item_name: '{{ item.item.name|escapejs }}',
+                item_sku: '{{ item.item.sku|default:""|escapejs }}',
+                item_unit: '{{ item.item.unit|default:"units"|escapejs }}',
+                pending_quantity: {{ item.pending_quantity }},
+                unit_price: {{ item.unit_price|default:0 }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        // Auto-populate items on page load
+        setTimeout(function() {
+            autoPopulateItems();
+        }, 500);
+    {% else %}
+        // Initialize PO selector
+        initializePOSelector();
+    {% endif %}
+    
+    // Set default receipt date to today
+    if (!$('#id_receipt_date').val()) {
+        const today = new Date().toISOString().split('T')[0];
+        $('#id_receipt_date').val(today);
+    }
+    
+    function initializePOSelector() {
+        $('#po-selector').select2({
+            placeholder: 'Search and select a purchase order...',
+            allowClear: true,
+            templateResult: formatPOOption,
+            templateSelection: formatPOSelection
+        });
+        
+        // Enable/disable load button based on selection
+        $('#po-selector').on('change', function() {
+            const hasSelection = $(this).val();
+            $('#load-po-btn').prop('disabled', !hasSelection);
+        });
+        
+        // Load PO button click
+        $('#load-po-btn').on('click', function() {
+            const poId = $('#po-selector').val();
+            if (poId) {
+                loadPurchaseOrderData(poId);
+            }
+        });
+    }
+    
+    function formatPOOption(option) {
+        if (!option.id) return option.text;
+        
+        const $option = $(option.element);
+        const supplier = $option.data('supplier');
+        const items = $option.data('items');
+        const total = $option.data('total');
+        const status = $option.data('status');
+        
+        return $(`
+            <div>
+                <div class="fw-semibold">${option.text}</div>
+                <div class="small text-muted">
+                    ${items} items • KES ${parseFloat(total).toLocaleString()} • Status: ${status}
+                </div>
+            </div>
+        `);
+    }
+    
+    function formatPOSelection(option) {
+        return option.text;
+    }
+    
+    function loadPurchaseOrderData(poId) {
+        showLoading();
+        
+        // Navigate to the form with the selected PO
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('po', poId);
+        window.location.href = currentUrl.toString();
+    }
+    
+    function autoPopulateItems() {
+        if (pendingItems.length === 0) {
+            showAlert('No pending items found for this purchase order.', 'info');
+            return;
+        }
+        
+        // Clear existing items
+        $('#items-tbody').empty();
+        
+        // Add each pending item
+        pendingItems.forEach((item, index) => {
+            addItemRow(item, index);
+        });
+        
+        updateStatistics();
+        showAlert(`Auto-populated ${pendingItems.length} items from the purchase order.`, 'success');
+    }
+    
+    function addItemRow(item, index) {
+        const rowHtml = `
+            <tr class="item-row highlight" data-form-index="${index}" data-item-id="${item.id}">
+                <td>
+                    <div class="fw-semibold">${item.item_name}</div>
+                    <div class="small text-muted">SKU: ${item.item_sku || 'N/A'}</div>
+                    <input type="hidden" name="items-${index}-purchase_order_item" value="${item.id}" id="id_items-${index}-purchase_order_item">
+                    <input type="hidden" name="items-${index}-id" id="id_items-${index}-id">
+                    <input type="hidden" name="items-${index}-DELETE" id="id_items-${index}-DELETE">
+                </td>
+                <td>
+                    <input type="number" name="items-${index}-expected_quantity" 
+                           class="form-control auto-calculated expected-qty" 
+                           value="${item.pending_quantity}" readonly
+                           id="id_items-${index}-expected_quantity">
+                    <div class="small text-muted">${item.item_unit}</div>
+                </td>
+                <td>
+                    <input type="number" name="items-${index}-received_quantity" 
+                           class="form-control received-qty" 
+                           step="0.01" min="0" 
+                           placeholder="0.00"
+                           id="id_items-${index}-received_quantity">
+                    <div class="small text-muted">${item.item_unit}</div>
+                </td>
+                <td>
+                    <input type="number" name="items-${index}-damaged_quantity" 
+                           class="form-control damaged-qty" 
+                           step="0.01" min="0" value="0"
+                           id="id_items-${index}-damaged_quantity">
+                </td>
+                <td>
+                    <div class="variance-indicator variance-zero" data-variance="0">0</div>
+                </td>
+                <td>
+                    <div class="form-check">
+                        <input type="checkbox" name="items-${index}-quality_passed" 
+                               class="form-check-input quality-check" checked
+                               id="id_items-${index}-quality_passed">
+                        <label class="form-check-label small">Pass</label>
+                    </div>
+                </td>
+                <td>
+                    <input type="text" name="items-${index}-lot_number" 
+                           class="form-control form-control-sm" 
+                           placeholder="Batch/Lot"
+                           id="id_items-${index}-lot_number">
+                    <input type="date" name="items-${index}-expiry_date" 
+                           class="form-control form-control-sm mt-1" 
+                           id="id_items-${index}-expiry_date">
+                </td>
+                <td>
+                    <textarea name="items-${index}-quality_notes" 
+                              class="form-control form-control-sm" 
+                              rows="2" placeholder="Quality notes"
+                              id="id_items-${index}-quality_notes"></textarea>
+                </td>
+            </tr>
+        `;
+        
+        $('#items-tbody').append(rowHtml);
+        formIndex = index + 1;
+    }
+    
+    // Quick action functions
+    window.receiveAllItems = function() {
+        $('.received-qty').each(function() {
+            const row = $(this).closest('tr');
+            const expected = parseFloat(row.find('.expected-qty').val()) || 0;
+            $(this).val(expected);
+            calculateVariance(row);
+        });
+        updateStatistics();
+        showAlert('Set all items to receive full expected quantities.', 'success');
+    };
+    
+    window.customReceiveItems = function() {
+        $('.received-qty').first().focus();
+        showAlert('Enter custom quantities for each item.', 'info');
+    };
+    
+    window.partialReceiveItems = function() {
+        $('.received-qty').each(function() {
+            const row = $(this).closest('tr');
+            const expected = parseFloat(row.find('.expected-qty').val()) || 0;
+            const partial = Math.round(expected * 0.75 * 100) / 100; // 75% rounded to 2 decimals
+            $(this).val(partial);
+            calculateVariance(row);
+        });
+        updateStatistics();
+        showAlert('Set all items to receive 75% of expected quantities.', 'info');
+    };
+    
+    window.clearAllItems = function() {
+        $('.received-qty, .damaged-qty').val('');
+        $('.quality-check').prop('checked', true);
+        $('textarea[name*="quality_notes"]').val('');
+        $('input[name*="lot_number"], input[name*="expiry_date"]').val('');
+        $('.variance-indicator').removeClass('variance-positive variance-negative').addClass('variance-zero').text('0');
+        updateStatistics();
+        showAlert('Cleared all item quantities and notes.', 'info');
+    };
+    
+    // Handle quantity and quality changes
+    $(document).on('input', '.received-qty, .damaged-qty', function() {
+        const row = $(this).closest('tr');
+        calculateVariance(row);
+        updateStatistics();
+    });
+    
+    $(document).on('change', '.quality-check', function() {
+        updateStatistics();
+        updateOverallQualityCheck();
+    });
+    
+    function calculateVariance(row) {
+        const expected = parseFloat(row.find('.expected-qty').val()) || 0;
+        const received = parseFloat(row.find('.received-qty').val()) || 0;
+        const damaged = parseFloat(row.find('.damaged-qty').val()) || 0;
+        const variance = received - expected;
+        
+        const varianceEl = row.find('.variance-indicator');
+        varianceEl.text(variance.toFixed(1));
+        varianceEl.attr('data-variance', variance);
+        
+        // Update variance styling
+        varianceEl.removeClass('variance-positive variance-negative variance-zero');
+        if (variance > 0) {
+            varianceEl.addClass('variance-positive');
+        } else if (variance < 0) {
+            varianceEl.addClass('variance-negative');
+        } else {
+            varianceEl.addClass('variance-zero');
+        }
+        
+        // Auto-uncheck quality if there's significant damage or major shortage
+        const qualityCheck = row.find('.quality-check');
+        if (damaged > 0 || variance < -expected * 0.1) { // More than 10% shortage
+            qualityCheck.prop('checked', false);
+            
+            // Auto-fill quality notes for damaged items
+            const qualityNotes = row.find('textarea[name*="quality_notes"]');
+            if (damaged > 0 && !qualityNotes.val()) {
+                qualityNotes.val(`${damaged} units damaged on delivery`);
+            }
+        }
+    }
+    
+    function updateStatistics() {
+        let totalItems = 0;
+        let totalExpected = 0;
+        let totalReceived = 0;
+        let totalDamaged = 0;
+        let qualityIssues = 0;
+        
+        $('.item-row').each(function() {
+            const row = $(this);
+            const expected = parseFloat(row.find('.expected-qty').val()) || 0;
+            const received = parseFloat(row.find('.received-qty').val()) || 0;
+            const damaged = parseFloat(row.find('.damaged-qty').val()) || 0;
+            const qualityPassed = row.find('.quality-check').is(':checked');
+            
+            totalItems++;
+            totalExpected += expected;
+            totalReceived += received;
+            totalDamaged += damaged;
+            
+            if (!qualityPassed || damaged > 0) {
+                qualityIssues++;
+            }
+        });
+        
+        // Update statistics display
+        $('#total-items').text(totalItems);
+        $('#total-expected').text(totalExpected.toFixed(1));
+        $('#total-received').text(totalReceived.toFixed(1));
+        $('#total-damaged').text(totalDamaged.toFixed(1));
+        $('#quality-issues').text(qualityIssues);
+        
+        // Update progress bar
+        const completionPercentage = totalExpected > 0 ? (totalReceived / totalExpected * 100) : 0;
+        $('#receive-progress').css('width', completionPercentage + '%');
+        $('#completion-percentage').text(completionPercentage.toFixed(1) + '%');
+        
+        // Update items count badge
+        $('#items-count').text(totalItems);
+        
+        // Update form total forms count
+        $('#id_items-TOTAL_FORMS').val(totalItems);
+        
+        // Color coding for statistics
+        $('#total-damaged').toggleClass('text-danger', totalDamaged > 0);
+        $('#quality-issues').toggleClass('text-warning', qualityIssues > 0);
+    }
+    
+    function updateOverallQualityCheck() {
+        const totalItems = $('.quality-check').length;
+        const passedItems = $('.quality-check:checked').length;
+        const overallPassed = passedItems === totalItems && totalItems > 0;
+        
+        $('#id_quality_check_passed').prop('checked', overallPassed);
+    }
+    
+    // Form validation
+    $('#goods-receipt-form').on('submit', function(e) {
+        if (!validateForm()) {
+            e.preventDefault();
+        }
+    });
+    
+    function validateForm() {
+        let isValid = true;
+        const errors = [];
+        
+        // Remove existing validation classes
+        $('.is-invalid').removeClass('is-invalid');
+        
+        // Check receipt date
+        if (!$('#id_receipt_date').val()) {
+            errors.push('Please provide a receipt date.');
+            $('#id_receipt_date').addClass('is-invalid');
+            isValid = false;
+        }
+        
+        // Check if at least one item has received quantity
+        const hasReceivedItems = $('.received-qty').filter(function() {
+            return parseFloat($(this).val() || 0) > 0;
+        }).length > 0;
+        
+        if (!hasReceivedItems) {
+            errors.push('Please enter received quantities for at least one item.');
+            isValid = false;
+        }
+        
+        // Validate each item row
+        $('.item-row').each(function() {
+            const row = $(this);
+            const received = parseFloat(row.find('.received-qty').val()) || 0;
+            const damaged = parseFloat(row.find('.damaged-qty').val()) || 0;
+            
+            if (received < 0) {
+                row.find('.received-qty').addClass('is-invalid');
+                if (errors.indexOf('Received quantities cannot be negative.') === -1) {
+                    errors.push('Received quantities cannot be negative.');
+                }
+                isValid = false;
+            }
+            
+            if (damaged < 0) {
+                row.find('.damaged-qty').addClass('is-invalid');
+                if (errors.indexOf('Damaged quantities cannot be negative.') === -1) {
+                    errors.push('Damaged quantities cannot be negative.');
+                }
+                isValid = false;
+            }
+            
+            if (damaged > received) {
+                row.find('.damaged-qty').addClass('is-invalid');
+                if (errors.indexOf('Damaged quantity cannot exceed received quantity.') === -1) {
+                    errors.push('Damaged quantity cannot exceed received quantity.');
+                }
+                isValid = false;
+            }
+        });
+        
+        if (!isValid) {
+            showValidationErrors(errors);
+        }
+        
+        return isValid;
+    }
+    
+    function showValidationErrors(errors) {
+        let errorHtml = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+        errorHtml += '<h6><i class="fas fa-exclamation-triangle me-2"></i>Please correct the following errors:</h6>';
+        errorHtml += '<ul class="mb-0">';
+        errors.forEach(error => {
+            errorHtml += `<li>${error}</li>`;
+        });
+        errorHtml += '</ul>';
+        errorHtml += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        errorHtml += '</div>';
+        
+        $('.alert-danger').remove();
+        $('.form-header').after(errorHtml);
+        
+        $('html, body').animate({
+            scrollTop: $('.alert-danger').offset().top - 100
+        }, 500);
+    }
+    
+    function showAlert(message, type) {
+        // Remove existing alerts
+        $('.auto-alert').remove();
+        
+        const alertHtml = `
+            <div class="auto-alert alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        $('.form-header').after(alertHtml);
+        
+        // Auto-hide success and info alerts after 4 seconds
+        if (type === 'success' || type === 'info') {
+            setTimeout(() => {
+                $('.auto-alert').fadeOut();
+            }, 4000);
+        }
+    }
+    
+    function showLoading() {
+        const loadingHtml = $('#loading-template').html();
+        $('body').append(loadingHtml);
+    }
+    
+    // Keyboard shortcuts
+    $(document).keydown(function(e) {
+        // Ctrl/Cmd + Enter to save and complete
+        if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
+            e.preventDefault();
+            $('button[name="save_and_complete"]').click();
+        }
+        
+        // Ctrl/Cmd + S to save as draft
+        if ((e.ctrlKey || e.metaKey) && e.keyCode === 83) {
+            e.preventDefault();
+            $('button[name="save_draft"]').click();
+        }
+        
+        // Ctrl/Cmd + A to receive all items
+        if ((e.ctrlKey || e.metaKey) && e.keyCode === 65 && $('.item-row').length > 0) {
+            e.preventDefault();
+            receiveAllItems();
+        }
+        
+        // Ctrl/Cmd + R to partial receive
+        if ((e.ctrlKey || e.metaKey) && e.keyCode === 82 && $('.item-row').length > 0) {
+            e.preventDefault();
+            partialReceiveItems();
+        }
+    });
+    
+    // Auto-save functionality
+    let autoSaveTimer;
+    function scheduleAutoSave() {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(function() {
+            const hasData = $('.received-qty').filter(function() {
+                return parseFloat($(this).val() || 0) > 0;
+            }).length > 0;
+            
+            if (hasData) {
+                autoSave();
+            }
+        }, 30000); // Auto-save every 30 seconds
+    }
+    
+    function autoSave() {
+        const formData = new FormData($('#goods-receipt-form')[0]);
+        formData.append('save_draft', 'true');
+        formData.append('auto_save', 'true');
+        
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                // Silent success - just update UI indicator
+                $('button[name="save_draft"]').html('<i class="fas fa-check me-2"></i>Auto-saved').addClass('btn-success').removeClass('btn-secondary');
+                setTimeout(() => {
+                    $('button[name="save_draft"]').html('<i class="fas fa-save me-2"></i>Save as Draft').removeClass('btn-success').addClass('btn-secondary');
+                }, 2000);
+            },
+            error: function() {
+                // Silent fail - don't disturb user
+            }
+        });
+    }
+    
+    // Track form changes for auto-save
+    $(document).on('input change', '#goods-receipt-form', function() {
+        scheduleAutoSave();
+    });
+    
+    // Prevent accidental page navigation
+    let formChanged = false;
+    $(document).on('input change', '#goods-receipt-form', function() {
+        formChanged = true;
+    });
+    
+    $(window).on('beforeunload', function(e) {
+        if (formChanged) {
+            const message = 'You have unsaved changes. Are you sure you want to leave?';
+            e.returnValue = message;
+            return message;
+        }
+    });
+    
+    $('#goods-receipt-form').on('submit', function() {
+        formChanged = false;
+        $(window).off('beforeunload');
+    });
+    
+    // Initialize statistics on page load
+    if ($('.item-row').length > 0) {
+        updateStatistics();
+    }
+    
+    // Add smart tab navigation for efficiency
+    $(document).on('keydown', '.received-qty, .damaged-qty', function(e) {
+        if (e.keyCode === 13) { // Enter key
+            e.preventDefault();
+            
+            // Move to next received quantity field
+            const currentRow = $(this).closest('tr');
+            const nextRow = currentRow.next('.item-row');
+            
+            if (nextRow.length) {
+                nextRow.find('.received-qty').focus().select();
+            } else {
+                // If last row, focus on save button
+                $('button[name="save_and_complete"]').focus();
+            }
+        }
+    });
+    
+    // Auto-select text in quantity fields for faster editing
+    $(document).on('focus', '.received-qty, .damaged-qty', function() {
+        $(this).select();
+    });
+    
+    // Add helpful tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // Initialize any Select2 elements if needed
+    $('.form-select:not(.readonly-field)').select2({
+        theme: 'bootstrap-5'
+    });
+    
+    // Bulk operations shortcuts
+    $(document).on('dblclick', '.expected-qty', function() {
+        // Double-click expected quantity to copy to received
+        const row = $(this).closest('tr');
+        const expected = $(this).val();
+        row.find('.received-qty').val(expected);
+        calculateVariance(row);
+        updateStatistics();
+        showAlert('Copied expected quantity to received quantity.', 'info');
+    });
+    
+    // Smart quality check updates
+    $(document).on('input', '.damaged-qty', function() {
+        const row = $(this).closest('tr');
+        const damaged = parseFloat($(this).val()) || 0;
+        const qualityCheck = row.find('.quality-check');
+        
+        if (damaged > 0) {
+            qualityCheck.prop('checked', false);
+        }
+    });
+    
+    // Initialize form if purchase order is already selected
+    {% if purchase_order %}
+    // Set the formset management form values
+    $('#id_items-TOTAL_FORMS').val(pendingItems.length);
+    $('#id_items-INITIAL_FORMS').val(0);
+    $('#id_items-MIN_NUM_FORMS').val(0);
+    $('#id_items-MAX_NUM_FORMS').val(1000);
+    {% endif %}
+    
+    // Add context menu for quick actions
+    $(document).on('contextmenu', '.received-qty', function(e) {
+        e.preventDefault();
+        const row = $(this).closest('tr');
+        const expected = parseFloat(row.find('.expected-qty').val()) || 0;
+        
+        // Create quick action menu
+        const menu = $(`
+            <div class="quick-menu position-absolute bg-white border rounded shadow p-2" style="z-index: 1050;">
+                <div class="small text-muted mb-1">Quick Actions:</div>
+                <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-1" onclick="setFullQuantity(this)">
+                    Set Full (${expected})
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-warning w-100 mb-1" onclick="setPartialQuantity(this)">
+                    Set 75% (${(expected * 0.75).toFixed(1)})
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="clearQuantity(this)">
+                    Clear
+                </button>
+            </div>
+        `);
+        
+        // Position and show menu
+        menu.css({
+            top: e.pageY + 'px',
+            left: e.pageX + 'px'
+        });
+        
+        $('body').append(menu);
+        
+        // Remove menu on click outside
+        $(document).one('click', function() {
+            menu.remove();
+        });
+    });
+    
+    // Quick action functions for context menu
+    window.setFullQuantity = function(btn) {
+        const row = $(btn).closest('.quick-menu').remove();
+        const targetRow = $('.received-qty:focus').closest('tr');
+        const expected = parseFloat(targetRow.find('.expected-qty').val()) || 0;
+        targetRow.find('.received-qty').val(expected);
+        calculateVariance(targetRow);
+        updateStatistics();
+    };
+    
+    window.setPartialQuantity = function(btn) {
+        const row = $(btn).closest('.quick-menu').remove();
+        const targetRow = $('.received-qty:focus').closest('tr');
+        const expected = parseFloat(targetRow.find('.expected-qty').val()) || 0;
+        targetRow.find('.received-qty').val((expected * 0.75).toFixed(1));
+        calculateVariance(targetRow);
+        updateStatistics();
+    };
+    
+    window.clearQuantity = function(btn) {
+        const row = $(btn).closest('.quick-menu').remove();
+        const targetRow = $('.received-qty:focus').closest('tr');
+        targetRow.find('.received-qty').val('');
+        calculateVariance(targetRow);
+        updateStatistics();
+    };
+});
+</script>
+{% endblock %}

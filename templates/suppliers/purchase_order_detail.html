@@ -1,14 +1,14 @@
+<!-- templates/suppliers/purchase_order_detail.html -->
 {% extends 'base/base.html' %}
 {% load static %}
-{% load math_filters %}
 
-{% block title %}PO-{{ order.po_number }} - Purchase Order Details{% endblock %}
+{% block title %}{{ order.po_number }} - Purchase Order{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
 <li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
 <li class="breadcrumb-item"><a href="{{ urls.purchase_order_list }}">Purchase Orders</a></li>
-<li class="breadcrumb-item active">PO-{{ order.po_number }}</li>
+<li class="breadcrumb-item active">{{ order.po_number }}</li>
 {% endblock %}
 
 {% block extra_css %}
@@ -16,107 +16,206 @@
 .order-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    border-radius: 12px;
+    border-radius: 0.5rem;
     padding: 2rem;
     margin-bottom: 2rem;
 }
 
 .status-badge {
+    font-size: 0.9rem;
     padding: 0.5rem 1rem;
-    border-radius: 25px;
-    font-size: 0.875rem;
+    border-radius: 2rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.025em;
+    letter-spacing: 0.5px;
+}
+
+.priority-badge {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
 }
 
 .info-card {
-    background: white;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    overflow: hidden;
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.3s ease;
+}
+
+.info-card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.progress-container {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
     margin-bottom: 1.5rem;
 }
 
-.info-card-header {
-    background: #f8fafc;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #e2e8f0;
-    font-weight: 600;
-    color: #1e293b;
+.progress-bar-custom {
+    height: 12px;
+    border-radius: 6px;
 }
 
-.progress-circle {
-    width: 80px;
-    height: 80px;
+.action-section {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
 }
 
-.progress-text {
-    font-size: 1.2rem;
-    font-weight: 700;
+.timeline {
+    position: relative;
+    padding-left: 2rem;
 }
 
-.item-row {
-    border-bottom: 1px solid #f1f5f9;
-    padding: 1rem 1.5rem;
-}
-
-.item-row:last-child {
-    border-bottom: none;
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
 }
 
 .timeline-item {
     position: relative;
-    padding-left: 2rem;
-    padding-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
 }
 
 .timeline-item::before {
     content: '';
     position: absolute;
-    left: 0.5rem;
-    top: 0.5rem;
+    left: -1.75rem;
+    top: 0.25rem;
     width: 12px;
     height: 12px;
-    background: #3b82f6;
-    border: 3px solid white;
     border-radius: 50%;
-    box-shadow: 0 0 0 2px #3b82f6;
+    background: #6c757d;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #dee2e6;
 }
 
-.timeline-item::after {
-    content: '';
-    position: absolute;
-    left: 0.75rem;
-    top: 1.5rem;
-    width: 2px;
-    height: calc(100% - 1rem);
-    background: #e2e8f0;
-}
-
-.timeline-item:last-child::after {
-    display: none;
-}
-
-.timeline-item.completed::before {
-    background: #10b981;
-    box-shadow: 0 0 0 2px #10b981;
+.timeline-item.active::before {
+    background: #28a745;
 }
 
 .timeline-item.current::before {
-    background: #f59e0b;
-    box-shadow: 0 0 0 2px #f59e0b;
+    background: #007bff;
+    animation: pulse 2s infinite;
 }
 
-.amount-breakdown {
-    background: #f8fafc;
-    border-radius: 8px;
-    padding: 1rem;
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 2px #007bff; }
+    50% { box-shadow: 0 0 0 6px rgba(0, 123, 255, 0.3); }
+    100% { box-shadow: 0 0 0 2px #007bff; }
 }
 
-@media print {
-    .no-print {
-        display: none !important;
+.item-table th {
+    background: #f8f9fa;
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.item-row:hover {
+    background: #f8f9fa;
+}
+
+.supplier-info {
+    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+
+.financial-summary {
+    background: #fff;
+    border: 2px solid #e9ecef;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+
+.receipt-card {
+    border-left: 4px solid #28a745;
+    transition: all 0.3s ease;
+}
+
+.receipt-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.alert-overdue {
+    background: linear-gradient(45deg, #dc3545, #c82333);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.btn-action {
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    border-radius: 0.375rem;
+    transition: all 0.3s ease;
+}
+
+.btn-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+
+.document-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: #f8f9fa;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.document-link:hover {
+    background: #e9ecef;
+    transform: translateY(-1px);
+}
+
+/* Status-specific styles */
+.status-draft { background: #6c757d; }
+.status-pending { background: #ffc107; color: #000; }
+.status-approved { background: #17a2b8; }
+.status-sent { background: #007bff; }
+.status-acknowledged { background: #28a745; }
+.status-partially_received { background: #fd7e14; }
+.status-completed { background: #28a745; }
+.status-cancelled { background: #dc3545; }
+.status-on_hold { background: #6c757d; }
+
+.overdue-warning {
+    animation: flash 2s infinite;
+}
+
+@keyframes flash {
+    0%, 50%, 100% { opacity: 1; }
+    25%, 75% { opacity: 0.7; }
+}
+
+@media (max-width: 768px) {
+    .order-header {
+        padding: 1rem;
+    }
+    
+    .btn-group-vertical {
+        width: 100%;
+    }
+    
+    .btn-group-vertical .btn {
+        margin-bottom: 0.5rem;
     }
 }
 </style>
@@ -127,251 +226,383 @@
 <div class="order-header">
     <div class="row align-items-center">
         <div class="col-md-8">
-            <div class="d-flex align-items-center mb-3">
-                <h1 class="h2 mb-0 me-3">PO-{{ order.po_number }}</h1>
-                <span class="status-badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% else %}primary{% endif %}">
+            <div class="d-flex align-items-center mb-2">
+                <h1 class="h3 mb-0 me-3">{{ order.po_number }}</h1>
+                <span class="status-badge status-{{ order.status }}">
                     {{ order.get_status_display }}
                 </span>
+                {% if order.priority != 'normal' %}
+                <span class="priority-badge bg-{% if order.priority == 'urgent' %}danger{% elif order.priority == 'high' %}warning text-dark{% else %}secondary{% endif %} ms-2">
+                    {{ order.get_priority_display }}
+                </span>
+                {% endif %}
             </div>
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="mb-1 opacity-90">
-                        <strong>Supplier:</strong> 
-                        <a href="/business/{{ request.tenant.slug }}/suppliers/{{ order.supplier.pk }}/" class="text-white">
-                            {{ order.supplier.name }}
-                        </a>
-                    </p>
-                    <p class="mb-1 opacity-90"><strong>Order Date:</strong> {{ order.order_date }}</p>
-                    <p class="mb-0 opacity-90"><strong>Expected Delivery:</strong> {{ order.expected_delivery_date }}</p>
-                </div>
-                <div class="col-md-6">
-                    <p class="mb-1 opacity-90"><strong>Total Amount:</strong> KES {{ order.total_amount|floatformat:2 }}</p>
-                    <p class="mb-1 opacity-90"><strong>Items:</strong> {{ items.count }}</p>
-                    {% if order.is_overdue %}
-                    <p class="mb-0 text-warning"><strong>⚠️ {{ order.days_overdue }} days overdue</strong></p>
-                    {% endif %}
-                </div>
+            <p class="mb-2 opacity-75">
+                <i class="fas fa-building me-2"></i>{{ order.supplier.name }}
+                {% if order.supplier.supplier_code %}
+                <span class="ms-2">({{ order.supplier.supplier_code }})</span>
+                {% endif %}
+            </p>
+            <p class="mb-0 opacity-75">
+                <i class="fas fa-calendar me-2"></i>Ordered: {{ order.order_date|date:"F d, Y" }}
+                <span class="ms-3">
+                    <i class="fas fa-truck me-2"></i>Expected: {{ order.expected_delivery_date|date:"F d, Y" }}
+                </span>
+            </p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="h4 mb-1">KES {{ order.total_amount|floatformat:0 }}</div>
+            <div class="opacity-75">{{ items.count }} item{{ items.count|pluralize }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Overdue Alert -->
+{% if progress.is_overdue %}
+<div class="alert alert-overdue overdue-warning mb-4">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-exclamation-triangle me-3 fa-2x"></i>
+        <div>
+            <h5 class="mb-1">Order Overdue!</h5>
+            <p class="mb-0">This order is {{ progress.days_overdue }} day{{ progress.days_overdue|pluralize }} past the expected delivery date.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Progress Section -->
+<div class="progress-container">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h6 class="mb-2">Order Progress</h6>
+            <div class="progress progress-bar-custom">
+                <div class="progress-bar {% if progress.completion_percentage >= 100 %}bg-success{% elif progress.completion_percentage >= 50 %}bg-info{% else %}bg-warning{% endif %}" 
+                     style="width: {{ progress.completion_percentage }}%"></div>
             </div>
         </div>
-        <div class="col-md-4 text-end">
-            <div class="d-flex justify-content-end align-items-center">
-                <!-- Progress Circle -->
-                <div class="progress-circle me-3">
-                    <svg width="80" height="80" class="transform-rotate-minus-90">
-                        <circle cx="40" cy="40" r="35" stroke="rgba(255,255,255,0.3)" stroke-width="6" fill="none"></circle>
-                        <circle cx="40" cy="40" r="35" stroke="white" stroke-width="6" fill="none" 
-                                stroke-dasharray="{{ progress.completion_percentage|mul:2.2 }} 220" 
-                                stroke-linecap="round"></circle>
-                    </svg>
-                    <div class="position-absolute top-50 start-50 translate-middle text-center">
-                        <div class="progress-text">{{ progress.completion_percentage|floatformat:0 }}%</div>
-                        <div class="small opacity-75">Complete</div>
-                    </div>
-                </div>
-            </div>
+        <div class="col-md-4 text-md-end">
+            <div class="h5 mb-0">{{ progress.completion_percentage|floatformat:0 }}%</div>
+            <small class="text-muted">Complete</small>
         </div>
     </div>
 </div>
 
 <!-- Action Buttons -->
-<div class="d-flex justify-content-between align-items-center mb-4 no-print">
-    <div>
-        <a href="{{ urls.purchase_order_list }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-2"></i>Back to Orders
-        </a>
-    </div>
-    <div class="d-flex gap-2">
-        {% if order.status == 'pending' %}
-        <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/approve/" style="display: inline;">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-success">
-                <i class="fas fa-check me-2"></i>Approve Order
-            </button>
-        </form>
-        {% elif order.status == 'approved' %}
-        <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/send/" style="display: inline;">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-info">
-                <i class="fas fa-paper-plane me-2"></i>Send to Supplier
-            </button>
-        </form>
-        {% elif order.status == 'sent' or order.status == 'acknowledged' or order.status == 'partially_received' %}
-        <a href="{{ urls.goods_receipt_create }}?po={{ order.pk }}" class="btn btn-success">
-            <i class="fas fa-truck-loading me-2"></i>Receive Goods
-        </a>
-        {% endif %}
-        <button onclick="window.print()" class="btn btn-outline-primary">
-            <i class="fas fa-print me-2"></i>Print
-        </button>
+{% if can_edit or user_role and user_role in 'owner,manager' and order.status == 'pending' or can_send or can_acknowledge or can_cancel %}
+<div class="action-section">
+    <h6 class="mb-3">
+        <i class="fas fa-cogs me-2"></i>Available Actions
+    </h6>
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="d-flex flex-wrap gap-2">
+                {% if can_edit %}
+                <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/edit/" 
+                   class="btn btn-outline-primary btn-action">
+                    <i class="fas fa-edit me-2"></i>Edit Order
+                </a>
+                {% endif %}
+
+                {% if order.status == 'draft' %}
+                <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/submit/" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning btn-action">
+                        <i class="fas fa-paper-plane me-2"></i>Submit for Approval
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if order.status == 'pending' and user_role and user_role in 'owner,manager' %}
+                <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/approve/" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success btn-action">
+                        <i class="fas fa-check me-2"></i>Approve Order
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if can_send %}
+                <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/send/" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-action">
+                        <i class="fas fa-share me-2"></i>Send to Supplier
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if can_acknowledge %}
+                <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/acknowledge/" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-info btn-action">
+                        <i class="fas fa-handshake me-2"></i>Mark Acknowledged
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if can_receive %}
+                <a href="/business/{{ request.tenant.slug }}/suppliers/receipts/create/?po={{ order.pk }}" 
+                   class="btn btn-success btn-action">
+                    <i class="fas fa-truck-loading me-2"></i>Record Receipt
+                </a>
+                {% endif %}
+
+                {% if can_create_invoice %}
+                <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/create-invoice/" 
+                   class="btn btn-primary btn-action">
+                    <i class="fas fa-file-invoice me-2"></i>Create Invoice
+                </a>
+                {% endif %}
+
+                {% if can_cancel and user_role and user_role in 'owner,manager' %}
+                <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/cancel/" 
+                      class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this order?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-action">
+                        <i class="fas fa-times me-2"></i>Cancel Order
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+            <div class="btn-group">
+                <a href="{{ print_url }}" class="btn btn-outline-secondary btn-action" target="_blank">
+                    <i class="fas fa-print me-2"></i>Print
+                </a>
+                <a href="{{ pdf_url }}" class="btn btn-outline-secondary btn-action">
+                    <i class="fas fa-file-pdf me-2"></i>PDF
+                </a>
+            </div>
+        </div>
     </div>
 </div>
+{% endif %}
 
 <div class="row">
     <!-- Main Content -->
     <div class="col-lg-8">
         <!-- Order Items -->
-        <div class="info-card mb-4">
-            <div class="info-card-header">
-                <i class="fas fa-list me-2"></i>Order Items
+        <div class="card info-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Order Items
+                    <span class="badge bg-secondary ms-2">{{ items.count }}</span>
+                </h5>
             </div>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Item</th>
-                            <th>SKU</th>
-                            <th class="text-end">Qty Ordered</th>
-                            <th class="text-end">Qty Received</th>
-                            <th class="text-end">Unit Price</th>
-                            <th class="text-end">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in items %}
-                        <tr>
-                            <td>
-                                <div class="fw-semibold">{{ item.item.name }}</div>
-                                {% if item.item_description %}
-                                <small class="text-muted">{{ item.item_description }}</small>
-                                {% endif %}
-                            </td>
-                            <td>{{ item.item_sku|default:item.item.sku }}</td>
-                            <td class="text-end">{{ item.quantity }}</td>
-                            <td class="text-end">
-                                <span class="{% if item.received_quantity >= item.quantity %}text-success{% elif item.received_quantity > 0 %}text-warning{% else %}text-muted{% endif %}">
-                                    {{ item.received_quantity }}
-                                </span>
-                            </td>
-                            <td class="text-end">KES {{ item.unit_price|floatformat:2 }}</td>
-                            <td class="text-end fw-semibold">KES {{ item.total_amount|floatformat:2 }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    <tfoot class="table-light">
-                        <tr>
-                            <th colspan="5" class="text-end">Subtotal:</th>
-                            <th class="text-end">KES {{ order.subtotal|floatformat:2 }}</th>
-                        </tr>
-                        {% if order.tax_amount > 0 %}
-                        <tr>
-                            <th colspan="5" class="text-end">Tax:</th>
-                            <th class="text-end">KES {{ order.tax_amount|floatformat:2 }}</th>
-                        </tr>
-                        {% endif %}
-                        {% if order.shipping_cost > 0 %}
-                        <tr>
-                            <th colspan="5" class="text-end">Shipping:</th>
-                            <th class="text-end">KES {{ order.shipping_cost|floatformat:2 }}</th>
-                        </tr>
-                        {% endif %}
-                        {% if order.discount_amount > 0 %}
-                        <tr>
-                            <th colspan="5" class="text-end">Discount:</th>
-                            <th class="text-end text-success">-KES {{ order.discount_amount|floatformat:2 }}</th>
-                        </tr>
-                        {% endif %}
-                        <tr class="table-primary">
-                            <th colspan="5" class="text-end fs-5">Total:</th>
-                            <th class="text-end fs-5">KES {{ order.total_amount|floatformat:2 }}</th>
-                        </tr>
-                    </tfoot>
-                </table>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover item-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="text-center">Ordered</th>
+                                <th class="text-center">Received</th>
+                                <th class="text-center">Pending</th>
+                                <th class="text-end">Unit Price</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr class="item-row">
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div>
+                                            <div class="fw-semibold">{{ item.item.name }}</div>
+                                            {% if item.item.sku %}
+                                            <small class="text-muted">SKU: {{ item.item.sku }}</small>
+                                            {% endif %}
+                                            {% if item.notes %}
+                                            <br><small class="text-info">{{ item.notes }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold">{{ item.quantity|floatformat:0 }}</span>
+                                    {% if item.item.unit %}
+                                    <br><small class="text-muted">{{ item.item.unit }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold {% if item.received_quantity > 0 %}text-success{% else %}text-muted{% endif %}">
+                                        {{ item.received_quantity|floatformat:0 }}
+                                    </span>
+                                    {% if item.received_date %}
+                                    <br><small class="text-muted">{{ item.received_date|date:"M d" }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold {% if item.pending_quantity > 0 %}text-warning{% else %}text-success{% endif %}">
+                                        {{ item.pending_quantity|floatformat:0 }}
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold">KES {{ item.unit_price|floatformat:0 }}</span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold">KES {{ item.total_amount|floatformat:0 }}</span>
+                                </td>
+                                <td class="text-center">
+                                    {% if item.is_fully_received %}
+                                    <span class="badge bg-success">Complete</span>
+                                    {% elif item.received_quantity > 0 %}
+                                    <span class="badge bg-warning">Partial</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Pending</span>
+                                    {% endif %}
+                                    {% if item.receive_percentage > 0 and item.receive_percentage < 100 %}
+                                    <br><small class="text-muted">{{ item.receive_percentage|floatformat:0 }}%</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <i class="fas fa-box-open fa-2x text-muted mb-2"></i>
+                                    <p class="text-muted mb-0">No items in this order</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- Order Details -->
-        <div class="info-card mb-4">
-            <div class="info-card-header">
-                <i class="fas fa-info-circle me-2"></i>Order Details
+        <!-- Order Timeline -->
+        <div class="card info-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2"></i>Order Timeline
+                </h5>
             </div>
-            <div class="row p-3">
-                <div class="col-md-6">
-                    <p><strong>Priority:</strong> 
-                        <span class="badge bg-{% if order.priority == 'urgent' %}danger{% elif order.priority == 'high' %}warning{% elif order.priority == 'low' %}secondary{% else %}info{% endif %}">
-                            {{ order.get_priority_display }}
-                        </span>
-                    </p>
-                    {% if order.payment_terms %}
-                    <p><strong>Payment Terms:</strong> {{ order.get_payment_terms_display }}</p>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item {% if order.status == 'draft' %}current{% else %}active{% endif %}">
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Order Created</h6>
+                            <p class="text-muted mb-1">{{ order.created_at|date:"F d, Y g:i A" }}</p>
+                            {% if order.requested_by %}
+                            <small class="text-muted">by {{ order.requested_by.user.get_full_name|default:order.requested_by.user.username }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if order.status != 'draft' %}
+                    <div class="timeline-item {% if order.status == 'pending' %}current{% else %}active{% endif %}">
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Submitted for Approval</h6>
+                            <p class="text-muted mb-0">Status changed to pending</p>
+                        </div>
+                    </div>
                     {% endif %}
-                    {% if order.delivery_terms %}
-                    <p><strong>Delivery Terms:</strong> {{ order.delivery_terms }}</p>
+
+                    {% if order.approved_at %}
+                    <div class="timeline-item {% if order.status == 'approved' %}current{% else %}active{% endif %}">
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Order Approved</h6>
+                            <p class="text-muted mb-1">{{ order.approved_at|date:"F d, Y g:i A" }}</p>
+                            {% if order.approved_by %}
+                            <small class="text-muted">by {{ order.approved_by.user.get_full_name|default:order.approved_by.user.username }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
                     {% endif %}
-                    {% if order.contact_person %}
-                    <p><strong>Contact Person:</strong> {{ order.contact_person }}</p>
+
+                    {% if order.status in 'sent,acknowledged,partially_received,completed' %}
+                    <div class="timeline-item {% if order.status == 'sent' %}current{% else %}active{% endif %}">
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Sent to Supplier</h6>
+                            <p class="text-muted mb-0">Order transmitted to {{ order.supplier.name }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if order.status in 'acknowledged,partially_received,completed' %}
+                    <div class="timeline-item {% if order.status == 'acknowledged' %}current{% else %}active{% endif %}">
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Acknowledged by Supplier</h6>
+                            <p class="text-muted mb-0">Supplier confirmed receipt of order</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if order.status in 'partially_received,completed' %}
+                    <div class="timeline-item {% if order.status == 'partially_received' %}current{% else %}active{% endif %}">
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Goods Receipt Started</h6>
+                            <p class="text-muted mb-0">Items being received</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if order.status == 'completed' %}
+                    <div class="timeline-item active">
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Order Completed</h6>
+                            {% if order.delivery_date %}
+                            <p class="text-muted mb-0">{{ order.delivery_date|date:"F d, Y" }}</p>
+                            {% else %}
+                            <p class="text-muted mb-0">All items received</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if order.status == 'cancelled' %}
+                    <div class="timeline-item" style="--timeline-color: #dc3545;">
+                        <div class="timeline-content">
+                            <h6 class="mb-1 text-danger">Order Cancelled</h6>
+                            <p class="text-muted mb-0">Order was cancelled</p>
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
-                <div class="col-md-6">
-                    {% if order.requested_by %}
-                    <p><strong>Requested By:</strong> {{ order.requested_by.user.get_full_name }}</p>
-                    {% endif %}
-                    {% if order.approved_by %}
-                    <p><strong>Approved By:</strong> {{ order.approved_by.user.get_full_name }}</p>
-                    <p><strong>Approved At:</strong> {{ order.approved_at }}</p>
-                    {% endif %}
-                    {% if order.supplier_reference %}
-                    <p><strong>Supplier Reference:</strong> {{ order.supplier_reference }}</p>
-                    {% endif %}
-                </div>
             </div>
-            {% if order.special_instructions %}
-            <div class="border-top p-3">
-                <p class="mb-2"><strong>Special Instructions:</strong></p>
-                <p class="mb-0">{{ order.special_instructions|linebreaks }}</p>
-            </div>
-            {% endif %}
-            {% if order.delivery_address %}
-            <div class="border-top p-3">
-                <p class="mb-2"><strong>Delivery Address:</strong></p>
-                <p class="mb-0">{{ order.delivery_address|linebreaks }}</p>
-            </div>
-            {% endif %}
         </div>
 
         <!-- Goods Receipts -->
         {% if receipts %}
-        <div class="info-card">
-            <div class="info-card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-truck-loading me-2"></i>Goods Receipts</span>
-                <a href="{{ urls.goods_receipt_create }}?po={{ order.pk }}" class="btn btn-sm btn-outline-success">
-                    <i class="fas fa-plus me-1"></i>New Receipt
-                </a>
+        <div class="card info-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-truck-loading me-2"></i>Goods Receipts
+                    <span class="badge bg-secondary ms-2">{{ receipts.count }}</span>
+                </h5>
             </div>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Receipt Number</th>
-                            <th>Date</th>
-                            <th>Items</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for receipt in receipts %}
-                        <tr>
-                            <td>
-                                <a href="/business/{{ request.tenant.slug }}/suppliers/receipts/{{ receipt.pk }}/" class="fw-semibold text-decoration-none">
-                                    GR-{{ receipt.receipt_number }}
-                                </a>
-                            </td>
-                            <td>{{ receipt.receipt_date }}</td>
-                            <td>{{ receipt.total_items }} items</td>
-                            <td>
-                                <span class="badge bg-{% if receipt.status == 'completed' %}success{% elif receipt.status == 'pending' %}warning{% elif receipt.status == 'discrepancy' %}danger{% else %}primary{% endif %}">
+            <div class="card-body">
+                {% for receipt in receipts %}
+                <div class="card receipt-card mb-3">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h6 class="mb-1">
+                                    <a href="/business/{{ request.tenant.slug }}/suppliers/receipts/{{ receipt.pk }}/" 
+                                       class="text-decoration-none">
+                                        {{ receipt.receipt_number }}
+                                    </a>
+                                </h6>
+                                <p class="text-muted mb-0">
+                                    {{ receipt.receipt_date|date:"F d, Y" }}
+                                    {% if receipt.delivery_note_number %}
+                                    • DN: {{ receipt.delivery_note_number }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                <span class="badge bg-{% if receipt.status == 'completed' %}success{% elif receipt.status == 'discrepancy' %}warning{% else %}secondary{% endif %}">
                                     {{ receipt.get_status_display }}
                                 </span>
-                            </td>
-                            <td>
-                                <a href="/business/{{ request.tenant.slug }}/suppliers/receipts/{{ receipt.pk }}/" class="btn btn-sm btn-outline-primary">
-                                    View
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </div>
+                            <div class="col-md-3 text-md-end">
+                                <small class="text-muted">{{ receipt.total_items }} item{{ receipt.total_items|pluralize }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
         {% endif %}
@@ -379,120 +610,365 @@
 
     <!-- Sidebar -->
     <div class="col-lg-4">
-        <!-- Order Timeline -->
-        <div class="info-card mb-4">
-            <div class="info-card-header">
-                <i class="fas fa-history me-2"></i>Order Timeline
+        <!-- Supplier Information -->
+        <div class="card info-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-building me-2"></i>Supplier Information
+                </h5>
             </div>
-            <div class="p-3">
-                <div class="timeline-item completed">
-                    <div class="fw-semibold">Order Created</div>
-                    <div class="text-muted small">{{ order.created_at }}</div>
-                    {% if order.requested_by %}
-                    <div class="text-muted small">by {{ order.requested_by.user.get_full_name }}</div>
+            <div class="card-body supplier-info">
+                <h6 class="mb-2">{{ order.supplier.name }}</h6>
+                {% if order.supplier.business_name and order.supplier.business_name != order.supplier.name %}
+                <p class="text-muted mb-2">{{ order.supplier.business_name }}</p>
+                {% endif %}
+                
+                <div class="mb-3">
+                    {% if order.supplier.email %}
+                    <div class="mb-1">
+                        <i class="fas fa-envelope me-2 text-muted"></i>
+                        <a href="mailto:{{ order.supplier.email }}">{{ order.supplier.email }}</a>
+                    </div>
+                    {% endif %}
+                    {% if order.supplier.phone %}
+                    <div class="mb-1">
+                        <i class="fas fa-phone me-2 text-muted"></i>
+                        <a href="tel:{{ order.supplier.phone }}">{{ order.supplier.phone }}</a>
+                    </div>
                     {% endif %}
                 </div>
-                
-                {% if order.approved_at %}
-                <div class="timeline-item completed">
-                    <div class="fw-semibold">Order Approved</div>
-                    <div class="text-muted small">{{ order.approved_at }}</div>
-                    {% if order.approved_by %}
-                    <div class="text-muted small">by {{ order.approved_by.user.get_full_name }}</div>
-                    {% endif %}
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">Rating:</small>
+                    <div>
+                        {% for i in "12345" %}
+                        <i class="fas fa-star {% if forloop.counter <= order.supplier.rating %}text-warning{% else %}text-muted{% endif %}"></i>
+                        {% endfor %}
+                        <span class="ms-1">({{ order.supplier.rating|floatformat:1 }})</span>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/{{ order.supplier.pk }}/" 
+                       class="btn btn-outline-primary btn-sm w-100">
+                        <i class="fas fa-external-link-alt me-2"></i>View Supplier Details
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="card info-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-calculator me-2"></i>Financial Summary
+                </h5>
+            </div>
+            <div class="card-body financial-summary">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal:</span>
+                    <span class="fw-bold">KES {{ order.subtotal|floatformat:0 }}</span>
+                </div>
+                {% if order.tax_amount > 0 %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Tax:</span>
+                    <span>KES {{ order.tax_amount|floatformat:0 }}</span>
                 </div>
                 {% endif %}
-                
-                {% if order.status == 'sent' or order.status == 'acknowledged' or order.status == 'partially_received' or order.status == 'completed' %}
-                <div class="timeline-item completed">
-                    <div class="fw-semibold">Sent to Supplier</div>
-                    <div class="text-muted small">Order transmitted</div>
+                {% if order.shipping_cost > 0 %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Shipping:</span>
+                    <span>KES {{ order.shipping_cost|floatformat:0 }}</span>
                 </div>
                 {% endif %}
-                
-                {% if order.status == 'acknowledged' or order.status == 'partially_received' or order.status == 'completed' %}
-                <div class="timeline-item completed">
-                    <div class="fw-semibold">Acknowledged</div>
-                    <div class="text-muted small">Supplier confirmed order</div>
+                {% if order.discount_amount > 0 %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-success">Discount:</span>
+                    <span class="text-success">-KES {{ order.discount_amount|floatformat:0 }}</span>
                 </div>
                 {% endif %}
-                
-                {% if order.status == 'partially_received' %}
-                <div class="timeline-item current">
-                    <div class="fw-semibold">Partially Received</div>
-                    <div class="text-muted small">{{ progress.completion_percentage|floatformat:0 }}% complete</div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <span class="fw-bold">Total:</span>
+                    <span class="fw-bold h5 mb-0">KES {{ order.total_amount|floatformat:0 }}</span>
                 </div>
-                {% elif order.status == 'completed' %}
-                <div class="timeline-item completed">
-                    <div class="fw-semibold">Order Completed</div>
-                    <div class="text-muted small">{{ order.delivery_date|default:"All items received" }}</div>
+            </div>
+        </div>
+
+        <!-- Order Details -->
+        <div class="card info-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Order Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted">Payment Terms:</small>
+                    </div>
+                    <div class="col-6 text-end">
+                        <small class="fw-bold">{{ order.get_payment_terms_display|default:"Not specified" }}</small>
+                    </div>
+                </div>
+                
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted">Delivery Terms:</small>
+                    </div>
+                    <div class="col-6 text-end">
+                        <small class="fw-bold">{{ order.delivery_terms|default:"Standard" }}</small>
+                    </div>
+                </div>
+
+                {% if order.supplier_reference %}
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted">Supplier Ref:</small>
+                    </div>
+                    <div class="col-6 text-end">
+                        <small class="fw-bold">{{ order.supplier_reference }}</small>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if order.tracking_number %}
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted">Tracking:</small>
+                    </div>
+                    <div class="col-6 text-end">
+                        <small class="fw-bold">{{ order.tracking_number }}</small>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted">Created:</small>
+                    </div>
+                    <div class="col-6 text-end">
+                        <small class="fw-bold">{{ order.created_at|date:"M d, Y" }}</small>
+                    </div>
+                </div>
+
+                {% if order.delivery_address %}
+                <hr>
+                <div class="mb-2">
+                    <small class="text-muted d-block">Delivery Address:</small>
+                    <small class="fw-bold">{{ order.delivery_address|linebreaksbr }}</small>
+                </div>
+                {% endif %}
+
+                {% if order.contact_person %}
+                <div class="mb-2">
+                    <small class="text-muted d-block">Contact Person:</small>
+                    <small class="fw-bold">
+                        {{ order.contact_person }}
+                        {% if order.contact_phone %}
+                        <br>{{ order.contact_phone }}
+                        {% endif %}
+                    </small>
                 </div>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Supplier Information -->
-        <div class="info-card mb-4">
-            <div class="info-card-header">
-                <i class="fas fa-truck me-2"></i>Supplier Information
+        <!-- Special Instructions -->
+        {% if order.special_instructions %}
+        <div class="card info-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-sticky-note me-2"></i>Special Instructions
+                </h5>
             </div>
-            <div class="p-3">
-                <h6 class="mb-2">{{ order.supplier.name }}</h6>
-                <p class="mb-1 text-muted small">{{ order.supplier.supplier_code }}</p>
-                {% if order.supplier.email %}
-                <p class="mb-1">
-                    <i class="fas fa-envelope me-1"></i>
-                    <a href="mailto:{{ order.supplier.email }}">{{ order.supplier.email }}</a>
-                </p>
-                {% endif %}
-                {% if order.supplier.phone %}
-                <p class="mb-1">
-                    <i class="fas fa-phone me-1"></i>
-                    <a href="tel:{{ order.supplier.phone }}">{{ order.supplier.phone }}</a>
-                </p>
-                {% endif %}
-                <div class="mt-3">
-                    <a href="/business/{{ request.tenant.slug }}/suppliers/{{ order.supplier.pk }}/" class="btn btn-sm btn-outline-primary w-100">
-                        View Supplier Details
-                    </a>
-                </div>
+            <div class="card-body">
+                <p class="mb-0">{{ order.special_instructions|linebreaksbr }}</p>
             </div>
         </div>
+        {% endif %}
+
+        <!-- Notes -->
+        {% if order.notes %}
+        <div class="card info-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-comment me-2"></i>Internal Notes
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-0">{{ order.notes|linebreaksbr }}</p>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Quick Actions -->
-        <div class="info-card">
-            <div class="info-card-header">
-                <i class="fas fa-bolt me-2"></i>Quick Actions
+        <div class="card info-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bolt me-2"></i>Quick Actions
+                </h5>
             </div>
-            <div class="p-3">
+            <div class="card-body">
                 <div class="d-grid gap-2">
-                    {% if order.status == 'sent' or order.status == 'acknowledged' or order.status == 'partially_received' %}
-                    <a href="{{ urls.goods_receipt_create }}?po={{ order.pk }}" class="btn btn-success">
-                        <i class="fas fa-truck-loading me-2"></i>Receive Goods
+                    <a href="{{ print_url }}" class="document-link" target="_blank">
+                        <i class="fas fa-print me-2"></i>
+                        Print Purchase Order
+                    </a>
+                    
+                    <a href="{{ pdf_url }}" class="document-link">
+                        <i class="fas fa-file-pdf me-2"></i>
+                        Download PDF
+                    </a>
+                    
+                    {% if order.supplier.email %}
+                    <a href="mailto:{{ order.supplier.email }}?subject=Purchase Order {{ order.po_number }}" 
+                       class="document-link">
+                        <i class="fas fa-envelope me-2"></i>
+                        Email Supplier
                     </a>
                     {% endif %}
-                    <a href="{{ urls.purchase_order_create }}?supplier={{ order.supplier.pk }}" class="btn btn-outline-primary">
-                        <i class="fas fa-plus me-2"></i>New Order from Supplier
+                    
+                    {% if order.status in 'sent,acknowledged,partially_received' %}
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/receipts/create/?po={{ order.pk }}" 
+                       class="document-link">
+                        <i class="fas fa-truck-loading me-2"></i>
+                        Record Receipt
                     </a>
-                    <a href="{{ urls.payment_create }}?supplier={{ order.supplier.pk }}" class="btn btn-outline-success">
-                        <i class="fas fa-money-bill me-2"></i>Record Payment
+                    {% endif %}
+                    
+                    {% if order.status == 'completed' %}
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/create-invoice/" 
+                       class="document-link">
+                        <i class="fas fa-file-invoice me-2"></i>
+                        Create Invoice
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Related Orders -->
+        {% if order.supplier.purchase_orders.count > 1 %}
+        <div class="card info-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2"></i>Recent Orders from Supplier
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for related_order in order.supplier.purchase_orders.all|slice:":5" %}
+                {% if related_order.pk != order.pk %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ related_order.pk }}/" 
+                           class="text-decoration-none fw-bold">
+                            {{ related_order.po_number }}
+                        </a>
+                        <br>
+                        <small class="text-muted">{{ related_order.order_date|date:"M d, Y" }}</small>
+                    </div>
+                    <div class="text-end">
+                        <small class="fw-bold">KES {{ related_order.total_amount|floatformat:0 }}</small>
+                        <br>
+                        <span class="badge bg-{% if related_order.status == 'completed' %}success{% elif related_order.status == 'pending' %}warning{% elif related_order.status == 'cancelled' %}danger{% else %}secondary{% endif %} badge-sm">
+                            {{ related_order.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                {% if not forloop.last %}<hr class="my-2">{% endif %}
+                {% endif %}
+                {% endfor %}
+                
+                <div class="mt-3">
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/orders/?supplier={{ order.supplier.pk }}" 
+                       class="btn btn-outline-primary btn-sm w-100">
+                        <i class="fas fa-external-link-alt me-2"></i>View All Orders
                     </a>
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 
-<!-- Notes Section -->
-{% if order.notes %}
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="info-card">
-            <div class="info-card-header">
-                <i class="fas fa-sticky-note me-2"></i>Notes
+<!-- Status Change Modal -->
+{% if available_statuses %}
+<div class="modal fade" id="statusChangeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Order Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="p-3">
-                <p class="mb-0">{{ order.notes|linebreaks }}</p>
+            <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/status-update/">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p>Current status: <span class="badge status-{{ order.status }}">{{ order.get_status_display }}</span></p>
+                    
+                    <div class="mb-3">
+                        <label for="status" class="form-label">New Status</label>
+                        <select name="status" id="status" class="form-select" required>
+                            <option value="">Select new status...</option>
+                            {% for status_value, status_label, status_class in available_statuses %}
+                            <option value="{{ status_value }}">{{ status_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This action will update the order status and may trigger notifications to relevant parties.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add Items Modal (for draft orders) -->
+{% if order.status == 'draft' and user_role and user_role in 'owner,manager' %}
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Item to Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addItemForm">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="item_select" class="form-label">Item</label>
+                            <select id="item_select" class="form-select" required>
+                                <option value="">Select an item...</option>
+                                <!-- Items will be loaded via AJAX -->
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="quantity" class="form-label">Quantity</label>
+                            <input type="number" id="quantity" class="form-control" step="0.01" min="0.01" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="unit_price" class="form-label">Unit Price</label>
+                            <input type="number" id="unit_price" class="form-control" step="0.01" min="0.01" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="item_notes" class="form-label">Notes (Optional)</label>
+                        <input type="text" id="item_notes" class="form-control" placeholder="Special instructions for this item">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addItemToOrder()">Add Item</button>
             </div>
         </div>
     </div>
@@ -504,22 +980,141 @@
 <script>
 $(document).ready(function() {
     // Initialize tooltips
-    $('[data-bs-toggle="tooltip"]').tooltip();
-    
-    // Confirmation for order actions
-    $('form[action*="/approve/"], form[action*="/send/"]').on('submit', function(e) {
-        const action = $(this).find('button').text().trim();
-        if (!confirm(`Are you sure you want to ${action.toLowerCase()}?`)) {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Auto-refresh progress if order is active
+    {% if order.status in 'sent,acknowledged,partially_received' %}
+    setInterval(function() {
+        location.reload();
+    }, 300000); // Refresh every 5 minutes
+    {% endif %}
+
+    // Confirmation for critical actions
+    $('form[action*="/cancel/"], form[action*="/approve/"]').on('submit', function(e) {
+        var action = $(this).find('button[type="submit"]').text().trim();
+        if (!confirm('Are you sure you want to ' + action.toLowerCase() + '?')) {
             e.preventDefault();
         }
     });
 
-    // Auto-refresh for pending orders (every 30 seconds)
-    {% if order.status == 'pending' or order.status == 'approved' or order.status == 'sent' %}
-    setTimeout(function() {
-        location.reload();
-    }, 30000);
+    // Enhanced form validation
+    $('form').on('submit', function(e) {
+        var requiredFields = $(this).find('[required]');
+        var isValid = true;
+        
+        requiredFields.each(function() {
+            if (!$(this).val()) {
+                isValid = false;
+                $(this).addClass('is-invalid');
+            } else {
+                $(this).removeClass('is-invalid');
+            }
+        });
+        
+        if (!isValid) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+        }
+    });
+
+    // Print functionality
+    $('.print-btn').on('click', function(e) {
+        e.preventDefault();
+        window.open($(this).attr('href'), '_blank', 'width=800,height=600');
+    });
+
+    // Status change tracking
+    if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.href);
+    }
+});
+
+// Add item to order function (for draft orders)
+function addItemToOrder() {
+    var formData = {
+        'item_id': $('#item_select').val(),
+        'quantity': $('#quantity').val(),
+        'unit_price': $('#unit_price').val(),
+        'notes': $('#item_notes').val(),
+        'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+    };
+    
+    $.ajax({
+        url: '/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/add-item/',
+        type: 'POST',
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                location.reload();
+            } else {
+                alert('Error adding item: ' + response.error);
+            }
+        },
+        error: function() {
+            alert('Error adding item. Please try again.');
+        }
+    });
+}
+
+// Load items for add item modal
+$('#addItemModal').on('show.bs.modal', function() {
+    $.ajax({
+        url: '/api/inventory/items/',
+        type: 'GET',
+        success: function(response) {
+            var select = $('#item_select');
+            select.empty().append('<option value="">Select an item...</option>');
+            
+            response.items.forEach(function(item) {
+                select.append('<option value="' + item.id + '">' + item.name + ' (' + item.sku + ')</option>');
+            });
+        }
+    });
+});
+
+// Auto-calculate totals when adding items
+$('#quantity, #unit_price').on('input', function() {
+    var quantity = parseFloat($('#quantity').val()) || 0;
+    var unitPrice = parseFloat($('#unit_price').val()) || 0;
+    var total = quantity * unitPrice;
+    
+    // You can display the calculated total here
+    // $('#calculated_total').text('KES ' + total.toFixed(2));
+});
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    // Ctrl+P for print
+    if (e.ctrlKey && e.keyCode == 80) {
+        e.preventDefault();
+        window.open('{{ print_url }}', '_blank');
+    }
+    
+    // Ctrl+E for edit (if allowed)
+    {% if can_edit %}
+    if (e.ctrlKey && e.keyCode == 69) {
+        e.preventDefault();
+        window.location.href = '/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/edit/';
+    }
     {% endif %}
 });
+
+// Progress animation
+$('.progress-bar').each(function() {
+    var $this = $(this);
+    var width = $this.css('width');
+    $this.css('width', '0').animate({width: width}, 1000);
+});
+
+// Real-time status updates (if WebSocket is available)
+{% if order.status in 'sent,acknowledged,partially_received' %}
+if (typeof WebSocket !== 'undefined') {
+    // Implement WebSocket connection for real-time updates
+    // This would connect to your WebSocket endpoint for order updates
+}
+{% endif %}
 </script>
 {% endblock %}

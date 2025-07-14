@@ -7,12 +7,12 @@ from datetime import datetime, timedelta
 from .models import (
     Supplier, SupplierCategory, PurchaseOrder, PurchaseOrderItem,
     GoodsReceipt, GoodsReceiptItem, SupplierEvaluation, SupplierPayment,
-    SupplierDocument, SupplierContact
+    SupplierDocument, SupplierContact, Invoice, InvoiceItem
 )
 
 class SupplierForm(forms.ModelForm):
     """Form for creating and editing suppliers"""
-    # 
+    
     class Meta:
         model = Supplier
         fields = [
@@ -183,9 +183,9 @@ class PurchaseOrderForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active suppliers - Changed from is_active=True to is_deleted=False
+        # Filter suppliers using is_deleted=False instead of is_active=True
         self.fields['supplier'].queryset = Supplier.objects.filter(
-            is_deleted=False, 
+            is_deleted=False,  # Changed from is_active=True
             status='active'
         )
         
@@ -217,10 +217,10 @@ class PurchaseOrderItemForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active inventory items - assuming InventoryItem uses is_active field
+        # Filter active inventory items
         try:
             from apps.inventory.models import InventoryItem
-            self.fields['item'].queryset = InventoryItem.objects.filter(is_active=True)
+            self.fields['item'].queryset = InventoryItem.objects.filter(is_deleted=False)  # Changed from is_active=True
         except ImportError:
             pass
 
@@ -265,9 +265,9 @@ class GoodsReceiptForm(forms.ModelForm):
             status__in=['approved', 'sent', 'acknowledged', 'partially_received']
         )
         
-        # Filter active suppliers - Changed from is_active=True to is_deleted=False
+        # Filter suppliers using is_deleted=False instead of is_active=True
         self.fields['supplier'].queryset = Supplier.objects.filter(
-            is_deleted=False,
+            is_deleted=False,  # Changed from is_active=True
             status='active'
         )
 
@@ -338,8 +338,8 @@ class SupplierEvaluationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active suppliers - Changed from is_active=True to is_deleted=False
-        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)
+        # Filter suppliers using is_deleted=False instead of is_active=True
+        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)  # Changed from is_active=True
         
         # Filter completed purchase orders
         self.fields['purchase_order'].queryset = PurchaseOrder.objects.filter(
@@ -376,8 +376,8 @@ class SupplierPaymentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active suppliers - Changed from is_active=True to is_deleted=False
-        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)
+        # Filter suppliers using is_deleted=False instead of is_active=True
+        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)  # Changed from is_active=True
         
         # Filter completed purchase orders
         self.fields['purchase_orders'].queryset = PurchaseOrder.objects.filter(
@@ -410,8 +410,8 @@ class SupplierDocumentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Filter active suppliers - Changed from is_active=True to is_deleted=False
-        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)
+        # Filter suppliers using is_deleted=False instead of is_active=True
+        self.fields['supplier'].queryset = Supplier.objects.filter(is_deleted=False)  # Changed from is_active=True
     
     def clean_expiry_date(self):
         issue_date = self.cleaned_data.get('issue_date')
@@ -426,7 +426,7 @@ class SupplierFilterForm(forms.Form):
     """Form for filtering suppliers"""
     
     category = forms.ModelChoiceField(
-        queryset=SupplierCategory.objects.filter(is_active=True),  # SupplierCategory has is_active
+        queryset=SupplierCategory.objects.filter(is_active=True),  # SupplierCategory has is_active field
         required=False,
         empty_label="All Categories",
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -504,7 +504,6 @@ class PurchaseOrderFilterForm(forms.Form):
             'placeholder': 'Search orders...'
         })
     )
-
 
 class GoodsReceiptFilterForm(forms.Form):
     """Form for filtering goods receipts"""
@@ -584,3 +583,126 @@ class QuickSupplierForm(forms.ModelForm):
             code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         
         return code
+
+# Invoice Forms
+class InvoiceForm(forms.ModelForm):
+    """Form for creating and editing invoices"""
+    
+    class Meta:
+        model = Invoice
+        fields = [
+            'supplier', 'purchase_order', 'supplier_invoice_number',
+            'invoice_date', 'due_date', 'total_amount', 'currency',
+            'subtotal', 'tax_amount', 'shipping_cost', 'discount_amount',
+            'description', 'notes', 'invoice_file'
+        ]
+        widgets = {
+            'supplier': forms.Select(attrs={'class': 'form-select'}),
+            'purchase_order': forms.Select(attrs={'class': 'form-select'}),
+            'supplier_invoice_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'invoice_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'due_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'total_amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'currency': forms.TextInput(attrs={'class': 'form-control', 'value': 'KES'}),
+            'subtotal': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'tax_amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'shipping_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'discount_amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'invoice_file': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Filter suppliers using is_deleted=False instead of is_active=True
+        self.fields['supplier'].queryset = Supplier.objects.filter(
+            is_deleted=False,  # Changed from is_active=True
+            status='active'
+        )
+        
+        # Filter completed purchase orders
+        self.fields['purchase_order'].queryset = PurchaseOrder.objects.filter(
+            status='completed'
+        )
+        self.fields['purchase_order'].required = False
+        
+        # Set default dates
+        if not self.instance.pk:
+            self.fields['invoice_date'].initial = timezone.now().date()
+            self.fields['due_date'].initial = timezone.now().date() + timedelta(days=30)
+    
+    def clean_due_date(self):
+        invoice_date = self.cleaned_data.get('invoice_date')
+        due_date = self.cleaned_data.get('due_date')
+        
+        if invoice_date and due_date and due_date < invoice_date:
+            raise ValidationError("Due date cannot be before invoice date.")
+        
+        return due_date
+
+class InvoiceItemForm(forms.ModelForm):
+    """Form for invoice items"""
+    
+    class Meta:
+        model = InvoiceItem
+        fields = ['description', 'quantity', 'unit_price', 'item_code', 'notes']
+        widgets = {
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
+            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
+            'item_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'notes': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+# Formset for invoice items
+InvoiceItemFormSet = inlineformset_factory(
+    Invoice,
+    InvoiceItem,
+    form=InvoiceItemForm,
+    extra=1,
+    can_delete=True,
+    min_num=1,
+    validate_min=True
+)
+
+class InvoiceFilterForm(forms.Form):
+    """Form for filtering invoices"""
+    
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.filter(is_deleted=False, status='active'),
+        required=False,
+        empty_label="All Suppliers",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    
+    status = forms.ChoiceField(
+        choices=[('', 'All Status')] + Invoice.STATUS_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    
+    payment_status = forms.ChoiceField(
+        choices=[('', 'All Payment Status')] + Invoice.PAYMENT_STATUS_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    
+    date_from = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    
+    date_to = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    
+    search = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Search invoices...'
+        })
+    )

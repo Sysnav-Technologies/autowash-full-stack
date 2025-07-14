@@ -1,0 +1,755 @@
+<!-- templates/suppliers/goods_receipt_detail.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}Goods Receipt - GR-{{ receipt.receipt_number }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.goods_receipt_list }}">Goods Receipts</a></li>
+<li class="breadcrumb-item active">GR-{{ receipt.receipt_number }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.receipt-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.info-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.info-card-header {
+    background: #f8fafc;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-partial { background: #dbeafe; color: #1e40af; }
+.status-completed { background: #d1fae5; color: #065f46; }
+.status-discrepancy { background: #fee2e2; color: #991b1b; }
+
+.items-table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.items-table .table th {
+    background: #f8fafc;
+    color: #374151;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.75rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.items-table .table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.variance-indicator {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.variance-positive { background: #d1fae5; color: #065f46; }
+.variance-negative { background: #fee2e2; color: #991b1b; }
+.variance-zero { background: #f3f4f6; color: #374151; }
+
+.quality-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.5rem;
+}
+
+.quality-passed { background: #10b981; }
+.quality-failed { background: #ef4444; }
+
+.metric-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border-left: 4px solid #10b981;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.action-buttons {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-item {
+    border-left: 2px solid #e5e7eb;
+    padding-left: 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+.timeline-item.completed::before {
+    background: #059669;
+}
+
+.damage-alert {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.quality-alert {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6b7280;
+}
+
+@media (max-width: 768px) {
+    .receipt-header {
+        padding: 1.5rem;
+    }
+    
+    .metric-card {
+        margin-bottom: 1rem;
+    }
+    
+    .items-table {
+        font-size: 0.8rem;
+    }
+    
+    .btn-group {
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        flex: 1;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Receipt Header -->
+<div class="receipt-header">
+    <div class="row align-items-center">
+        <div class="col-auto">
+            <div class="bg-white bg-opacity-20 rounded-3 p-3">
+                <i class="fas fa-truck-loading fa-2x"></i>
+            </div>
+        </div>
+        <div class="col">
+            <h1 class="h2 mb-2">Goods Receipt GR-{{ receipt.receipt_number }}</h1>
+            <p class="mb-2 opacity-90">
+                Received from {{ receipt.supplier.name }} on {{ receipt.receipt_date|date:"F d, Y" }}
+            </p>
+            <div class="d-flex align-items-center gap-3">
+                <span class="status-badge status-{{ receipt.status }}">
+                    {{ receipt.get_status_display }}
+                </span>
+                <div class="d-flex align-items-center">
+                    <span class="quality-indicator {% if receipt.quality_check_passed %}quality-passed{% else %}quality-failed{% endif %}"></span>
+                    <span class="small">Quality {% if receipt.quality_check_passed %}Passed{% else %}Failed{% endif %}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="btn-group">
+                {% if receipt.status != 'completed' %}
+                <button type="button" class="btn btn-light" onclick="completeReceipt()">
+                    <i class="fas fa-check me-2"></i>Complete
+                </button>
+                {% endif %}
+                <a href="{{ urls.goods_receipt_list }}" class="btn btn-outline-light">
+                    <i class="fas fa-list me-2"></i>All Receipts
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Metrics -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
+        <div class="metric-card">
+            <div class="metric-value">{{ receipt.total_items }}</div>
+            <div class="metric-label">
+                <i class="fas fa-list me-2"></i>Total Items
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
+        <div class="metric-card">
+            <div class="metric-value">{{ receipt.total_quantity|floatformat:0 }}</div>
+            <div class="metric-label">
+                <i class="fas fa-boxes me-2"></i>Total Quantity
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
+        <div class="metric-card">
+            <div class="metric-value text-danger">{{ items|dictsort:"damaged_quantity"|dictsortreversed:"0"|length|default:0 }}</div>
+            <div class="metric-label">
+                <i class="fas fa-exclamation-triangle me-2"></i>Items with Damage
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
+        <div class="metric-card">
+            <div class="metric-value text-warning">{{ items|dictsort:"quality_passed"|dictsortreversed:"False"|length|default:0 }}</div>
+            <div class="metric-label">
+                <i class="fas fa-clipboard-check me-2"></i>Quality Issues
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+{% if receipt.status != 'completed' %}
+<div class="action-buttons">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h6 class="mb-1">Available Actions</h6>
+            <p class="text-muted small mb-0">Complete this receipt to update inventory</p>
+        </div>
+        <div>
+            <button type="button" class="btn btn-success" onclick="completeReceipt()">
+                <i class="fas fa-check-circle me-2"></i>Complete Receipt
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <!-- Main Content -->
+    <div class="col-lg-8 mb-4">
+        <!-- Receipt Information -->
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-info-circle me-2"></i>Receipt Information
+            </div>
+            <div class="p-4">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="small text-muted">Purchase Order</div>
+                        <div class="fw-semibold">
+                            <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ receipt.purchase_order.pk }}/" 
+                               class="text-decoration-none">
+                                PO-{{ receipt.purchase_order.po_number }}
+                            </a>
+                        </div>
+                        <div class="small text-muted">Ordered: {{ receipt.purchase_order.order_date|date:"M d, Y" }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="small text-muted">Supplier</div>
+                        <div class="fw-semibold">
+                            <a href="/business/{{ request.tenant.slug }}/suppliers/{{ receipt.supplier.pk }}/" 
+                               class="text-decoration-none">
+                                {{ receipt.supplier.name }}
+                            </a>
+                        </div>
+                        <div class="small text-muted">{{ receipt.supplier.supplier_code }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="small text-muted">Receipt Date</div>
+                        <div class="fw-semibold">{{ receipt.receipt_date|date:"F d, Y" }}</div>
+                        <div class="small text-muted">{{ receipt.receipt_date|timesince }} ago</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="small text-muted">Received By</div>
+                        <div class="fw-semibold">
+                            {% if receipt.received_by %}
+                                {{ receipt.received_by.user.get_full_name|default:receipt.received_by.user.username }}
+                            {% else %}
+                                System
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if receipt.delivery_note_number %}
+                    <div class="col-md-6 mb-3">
+                        <div class="small text-muted">Delivery Note</div>
+                        <div class="fw-semibold">{{ receipt.delivery_note_number }}</div>
+                    </div>
+                    {% endif %}
+                    {% if receipt.vehicle_number %}
+                    <div class="col-md-6 mb-3">
+                        <div class="small text-muted">Vehicle Number</div>
+                        <div class="fw-semibold">{{ receipt.vehicle_number }}</div>
+                    </div>
+                    {% endif %}
+                    {% if receipt.driver_name %}
+                    <div class="col-md-6 mb-3">
+                        <div class="small text-muted">Driver Name</div>
+                        <div class="fw-semibold">{{ receipt.driver_name }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Quality Check Results -->
+        {% if not receipt.quality_check_passed or receipt.quality_notes %}
+        <div class="{% if not receipt.quality_check_passed %}quality-alert{% else %}info-card{% endif %}">
+            {% if not receipt.quality_check_passed %}
+            <div class="d-flex align-items-center mb-2">
+                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                <h6 class="mb-0 text-warning">Quality Check Issues</h6>
+            </div>
+            {% else %}
+            <div class="info-card-header">
+                <i class="fas fa-clipboard-check me-2"></i>Quality Check Notes
+            </div>
+            <div class="p-4">
+            {% endif %}
+                {% if receipt.quality_notes %}
+                <p class="mb-0">{{ receipt.quality_notes }}</p>
+                {% endif %}
+            {% if receipt.quality_check_passed %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Receipt Items -->
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-list me-2"></i>Received Items
+            </div>
+            <div class="p-3">
+                {% if items %}
+                <!-- Damage/Quality Alerts -->
+                {% with damaged_items=items|dictsort:"damaged_quantity"|dictsortreversed:"0" quality_failed=items|dictsort:"quality_passed"|dictsortreversed:"False" %}
+                {% if damaged_items %}
+                <div class="damage-alert">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                        <h6 class="mb-0 text-danger">Items with Damage</h6>
+                    </div>
+                    <div class="row">
+                        {% for item in damaged_items %}
+                        {% if item.damaged_quantity > 0 %}
+                        <div class="col-md-6 mb-1">
+                            <span class="small">{{ item.purchase_order_item.item.name }}</span>
+                            <span class="small fw-semibold text-danger">- {{ item.damaged_quantity }} damaged</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if quality_failed %}
+                <div class="quality-alert">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-times-circle text-warning me-2"></i>
+                        <h6 class="mb-0 text-warning">Quality Check Failed</h6>
+                    </div>
+                    <div class="row">
+                        {% for item in quality_failed %}
+                        {% if not item.quality_passed %}
+                        <div class="col-md-6 mb-1">
+                            <span class="small">{{ item.purchase_order_item.item.name }}</span>
+                            {% if item.quality_notes %}
+                            <span class="small text-muted">- {{ item.quality_notes }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+                
+                <div class="table-responsive">
+                    <table class="items-table table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Expected</th>
+                                <th>Received</th>
+                                <th>Damaged</th>
+                                <th>Variance</th>
+                                <th>Quality</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">{{ item.purchase_order_item.item.name }}</div>
+                                    <div class="small text-muted">SKU: {{ item.purchase_order_item.item.sku }}</div>
+                                    {% if item.lot_number %}
+                                    <div class="small text-muted">Lot: {{ item.lot_number }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="fw-semibold">{{ item.expected_quantity|floatformat:1 }}</span>
+                                    <div class="small text-muted">{{ item.purchase_order_item.item.unit|default:"units" }}</div>
+                                </td>
+                                <td>
+                                    <span class="fw-semibold text-success">{{ item.received_quantity|floatformat:1 }}</span>
+                                    <div class="small text-muted">{{ item.purchase_order_item.item.unit|default:"units" }}</div>
+                                </td>
+                                <td>
+                                    {% if item.damaged_quantity > 0 %}
+                                    <span class="fw-semibold text-danger">{{ item.damaged_quantity|floatformat:1 }}</span>
+                                    {% else %}
+                                    <span class="text-muted">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% with variance=item.received_quantity|add:item.expected_quantity|mul:-1 %}
+                                    <span class="variance-indicator {% if variance > 0 %}variance-positive{% elif variance < 0 %}variance-negative{% else %}variance-zero{% endif %}">
+                                        {% if variance > 0 %}+{% endif %}{{ variance|floatformat:1 }}
+                                    </span>
+                                    {% endwith %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="quality-indicator {% if item.quality_passed %}quality-passed{% else %}quality-failed{% endif %}"></span>
+                                        <span class="small">
+                                            {% if item.quality_passed %}Passed{% else %}Failed{% endif %}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if item.quality_notes %}
+                                    <span class="small">{{ item.quality_notes|truncatechars:50 }}</span>
+                                    {% else %}
+                                    <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No Items Received</h5>
+                    <p class="text-muted">No items have been recorded for this receipt yet.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Additional Notes -->
+        {% if receipt.notes %}
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-sticky-note me-2"></i>Additional Notes
+            </div>
+            <div class="p-4">
+                <p class="mb-0">{{ receipt.notes }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Receipt Timeline -->
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-history me-2"></i>Receipt Timeline
+            </div>
+            <div class="p-4">
+                <div class="timeline-item completed">
+                    <div class="fw-semibold">Receipt Created</div>
+                    <div class="small text-muted">{{ receipt.created_at|date:"M d, Y g:i A" }}</div>
+                </div>
+                
+                {% if receipt.status == 'completed' %}
+                <div class="timeline-item completed">
+                    <div class="fw-semibold">Receipt Completed</div>
+                    <div class="small text-muted">Inventory updated</div>
+                </div>
+                {% else %}
+                <div class="timeline-item">
+                    <div class="fw-semibold text-muted">Pending Completion</div>
+                    <div class="small text-muted">Waiting to update inventory</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Purchase Order Details -->
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-file-invoice me-2"></i>Purchase Order Details
+            </div>
+            <div class="p-4">
+                <div class="mb-3">
+                    <div class="small text-muted">PO Number</div>
+                    <div class="fw-semibold">
+                        <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ receipt.purchase_order.pk }}/" 
+                           class="text-decoration-none">
+                            PO-{{ receipt.purchase_order.po_number }}
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="small text-muted">Order Date</div>
+                    <div>{{ receipt.purchase_order.order_date|date:"M d, Y" }}</div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="small text-muted">Expected Delivery</div>
+                    <div>{{ receipt.purchase_order.expected_delivery_date|date:"M d, Y" }}</div>
+                    {% if receipt.purchase_order.is_overdue %}
+                    <div class="small text-danger">{{ receipt.purchase_order.days_overdue }} days overdue</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <div class="small text-muted">PO Status</div>
+                    <div>
+                        <span class="badge bg-{% if receipt.purchase_order.status == 'completed' %}success{% elif receipt.purchase_order.status == 'partially_received' %}warning{% else %}primary{% endif %}">
+                            {{ receipt.purchase_order.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="small text-muted">Total Value</div>
+                    <div class="fw-semibold">KES {{ receipt.purchase_order.total_amount|floatformat:2 }}</div>
+                </div>
+                
+                <div>
+                    <div class="small text-muted">Completion</div>
+                    <div class="progress mb-1" style="height: 6px;">
+                        <div class="progress-bar bg-success" style="width: {{ receipt.purchase_order.completion_percentage }}%"></div>
+                    </div>
+                    <div class="small text-muted">{{ receipt.purchase_order.completion_percentage|floatformat:1 }}% received</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supplier Information -->
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-truck me-2"></i>Supplier Information
+            </div>
+            <div class="p-4">
+                <div class="mb-3">
+                    <div class="fw-semibold">
+                        <a href="/business/{{ request.tenant.slug }}/suppliers/{{ receipt.supplier.pk }}/" 
+                           class="text-decoration-none">
+                            {{ receipt.supplier.name }}
+                        </a>
+                    </div>
+                    <div class="small text-muted">{{ receipt.supplier.supplier_code }}</div>
+                </div>
+                
+                {% if receipt.supplier.email %}
+                <div class="mb-2">
+                    <div class="small text-muted">Email</div>
+                    <div class="small">{{ receipt.supplier.email }}</div>
+                </div>
+                {% endif %}
+                
+                {% if receipt.supplier.phone %}
+                <div class="mb-2">
+                    <div class="small text-muted">Phone</div>
+                    <div class="small">{{ receipt.supplier.phone }}</div>
+                </div>
+                {% endif %}
+                
+                <div class="mb-2">
+                    <div class="small text-muted">Rating</div>
+                    <div class="d-flex align-items-center">
+                        <div class="rating-stars text-warning me-2">
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= receipt.supplier.rating %}
+                                <i class="fas fa-star"></i>
+                                {% else %}
+                                <i class="far fa-star"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <span class="small">{{ receipt.supplier.rating|floatformat:1 }}/5</span>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/{{ receipt.supplier.pk }}/" 
+                       class="btn btn-sm btn-outline-primary w-100">
+                        View Supplier
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="info-card">
+            <div class="info-card-header">
+                <i class="fas fa-bolt me-2"></i>Quick Actions
+            </div>
+            <div class="p-4">
+                <div class="d-grid gap-2">
+                    {% if receipt.status != 'completed' %}
+                    <button type="button" class="btn btn-success" onclick="completeReceipt()">
+                        <i class="fas fa-check-circle me-2"></i>Complete Receipt
+                    </button>
+                    {% endif %}
+                    
+                    <a href="{{ urls.goods_receipt_create }}?po={{ receipt.purchase_order.pk }}" 
+                       class="btn btn-outline-primary">
+                        <i class="fas fa-plus me-2"></i>New Receipt for PO
+                    </a>
+                    
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ receipt.purchase_order.pk }}/" 
+                       class="btn btn-outline-secondary">
+                        <i class="fas fa-file-invoice me-2"></i>View Purchase Order
+                    </a>
+                    
+                    <a href="/business/{{ request.tenant.slug }}/suppliers/{{ receipt.supplier.pk }}/" 
+                       class="btn btn-outline-info">
+                        <i class="fas fa-truck me-2"></i>View Supplier
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Receipt Modal -->
+<div class="modal fade" id="completeReceiptModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Complete Goods Receipt</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to complete this goods receipt? This action will:</p>
+                <ul>
+                    <li>Update inventory stock levels for all received items</li>
+                    <li>Create stock movement records</li>
+                    <li>Update purchase order item quantities</li>
+                    <li>Potentially complete the purchase order if fully received</li>
+                </ul>
+                
+                {% if items|dictsort:"damaged_quantity"|dictsortreversed:"0" or items|dictsort:"quality_passed"|dictsortreversed:"False" %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Note:</strong> This receipt contains items with damage or quality issues. 
+                    These will be recorded in the inventory system.
+                </div>
+                {% endif %}
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Reminder:</strong> Once completed, this action cannot be undone. 
+                    Please ensure all quantities and quality checks are accurate.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="/business/{{ request.tenant.slug }}/suppliers/receipts/{{ receipt.pk }}/complete/" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check-circle me-2"></i>Complete Receipt
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize tooltips
+    $('[title]').tooltip();
+});
+
+function completeReceipt() {
+    const modal = new bootstrap.Modal(document.getElementById('completeReceiptModal'));
+    modal.show();
+}
+
+// Handle form submission with loading state
+$('form[action*="/complete/"]').on('submit', function() {
+    const submitBtn = $(this).find('button[type="submit"]');
+    submitBtn.prop('disabled', true);
+    submitBtn.html('<i class="fas fa-spinner fa-spin me-2"></i>Processing...');
+});
+</script>
+{% endblock %}

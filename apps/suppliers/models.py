@@ -908,3 +908,185 @@ class SupplierDocument(TimeStampedModel):
         verbose_name = "Supplier Document"
         verbose_name_plural = "Supplier Documents"
         ordering = ['-created_at']
+
+class Invoice(TimeStampedModel):
+    """Invoices from suppliers"""
+    
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('sent', 'Sent'),
+        ('received', 'Received'),
+        ('verified', 'Verified'),
+        ('approved', 'Approved'),
+        ('paid', 'Paid'),
+        ('overdue', 'Overdue'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    PAYMENT_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('partial', 'Partially Paid'),
+        ('paid', 'Fully Paid'),
+        ('overdue', 'Overdue'),
+    ]
+    
+    # Reference Information
+    invoice_number = models.CharField(max_length=50, unique=True)
+    supplier_invoice_number = models.CharField(max_length=100, help_text="Supplier's invoice number")
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='invoices')
+    purchase_order = models.ForeignKey(
+        PurchaseOrder, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='invoices'
+    )
+    
+    # Dates
+    invoice_date = models.DateField()
+    due_date = models.DateField()
+    received_date = models.DateField(null=True, blank=True)
+    
+    # Status
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='received')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    
+    # Financial Information
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    shipping_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    # Currency
+    currency = models.CharField(max_length=3, default='KES')
+    
+    # Additional Information
+    description = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    
+    # Verification
+    verified_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_invoices'
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    
+    # Approval
+    approved_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_invoices'
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    
+    # File attachment
+    invoice_file = models.FileField(
+        upload_to='invoices/',
+        null=True,
+        blank=True,
+        help_text="Upload the original invoice file"
+    )
+    
+    def __str__(self):
+        return f"Invoice {self.invoice_number} - {self.supplier.name}"
+    
+    @property
+    def outstanding_amount(self):
+        """Calculate outstanding amount"""
+        return self.total_amount - self.paid_amount
+    
+    @property
+    def is_overdue(self):
+        """Check if invoice is overdue"""
+        return timezone.now().date() > self.due_date and self.payment_status != 'paid'
+    
+    @property
+    def days_overdue(self):
+        """Calculate days overdue"""
+        if not self.is_overdue:
+            return 0
+        return (timezone.now().date() - self.due_date).days
+    
+    @property
+    def payment_percentage(self):
+        """Calculate payment percentage"""
+        if self.total_amount > 0:
+            return (self.paid_amount / self.total_amount) * 100
+        return 0
+    
+    def verify_invoice(self, user):
+        """Verify the invoice"""
+        self.status = 'verified'
+        if hasattr(user, 'employee_profile'):
+            self.verified_by = user.employee_profile
+        self.verified_at = timezone.now()
+        self.save()
+    
+    def approve_invoice(self, user):
+        """Approve the invoice for payment"""
+        self.status = 'approved'
+        if hasattr(user, 'employee_profile'):
+            self.approved_by = user.employee_profile
+        self.approved_at = timezone.now()
+        self.save()
+    
+    def mark_paid(self, amount=None):
+        """Mark invoice as paid"""
+        if amount is None:
+            amount = self.outstanding_amount
+        
+        self.paid_amount += amount
+        
+        if self.paid_amount >= self.total_amount:
+            self.payment_status = 'paid'
+            self.status = 'paid'
+        else:
+            self.payment_status = 'partial'
+        
+        self.save()
+    
+    class Meta:
+        verbose_name = "Invoice"
+        verbose_name_plural = "Invoices"
+        ordering = ['-invoice_date']
+
+
+class InvoiceItem(TimeStampedModel):
+    """Items in an invoice"""
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='items')
+    purchase_order_item = models.ForeignKey(
+        PurchaseOrderItem, 
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invoice_items'
+    )
+    
+    # Item details
+    description = models.TextField()
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    # Additional info
+    item_code = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+    
+    def __str__(self):
+        return f"{self.description} - {self.quantity} @ {self.unit_price}"
+    
+    def save(self, *args, **kwargs):
+        # Calculate total amount
+        self.total_amount = self.quantity * self.unit_price
+        super().save(*args, **kwargs)
+    
+    class Meta:
+        verbose_name = "Invoice Item"
+        verbose_name_plural = "Invoice Items"

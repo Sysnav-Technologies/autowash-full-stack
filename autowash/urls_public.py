@@ -1,4 +1,3 @@
-# autowash/urls_public.py - Public schema URLs (completely separate from tenant URLs)
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
