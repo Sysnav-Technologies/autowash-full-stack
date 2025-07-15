@@ -311,7 +311,10 @@ def alerts_view(request):
 def resolve_alert(request, alert_id):
     """Resolve an inventory alert"""
     alert = get_object_or_404(InventoryAlert, id=alert_id)
-    alert.resolve(request.user)
+    
+    # Try to get employee from request, fallback to None
+    employee = getattr(request, 'employee', None)
+    alert.resolve(employee)
     
     messages.success(request, f'Alert for {alert.item.name} has been resolved.')
     return redirect('inventory:alerts')
@@ -457,11 +460,17 @@ def item_consumption_ajax(request):
     """Record item consumption for service orders"""
     if request.method == 'POST':
         try:
-            data = json.loads(request.body)
+            # Handle both JSON and form data
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+            else:
+                data = request.POST
+            
             item_id = data.get('item_id')
             service_order_id = data.get('service_order_id')
             service_id = data.get('service_id')
             quantity = float(data.get('quantity', 0))
+            notes = data.get('notes', '')
             
             item = InventoryItem.objects.get(id=item_id)
             
@@ -471,17 +480,22 @@ def item_consumption_ajax(request):
                     'error': f'Insufficient stock. Available: {item.current_stock}'
                 }, status=400)
             
+            # Get employee from request
+            employee = getattr(request, 'employee', None)
+            
             # Create consumption record
             consumption = ItemConsumption.objects.create(
                 item=item,
-                service_order_id=service_order_id,
-                service_id=service_id,
+                service_order_id=service_order_id if service_order_id else None,
+                service_id=service_id if service_id else None,
                 quantity=quantity,
                 unit_cost=item.unit_cost,
-                used_by=request.employee
+                used_by=employee,
+                notes=notes
             )
             
             # Update stock
+            old_stock = item.current_stock
             item.current_stock -= quantity
             item.save()
             
@@ -491,11 +505,11 @@ def item_consumption_ajax(request):
                 movement_type='out',
                 quantity=-quantity,
                 unit_cost=item.unit_cost,
-                old_stock=item.current_stock + quantity,
+                old_stock=old_stock,
                 new_stock=item.current_stock,
                 reference_type='sale',
-                service_order_id=service_order_id,
-                reason=f'Used for service order',
+                service_order_id=service_order_id if service_order_id else None,
+                reason=f'Used for service order' if service_order_id else 'Item consumption',
                 created_by=request.user
             )
             
@@ -640,6 +654,11 @@ def item_detail_view(request, pk):
     if avg_daily_consumption > 0:
         days_until_stockout = item.current_stock / avg_daily_consumption
     
+    # Calculate stock percentage for progress bar
+    stock_percentage = 0
+    if item.maximum_stock_level > 0:
+        stock_percentage = min((item.current_stock / item.maximum_stock_level) * 100, 100)
+    
     context = {
         'item': item,
         'recent_movements': recent_movements,
@@ -692,7 +711,8 @@ def stock_adjustment_view(request, item_id=None):
                     )
                     
                     # Auto-approve if user has permission
-                    if request.employee.role in ['owner', 'manager']:
+                    employee = getattr(request, 'employee', None)
+                    if employee and employee.role in ['owner', 'manager']:
                         adjustment.approve(request.user)
                     
                     messages.success(request, 'Stock adjustment created successfully!')
@@ -775,7 +795,7 @@ def stock_take_create_view(request):
         form = StockTakeForm(request.POST)
         if form.is_valid():
             stock_take = form.save(commit=False)
-            stock_take.supervisor = request.employee
+            stock_take.supervisor = getattr(request, 'employee', None)
             stock_take.created_by = request.user
             stock_take.save()
             
@@ -842,20 +862,23 @@ def update_stock_count(request, stock_take_id, item_id):
     try:
         counted_quantity = float(counted_quantity)
         
+        # Get employee from request
+        employee = getattr(request, 'employee', None)
+        
         count_record, created = StockTakeCount.objects.get_or_create(
             stock_take=stock_take,
             item=item,
             defaults={
                 'system_quantity': item.current_stock,
                 'counted_quantity': counted_quantity,
-                'counted_by': request.employee,
+                'counted_by': employee,
                 'notes': notes
             }
         )
         
         if not created:
             count_record.counted_quantity = counted_quantity
-            count_record.counted_by = request.employee
+            count_record.counted_by = employee
             count_record.notes = notes
             count_record.save()
         
@@ -869,12 +892,9 @@ def update_stock_count(request, stock_take_id, item_id):
         return JsonResponse({'error': 'Invalid quantity'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-    
 
 
 # UNIT VIEWS
-# views.py - Add these views to your inventory views
-
 @login_required
 @employee_required()
 def unit_list_view(request):
@@ -1130,3 +1150,50 @@ def populate_car_wash_units_view(request):
                 })
     
     return redirect('inventory:unit_list')
+
+# Additional helper views for AJAX operations
+@login_required
+@employee_required()
+@ajax_required
+def ajax_location_create(request):
+    """AJAX endpoint to create item locations"""
+    if request.method == 'POST':
+        try:
+            item_id = request.POST.get('item')
+            warehouse = request.POST.get('warehouse', 'Main Warehouse')
+            zone = request.POST.get('zone', '')
+            aisle = request.POST.get('aisle', '')
+            shelf = request.POST.get('shelf', '')
+            bin_location = request.POST.get('bin', '')
+            quantity = float(request.POST.get('quantity', 0))
+            is_primary = request.POST.get('is_primary') == 'on'
+            is_picking_location = request.POST.get('is_picking_location') == 'on'
+            
+            item = InventoryItem.objects.get(id=item_id)
+            
+            # If this is set as primary, remove primary flag from other locations
+            if is_primary:
+                ItemLocation.objects.filter(item=item, is_primary=True).update(is_primary=False)
+            
+            location = ItemLocation.objects.create(
+                item=item,
+                warehouse=warehouse,
+                zone=zone,
+                aisle=aisle,
+                shelf=shelf,
+                bin=bin_location,
+                quantity=quantity,
+                is_primary=is_primary,
+                is_picking_location=is_picking_location
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'location_id': location.id,
+                'full_location': location.full_location
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)}, status=400)
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request'}, status=400)
