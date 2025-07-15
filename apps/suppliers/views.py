@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from datetime import datetime, timedelta
 import json
 import csv
@@ -34,47 +35,29 @@ def get_supplier_urls(request):
     base_url = f"/business/{tenant_slug}/suppliers"
     
     return {
-        # Dashboard
         'dashboard': f"{base_url}/",
         'businesses_dashboard': f"/business/{tenant_slug}/dashboard/",
-        
-        # Suppliers
         'list': f"{base_url}/list/",
         'create': f"{base_url}/create/",
-        
-        # Categories
         'categories': f"{base_url}/categories/",
-        
-        # Purchase Orders
         'purchase_order_list': f"{base_url}/orders/",
         'purchase_order_create': f"{base_url}/orders/create/",
-        
-        # Goods Receipts
         'goods_receipt_list': f"{base_url}/receipts/",
         'goods_receipt_create': f"{base_url}/receipts/create/",
-        
-        # Invoices
         'invoice_list': f"{base_url}/invoices/",
         'invoice_create': f"{base_url}/invoices/create/",
-        
-        # Evaluations
         'evaluation_list': f"{base_url}/evaluations/",
         'evaluation_create': f"{base_url}/evaluations/create/",
-        
-        # Payments
         'payment_list': f"{base_url}/payments/",
         'payment_create': f"{base_url}/payments/create/",
-        
-        # Documents
         'document_list': f"{base_url}/documents/",
         'document_upload': f"{base_url}/documents/upload/",
-        
-        # Reports
         'performance_report': f"{base_url}/performance/",
         'export': f"{base_url}/export/",
-        
-        # AJAX
         'ajax_purchase_order_items': f"{base_url}/ajax/purchase-order-items/",
+        'ajax_search_purchase_orders': f"{base_url}/ajax/search-purchase-orders/",
+        'ajax_purchase_order_details': f"{base_url}/ajax/purchase-order-details/",
+        'ajax_supplier_details': f"{base_url}/ajax/supplier-details/",
     }
 
 def get_business_url(request, url_name, **kwargs):
@@ -83,24 +66,15 @@ def get_business_url(request, url_name, **kwargs):
     base_url = f"/business/{tenant_slug}/suppliers"
     
     url_mapping = {
-        # Dashboard
         'suppliers:dashboard': f"{base_url}/",
         'businesses:dashboard': f"/business/{tenant_slug}/dashboard/",
-        
-        # Suppliers
         'suppliers:list': f"{base_url}/list/",
         'suppliers:create': f"{base_url}/create/",
         'suppliers:detail': f"{base_url}/{{pk}}/",
         'suppliers:edit': f"{base_url}/{{pk}}/edit/",
         'suppliers:delete': f"{base_url}/{{pk}}/delete/",
-        
-        # Categories
         'suppliers:categories': f"{base_url}/categories/",
-        
-        # Contacts
         'suppliers:contact_add': f"{base_url}/{{supplier_id}}/contacts/add/",
-        
-        # Purchase Orders
         'suppliers:purchase_order_list': f"{base_url}/orders/",
         'suppliers:purchase_order_create': f"{base_url}/orders/create/",
         'suppliers:purchase_order_detail': f"{base_url}/orders/{{pk}}/",
@@ -109,46 +83,31 @@ def get_business_url(request, url_name, **kwargs):
         'suppliers:purchase_order_send': f"{base_url}/orders/{{pk}}/send/",
         'suppliers:purchase_order_print': f"{base_url}/orders/{{pk}}/print/",
         'suppliers:purchase_order_pdf': f"{base_url}/orders/{{pk}}/pdf/",
-        
-        # Goods Receipts
         'suppliers:goods_receipt_list': f"{base_url}/receipts/",
         'suppliers:goods_receipt_create': f"{base_url}/receipts/create/",
         'suppliers:goods_receipt_detail': f"{base_url}/receipts/{{pk}}/",
         'suppliers:goods_receipt_complete': f"{base_url}/receipts/{{pk}}/complete/",
-        
-        # Invoices
         'suppliers:invoice_list': f"{base_url}/invoices/",
         'suppliers:invoice_create': f"{base_url}/invoices/create/",
         'suppliers:invoice_detail': f"{base_url}/invoices/{{pk}}/",
         'suppliers:invoice_print': f"{base_url}/invoices/{{pk}}/print/",
         'suppliers:invoice_pdf': f"{base_url}/invoices/{{pk}}/pdf/",
-        
-        # Evaluations
         'suppliers:evaluation_list': f"{base_url}/evaluations/",
         'suppliers:evaluation_create': f"{base_url}/evaluations/create/",
-        
-        # Payments
         'suppliers:payment_list': f"{base_url}/payments/",
         'suppliers:payment_create': f"{base_url}/payments/create/",
         'suppliers:payment_detail': f"{base_url}/payments/{{pk}}/",
         'suppliers:payment_process': f"{base_url}/payments/{{pk}}/process/",
-        
-        # Documents
         'suppliers:document_list': f"{base_url}/documents/",
         'suppliers:document_upload': f"{base_url}/documents/upload/",
-        
-        # Reports
         'suppliers:performance_report': f"{base_url}/performance/",
         'suppliers:export': f"{base_url}/export/",
-        
-        # AJAX
         'suppliers:ajax_purchase_order_items': f"{base_url}/ajax/purchase-order-items/",
         'suppliers:create_invoice_from_po': f"{base_url}/orders/{{po_pk}}/create-invoice/",
     }
     
     url = url_mapping.get(url_name, f"{base_url}/")
     
-    # Replace placeholders with actual values
     for key, value in kwargs.items():
         url = url.replace(f"{{{key}}}", str(value))
     
@@ -159,7 +118,6 @@ def get_business_url(request, url_name, **kwargs):
 @employee_required(['owner', 'manager', 'supervisor'])
 def supplier_dashboard(request):
     """Supplier management dashboard"""
-    # Key metrics
     total_suppliers = Supplier.objects.filter(is_deleted=False).count()
     active_suppliers = Supplier.objects.filter(status='active', is_deleted=False).count()
     pending_orders = PurchaseOrder.objects.filter(
@@ -170,22 +128,18 @@ def supplier_dashboard(request):
         status__in=['approved', 'sent', 'acknowledged', 'partially_received']
     ).count()
     
-    # Recent activities
     recent_orders = PurchaseOrder.objects.select_related('supplier').order_by('-created_at')[:5]
     recent_receipts = GoodsReceipt.objects.select_related('supplier').order_by('-receipt_date')[:5]
     
-    # Top suppliers by value
     top_suppliers = Supplier.objects.filter(
         is_deleted=False
     ).order_by('-total_value')[:5]
     
-    # Supplier performance
     supplier_ratings = Supplier.objects.filter(
         is_deleted=False,
         rating__gt=0
     ).order_by('-rating')[:5]
     
-    # Monthly purchase trends (last 6 months)
     six_months_ago = timezone.now().date() - timedelta(days=180)
     monthly_purchases = PurchaseOrder.objects.filter(
         order_date__gte=six_months_ago
@@ -215,7 +169,6 @@ def supplier_dashboard(request):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class SupplierListView(ListView):
-    """List all suppliers"""
     model = Supplier
     template_name = 'suppliers/supplier_list.html'
     context_object_name = 'suppliers'
@@ -224,7 +177,6 @@ class SupplierListView(ListView):
     def get_queryset(self):
         queryset = Supplier.objects.filter(is_deleted=False).select_related('category')
         
-        # Apply filters
         category = self.request.GET.get('category')
         if category:
             queryset = queryset.filter(category_id=category)
@@ -246,7 +198,6 @@ class SupplierListView(ListView):
                 Q(email__icontains=search)
             )
         
-        # Sorting
         sort_by = self.request.GET.get('sort', 'name')
         if sort_by in ['name', '-name', 'rating', '-rating', 'total_orders', '-total_orders']:
             queryset = queryset.order_by(sort_by)
@@ -262,19 +213,16 @@ class SupplierListView(ListView):
         context['status_choices'] = Supplier.STATUS_CHOICES
         context['filter_form'] = SupplierFilterForm(self.request.GET)
         
-        # Statistics
         context['total_suppliers'] = Supplier.objects.filter(is_deleted=False).count()
         context['active_suppliers'] = Supplier.objects.filter(status='active', is_deleted=False).count()
         context['preferred_suppliers'] = Supplier.objects.filter(is_preferred=True, is_deleted=False).count()
         
-        # URLs
         context['urls'] = get_supplier_urls(self.request)
         
         return context
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class SupplierDetailView(DetailView):
-    """Supplier detail view"""
     model = Supplier
     template_name = 'suppliers/supplier_detail.html'
     context_object_name = 'supplier'
@@ -286,10 +234,8 @@ class SupplierDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         supplier = self.object
         
-        # Recent orders
         context['recent_orders'] = supplier.purchase_orders.order_by('-created_at')[:5]
         
-        # Performance metrics
         context['performance_metrics'] = {
             'total_orders': supplier.total_orders,
             'total_value': supplier.total_value,
@@ -298,30 +244,20 @@ class SupplierDetailView(DetailView):
             'items_supplied': supplier.items_supplied_count,
         }
         
-        # Recent evaluations
         context['recent_evaluations'] = supplier.evaluations.order_by('-created_at')[:3]
         
-        # Outstanding orders
         context['outstanding_orders'] = supplier.purchase_orders.filter(
             status__in=['approved', 'sent', 'acknowledged', 'partially_received']
         ).count()
         
-        # Documents
         context['documents'] = supplier.documents.filter(is_active=True)[:5]
-        
-        # Payment history
         context['recent_payments'] = supplier.payments.order_by('-payment_date')[:5]
-        
-        # Contacts
         context['contacts'] = supplier.contacts.filter(is_active=True)
-        
-        # URLs
         context['urls'] = get_supplier_urls(self.request)
         
         return context
     
     def calculate_on_time_delivery(self, supplier):
-        """Calculate on-time delivery percentage"""
         completed_orders = supplier.purchase_orders.filter(
             status='completed',
             delivery_date__isnull=False
@@ -336,7 +272,6 @@ class SupplierDetailView(DetailView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierCreateView(CreateView):
-    """Create new supplier"""
     model = Supplier
     form_class = SupplierForm
     template_name = 'suppliers/supplier_form.html'
@@ -355,7 +290,6 @@ class SupplierCreateView(CreateView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierUpdateView(UpdateView):
-    """Update supplier"""
     model = Supplier
     form_class = SupplierForm
     template_name = 'suppliers/supplier_form.html'
@@ -377,7 +311,6 @@ class SupplierUpdateView(UpdateView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierDeleteView(DeleteView):
-    """Delete supplier (soft delete)"""
     model = Supplier
     template_name = 'suppliers/supplier_confirm_delete.html'
     
@@ -394,7 +327,6 @@ class SupplierDeleteView(DeleteView):
     
     def delete(self, request, *args, **kwargs):
         self.object = self.get_object()
-        # Soft delete
         self.object.is_deleted = True
         self.object.deleted_at = timezone.now()
         self.object.save()
@@ -403,7 +335,6 @@ class SupplierDeleteView(DeleteView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class PurchaseOrderListView(ListView):
-    """List purchase orders"""
     model = PurchaseOrder
     template_name = 'suppliers/purchase_order_list.html'
     context_object_name = 'orders'
@@ -412,7 +343,6 @@ class PurchaseOrderListView(ListView):
     def get_queryset(self):
         queryset = PurchaseOrder.objects.select_related('supplier').prefetch_related('items')
         
-        # Apply filters
         status = self.request.GET.get('status')
         if status:
             queryset = queryset.filter(status=status)
@@ -425,7 +355,6 @@ class PurchaseOrderListView(ListView):
         if priority:
             queryset = queryset.filter(priority=priority)
         
-        # Date range filter
         date_from = self.request.GET.get('date_from')
         date_to = self.request.GET.get('date_to')
         if date_from:
@@ -450,7 +379,6 @@ class PurchaseOrderListView(ListView):
         context['priority_choices'] = PurchaseOrder.PRIORITY_LEVELS
         context['filter_form'] = PurchaseOrderFilterForm(self.request.GET)
         
-        # Statistics
         orders = PurchaseOrder.objects.all()
         context['total_orders'] = orders.count()
         context['pending_orders'] = orders.filter(status__in=['draft', 'pending', 'approved']).count()
@@ -459,14 +387,12 @@ class PurchaseOrderListView(ListView):
             status__in=['approved', 'sent', 'acknowledged', 'partially_received']
         ).count()
         
-        # URLs
         context['urls'] = get_supplier_urls(self.request)
         
         return context
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class PurchaseOrderDetailView(DetailView):
-    """Purchase order detail view with status-based actions"""
     model = PurchaseOrder
     template_name = 'suppliers/purchase_order_detail.html'
     context_object_name = 'order'
@@ -475,28 +401,21 @@ class PurchaseOrderDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         order = self.object
         
-        # Get user role
         user_role = None
         if hasattr(self.request.user, 'employee_profile') and self.request.user.employee_profile:
             user_role = self.request.user.employee_profile.role
         
-        # Order items
         context['items'] = order.items.select_related('item').all()
-        
-        # Receipts
         context['receipts'] = order.receipts.order_by('-receipt_date')
         
-        # Progress tracking
         context['progress'] = {
             'completion_percentage': order.completion_percentage,
             'is_overdue': order.is_overdue,
             'days_overdue': order.days_overdue if order.is_overdue else 0,
         }
         
-        # User role for template conditions
         context['user_role'] = user_role
         
-        # Status-based actions
         context['can_edit'] = order.status in ['draft', 'pending']
         context['can_approve'] = (
             order.status in ['draft', 'pending'] and 
@@ -508,17 +427,15 @@ class PurchaseOrderDetailView(DetailView):
         context['can_cancel'] = order.status in ['draft', 'pending', 'approved']
         context['can_create_invoice'] = order.status == 'completed'
         
-        # Print URLs
         context['print_url'] = f"/business/{self.request.tenant.slug}/suppliers/orders/{order.pk}/print/"
         context['pdf_url'] = f"/business/{self.request.tenant.slug}/suppliers/orders/{order.pk}/pdf/"
         
-        # URLs
         context['urls'] = get_supplier_urls(self.request)
         
         return context
+
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class PurchaseOrderCreateView(CreateView):
-    """Create purchase order"""
     model = PurchaseOrder
     form_class = PurchaseOrderForm
     template_name = 'suppliers/purchase_order_form.html'
@@ -530,7 +447,6 @@ class PurchaseOrderCreateView(CreateView):
         else:
             context['items_formset'] = PurchaseOrderItemFormSet()
         
-        # URLs
         context['urls'] = get_supplier_urls(self.request)
         return context
     
@@ -539,7 +455,6 @@ class PurchaseOrderCreateView(CreateView):
         items_formset = context['items_formset']
         
         if items_formset.is_valid():
-            # Generate PO number
             form.instance.po_number = self.generate_po_number()
             if hasattr(self.request.user, 'employee_profile'):
                 form.instance.requested_by = self.request.user.employee_profile
@@ -548,7 +463,6 @@ class PurchaseOrderCreateView(CreateView):
             items_formset.instance = self.object
             items_formset.save()
             
-            # Calculate totals
             self.object.calculate_totals()
             
             messages.success(self.request, f'Purchase Order {self.object.po_number} created successfully!')
@@ -557,7 +471,6 @@ class PurchaseOrderCreateView(CreateView):
             return self.form_invalid(form)
     
     def generate_po_number(self):
-        """Generate unique PO number"""
         today = timezone.now()
         prefix = f"PO{today.strftime('%Y%m')}"
         
@@ -578,13 +491,11 @@ class PurchaseOrderCreateView(CreateView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class PurchaseOrderUpdateView(UpdateView):
-    """Update purchase order - only allowed for draft and pending orders"""
     model = PurchaseOrder
     form_class = PurchaseOrderForm
     template_name = 'suppliers/purchase_order_form.html'
     
     def get_queryset(self):
-        # Only allow editing of draft and pending orders
         return PurchaseOrder.objects.filter(status__in=['draft', 'pending'])
     
     def get_context_data(self, **kwargs):
@@ -597,13 +508,11 @@ class PurchaseOrderUpdateView(UpdateView):
         else:
             context['items_formset'] = PurchaseOrderItemFormSet(instance=self.object)
         
-        # Get user role for template conditions
         user_role = None
         if hasattr(self.request.user, 'employee_profile') and self.request.user.employee_profile:
             user_role = self.request.user.employee_profile.role
         context['user_role'] = user_role
         
-        # URLs
         context['urls'] = get_supplier_urls(self.request)
         return context
     
@@ -615,7 +524,6 @@ class PurchaseOrderUpdateView(UpdateView):
             self.object = form.save()
             items_formset.save()
             
-            # Recalculate totals
             self.object.calculate_totals()
             
             messages.success(self.request, 'Purchase Order updated successfully!')
@@ -625,13 +533,11 @@ class PurchaseOrderUpdateView(UpdateView):
     
     def get_success_url(self):
         return get_business_url(self.request, 'suppliers:purchase_order_detail', pk=self.object.pk)
-        
 
 @login_required
 @business_required
 @employee_required(['owner', 'manager', 'supervisor'])
 def purchase_order_print(request, pk):
-    """Print purchase order"""
     order = get_object_or_404(PurchaseOrder, pk=pk)
     
     context = {
@@ -645,31 +551,26 @@ def purchase_order_print(request, pk):
 @business_required
 @employee_required(['owner', 'manager', 'supervisor'])
 def purchase_order_pdf(request, pk):
-    """Generate PDF for purchase order"""
     try:
         from weasyprint import HTML, CSS
         from django.template.loader import render_to_string
         
         order = get_object_or_404(PurchaseOrder, pk=pk)
         
-        # Render HTML template
         html_string = render_to_string('suppliers/purchase_order_print.html', {
             'order': order,
             'items': order.items.select_related('item').all(),
             'request': request,
         })
         
-        # Create PDF
         html = HTML(string=html_string, base_url=request.build_absolute_uri())
         pdf = html.write_pdf()
         
-        # Return PDF response
         response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="PO-{order.po_number}.pdf"'
         return response
         
     except ImportError:
-        # Fallback if weasyprint is not installed
         messages.error(request, 'PDF generation is not available. Please install weasyprint.')
         return redirect('suppliers:purchase_order_detail', pk=pk)
 
@@ -678,30 +579,18 @@ def purchase_order_pdf(request, pk):
 @employee_required(['owner', 'manager', 'supervisor'])
 @require_http_methods(["POST"])
 def approve_purchase_order(request, pk):
-    """Approve purchase order - managers can approve directly from draft"""
     order = get_object_or_404(PurchaseOrder, pk=pk)
-    
-    # # Check if user has approval permissions
-    # user_role = getattr(request.user.e, 'role', None) if hasattr(request.user, 'employee_profile') else None
-    # can_approve = user_role in ['owner', 'manager']
-    
-    # if not can_approve:
-    #     messages.error(request, 'You do not have permission to approve purchase orders.')
-    #     return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
     
     if order.status not in ['draft', 'pending']:
         messages.error(request, 'Only draft or pending orders can be approved.')
         return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
     
-    # Validate that order has items
     if not order.items.exists():
         messages.error(request, 'Cannot approve an order without items.')
         return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
     
-    # Approve the order
     order.approve(request.user)
     
-    # Check if should automatically send to supplier
     auto_send = request.POST.get('auto_send', 'false').lower() == 'true'
     if auto_send:
         order.send_to_supplier()
@@ -716,7 +605,6 @@ def approve_purchase_order(request, pk):
 @employee_required(['owner', 'manager', 'supervisor'])
 @require_http_methods(["POST"])
 def send_purchase_order(request, pk):
-    """Send purchase order to supplier"""
     order = get_object_or_404(PurchaseOrder, pk=pk)
     
     if order.status != 'approved':
@@ -728,9 +616,113 @@ def send_purchase_order(request, pk):
     
     return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
 
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+@require_http_methods(["POST"])
+def submit_purchase_order(request, pk):
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    
+    if order.status != 'draft':
+        messages.error(request, 'Only draft orders can be submitted for approval.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    if not order.items.exists():
+        messages.error(request, 'Cannot submit an order without items.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    order.status = 'pending'
+    order.save()
+    
+    messages.success(request, f'Purchase Order {order.po_number} submitted for approval!')
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager'])
+@require_http_methods(["POST"])
+def cancel_purchase_order(request, pk):
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    
+    if order.status not in ['draft', 'pending', 'approved']:
+        messages.error(request, 'Cannot cancel an order that has been sent to supplier.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    order.status = 'cancelled'
+    order.save()
+    
+    messages.success(request, f'Purchase Order {order.po_number} has been cancelled.')
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+@require_http_methods(["POST"])
+def acknowledge_purchase_order(request, pk):
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    
+    if order.status != 'sent':
+        messages.error(request, 'Only sent orders can be acknowledged.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    order.acknowledge_receipt()
+    messages.success(request, f'Purchase Order {order.po_number} marked as acknowledged by supplier!')
+    
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def purchase_order_status_update(request, pk):
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    new_status = request.POST.get('status')
+    
+    if not new_status:
+        messages.error(request, 'No status provided.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    valid_transitions = {
+        'draft': ['pending', 'cancelled'],
+        'pending': ['approved', 'cancelled', 'draft'],
+        'approved': ['sent', 'cancelled'],
+        'sent': ['acknowledged', 'cancelled'],
+        'acknowledged': ['partially_received', 'completed', 'cancelled'],
+        'partially_received': ['completed', 'cancelled'],
+        'completed': [],
+        'cancelled': [],
+        'on_hold': ['pending', 'cancelled'],
+    }
+    
+    if new_status not in valid_transitions.get(order.status, []):
+        messages.error(request, f'Invalid status transition from {order.get_status_display()} to {new_status}.')
+        return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+    
+    old_status = order.status
+    order.status = new_status
+    
+    if new_status == 'approved' and hasattr(request.user, 'employee_profile'):
+        order.approved_by = request.user.employee_profile
+        order.approved_at = timezone.now()
+    
+    order.save()
+    
+    status_messages = {
+        'pending': f'Purchase Order {order.po_number} submitted for approval.',
+        'approved': f'Purchase Order {order.po_number} has been approved.',
+        'sent': f'Purchase Order {order.po_number} has been sent to supplier.',
+        'acknowledged': f'Purchase Order {order.po_number} acknowledged by supplier.',
+        'completed': f'Purchase Order {order.po_number} has been completed.',
+        'cancelled': f'Purchase Order {order.po_number} has been cancelled.',
+        'on_hold': f'Purchase Order {order.po_number} has been put on hold.',
+    }
+    
+    message = status_messages.get(new_status, f'Purchase Order {order.po_number} status updated to {order.get_status_display()}.')
+    messages.success(request, message)
+    
+    return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
+
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class GoodsReceiptListView(ListView):
-    """List goods receipts"""
     model = GoodsReceipt
     template_name = 'suppliers/goods_receipt_list.html'
     context_object_name = 'receipts'
@@ -739,7 +731,6 @@ class GoodsReceiptListView(ListView):
     def get_queryset(self):
         queryset = GoodsReceipt.objects.select_related('supplier', 'purchase_order')
         
-        # Apply filters
         status = self.request.GET.get('status')
         if status:
             queryset = queryset.filter(status=status)
@@ -765,7 +756,6 @@ class GoodsReceiptListView(ListView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class GoodsReceiptCreateView(CreateView):
-    """Create goods receipt"""
     model = GoodsReceipt
     form_class = GoodsReceiptForm
     template_name = 'suppliers/goods_receipt_form.html'
@@ -776,11 +766,24 @@ class GoodsReceiptCreateView(CreateView):
         if po_id:
             try:
                 po = PurchaseOrder.objects.get(pk=po_id)
-                initial['purchase_order'] = po
-                initial['supplier'] = po.supplier
+                if self.can_receive_goods(po):
+                    initial['purchase_order'] = po
+                    initial['supplier'] = po.supplier
+                else:
+                    messages.warning(self.request, f'Purchase Order {po.po_number} cannot receive goods or has already been fully received.')
             except PurchaseOrder.DoesNotExist:
-                pass
+                messages.error(self.request, 'Purchase Order not found.')
         return initial
+    
+    def can_receive_goods(self, po):
+        if po.status not in ['approved', 'sent', 'acknowledged', 'partially_received']:
+            return False
+        
+        pending_items = po.items.filter(received_quantity__lt=F('quantity'))
+        if not pending_items.exists():
+            return False
+        
+        return True
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -789,44 +792,100 @@ class GoodsReceiptCreateView(CreateView):
             context['items_formset'] = GoodsReceiptItemFormSet(self.request.POST)
         else:
             context['items_formset'] = GoodsReceiptItemFormSet()
-            
-        # Pre-populate items if PO is selected
+        
         po_id = self.request.GET.get('po')
-        if po_id and not self.request.POST:
+        if po_id:
             try:
                 po = PurchaseOrder.objects.get(pk=po_id)
-                context['purchase_order'] = po
-                context['pending_items'] = po.items.filter(
-                    received_quantity__lt=F('quantity')
-                )
+                if self.can_receive_goods(po):
+                    context['purchase_order'] = po
+                    context['pending_items'] = po.items.filter(
+                        received_quantity__lt=F('quantity')
+                    ).select_related('item')
+                    
+                    context['existing_receipts'] = po.receipts.order_by('-receipt_date')
+                    
+                    context['po_completion'] = {
+                        'percentage': po.completion_percentage,
+                        'is_fully_received': po.is_fully_received,
+                        'total_items': po.items.count(),
+                        'pending_items': context['pending_items'].count()
+                    }
+                    
+                    context['duplicate_warning'] = self.check_duplicate_receipts(po)
             except PurchaseOrder.DoesNotExist:
                 pass
         
-        # URLs
+        context['available_pos'] = PurchaseOrder.objects.filter(
+            status__in=['approved', 'sent', 'acknowledged', 'partially_received']
+        ).annotate(
+            pending_items_count=Count('items', filter=Q(items__received_quantity__lt=F('items__quantity')))
+        ).filter(
+            pending_items_count__gt=0
+        ).select_related('supplier').order_by('-created_at')[:10]
+        
         context['urls'] = get_supplier_urls(self.request)
         return context
+    
+    def check_duplicate_receipts(self, po):
+        recent_receipts = po.receipts.filter(
+            created_at__gte=timezone.now() - timedelta(hours=24)
+        ).order_by('-created_at')
+        
+        if recent_receipts.exists():
+            return {
+                'has_recent': True,
+                'recent_receipts': recent_receipts,
+                'warning_message': f'Warning: {recent_receipts.count()} receipt(s) created for this PO in the last 24 hours.'
+            }
+        return {'has_recent': False}
     
     def form_valid(self, form):
         context = self.get_context_data()
         items_formset = context['items_formset']
         
-        if items_formset.is_valid():
-            # Generate receipt number
+        if not items_formset.is_valid():
+            return self.form_invalid(form)
+        
+        po = form.cleaned_data.get('purchase_order')
+        if not po:
+            messages.error(self.request, 'Please select a purchase order.')
+            return self.form_invalid(form)
+        
+        if not self.can_receive_goods(po):
+            messages.error(self.request, f'Purchase Order {po.po_number} cannot receive goods.')
+            return self.form_invalid(form)
+        
+        with transaction.atomic():
             form.instance.receipt_number = self.generate_receipt_number()
             if hasattr(self.request.user, 'employee_profile'):
                 form.instance.received_by = self.request.user.employee_profile
             
             self.object = form.save()
+            
             items_formset.instance = self.object
-            items_formset.save()
+            receipt_items = items_formset.save(commit=False)
+            
+            for receipt_item in receipt_items:
+                po_item = receipt_item.purchase_order_item
+                
+                if receipt_item.received_quantity > po_item.pending_quantity:
+                    messages.error(self.request, f'Cannot receive {receipt_item.received_quantity} of {po_item.item.name}. Only {po_item.pending_quantity} pending.')
+                    return self.form_invalid(form)
+                
+                receipt_item.expected_quantity = po_item.pending_quantity
+                receipt_item.save()
+            
+            items_formset.save_m2m()
             
             messages.success(self.request, f'Goods Receipt {self.object.receipt_number} created successfully!')
-            return redirect(get_business_url(self.request, 'suppliers:goods_receipt_detail', pk=self.object.pk))
-        else:
-            return self.form_invalid(form)
+            
+            if self.request.POST.get('save_and_complete'):
+                return redirect(get_business_url(self.request, 'suppliers:goods_receipt_complete', pk=self.object.pk))
+            else:
+                return redirect(get_business_url(self.request, 'suppliers:goods_receipt_detail', pk=self.object.pk))
     
     def generate_receipt_number(self):
-        """Generate unique receipt number"""
         today = timezone.now()
         prefix = f"GR{today.strftime('%Y%m')}"
         
@@ -847,7 +906,6 @@ class GoodsReceiptCreateView(CreateView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class GoodsReceiptDetailView(DetailView):
-    """Goods receipt detail view"""
     model = GoodsReceipt
     template_name = 'suppliers/goods_receipt_detail.html'
     context_object_name = 'receipt'
@@ -856,10 +914,7 @@ class GoodsReceiptDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         receipt = self.object
         
-        # Receipt items
         context['items'] = receipt.items.select_related('purchase_order_item__item').all()
-        
-        # URLs
         context['urls'] = get_supplier_urls(self.request)
         
         return context
@@ -869,7 +924,6 @@ class GoodsReceiptDetailView(DetailView):
 @employee_required(['owner', 'manager', 'supervisor'])
 @require_http_methods(["POST"])
 def complete_goods_receipt(request, pk):
-    """Complete goods receipt and update inventory"""
     receipt = get_object_or_404(GoodsReceipt, pk=pk)
     
     if receipt.status == 'completed':
@@ -877,8 +931,9 @@ def complete_goods_receipt(request, pk):
         return redirect(get_business_url(request, 'suppliers:goods_receipt_detail', pk=pk))
     
     try:
-        receipt.complete_receipt()
-        messages.success(request, f'Goods Receipt {receipt.receipt_number} completed and inventory updated!')
+        with transaction.atomic():
+            receipt.complete_receipt()
+            messages.success(request, f'Goods Receipt {receipt.receipt_number} completed and inventory updated!')
     except Exception as e:
         messages.error(request, f'Error completing receipt: {str(e)}')
     
@@ -886,9 +941,204 @@ def complete_goods_receipt(request, pk):
 
 @login_required
 @business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def ajax_search_purchase_orders(request):
+    query = request.GET.get('q', '').strip()
+    show_all = request.GET.get('show_all', 'false').lower() == 'true'
+    invoice_mode = request.GET.get('invoice_mode', 'false').lower() == 'true'
+    
+    if invoice_mode:
+        queryset = PurchaseOrder.objects.filter(
+            status='completed'
+        ).exclude(
+            invoices__isnull=False
+        ).select_related('supplier')
+    else:
+        queryset = PurchaseOrder.objects.filter(
+            status__in=['approved', 'sent', 'acknowledged', 'partially_received']
+        ).annotate(
+            pending_items_count=Count('items', filter=Q(items__received_quantity__lt=F('items__quantity')))
+        ).filter(
+            pending_items_count__gt=0
+        ).select_related('supplier')
+    
+    if query and not show_all:
+        queryset = queryset.filter(
+            Q(po_number__icontains=query) |
+            Q(supplier__name__icontains=query) |
+            Q(supplier__supplier_code__icontains=query) |
+            Q(supplier_reference__icontains=query)
+        )
+    
+    queryset = queryset[:20]
+    
+    results = []
+    for po in queryset:
+        pending_items_count = 0
+        if not invoice_mode:
+            pending_items_count = po.items.filter(
+                received_quantity__lt=F('quantity')
+            ).count()
+        
+        results.append({
+            'id': str(po.pk),
+            'po_number': po.po_number,
+            'supplier_name': po.supplier.name,
+            'supplier_id': str(po.supplier.pk),
+            'order_date': po.order_date.strftime('%Y-%m-%d'),
+            'expected_delivery': po.expected_delivery_date.strftime('%Y-%m-%d'),
+            'total_amount': float(po.total_amount),
+            'status': po.status,
+            'status_display': po.get_status_display(),
+            'pending_items': pending_items_count,
+            'completion_percentage': float(po.completion_percentage) if hasattr(po, 'completion_percentage') else 0,
+            'items_count': po.items.count(),
+        })
+    
+    return JsonResponse({
+        'results': results,
+        'total': len(results)
+    })
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def ajax_purchase_order_details(request):
+    po_id = request.GET.get('po_id')
+    
+    if not po_id:
+        return JsonResponse({'error': 'Purchase Order ID required'}, status=400)
+    
+    try:
+        po = PurchaseOrder.objects.get(pk=po_id)
+        
+        invoice_mode = request.GET.get('invoice_mode', 'false').lower() == 'true'
+        
+        if invoice_mode:
+            items = po.items.filter(received_quantity__gt=0).select_related('item')
+            items_data = []
+            for item in items:
+                items_data.append({
+                    'id': item.id,
+                    'item_name': item.item.name,
+                    'item_sku': item.item.sku,
+                    'description': item.item_description or item.item.name,
+                    'quantity': float(item.received_quantity),
+                    'unit_price': float(item.unit_price),
+                    'total_amount': float(item.unit_price * item.received_quantity),
+                })
+        else:
+            items = po.items.filter(received_quantity__lt=F('quantity')).select_related('item')
+            items_data = []
+            for item in items:
+                pending_qty = item.quantity - item.received_quantity
+                items_data.append({
+                    'id': item.id,
+                    'item_name': item.item.name,
+                    'item_sku': item.item.sku,
+                    'item_unit': getattr(item.item, 'unit', 'units'),
+                    'ordered_quantity': float(item.quantity),
+                    'received_quantity': float(item.received_quantity),
+                    'pending_quantity': float(pending_qty),
+                    'unit_price': float(item.unit_price),
+                })
+        
+        return JsonResponse({
+            'po_number': po.po_number,
+            'supplier': {
+                'id': str(po.supplier.pk),
+                'name': po.supplier.name,
+                'code': po.supplier.supplier_code,
+                'email': po.supplier.email,
+                'phone': str(po.supplier.phone) if po.supplier.phone else '',
+            },
+            'order_date': po.order_date.strftime('%Y-%m-%d'),
+            'expected_delivery': po.expected_delivery_date.strftime('%Y-%m-%d'),
+            'total_amount': float(po.total_amount),
+            'subtotal': float(po.subtotal),
+            'tax_amount': float(po.tax_amount),
+            'shipping_cost': float(po.shipping_cost),
+            'discount_amount': float(po.discount_amount),
+            'status': po.status,
+            'status_display': po.get_status_display(),
+            'items': items_data,
+            'delivery_address': po.delivery_address,
+            'contact_person': po.contact_person,
+            'contact_phone': po.contact_phone,
+            'special_instructions': po.special_instructions,
+        })
+        
+    except PurchaseOrder.DoesNotExist:
+        return JsonResponse({'error': 'Purchase Order not found'}, status=404)
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def ajax_supplier_details(request):
+    supplier_id = request.GET.get('supplier_id')
+    
+    if not supplier_id:
+        return JsonResponse({'error': 'Supplier ID required'}, status=400)
+    
+    try:
+        supplier = Supplier.objects.get(pk=supplier_id, is_deleted=False)
+        
+        return JsonResponse({
+            'id': str(supplier.pk),
+            'name': supplier.name,
+            'supplier_code': supplier.supplier_code,
+            'business_name': supplier.business_name,
+            'email': supplier.email,
+            'phone': str(supplier.phone) if supplier.phone else '',
+            'payment_terms': supplier.payment_terms,
+            'currency': supplier.currency,
+            'address': supplier.address if hasattr(supplier, 'address') else '',
+            'city': supplier.city,
+            'state': supplier.state,
+            'postal_code': supplier.postal_code,
+            'country': supplier.country,
+        })
+        
+    except Supplier.DoesNotExist:
+        return JsonResponse({'error': 'Supplier not found'}, status=404)
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def ajax_purchase_order_items(request):
+    po_id = request.GET.get('po_id')
+    
+    if not po_id:
+        return JsonResponse({'error': 'Purchase Order ID required'}, status=400)
+    
+    try:
+        po = PurchaseOrder.objects.get(pk=po_id)
+        items = []
+        
+        for item in po.items.filter(received_quantity__lt=F('quantity')):
+            items.append({
+                'id': item.id,
+                'item_name': item.item.name,
+                'item_sku': item.item.sku,
+                'ordered_quantity': float(item.quantity),
+                'received_quantity': float(item.received_quantity),
+                'pending_quantity': float(item.pending_quantity),
+                'unit_price': float(item.unit_price),
+            })
+        
+        return JsonResponse({
+            'po_number': po.po_number,
+            'supplier': po.supplier.name,
+            'items': items
+        })
+        
+    except PurchaseOrder.DoesNotExist:
+        return JsonResponse({'error': 'Purchase Order not found'}, status=404)
+
+@login_required
+@business_required
 @employee_required(['owner', 'manager'])
 def supplier_categories(request):
-    """Manage supplier categories"""
     categories = SupplierCategory.objects.filter(is_active=True).annotate(
         supplier_count=Count('suppliers', filter=Q(suppliers__is_deleted=False))
     )
@@ -914,7 +1164,6 @@ def supplier_categories(request):
 @business_required
 @employee_required(['owner', 'manager'])
 def export_suppliers(request):
-    """Export suppliers to CSV"""
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="suppliers.csv"'
     
@@ -948,17 +1197,14 @@ def export_suppliers(request):
 @business_required
 @employee_required(['owner', 'manager', 'supervisor'])
 def supplier_performance_report(request):
-    """Generate supplier performance report"""
-    # Get date range
     end_date = timezone.now().date()
-    start_date = end_date - timedelta(days=90)  # Last 3 months
+    start_date = end_date - timedelta(days=90)
     
     if request.GET.get('start_date'):
         start_date = datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').date()
     if request.GET.get('end_date'):
         end_date = datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').date()
     
-    # Get suppliers with orders in the period
     suppliers_data = []
     
     for supplier in Supplier.objects.filter(is_deleted=False):
@@ -984,7 +1230,6 @@ def supplier_performance_report(request):
                 'rating': supplier.average_rating,
             })
     
-    # Sort by total value
     suppliers_data.sort(key=lambda x: x['total_value'], reverse=True)
     
     context = {
@@ -999,44 +1244,8 @@ def supplier_performance_report(request):
     
     return render(request, 'suppliers/performance_report.html', context)
 
-@login_required
-@business_required
-@employee_required(['owner', 'manager', 'supervisor'])
-def ajax_purchase_order_items(request):
-    """AJAX endpoint to get purchase order items for goods receipt"""
-    po_id = request.GET.get('po_id')
-    
-    if not po_id:
-        return JsonResponse({'error': 'Purchase Order ID required'}, status=400)
-    
-    try:
-        po = PurchaseOrder.objects.get(pk=po_id)
-        items = []
-        
-        for item in po.items.filter(received_quantity__lt=F('quantity')):
-            items.append({
-                'id': item.id,
-                'item_name': item.item.name,
-                'item_sku': item.item.sku,
-                'ordered_quantity': float(item.quantity),
-                'received_quantity': float(item.received_quantity),
-                'pending_quantity': float(item.pending_quantity),
-                'unit_price': float(item.unit_price),
-            })
-        
-        return JsonResponse({
-            'po_number': po.po_number,
-            'supplier': po.supplier.name,
-            'items': items
-        })
-        
-    except PurchaseOrder.DoesNotExist:
-        return JsonResponse({'error': 'Purchase Order not found'}, status=404)
-
-# Supplier Evaluation Views
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierEvaluationListView(ListView):
-    """List supplier evaluations"""
     model = SupplierEvaluation
     template_name = 'suppliers/evaluation_list.html'
     context_object_name = 'evaluations'
@@ -1062,7 +1271,6 @@ class SupplierEvaluationListView(ListView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierEvaluationCreateView(CreateView):
-    """Create supplier evaluation"""
     model = SupplierEvaluation
     form_class = SupplierEvaluationForm
     template_name = 'suppliers/evaluation_form.html'
@@ -1081,10 +1289,8 @@ class SupplierEvaluationCreateView(CreateView):
         messages.success(self.request, 'Supplier evaluation saved successfully!')
         return super().form_valid(form)
 
-# Supplier Payment Views
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierPaymentListView(ListView):
-    """List supplier payments"""
     model = SupplierPayment
     template_name = 'suppliers/payment_list.html'
     context_object_name = 'payments'
@@ -1114,7 +1320,6 @@ class SupplierPaymentListView(ListView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierPaymentCreateView(CreateView):
-    """Create supplier payment"""
     model = SupplierPayment
     form_class = SupplierPaymentForm
     template_name = 'suppliers/payment_form.html'
@@ -1128,7 +1333,6 @@ class SupplierPaymentCreateView(CreateView):
         return context
     
     def form_valid(self, form):
-        # Generate payment number
         form.instance.payment_number = self.generate_payment_number()
         if hasattr(self.request.user, 'employee_profile'):
             form.instance.processed_by = self.request.user.employee_profile
@@ -1137,7 +1341,6 @@ class SupplierPaymentCreateView(CreateView):
         return super().form_valid(form)
     
     def generate_payment_number(self):
-        """Generate unique payment number"""
         today = timezone.now()
         prefix = f"SP{today.strftime('%Y%m')}"
         
@@ -1158,7 +1361,6 @@ class SupplierPaymentCreateView(CreateView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class SupplierPaymentDetailView(DetailView):
-    """Supplier payment detail view"""
     model = SupplierPayment
     template_name = 'suppliers/payment_detail.html'
     context_object_name = 'payment'
@@ -1166,6 +1368,13 @@ class SupplierPaymentDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['urls'] = get_supplier_urls(self.request)
+        outstanding_invoices = context.get('outstanding_invoices')
+        if outstanding_invoices:
+            context['total_outstanding'] = sum(
+                float(inv.outstanding_amount) for inv in outstanding_invoices
+            )
+        else:
+            context['total_outstanding'] = 0
         return context
 
 @login_required
@@ -1264,9 +1473,9 @@ class SupplierContactCreateView(CreateView):
         return get_business_url(self.request, 'suppliers:detail', pk=self.object.supplier.pk)
     
 
+# Invoice views 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class InvoiceListView(ListView):
-    """List invoices"""
     model = Invoice
     template_name = 'suppliers/invoice_list.html'
     context_object_name = 'invoices'
@@ -1275,7 +1484,6 @@ class InvoiceListView(ListView):
     def get_queryset(self):
         queryset = Invoice.objects.select_related('supplier', 'purchase_order')
         
-        # Apply filters
         status = self.request.GET.get('status')
         if status:
             queryset = queryset.filter(status=status)
@@ -1288,7 +1496,6 @@ class InvoiceListView(ListView):
         if supplier:
             queryset = queryset.filter(supplier_id=supplier)
         
-        # Date range filter
         date_from = self.request.GET.get('date_from')
         date_to = self.request.GET.get('date_to')
         if date_from:
@@ -1312,7 +1519,6 @@ class InvoiceListView(ListView):
         context['status_choices'] = Invoice.STATUS_CHOICES
         context['payment_status_choices'] = Invoice.PAYMENT_STATUS_CHOICES
         
-        # Statistics
         invoices = Invoice.objects.all()
         context['total_invoices'] = invoices.count()
         context['pending_approval'] = invoices.filter(status='received').count()
@@ -1329,7 +1535,6 @@ class InvoiceListView(ListView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class InvoiceDetailView(DetailView):
-    """Invoice detail view"""
     model = Invoice
     template_name = 'suppliers/invoice_detail.html'
     context_object_name = 'invoice'
@@ -1338,15 +1543,12 @@ class InvoiceDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         invoice = self.object
         
-        # Invoice items
         context['items'] = invoice.items.all()
         
-        # Related payments
         context['payments'] = invoice.supplier.payments.filter(
             purchase_orders__in=[invoice.purchase_order] if invoice.purchase_order else []
         ).order_by('-payment_date')[:5]
         
-        # Print URLs
         context['print_url'] = get_business_url(self.request, 'suppliers:invoice_print', pk=invoice.pk)
         context['pdf_url'] = get_business_url(self.request, 'suppliers:invoice_pdf', pk=invoice.pk)
         
@@ -1355,10 +1557,33 @@ class InvoiceDetailView(DetailView):
 
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class InvoiceCreateView(CreateView):
-    """Create invoice"""
     model = Invoice
     form_class = InvoiceForm
     template_name = 'suppliers/invoice_form.html'
+    
+    def get_initial(self):
+        initial = super().get_initial()
+        po_id = self.request.GET.get('po')
+        if po_id:
+            try:
+                po = PurchaseOrder.objects.get(pk=po_id, status='completed')
+                
+                # Check if invoice already exists for this PO
+                existing_invoice = Invoice.objects.filter(purchase_order=po).first()
+                if existing_invoice:
+                    messages.warning(self.request, f'Invoice {existing_invoice.invoice_number} already exists for this purchase order.')
+                    return initial
+                
+                initial['purchase_order'] = po
+                initial['supplier'] = po.supplier
+                initial['total_amount'] = po.total_amount
+                initial['subtotal'] = po.subtotal
+                initial['tax_amount'] = po.tax_amount
+                initial['shipping_cost'] = po.shipping_cost
+                initial['discount_amount'] = po.discount_amount
+            except PurchaseOrder.DoesNotExist:
+                pass
+        return initial
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1367,38 +1592,58 @@ class InvoiceCreateView(CreateView):
             context['items_formset'] = InvoiceItemFormSet(self.request.POST)
         else:
             context['items_formset'] = InvoiceItemFormSet()
-            
-        # Pre-populate from PO if specified
+        
+        # Get purchase order if pre-selected
         po_id = self.request.GET.get('po')
-        if po_id and not self.request.POST:
+        if po_id:
             try:
-                po = PurchaseOrder.objects.get(pk=po_id)
-                context['purchase_order'] = po
-                context['po_items'] = po.items.all()
+                po = PurchaseOrder.objects.get(pk=po_id, status='completed')
+                existing_invoice = Invoice.objects.filter(purchase_order=po).first()
+                if not existing_invoice:
+                    context['purchase_order'] = po
+                    context['po_items'] = po.items.filter(
+                        received_quantity__gt=0
+                    ).select_related('item')
             except PurchaseOrder.DoesNotExist:
                 pass
+        
+        # Get available completed purchase orders without invoices
+        context['available_pos'] = PurchaseOrder.objects.filter(
+            status='completed'
+        ).exclude(
+            invoices__isnull=False
+        ).select_related('supplier').order_by('-created_at')[:10]
         
         context['urls'] = get_supplier_urls(self.request)
         return context
     
     def form_valid(self, form):
+        # Check for duplicate invoice
+        po = form.cleaned_data.get('purchase_order')
+        if po:
+            existing_invoice = Invoice.objects.filter(purchase_order=po).first()
+            if existing_invoice:
+                messages.error(self.request, f'Invoice {existing_invoice.invoice_number} already exists for this purchase order.')
+                return self.form_invalid(form)
+        
         context = self.get_context_data()
         items_formset = context['items_formset']
         
         if items_formset.is_valid():
-            # Generate invoice number
-            form.instance.invoice_number = self.generate_invoice_number()
-            form.instance.received_date = timezone.now().date()
-            
-            self.object = form.save()
-            items_formset.instance = self.object
-            items_formset.save()
-            
-            # Calculate totals
-            self.calculate_invoice_totals()
-            
-            messages.success(self.request, f'Invoice {self.object.invoice_number} created successfully!')
-            return redirect(get_business_url(self.request, 'suppliers:invoice_detail', pk=self.object.pk))
+            with transaction.atomic():
+                # Generate invoice number
+                form.instance.invoice_number = self.generate_invoice_number()
+                form.instance.received_date = timezone.now().date()
+                
+                self.object = form.save()
+                items_formset.instance = self.object
+                items_formset.save()
+                
+                # Calculate totals
+                self.calculate_invoice_totals()
+                
+                messages.success(self.request, f'Invoice {self.object.invoice_number} created successfully!')
+                return redirect(get_business_url(self.request, 'suppliers:invoice_detail', pk=self.object.pk))
         else:
             return self.form_invalid(form)
     
@@ -1528,7 +1773,113 @@ def create_invoice_from_po(request, po_pk):
     # Redirect to invoice creation with PO pre-selected
     return redirect(f"{get_business_url(request, 'suppliers:invoice_create')}?po={po.pk}")
 
+# AJAX endpoints for invoice creation
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def ajax_completed_purchase_orders(request):
+    """AJAX endpoint to get completed purchase orders for invoice creation"""
+    query = request.GET.get('q', '').strip()
+    
+    # Get completed POs without invoices
+    queryset = PurchaseOrder.objects.filter(
+        status='completed'
+    ).exclude(
+        invoices__isnull=False
+    ).select_related('supplier')
+    
+    # Apply search filter
+    if query:
+        queryset = queryset.filter(
+            Q(po_number__icontains=query) |
+            Q(supplier__name__icontains=query) |
+            Q(supplier__supplier_code__icontains=query)
+        )
+    
+    queryset = queryset[:15]
+    
+    results = []
+    for po in queryset:
+        results.append({
+            'id': str(po.pk),
+            'po_number': po.po_number,
+            'supplier_name': po.supplier.name,
+            'supplier_id': str(po.supplier.pk),
+            'order_date': po.order_date.strftime('%Y-%m-%d'),
+            'delivery_date': po.delivery_date.strftime('%Y-%m-%d') if po.delivery_date else '',
+            'total_amount': float(po.total_amount),
+            'subtotal': float(po.subtotal),
+            'tax_amount': float(po.tax_amount),
+            'shipping_cost': float(po.shipping_cost),
+            'discount_amount': float(po.discount_amount),
+            'items_count': po.items.count(),
+            'received_items_count': po.items.filter(received_quantity__gt=0).count(),
+        })
+    
+    return JsonResponse({
+        'results': results,
+        'total': len(results)
+    })
 
+@login_required
+@business_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def ajax_po_invoice_items(request):
+    """AJAX endpoint to get PO items for invoice creation"""
+    po_id = request.GET.get('po_id')
+    
+    if not po_id:
+        return JsonResponse({'error': 'Purchase Order ID required'}, status=400)
+    
+    try:
+        po = PurchaseOrder.objects.get(pk=po_id, status='completed')
+        
+        # Check if invoice already exists
+        existing_invoice = Invoice.objects.filter(purchase_order=po).first()
+        if existing_invoice:
+            return JsonResponse({
+                'error': 'Invoice already exists',
+                'invoice_number': existing_invoice.invoice_number,
+                'invoice_id': str(existing_invoice.pk)
+            }, status=400)
+        
+        # Get received items only
+        items = po.items.filter(received_quantity__gt=0).select_related('item')
+        items_data = []
+        
+        for item in items:
+            items_data.append({
+                'id': item.id,
+                'item_name': item.item.name,
+                'item_sku': item.item.sku,
+                'description': item.item_description or item.item.name,
+                'quantity': float(item.received_quantity),  # Use received quantity
+                'unit_price': float(item.unit_price),
+                'total_amount': float(item.unit_price * item.received_quantity),
+                'item_code': item.item_sku,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'po_number': po.po_number,
+            'supplier': {
+                'id': str(po.supplier.pk),
+                'name': po.supplier.name,
+                'code': po.supplier.supplier_code,
+                'email': po.supplier.email,
+            },
+            'total_amount': float(po.total_amount),
+            'subtotal': float(po.subtotal),
+            'tax_amount': float(po.tax_amount),
+            'shipping_cost': float(po.shipping_cost),
+            'discount_amount': float(po.discount_amount),
+            'items': items_data,
+            'delivery_address': po.delivery_address,
+            'special_instructions': po.special_instructions,
+        })
+        
+    except PurchaseOrder.DoesNotExist:
+        return JsonResponse({'error': 'Purchase Order not found'}, status=404)
 @login_required
 @business_required
 @employee_required(['owner', 'manager', 'supervisor'])

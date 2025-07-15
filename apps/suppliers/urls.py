@@ -1,3 +1,5 @@
+# Add these URL patterns to your suppliers/urls.py file
+
 from django.urls import path
 from . import views
 
@@ -7,7 +9,7 @@ urlpatterns = [
     # Dashboard
     path('', views.supplier_dashboard, name='dashboard'),
     
-    # Suppliers - Change <int:pk> to <uuid:pk>
+    # Suppliers 
     path('list/', views.SupplierListView.as_view(), name='list'),
     path('create/', views.SupplierCreateView.as_view(), name='create'),
     path('<uuid:pk>/', views.SupplierDetailView.as_view(), name='detail'),
@@ -17,10 +19,10 @@ urlpatterns = [
     # Supplier Categories
     path('categories/', views.supplier_categories, name='categories'),
     
-    # Supplier Contacts - Change <int:supplier_id> to <uuid:supplier_id>
+    # Supplier Contacts 
     path('<uuid:supplier_id>/contacts/add/', views.SupplierContactCreateView.as_view(), name='contact_add'),
     
-    # Purchase Orders - Change <int:pk> to <uuid:pk>
+    # Purchase Orders 
     path('orders/', views.PurchaseOrderListView.as_view(), name='purchase_order_list'),
     path('orders/create/', views.PurchaseOrderCreateView.as_view(), name='purchase_order_create'),
     path('orders/<uuid:pk>/', views.PurchaseOrderDetailView.as_view(), name='purchase_order_detail'),
@@ -34,7 +36,7 @@ urlpatterns = [
     path('orders/<uuid:pk>/acknowledge/', views.acknowledge_purchase_order, name='purchase_order_acknowledge'),
     path('orders/<uuid:pk>/status-update/', views.purchase_order_status_update, name='purchase_order_status_update'),
     
-    # Goods Receipts - Change <int:pk> to <uuid:pk>
+    # Goods Receipts 
     path('receipts/', views.GoodsReceiptListView.as_view(), name='goods_receipt_list'),
     path('receipts/create/', views.GoodsReceiptCreateView.as_view(), name='goods_receipt_create'),
     path('receipts/<uuid:pk>/', views.GoodsReceiptDetailView.as_view(), name='goods_receipt_detail'),
@@ -50,11 +52,11 @@ urlpatterns = [
     path('invoices/<uuid:pk>/approve/', views.approve_invoice, name='invoice_approve'),
     path('orders/<uuid:po_pk>/create-invoice/', views.create_invoice_from_po, name='create_invoice_from_po'),
     
-    # Supplier Evaluations - Change <int:pk> to <uuid:pk>
+    # Supplier Evaluations 
     path('evaluations/', views.SupplierEvaluationListView.as_view(), name='evaluation_list'),
     path('evaluations/create/', views.SupplierEvaluationCreateView.as_view(), name='evaluation_create'),
     
-    # Supplier Payments - Change <int:pk> to <uuid:pk>
+    # Supplier Payments 
     path('payments/', views.SupplierPaymentListView.as_view(), name='payment_list'),
     path('payments/create/', views.SupplierPaymentCreateView.as_view(), name='payment_create'),
     path('payments/<uuid:pk>/', views.SupplierPaymentDetailView.as_view(), name='payment_detail'),
@@ -68,6 +70,9 @@ urlpatterns = [
     path('performance/', views.supplier_performance_report, name='performance_report'),
     path('export/', views.export_suppliers, name='export'),
     
-    # AJAX Endpoints
+    # AJAX Endpoints 
     path('ajax/purchase-order-items/', views.ajax_purchase_order_items, name='ajax_purchase_order_items'),
+    path('ajax/search-purchase-orders/', views.ajax_search_purchase_orders, name='ajax_search_purchase_orders'),
+    path('ajax/purchase-order-details/', views.ajax_purchase_order_details, name='ajax_purchase_order_details'),
+    path('ajax/supplier-details/', views.ajax_supplier_details, name='ajax_supplier_details'),
 ]

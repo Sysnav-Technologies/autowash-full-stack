@@ -1,0 +1,1179 @@
+<!-- templates/suppliers/payment_form.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}{% if object %}Edit Payment{% else %}Record Payment{% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
+<li class="breadcrumb-item"><a href="{{ urls.payment_list }}">Payments</a></li>
+<li class="breadcrumb-item active">{% if object %}Edit {{ object.payment_number }}{% else %}Record Payment{% endif %}</li>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+.form-header {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.auto-filled-card {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    border: 1px solid #6ee7b7;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.auto-filled-header {
+    background: rgba(110, 231, 183, 0.3);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(110, 231, 183, 0.4);
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    color: #047857;
+}
+
+.form-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-card-header {
+    background: #f8fafc;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.supplier-locked {
+    background: #fffbeb;
+    border: 1px solid #fbbf24;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.outstanding-invoices-card {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.invoice-table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.invoice-table th {
+    background: #f8fafc;
+    color: #374151;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.75rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.invoice-table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.payment-method-card {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.payment-method-card:hover {
+    border-color: #059669;
+    background: #f0fdf4;
+}
+
+.payment-method-card.selected {
+    border-color: #059669;
+    background: #f0fdf4;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
+}
+
+.payment-method-card .method-icon {
+    width: 48px;
+    height: 48px;
+    background: #e5e7eb;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.payment-method-card.selected .method-icon {
+    background: #059669;
+    color: white;
+}
+
+.readonly-field {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+.auto-calculated {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #047857;
+    font-weight: 500;
+}
+
+.payment-status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-processing { background: #dbeafe; color: #1e40af; }
+.status-completed { background: #d1fae5; color: #065f46; }
+.status-failed { background: #fee2e2; color: #991b1b; }
+
+.amount-display {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #047857;
+}
+
+.currency-input {
+    position: relative;
+}
+
+.currency-symbol {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.currency-input input {
+    padding-left: 40px;
+}
+
+.form-actions {
+    background: #f8fafc;
+    padding: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    border-radius: 0 0 12px 12px;
+}
+
+.select2-container--default .select2-selection--single {
+    height: 38px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 36px;
+    padding-left: 12px;
+}
+
+.conditional-fields {
+    display: none;
+    padding: 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.invoice-checkbox {
+    transform: scale(1.2);
+    margin-right: 0.5rem;
+}
+
+.overdue-indicator {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .form-header {
+        padding: 1.5rem;
+    }
+    
+    .payment-method-card {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    .amount-display {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Form Header -->
+<div class="form-header">
+    <div class="row align-items-center">
+        <div class="col-auto">
+            <div class="bg-white bg-opacity-20 rounded-3 p-3">
+                <i class="fas fa-credit-card fa-2x"></i>
+            </div>
+        </div>
+        <div class="col">
+            <h1 class="h2 mb-2">
+                {% if object %}Edit Payment{% else %}Record Supplier Payment{% endif %}
+                {% if supplier %} - {{ supplier.name }}{% endif %}
+            </h1>
+            <p class="mb-0 opacity-90">
+                {% if object %}
+                Update payment details for {{ object.payment_number }}
+                {% else %}
+                Record a payment made to supplier with automatic calculations
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Error Messages -->
+{% if form.non_field_errors %}
+<div class="alert alert-danger">
+    <h6><i class="fas fa-exclamation-triangle me-2"></i>Please correct the following errors:</h6>
+    <ul class="mb-0">
+        {% for error in form.non_field_errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- Supplier Selection (Only if no supplier pre-selected) -->
+{% if not supplier %}
+<div class="form-card">
+    <div class="form-card-header">
+        <i class="fas fa-search me-2"></i>Select Supplier
+    </div>
+    <div class="p-4">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Required:</strong> Select a supplier to view outstanding invoices and record payment.
+        </div>
+        
+        <div class="row">
+            <div class="col-md-8">
+                <label for="supplier-selector" class="form-label">Supplier <span class="text-danger">*</span></label>
+                <select id="supplier-selector" class="form-select">
+                    <option value="">Select a supplier to record payment...</option>
+                    <!-- Will be populated by JavaScript -->
+                </select>
+                <div class="form-text">Only suppliers with outstanding invoices are shown</div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="button" class="btn btn-primary w-100" id="load-supplier-btn" disabled>
+                    <i class="fas fa-download me-2"></i>Load Supplier
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<form method="post" id="payment-form" {% if not supplier %}style="display: none;"{% endif %}>
+    {% csrf_token %}
+    
+    <!-- Auto-Filled Supplier Information -->
+    {% if supplier %}
+    <div class="supplier-locked">
+        <div class="d-flex align-items-center mb-3">
+            <i class="fas fa-lock text-warning me-2"></i>
+            <h6 class="mb-0 text-warning">Payment To: {{ supplier.name }}</h6>
+        </div>
+        <div class="row">
+            <div class="col-md-3 mb-2">
+                <div class="small text-muted">Supplier Name</div>
+                <div class="fw-semibold">{{ supplier.name }}</div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="small text-muted">Supplier Code</div>
+                <div>{{ supplier.supplier_code }}</div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="small text-muted">Outstanding Balance</div>
+                <div class="fw-semibold {% if supplier.outstanding_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                    KES {{ supplier.outstanding_balance|floatformat:2 }}
+                </div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="small text-muted">Payment Terms</div>
+                <div>{{ supplier.get_payment_terms_display }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Outstanding Invoices -->
+    {% if outstanding_invoices %}
+    <div class="outstanding-invoices-card">
+        <h6 class="mb-3">
+            <i class="fas fa-file-invoice-dollar text-warning me-2"></i>Outstanding Invoices ({{ outstanding_invoices|length }})
+        </h6>
+        <div class="table-responsive">
+            <table class="invoice-table table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th width="50">Pay</th>
+                        <th>Invoice #</th>
+                        <th>Date</th>
+                        <th>Due Date</th>
+                        <th>Amount</th>
+                        <th>Outstanding</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invoice in outstanding_invoices %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input invoice-checkbox" 
+                                   value="{{ invoice.pk }}" data-amount="{{ invoice.outstanding_amount }}">
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ invoice.supplier_invoice_number }}</div>
+                            <div class="small text-muted">{{ invoice.invoice_number }}</div>
+                        </td>
+                        <td>{{ invoice.invoice_date|date:"M d, Y" }}</td>
+                        <td>
+                            {{ invoice.due_date|date:"M d, Y" }}
+                            {% if invoice.is_overdue %}
+                            <div class="small overdue-indicator">{{ invoice.days_overdue }} days overdue</div>
+                            {% endif %}
+                        </td>
+                        <td>KES {{ invoice.total_amount|floatformat:2 }}</td>
+                        <td class="fw-semibold">KES {{ invoice.outstanding_amount|floatformat:2 }}</td>
+                        <td>
+                            <span class="payment-status-badge status-{{ invoice.payment_status }}">
+                                {{ invoice.get_payment_status_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-3">
+            <div class="row">
+                <div class="col-md-6">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="select-all-invoices">
+                        <i class="fas fa-check-square me-1"></i>Select All
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="clear-all-invoices">
+                        <i class="fas fa-square me-1"></i>Clear All
+                    </button>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="small text-muted">Total Outstanding:</div>
+                    <div class="fw-bold text-danger" id="total-outstanding">
+                        KES {{ total_outstanding|floatformat:2 }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Main Form -->
+        <div class="col-lg-8 mb-4">
+            <!-- Payment Information -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-info-circle me-2"></i>Payment Information
+                </div>
+                <div class="p-4">
+                    <!-- Hidden fields for auto-filled data -->
+                    {% if supplier %}
+                    <input type="hidden" name="supplier" value="{{ supplier.pk }}" id="id_supplier">
+                    {% endif %}
+                    
+                    <div class="row">
+                        {% if not supplier %}
+                        <div class="col-md-12 mb-3">
+                            <label for="{{ form.supplier.id_for_label }}" class="form-label">
+                                Supplier <span class="text-danger">*</span>
+                            </label>
+                            {{ form.supplier|add_class:"form-select" }}
+                            {% if form.supplier.errors %}
+                                <div class="invalid-feedback">{{ form.supplier.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="payment_number_display" class="form-label">Payment Number</label>
+                            <input type="text" class="form-control readonly-field" id="payment_number_display" readonly 
+                                   value="{% if object %}{{ object.payment_number }}{% else %}Auto-generated on save{% endif %}">
+                            <div class="form-text">Payment number will be automatically generated</div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.payment_date.id_for_label }}" class="form-label">
+                                Payment Date <span class="text-danger">*</span>
+                            </label>
+                            {{ form.payment_date|add_class:"form-control" }}
+                            {% if form.payment_date.errors %}
+                                <div class="invalid-feedback">{{ form.payment_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-8 mb-3">
+                            <label for="{{ form.amount.id_for_label }}" class="form-label">
+                                Payment Amount <span class="text-danger">*</span>
+                            </label>
+                            <div class="currency-input">
+                                <span class="currency-symbol">KES</span>
+                                {{ form.amount|add_class:"form-control" }}
+                            </div>
+                            {% if form.amount.errors %}
+                                <div class="invalid-feedback">{{ form.amount.errors.0 }}</div>
+                            {% endif %}
+                            <div class="form-text">Amount will be auto-calculated from selected invoices</div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Amount Display</label>
+                            <div class="amount-display" id="amount-display">KES 0.00</div>
+                        </div>
+                        
+                        <div class="col-md-12 mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                            {{ form.description|add_class:"form-control" }}
+                            <div class="form-text">Brief description of the payment</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden field for selected purchase orders -->
+                    {{ form.purchase_orders|add_class:"d-none" }}
+                </div>
+            </div>
+
+            <!-- Payment Method Selection -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-credit-card me-2"></i>Payment Method
+                </div>
+                <div class="p-4">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="payment-method-card" data-method="bank_transfer">
+                                <div class="method-icon">
+                                    <i class="fas fa-university"></i>
+                                </div>
+                                <div class="fw-semibold">Bank Transfer</div>
+                                <div class="small text-muted">Electronic transfer</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="payment-method-card" data-method="cheque">
+                                <div class="method-icon">
+                                    <i class="fas fa-money-check"></i>
+                                </div>
+                                <div class="fw-semibold">Cheque</div>
+                                <div class="small text-muted">Bank cheque</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="payment-method-card" data-method="cash">
+                                <div class="method-icon">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div class="fw-semibold">Cash</div>
+                                <div class="small text-muted">Cash payment</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="payment-method-card" data-method="mobile_money">
+                                <div class="method-icon">
+                                    <i class="fas fa-mobile-alt"></i>
+                                </div>
+                                <div class="fw-semibold">Mobile Money</div>
+                                <div class="small text-muted">M-Pesa, Airtel, etc.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="payment-method-card" data-method="card">
+                                <div class="method-icon">
+                                    <i class="fas fa-credit-card"></i>
+                                </div>
+                                <div class="fw-semibold">Card Payment</div>
+                                <div class="small text-muted">Credit/Debit card</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="payment-method-card" data-method="online">
+                                <div class="method-icon">
+                                    <i class="fas fa-globe"></i>
+                                </div>
+                                <div class="fw-semibold">Online Payment</div>
+                                <div class="small text-muted">Online platform</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden payment method field -->
+                    <input type="hidden" name="payment_method" id="id_payment_method">
+                    
+                    <!-- Bank Transfer Fields -->
+                    <div id="bank_transfer_fields" class="conditional-fields">
+                        <h6 class="mb-3">Bank Transfer Details</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.bank_name.id_for_label }}" class="form-label">Bank Name</label>
+                                {{ form.bank_name|add_class:"form-control" }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.account_number.id_for_label }}" class="form-label">Account Number</label>
+                                {{ form.account_number|add_class:"form-control" }}
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.reference_number.id_for_label }}" class="form-label">Reference Number</label>
+                                {{ form.reference_number|add_class:"form-control" }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Cheque Fields -->
+                    <div id="cheque_fields" class="conditional-fields">
+                        <h6 class="mb-3">Cheque Details</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.cheque_number.id_for_label }}" class="form-label">Cheque Number</label>
+                                {{ form.cheque_number|add_class:"form-control" }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.cheque_date.id_for_label }}" class="form-label">Cheque Date</label>
+                                {{ form.cheque_date|add_class:"form-control" }}
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.bank_name.id_for_label }}" class="form-label">Bank Name</label>
+                                {{ form.bank_name|add_class:"form-control" }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mobile Money Fields -->
+                    <div id="mobile_money_fields" class="conditional-fields">
+                        <h6 class="mb-3">Mobile Money Details</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.transaction_id.id_for_label }}" class="form-label">Transaction ID</label>
+                                {{ form.transaction_id|add_class:"form-control" }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.reference_number.id_for_label }}" class="form-label">Reference Number</label>
+                                {{ form.reference_number|add_class:"form-control" }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Online Payment Fields -->
+                    <div id="online_fields" class="conditional-fields">
+                        <h6 class="mb-3">Online Payment Details</h6>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.transaction_id.id_for_label }}" class="form-label">Transaction ID</label>
+                                {{ form.transaction_id|add_class:"form-control" }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Payment Summary -->
+            <div class="form-card mb-4">
+                <div class="form-card-header">
+                    <i class="fas fa-chart-bar me-2"></i>Payment Summary
+                </div>
+                <div class="p-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Selected Invoices:</span>
+                        <span class="fw-semibold" id="selected-count">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Amount:</span>
+                        <span class="fw-semibold text-success" id="total-amount">KES 0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted">Payment Method:</span>
+                        <span class="fw-semibold" id="selected-method">Not selected</span>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <small>Select invoices and payment method to proceed</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="form-card mb-4">
+                <div class="form-card-header">
+                    <i class="fas fa-bolt me-2"></i>Quick Actions
+                </div>
+                <div class="p-4">
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary" id="pay-overdue-btn">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Pay Overdue Only
+                        </button>
+                        <button type="button" class="btn btn-outline-success" id="pay-oldest-btn">
+                            <i class="fas fa-sort-numeric-up me-2"></i>Pay Oldest First
+                        </button>
+                        <button type="button" class="btn btn-outline-info" id="calculate-partial-btn">
+                            <i class="fas fa-percentage me-2"></i>Calculate Partial (80%)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-sticky-note me-2"></i>Additional Information
+                </div>
+                <div class="p-4">
+                    <div class="mb-3">
+                        <label for="{{ form.notes.id_for_label }}" class="form-label">Internal Notes</label>
+                        {{ form.notes|add_class:"form-control" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="form-card">
+        <div class="form-actions">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="{{ urls.payment_list }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Cancel
+                    </a>
+                </div>
+                <div class="d-flex gap-2">
+                    {% if object %}
+                        <button type="submit" name="save" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Update Payment
+                        </button>
+                        {% if object.status == 'pending' %}
+                        <button type="submit" name="process" class="btn btn-warning">
+                            <i class="fas fa-play me-2"></i>Process Payment
+                        </button>
+                        {% elif object.status == 'processing' %}
+                        <button type="submit" name="complete" class="btn btn-success">
+                            <i class="fas fa-check-circle me-2"></i>Mark Completed
+                        </button>
+                        {% endif %}
+                    {% else %}
+                        <button type="submit" name="save_pending" class="btn btn-secondary">
+                            <i class="fas fa-save me-2"></i>Save as Pending
+                        </button>
+                        <button type="submit" name="save_and_process" class="btn btn-success">
+                            <i class="fas fa-credit-card me-2"></i>Save & Process
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    let selectedInvoices = [];
+    let totalOutstanding = 0;
+    
+    // Initialize supplier data if pre-selected
+    {% if supplier %}
+    const supplierData = {
+        id: '{{ supplier.pk }}',
+        name: '{{ supplier.name|escapejs }}',
+        outstanding_balance: {{ supplier.outstanding_balance|default:0 }}
+    };
+    {% else %}
+    let supplierData = null;
+    initializeSupplierSelector();
+    {% endif %}
+    
+    // Calculate total outstanding from invoices
+    {% if outstanding_invoices %}
+    totalOutstanding = {% for invoice in outstanding_invoices %}{{ invoice.outstanding_amount }}{% if not forloop.last %} + {% endif %}{% endfor %};
+    $('#total-outstanding').text(`KES ${totalOutstanding.toFixed(2)}`);
+    {% endif %}
+    
+    // Set default payment date to today
+    if (!$('#id_payment_date').val()) {
+        const today = new Date().toISOString().split('T')[0];
+        $('#id_payment_date').val(today);
+    }
+    
+    // Handle invoice selection
+    $('.invoice-checkbox').on('change', function() {
+        updateSelectedInvoices();
+        calculatePaymentAmount();
+    });
+    
+    // Handle payment method selection
+    $('.payment-method-card').on('click', function() {
+        const method = $(this).data('method');
+        selectPaymentMethod(method);
+    });
+    
+    // Handle amount input changes
+    $('#id_amount').on('input', function() {
+        updateAmountDisplay();
+    });
+    
+    // Quick action buttons
+    $('#select-all-invoices').on('click', function() {
+        $('.invoice-checkbox').prop('checked', true);
+        updateSelectedInvoices();
+        calculatePaymentAmount();
+    });
+    
+    $('#clear-all-invoices').on('click', function() {
+        $('.invoice-checkbox').prop('checked', false);
+        updateSelectedInvoices();
+        calculatePaymentAmount();
+    });
+    
+    $('#pay-overdue-btn').on('click', function() {
+        $('.invoice-checkbox').prop('checked', false);
+        $('.invoice-checkbox').each(function() {
+            const row = $(this).closest('tr');
+            if (row.find('.overdue-indicator').length > 0) {
+                $(this).prop('checked', true);
+            }
+        });
+        updateSelectedInvoices();
+        calculatePaymentAmount();
+        showAlert('Selected all overdue invoices for payment.', 'info');
+    });
+    
+    $('#pay-oldest-btn').on('click', function() {
+        $('.invoice-checkbox').prop('checked', false);
+        // Select first 3 invoices (assuming they're sorted by date)
+        $('.invoice-checkbox').slice(0, 3).prop('checked', true);
+        updateSelectedInvoices();
+        calculatePaymentAmount();
+        showAlert('Selected oldest invoices for payment.', 'info');
+    });
+    
+    $('#calculate-partial-btn').on('click', function() {
+        if (selectedInvoices.length === 0) {
+            showAlert('Please select invoices first.', 'warning');
+            return;
+        }
+        const currentAmount = parseFloat($('#id_amount').val()) || 0;
+        const partialAmount = currentAmount * 0.8;
+        $('#id_amount').val(partialAmount.toFixed(2));
+        updateAmountDisplay();
+        showAlert('Calculated 80% of total amount for partial payment.', 'info');
+    });
+    
+    // Form validation
+    $('#payment-form').on('submit', function(e) {
+        if (!validateForm()) {
+            e.preventDefault();
+        }
+    });
+    
+    function initializeSupplierSelector() {
+        $('#supplier-selector').select2({
+            placeholder: 'Search and select a supplier...',
+            allowClear: true
+        });
+        
+        // Load suppliers with outstanding invoices
+        loadSuppliersWithOutstanding();
+        
+        // Enable/disable load button based on selection
+        $('#supplier-selector').on('change', function() {
+            const hasSelection = $(this).val();
+            $('#load-supplier-btn').prop('disabled', !hasSelection);
+        });
+        
+        // Load supplier button click
+        $('#load-supplier-btn').on('click', function() {
+            const supplierId = $('#supplier-selector').val();
+            if (supplierId) {
+                loadSupplierData(supplierId);
+            }
+        });
+    }
+    
+    function loadSuppliersWithOutstanding() {
+        $.ajax({
+            url: '{{ urls.ajax_purchase_order_items }}',
+            data: { 
+                action: 'get_suppliers_with_outstanding' 
+            },
+            success: function(data) {
+                const selector = $('#supplier-selector');
+                selector.empty().append('<option value="">Select a supplier to record payment...</option>');
+                
+                if (data.suppliers) {
+                    data.suppliers.forEach(supplier => {
+                        selector.append(`
+                            <option value="${supplier.id}" data-outstanding="${supplier.outstanding_balance}">
+                                ${supplier.name} - Outstanding: KES ${parseFloat(supplier.outstanding_balance).toLocaleString()}
+                            </option>
+                        `);
+                    });
+                }
+            },
+            error: function() {
+                showAlert('Could not load suppliers. Please refresh the page.', 'error');
+            }
+        });
+    }
+    
+    function loadSupplierData(supplierId) {
+        // Navigate to the form with the selected supplier
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('supplier', supplierId);
+        window.location.href = currentUrl.toString();
+    }
+    
+    function updateSelectedInvoices() {
+        selectedInvoices = [];
+        $('.invoice-checkbox:checked').each(function() {
+            selectedInvoices.push({
+                id: $(this).val(),
+                amount: parseFloat($(this).data('amount'))
+            });
+        });
+        
+        $('#selected-count').text(selectedInvoices.length);
+    }
+    
+    function calculatePaymentAmount() {
+        let totalAmount = 0;
+        selectedInvoices.forEach(invoice => {
+            totalAmount += invoice.amount;
+        });
+        
+        $('#id_amount').val(totalAmount.toFixed(2));
+        updateAmountDisplay();
+        updatePaymentSummary();
+    }
+    
+    function updateAmountDisplay() {
+        const amount = parseFloat($('#id_amount').val()) || 0;
+        $('#amount-display').text(`KES ${amount.toLocaleString()}`);
+        $('#total-amount').text(`KES ${amount.toFixed(2)}`);
+    }
+    
+    function updatePaymentSummary() {
+        const amount = parseFloat($('#id_amount').val()) || 0;
+        $('#total-amount').text(`KES ${amount.toFixed(2)}`);
+    }
+    
+    function selectPaymentMethod(method) {
+        // Remove previous selection
+        $('.payment-method-card').removeClass('selected');
+        
+        // Select new method
+        $(`.payment-method-card[data-method="${method}"]`).addClass('selected');
+        $('#id_payment_method').val(method);
+        
+        // Hide all conditional fields
+        $('.conditional-fields').hide();
+        
+        // Show relevant fields
+        if (method === 'bank_transfer') {
+            $('#bank_transfer_fields').show();
+        } else if (method === 'cheque') {
+            $('#cheque_fields').show();
+        } else if (method === 'mobile_money') {
+            $('#mobile_money_fields').show();
+        } else if (method === 'online') {
+            $('#online_fields').show();
+        }
+        
+        // Update summary
+        const methodNames = {
+            'bank_transfer': 'Bank Transfer',
+            'cheque': 'Cheque',
+            'cash': 'Cash',
+            'mobile_money': 'Mobile Money',
+            'card': 'Card Payment',
+            'online': 'Online Payment'
+        };
+        
+        $('#selected-method').text(methodNames[method] || 'Not selected');
+    }
+    
+    function validateForm() {
+        let isValid = true;
+        const errors = [];
+        
+        // Remove existing validation classes
+        $('.is-invalid').removeClass('is-invalid');
+        
+        // Check if supplier is selected
+        if (!$('#id_supplier').val() && !supplierData) {
+            errors.push('Please select a supplier.');
+            isValid = false;
+        }
+        
+        // Check payment amount
+        const amount = parseFloat($('#id_amount').val());
+        if (!amount || amount <= 0) {
+            errors.push('Please enter a valid payment amount.');
+            $('#id_amount').addClass('is-invalid');
+            isValid = false;
+        }
+        
+        // Check payment date
+        if (!$('#id_payment_date').val()) {
+            errors.push('Please provide a payment date.');
+            $('#id_payment_date').addClass('is-invalid');
+            isValid = false;
+        }
+        
+        // Check payment method
+        if (!$('#id_payment_method').val()) {
+            errors.push('Please select a payment method.');
+            isValid = false;
+        }
+        
+        // Validate payment method specific fields
+        const paymentMethod = $('#id_payment_method').val();
+        if (paymentMethod === 'bank_transfer') {
+            if (!$('#id_reference_number').val()) {
+                errors.push('Please provide a reference number for bank transfer.');
+                $('#id_reference_number').addClass('is-invalid');
+                isValid = false;
+            }
+        } else if (paymentMethod === 'cheque') {
+            if (!$('#id_cheque_number').val()) {
+                errors.push('Please provide a cheque number.');
+                $('#id_cheque_number').addClass('is-invalid');
+                isValid = false;
+            }
+            if (!$('#id_cheque_date').val()) {
+                errors.push('Please provide a cheque date.');
+                $('#id_cheque_date').addClass('is-invalid');
+                isValid = false;
+            }
+        } else if (paymentMethod === 'mobile_money' || paymentMethod === 'online') {
+            if (!$('#id_transaction_id').val()) {
+                errors.push('Please provide a transaction ID.');
+                $('#id_transaction_id').addClass('is-invalid');
+                isValid = false;
+            }
+        }
+        
+        // Check if at least one invoice is selected (optional validation)
+        if (selectedInvoices.length === 0) {
+            errors.push('It is recommended to select at least one invoice for this payment.');
+            // Don't mark as invalid, just warn
+        }
+        
+        if (!isValid) {
+            showValidationErrors(errors);
+        }
+        
+        return isValid;
+    }
+    
+    function showValidationErrors(errors) {
+        let errorHtml = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+        errorHtml += '<h6><i class="fas fa-exclamation-triangle me-2"></i>Please correct the following errors:</h6>';
+        errorHtml += '<ul class="mb-0">';
+        errors.forEach(error => {
+            errorHtml += `<li>${error}</li>`;
+        });
+        errorHtml += '</ul>';
+        errorHtml += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        errorHtml += '</div>';
+        
+        $('.alert-danger').remove();
+        $('.form-header').after(errorHtml);
+        
+        $('html, body').animate({
+            scrollTop: $('.alert-danger').offset().top - 100
+        }, 500);
+    }
+    
+    function showAlert(message, type) {
+        // Remove existing alerts
+        $('.auto-alert').remove();
+        
+        const alertHtml = `
+            <div class="auto-alert alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        $('.form-header').after(alertHtml);
+        
+        // Auto-hide success and info alerts after 4 seconds
+        if (type === 'success' || type === 'info') {
+            setTimeout(() => {
+                $('.auto-alert').fadeOut();
+            }, 4000);
+        }
+    }
+    
+    // Initialize existing data
+    {% if object %}
+    // Pre-select payment method if editing
+    {% if object.payment_method %}
+    selectPaymentMethod('{{ object.payment_method }}');
+    {% endif %}
+    
+    // Update amount display
+    updateAmountDisplay();
+    {% endif %}
+    
+    // Auto-save functionality
+    let autoSaveTimer;
+    function scheduleAutoSave() {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(function() {
+            if ($('#id_amount').val() && $('#id_payment_method').val()) {
+                autoSave();
+            }
+        }, 30000); // Auto-save every 30 seconds
+    }
+    
+    function autoSave() {
+        const formData = new FormData($('#payment-form')[0]);
+        formData.append('save_pending', 'true');
+        formData.append('auto_save', 'true');
+        
+        $.ajax({
+            url: window.location.href,
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                console.log('Auto-saved successfully');
+            },
+            error: function() {
+                console.log('Auto-save failed');
+            }
+        });
+    }
+    
+    // Track form changes for auto-save
+    $(document).on('input change', '#payment-form', function() {
+        scheduleAutoSave();
+    });
+    
+    // Prevent accidental navigation
+    let formChanged = false;
+    $(document).on('input change', '#payment-form', function() {
+        formChanged = true;
+    });
+    
+    $(window).on('beforeunload', function(e) {
+        if (formChanged) {
+            const message = 'You have unsaved changes. Are you sure you want to leave?';
+            e.returnValue = message;
+            return message;
+        }
+    });
+    
+    $('#payment-form').on('submit', function() {
+        formChanged = false;
+        $(window).off('beforeunload');
+    });
+    
+    // Remove validation classes on input
+    $(document).on('input change', '.form-control, .form-select', function() {
+        $(this).removeClass('is-invalid');
+        $('.alert-danger').fadeOut();
+    });
+    
+    // Keyboard shortcuts
+    $(document).keydown(function(e) {
+        // Ctrl/Cmd + Enter to save and process
+        if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
+            e.preventDefault();
+            $('button[name="save_and_process"]').click();
+        }
+        
+        // Ctrl/Cmd + S to save
+        if ((e.ctrlKey || e.metaKey) && e.keyCode === 83) {
+            e.preventDefault();
+            $('button[name="save_pending"]').click();
+        }
+    });
+    
+    // Smart amount formatting
+    $('#id_amount').on('blur', function() {
+        const value = parseFloat($(this).val());
+        if (!isNaN(value)) {
+            $(this).val(value.toFixed(2));
+            updateAmountDisplay();
+        }
+    });
+    
+    // Auto-select overdue invoices on page load
+    {% if outstanding_invoices %}
+    setTimeout(function() {
+        let hasOverdue = false;
+        $('.invoice-checkbox').each(function() {
+            const row = $(this).closest('tr');
+            if (row.find('.overdue-indicator').length > 0) {
+                hasOverdue = true;
+            }
+        });
+        
+        if (hasOverdue) {
+            showAlert('There are overdue invoices. Consider paying them first.', 'warning');
+        }
+    }, 1000);
+    {% endif %}
+    
+    // Initialize tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // Initialize amount display
+    updateAmountDisplay();
+});
+</script>
+{% endblock %}

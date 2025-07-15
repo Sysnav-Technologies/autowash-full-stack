@@ -1,4 +1,4 @@
-<!-- templates/suppliers/goods_receipt_auto_form.html -->
+<!-- templates/suppliers/goods_receipt_form.html -->
 {% extends 'base/base.html' %}
 {% load static %}
 {% load widget_tweaks %}
@@ -13,7 +13,6 @@
 {% endblock %}
 
 {% block extra_css %}
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
 .form-header {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -23,20 +22,34 @@
     margin-bottom: 2rem;
 }
 
-.auto-filled-card {
-    background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
-    border: 1px solid #4fc3f7;
+.alert-duplicate {
+    background-color: #fef3c7;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+}
+
+.po-selection-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #0ea5e9;
     border-radius: 12px;
     margin-bottom: 1.5rem;
 }
 
-.auto-filled-header {
-    background: rgba(79, 195, 247, 0.2);
+.po-selection-header {
+    background: rgba(14, 165, 233, 0.1);
     padding: 1rem 1.5rem;
-    border-bottom: 1px solid rgba(79, 195, 247, 0.3);
+    border-bottom: 1px solid rgba(14, 165, 233, 0.2);
     border-radius: 12px 12px 0 0;
     font-weight: 600;
-    color: #0277bd;
+    color: #0369a1;
+}
+
+.po-selected-info {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid #10b981;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
 }
 
 .form-card {
@@ -104,10 +117,18 @@
 .variance-negative { background: #fee2e2; color: #991b1b; }
 .variance-zero { background: #f3f4f6; color: #374151; }
 
+.quick-actions {
+    background: #f0f9ff;
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
 .po-status-badge {
-    padding: 0.5rem 1rem;
-    border-radius: 1rem;
-    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
 }
@@ -117,14 +138,6 @@
 .status-acknowledged { background: #f0f9ff; color: #0369a1; }
 .status-partially_received { background: #fef3c7; color: #92400e; }
 
-.quick-actions {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-}
-
 .supplier-locked {
     background: #fffbeb;
     border: 1px solid #fbbf24;
@@ -133,25 +146,13 @@
     margin-bottom: 1rem;
 }
 
-.loading-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.9);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    border-radius: 12px;
-}
-
-.form-actions {
-    background: #f8fafc;
-    padding: 1.5rem;
-    border-top: 1px solid #e2e8f0;
-    border-radius: 0 0 12px 12px;
+.no-po-selected {
+    background: #fef3c7;
+    border: 1px solid #fbbf24;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    color: #92400e;
 }
 
 .item-row.highlight {
@@ -159,23 +160,38 @@
     border-left: 3px solid #10b981;
 }
 
-.auto-fill-controls {
-    background: #f0f9ff;
-    border: 1px solid #93c5fd;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-
-.select2-container--default .select2-selection--single {
-    height: 38px;
+.po-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
     border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
 }
 
-.select2-container--default .select2-selection--single .select2-selection__rendered {
-    line-height: 36px;
-    padding-left: 12px;
+.po-dropdown-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.po-dropdown-item:hover {
+    background: #f8fafc;
+}
+
+.po-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.po-search-container {
+    position: relative;
 }
 
 @media (max-width: 768px) {
@@ -192,7 +208,7 @@
         padding: 0.5rem 0.25rem;
     }
     
-    .auto-fill-controls .btn {
+    .quick-actions .btn {
         margin-bottom: 0.5rem;
     }
 }
@@ -211,18 +227,31 @@
         <div class="col">
             <h1 class="h2 mb-2">
                 {% if object %}Edit Goods Receipt{% else %}Receive Goods{% endif %}
-                {% if purchase_order %} - PO-{{ purchase_order.po_number }}{% endif %}
             </h1>
             <p class="mb-0 opacity-90">
                 {% if object %}
                 Update receipt details for GR-{{ object.receipt_number }}
                 {% else %}
-                Record goods received from supplier with pre-filled information
+                Record goods received from supplier with inventory safety checks
                 {% endif %}
             </p>
         </div>
     </div>
 </div>
+
+<!-- Duplicate Warning -->
+{% if duplicate_warning.has_recent %}
+<div class="alert alert-duplicate">
+    <h6><i class="fas fa-exclamation-triangle me-2"></i>Duplicate Receipt Warning</h6>
+    <p class="mb-2">{{ duplicate_warning.warning_message }}</p>
+    <small>Recent receipts:</small>
+    <ul class="mb-0">
+        {% for receipt in duplicate_warning.recent_receipts %}
+        <li>{{ receipt.receipt_number }} - {{ receipt.receipt_date }} ({{ receipt.status }})</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
 
 <!-- Error Messages -->
 {% if form.non_field_errors or items_formset.non_form_errors %}
@@ -239,373 +268,480 @@
 </div>
 {% endif %}
 
-<!-- Purchase Order Selection (Only if no PO pre-selected) -->
-{% if not purchase_order %}
-<div class="form-card">
-    <div class="form-card-header">
-        <i class="fas fa-search me-2"></i>Select Purchase Order
+<!-- Purchase Order Selection -->
+{% if not object %}
+<div class="po-selection-card">
+    <div class="po-selection-header">
+        <i class="fas fa-search me-2"></i>
+        Select Purchase Order for Goods Receipt
     </div>
     <div class="p-4">
+        {% if not purchase_order %}
         <div class="alert alert-info">
             <i class="fas fa-info-circle me-2"></i>
-            <strong>Auto-Fill Mode:</strong> Select a purchase order to automatically populate all information including supplier details and pending items.
+            <strong>Safety Feature:</strong> Only purchase orders that can receive goods are shown. Duplicate receipts are prevented.
         </div>
         
         <div class="row">
             <div class="col-md-8">
-                <label for="po-selector" class="form-label">Purchase Order <span class="text-danger">*</span></label>
-                <select id="po-selector" class="form-select">
-                    <option value="">Select a purchase order to receive goods...</option>
-                    {% for po in available_pos %}
-                    <option value="{{ po.pk }}" 
-                            data-supplier="{{ po.supplier.name }}"
-                            data-supplier-id="{{ po.supplier.pk }}"
-                            data-items="{{ po.items.count }}"
-                            data-total="{{ po.total_amount }}"
-                            data-status="{{ po.status }}">
-                        PO-{{ po.po_number }} - {{ po.supplier.name }} 
-                        ({{ po.items.count }} items, KES {{ po.total_amount|floatformat:0 }})
-                    </option>
-                    {% endfor %}
-                </select>
-                <div class="form-text">Only purchase orders that can receive goods are shown</div>
+                <label class="form-label">Search Purchase Orders</label>
+                <div class="po-search-container">
+                    <input type="text" 
+                           id="po-search-input" 
+                           class="form-control" 
+                           placeholder="Type PO number, supplier name..."
+                           autocomplete="off">
+                    <div class="po-dropdown" id="po-dropdown"></div>
+                </div>
+                <div class="form-text">Search for purchase orders ready for goods receipt</div>
             </div>
             <div class="col-md-4 d-flex align-items-end">
-                <button type="button" class="btn btn-primary w-100" id="load-po-btn" disabled>
-                    <i class="fas fa-download me-2"></i>Load Purchase Order
+                <button type="button" 
+                        class="btn btn-outline-secondary w-100" 
+                        onclick="showAllAvailablePOs()">
+                    <i class="fas fa-list me-2"></i>Show All Available
                 </button>
             </div>
         </div>
-    </div>
-</div>
-{% endif %}
-
-<form method="post" id="goods-receipt-form" {% if not purchase_order %}style="display: none;"{% endif %}>
-    {% csrf_token %}
-    
-    <!-- Auto-Filled Purchase Order Information -->
-    {% if purchase_order %}
-    <div class="auto-filled-card">
-        <div class="auto-filled-header d-flex justify-content-between align-items-center">
-            <div>
-                <i class="fas fa-file-invoice me-2"></i>Purchase Order Information (Auto-Filled)
-            </div>
-            <span class="po-status-badge status-{{ purchase_order.status }}">
-                {{ purchase_order.get_status_display }}
-            </span>
+        
+        <!-- Available POs List -->
+        <div class="mt-3">
+            <label class="form-label">Or select from available purchase orders:</label>
+            <select id="po-selector" class="form-select" onchange="loadSelectedPO()">
+                <option value="">Select a purchase order...</option>
+                {% for po in available_pos %}
+                <option value="{{ po.pk }}" 
+                        data-supplier="{{ po.supplier.name }}"
+                        data-supplier-id="{{ po.supplier.pk }}"
+                        data-items="{{ po.pending_items_count }}"
+                        data-total="{{ po.total_amount }}"
+                        data-status="{{ po.status }}">
+                    PO-{{ po.po_number }} - {{ po.supplier.name }} 
+                    ({{ po.pending_items_count }} pending items, KES {{ po.total_amount|floatformat:0 }})
+                </option>
+                {% endfor %}
+            </select>
         </div>
-        <div class="p-4">
-            <div class="row">
-                <div class="col-md-3 mb-3">
-                    <div class="small text-muted">Purchase Order</div>
-                    <div class="fw-semibold fs-5">PO-{{ purchase_order.po_number }}</div>
-                    <div class="small text-muted">{{ purchase_order.order_date|date:"M d, Y" }}</div>
+        
+        {% else %}
+        <!-- Selected Purchase Order Info -->
+        <div class="po-selected-info">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h6 class="mb-1">
+                        <i class="fas fa-file-invoice me-2"></i>
+                        Selected Purchase Order
+                    </h6>
+                    <div>
+                        <div class="fw-semibold">PO-{{ purchase_order.po_number }}</div>
+                        <div class="text-muted">{{ purchase_order.supplier.name }} • {{ purchase_order.order_date|date:"M d, Y" }}</div>
+                    </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="small text-muted">Expected Delivery</div>
-                    <div class="fw-semibold">{{ purchase_order.expected_delivery_date|date:"M d, Y" }}</div>
-                    {% if purchase_order.is_overdue %}
-                    <div class="small text-danger">{{ purchase_order.days_overdue }} days overdue</div>
-                    {% endif %}
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="small text-muted">Total Value</div>
-                    <div class="fw-semibold">KES {{ purchase_order.total_amount|floatformat:2 }}</div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="small text-muted">Items to Receive</div>
-                    <div class="fw-semibold">{{ pending_items|length }} items</div>
-                    <div class="small text-muted">{{ purchase_order.completion_percentage|floatformat:1 }}% completed</div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="po-status-badge status-{{ purchase_order.status }}">
+                        {{ purchase_order.get_status_display }}
+                    </span>
+                    <a href="?po=" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-exchange-alt me-1"></i>Change
+                    </a>
                 </div>
             </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Auto-Filled Supplier Information (Read-Only) -->
-    {% if purchase_order %}
-    <div class="supplier-locked">
-        <div class="d-flex align-items-center mb-3">
-            <i class="fas fa-lock text-warning me-2"></i>
-            <h6 class="mb-0 text-warning">Supplier Information (Locked from Purchase Order)</h6>
-        </div>
-        <div class="row">
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Supplier Name</div>
-                <div class="fw-semibold">{{ purchase_order.supplier.name }}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Supplier Code</div>
-                <div>{{ purchase_order.supplier.supplier_code }}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Contact</div>
-                <div>{{ purchase_order.supplier.email|default:"No email" }}</div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <div class="row">
-        <!-- Main Form -->
-        <div class="col-lg-8 mb-4">
-            <!-- Receipt Information -->
-            <div class="form-card">
-                <div class="form-card-header">
-                    <i class="fas fa-info-circle me-2"></i>Receipt Information
+            
+            <!-- PO Completion Info -->
+            {% if po_completion %}
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <div class="small text-muted">Completion</div>
+                    <div class="fw-semibold">{{ po_completion.percentage|floatformat:1 }}%</div>
                 </div>
-                <div class="p-4">
-                    <!-- Hidden fields for auto-filled data -->
-                    {% if purchase_order %}
-                    <input type="hidden" name="purchase_order" value="{{ purchase_order.pk }}" id="id_purchase_order">
-                    <input type="hidden" name="supplier" value="{{ purchase_order.supplier.pk }}" id="id_supplier">
-                    {% endif %}
-                    
-                    <div class="row">
-                        {% if not purchase_order %}
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.purchase_order.id_for_label }}" class="form-label">
-                                Purchase Order <span class="text-danger">*</span>
-                            </label>
-                            {{ form.purchase_order|add_class:"form-select readonly-field" }}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.supplier.id_for_label }}" class="form-label">
-                                Supplier <span class="text-danger">*</span>
-                            </label>
-                            {{ form.supplier|add_class:"form-select readonly-field" }}
-                        </div>
+                <div class="col-md-3">
+                    <div class="small text-muted">Total Items</div>
+                    <div class="fw-semibold">{{ po_completion.total_items }}</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="small text-muted">Pending Items</div>
+                    <div class="fw-semibold">{{ po_completion.pending_items }}</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="small text-muted">Status</div>
+                    <div class="fw-semibold">
+                        {% if po_completion.is_fully_received %}
+                            <span class="text-success">Fully Received</span>
+                        {% else %}
+                            <span class="text-warning">Pending</span>
                         {% endif %}
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.receipt_date.id_for_label }}" class="form-label">
-                                Receipt Date <span class="text-danger">*</span>
-                            </label>
-                            {{ form.receipt_date|add_class:"form-control" }}
-                            {% if form.receipt_date.errors %}
-                                <div class="invalid-feedback">{{ form.receipt_date.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.delivery_note_number.id_for_label }}" class="form-label">Delivery Note Number</label>
-                            {{ form.delivery_note_number|add_class:"form-control" }}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.vehicle_number.id_for_label }}" class="form-label">Vehicle Number</label>
-                            {{ form.vehicle_number|add_class:"form-control" }}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.driver_name.id_for_label }}" class="form-label">Driver Name</label>
-                            {{ form.driver_name|add_class:"form-control" }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Auto-Fill Controls -->
-            {% if pending_items %}
-            <div class="auto-fill-controls">
-                <h6 class="mb-3">
-                    <i class="fas fa-magic me-2"></i>Quick Actions for {{ pending_items|length }} Pending Items
-                </h6>
-                <div class="row">
-                    <div class="col-md-6 mb-2">
-                        <button type="button" class="btn btn-success w-100" onclick="receiveAllItems()">
-                            <i class="fas fa-check-double me-2"></i>Receive All Items (Full Quantities)
-                        </button>
-                    </div>
-                    <div class="col-md-6 mb-2">
-                        <button type="button" class="btn btn-primary w-100" onclick="customReceiveItems()">
-                            <i class="fas fa-edit me-2"></i>Custom Quantities
-                        </button>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-2">
-                        <button type="button" class="btn btn-warning w-100" onclick="partialReceiveItems()">
-                            <i class="fas fa-percent me-2"></i>Partial Receive (75%)
-                        </button>
-                    </div>
-                    <div class="col-md-6 mb-2">
-                        <button type="button" class="btn btn-info w-100" onclick="clearAllItems()">
-                            <i class="fas fa-eraser me-2"></i>Clear All
-                        </button>
                     </div>
                 </div>
             </div>
             {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 
-            <!-- Receipt Items (Auto-Populated) -->
-            <div class="form-card">
-                <div class="form-card-header d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-list me-2"></i>Items to Receive</span>
-                    <span class="badge bg-primary ms-2" id="items-count">{{ pending_items|length|default:0 }}</span>
+<!-- Main Form -->
+<form method="post" id="goods-receipt-form" enctype="multipart/form-data">
+    {% csrf_token %}
+    
+    <!-- Hidden Fields -->
+    <input type="hidden" name="purchase_order" id="id_purchase_order" value="{{ purchase_order.pk|default:'' }}">
+    <input type="hidden" name="supplier" id="id_supplier" value="{{ purchase_order.supplier.pk|default:'' }}">
+    
+    <!-- Form Content -->
+    <div id="form-content" {% if not purchase_order and not object %}style="display: none;"{% endif %}>
+        <div class="row">
+            <!-- Main Form Column -->
+            <div class="col-lg-8 mb-4">
+                <!-- Supplier Information (Locked from PO) -->
+                {% if purchase_order %}
+                <div class="supplier-locked">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fas fa-lock text-warning me-2"></i>
+                        <h6 class="mb-0 text-warning">Supplier Information (Locked from Purchase Order)</h6>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <div class="small text-muted">Supplier Name</div>
+                            <div class="fw-semibold">{{ purchase_order.supplier.name }}</div>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <div class="small text-muted">Supplier Code</div>
+                            <div>{{ purchase_order.supplier.supplier_code }}</div>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <div class="small text-muted">Contact</div>
+                            <div>{{ purchase_order.supplier.email|default:"No email" }}</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="p-3">
-                    {{ items_formset.management_form }}
-                    
-                    <div class="table-responsive">
-                        <table class="items-table table table-bordered mb-0" id="items-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 25%">Item</th>
-                                    <th style="width: 10%">Expected</th>
-                                    <th style="width: 12%">Received <span class="text-danger">*</span></th>
-                                    <th style="width: 10%">Damaged</th>
-                                    <th style="width: 8%">Variance</th>
-                                    <th style="width: 8%">Quality</th>
-                                    <th style="width: 15%">Batch/Lot</th>
-                                    <th style="width: 12%">Notes</th>
-                                </tr>
-                            </thead>
-                            <tbody id="items-tbody">
-                                <!-- Items will be auto-populated here -->
-                                {% if not pending_items %}
-                                <tr id="no-items-row">
-                                    <td colspan="8" class="text-center text-muted py-4">
-                                        <i class="fas fa-info-circle fa-2x mb-2"></i>
-                                        <div>Select a purchase order to load items automatically</div>
-                                    </td>
-                                </tr>
+                {% endif %}
+
+                <!-- Receipt Information -->
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <i class="fas fa-info-circle me-2"></i>Receipt Information
+                    </div>
+                    <div class="p-4">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.receipt_date.id_for_label }}" class="form-label">
+                                    Receipt Date <span class="text-danger">*</span>
+                                </label>
+                                {{ form.receipt_date|add_class:"form-control" }}
+                                {% if form.receipt_date.errors %}
+                                    <div class="invalid-feedback">{{ form.receipt_date.errors.0 }}</div>
                                 {% endif %}
-                            </tbody>
-                        </table>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.delivery_note_number.id_for_label }}" class="form-label">
+                                    Delivery Note Number
+                                </label>
+                                {{ form.delivery_note_number|add_class:"form-control" }}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.vehicle_number.id_for_label }}" class="form-label">
+                                    Vehicle Number
+                                </label>
+                                {{ form.vehicle_number|add_class:"form-control" }}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.driver_name.id_for_label }}" class="form-label">
+                                    Driver Name
+                                </label>
+                                {{ form.driver_name|add_class:"form-control" }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                {% if pending_items %}
+                <div class="quick-actions">
+                    <h6 class="mb-3">
+                        <i class="fas fa-magic me-2"></i>Quick Actions for {{ pending_items|length }} Pending Items
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <button type="button" class="btn btn-success w-100" onclick="receiveAllItems()">
+                                <i class="fas fa-check-double me-2"></i>Receive All Items (Full Quantities)
+                            </button>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <button type="button" class="btn btn-warning w-100" onclick="partialReceiveItems()">
+                                <i class="fas fa-percent me-2"></i>Partial Receive (75%)
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <button type="button" class="btn btn-info w-100" onclick="customReceiveItems()">
+                                <i class="fas fa-edit me-2"></i>Custom Quantities
+                            </button>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <button type="button" class="btn btn-outline-secondary w-100" onclick="clearAllItems()">
+                                <i class="fas fa-eraser me-2"></i>Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Receipt Items -->
+                <div class="form-card">
+                    <div class="form-card-header d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-list me-2"></i>Items to Receive</span>
+                        <span class="badge bg-primary ms-2" id="items-count">{{ pending_items|length|default:0 }}</span>
+                    </div>
+                    <div class="p-3">
+                        {{ items_formset.management_form }}
+                        
+                        <div class="table-responsive">
+                            <table class="items-table table table-bordered mb-0" id="items-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 25%">Item</th>
+                                        <th style="width: 10%">Expected</th>
+                                        <th style="width: 12%">Received <span class="text-danger">*</span></th>
+                                        <th style="width: 10%">Damaged</th>
+                                        <th style="width: 8%">Variance</th>
+                                        <th style="width: 8%">Quality</th>
+                                        <th style="width: 15%">Batch/Lot</th>
+                                        <th style="width: 12%">Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="items-tbody">
+                                    {% if pending_items %}
+                                        {% for item in pending_items %}
+                                        <tr class="item-row highlight" data-form-index="{{ forloop.counter0 }}" data-item-id="{{ item.id }}">
+                                            <td>
+                                                <div class="fw-semibold">{{ item.item.name }}</div>
+                                                <div class="small text-muted">SKU: {{ item.item.sku|default:"N/A" }}</div>
+                                                <input type="hidden" name="items-{{ forloop.counter0 }}-purchase_order_item" value="{{ item.id }}">
+                                                <input type="hidden" name="items-{{ forloop.counter0 }}-id">
+                                                <input type="hidden" name="items-{{ forloop.counter0 }}-DELETE">
+                                            </td>
+                                            <td>
+                                                <input type="number" name="items-{{ forloop.counter0 }}-expected_quantity" 
+                                                       class="form-control auto-calculated expected-qty" 
+                                                       value="{{ item.pending_quantity }}" readonly>
+                                                <div class="small text-muted">units</div>
+                                            </td>
+                                            <td>
+                                                <input type="number" name="items-{{ forloop.counter0 }}-received_quantity" 
+                                                       class="form-control received-qty" 
+                                                       step="0.01" min="0" 
+                                                       placeholder="0.00">
+                                                <div class="small text-muted">units</div>
+                                            </td>
+                                            <td>
+                                                <input type="number" name="items-{{ forloop.counter0 }}-damaged_quantity" 
+                                                       class="form-control damaged-qty" 
+                                                       step="0.01" min="0" value="0">
+                                            </td>
+                                            <td>
+                                                <div class="variance-indicator variance-zero" data-variance="0">0</div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check">
+                                                    <input type="checkbox" name="items-{{ forloop.counter0 }}-quality_passed" 
+                                                           class="form-check-input quality-check" checked>
+                                                    <label class="form-check-label small">Pass</label>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <input type="text" name="items-{{ forloop.counter0 }}-lot_number" 
+                                                       class="form-control form-control-sm" 
+                                                       placeholder="Batch/Lot">
+                                                <input type="date" name="items-{{ forloop.counter0 }}-expiry_date" 
+                                                       class="form-control form-control-sm mt-1">
+                                            </td>
+                                            <td>
+                                                <textarea name="items-{{ forloop.counter0 }}-quality_notes" 
+                                                          class="form-control form-control-sm" 
+                                                          rows="2" placeholder="Quality notes"></textarea>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr id="no-items-row">
+                                            <td colspan="8" class="text-center text-muted py-4">
+                                                <i class="fas fa-info-circle fa-2x mb-2"></i>
+                                                <div>No items to receive</div>
+                                                <small>Select a purchase order to load pending items</small>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Quality Check Summary -->
+                <div class="form-card mb-4">
+                    <div class="form-card-header">
+                        <i class="fas fa-clipboard-check me-2"></i>Quality Check Summary
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.quality_check_passed|add_class:"form-check-input" }}
+                                <label for="{{ form.quality_check_passed.id_for_label }}" class="form-check-label fw-semibold">
+                                    Overall Quality Check Passed
+                                </label>
+                            </div>
+                            <div class="form-text">Auto-updated based on individual item quality checks</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.quality_notes.id_for_label }}" class="form-label">Quality Notes</label>
+                            {{ form.quality_notes|add_class:"form-control" }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receipt Statistics -->
+                <div class="form-card mb-4">
+                    <div class="form-card-header">
+                        <i class="fas fa-chart-bar me-2"></i>Receipt Statistics
+                    </div>
+                    <div class="p-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Items:</span>
+                            <span class="fw-semibold" id="total-items">{{ pending_items|length|default:0 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Expected:</span>
+                            <span class="fw-semibold" id="total-expected">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Received:</span>
+                            <span class="fw-semibold text-success" id="total-received">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Damaged:</span>
+                            <span class="fw-semibold text-danger" id="total-damaged">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted">Quality Issues:</span>
+                            <span class="fw-semibold text-warning" id="quality-issues">0</span>
+                        </div>
+                        
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar bg-success" id="receive-progress" style="width: 0%"></div>
+                        </div>
+                        <div class="text-center">
+                            <small class="text-muted">Completion: <span id="completion-percentage">0%</span></small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing Receipts (if any) -->
+                {% if existing_receipts %}
+                <div class="form-card mb-4">
+                    <div class="form-card-header">
+                        <i class="fas fa-history me-2"></i>Previous Receipts
+                    </div>
+                    <div class="p-4">
+                        {% for receipt in existing_receipts %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <div>
+                                <div class="fw-semibold">{{ receipt.receipt_number }}</div>
+                                <div class="small text-muted">{{ receipt.receipt_date }} • {{ receipt.status }}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="small">{{ receipt.total_items }} items</div>
+                                <div class="small text-muted">{{ receipt.total_quantity }} qty</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Additional Information -->
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <i class="fas fa-sticky-note me-2"></i>Additional Information
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">General Notes</label>
+                            {{ form.notes|add_class:"form-control" }}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Sidebar -->
-        <div class="col-lg-4">
-            <!-- Quality Check Summary -->
-            <div class="form-card mb-4">
-                <div class="form-card-header">
-                    <i class="fas fa-clipboard-check me-2"></i>Quality Check Summary
-                </div>
-                <div class="p-4">
-                    <div class="mb-3">
-                        <div class="form-check">
-                            {{ form.quality_check_passed|add_class:"form-check-input" }}
-                            <label for="{{ form.quality_check_passed.id_for_label }}" class="form-check-label fw-semibold">
-                                Overall Quality Check Passed
-                            </label>
-                        </div>
-                        <div class="form-text">This will be auto-updated based on individual item quality checks</div>
+        <!-- Form Actions -->
+        <div class="form-card">
+            <div class="p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <a href="{{ urls.goods_receipt_list }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Cancel
+                        </a>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="{{ form.quality_notes.id_for_label }}" class="form-label">Quality Notes</label>
-                        {{ form.quality_notes|add_class:"form-control" }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Receipt Statistics -->
-            <div class="form-card mb-4">
-                <div class="form-card-header">
-                    <i class="fas fa-chart-bar me-2"></i>Receipt Statistics
-                </div>
-                <div class="p-4">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Total Items:</span>
-                        <span class="fw-semibold" id="total-items">0</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Total Expected:</span>
-                        <span class="fw-semibold" id="total-expected">0</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Total Received:</span>
-                        <span class="fw-semibold text-success" id="total-received">0</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Total Damaged:</span>
-                        <span class="fw-semibold text-danger" id="total-damaged">0</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-3">
-                        <span class="text-muted">Quality Issues:</span>
-                        <span class="fw-semibold text-warning" id="quality-issues">0</span>
-                    </div>
-                    
-                    <div class="progress mb-2" style="height: 8px;">
-                        <div class="progress-bar bg-success" id="receive-progress" style="width: 0%"></div>
-                    </div>
-                    <div class="text-center">
-                        <small class="text-muted">Completion: <span id="completion-percentage">0%</span></small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Additional Information -->
-            <div class="form-card">
-                <div class="form-card-header">
-                    <i class="fas fa-sticky-note me-2"></i>Additional Information
-                </div>
-                <div class="p-4">
-                    <div class="mb-3">
-                        <label for="{{ form.notes.id_for_label }}" class="form-label">General Notes</label>
-                        {{ form.notes|add_class:"form-control" }}
+                    <div class="d-flex gap-2">
+                        <button type="submit" name="save_draft" class="btn btn-secondary">
+                            <i class="fas fa-save me-2"></i>Save as Draft
+                        </button>
+                        <button type="submit" name="save_and_complete" class="btn btn-success">
+                            <i class="fas fa-check-circle me-2"></i>Save & Complete Receipt
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Form Actions -->
-    <div class="form-card">
-        <div class="form-actions">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <a href="{{ urls.goods_receipt_list }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>Cancel
-                    </a>
-                </div>
-                <div class="d-flex gap-2">
-                    <button type="submit" name="save_draft" class="btn btn-secondary">
-                        <i class="fas fa-save me-2"></i>Save as Draft
-                    </button>
-                    <button type="submit" name="save_and_complete" class="btn btn-success">
-                        <i class="fas fa-check-circle me-2"></i>Save & Complete Receipt
-                    </button>
-                </div>
-            </div>
+    
+    <!-- No PO Selected State -->
+    <div id="no-po-state" {% if purchase_order or object %}style="display: none;"{% endif %}>
+        <div class="no-po-selected">
+            <i class="fas fa-file-invoice fa-4x mb-3"></i>
+            <h5>Select a Purchase Order to Continue</h5>
+            <p class="mb-0">Search and select a purchase order above to automatically populate receipt information.</p>
         </div>
     </div>
 </form>
-
-<!-- Loading Overlay Template -->
-<div id="loading-template" style="display: none;">
-    <div class="loading-overlay">
-        <div class="text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <div class="mt-2 small text-muted">Loading purchase order data...</div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 $(document).ready(function() {
-    let purchaseOrderData = null;
+    let selectedPO = null;
     let pendingItems = [];
-    let formIndex = 0;
+    let formIndex = {{ pending_items|length|default:0 }};
+    let searchTimeout;
     
-    // Initialize the form based on whether PO is pre-selected
-    {% if purchase_order %}
-        // PO is pre-selected, auto-populate items
-        purchaseOrderData = {
+    // Initialize form
+    initializeForm();
+    
+    function initializeForm() {
+        // Set default receipt date to today
+        if (!$('#id_receipt_date').val()) {
+            const today = new Date().toISOString().split('T')[0];
+            $('#id_receipt_date').val(today);
+        }
+        
+        // If PO is pre-selected, initialize data
+        {% if purchase_order %}
+        selectedPO = {
             id: '{{ purchase_order.pk }}',
             po_number: '{{ purchase_order.po_number }}',
             supplier_id: '{{ purchase_order.supplier.pk }}',
-            supplier_name: '{{ purchase_order.supplier.name|escapejs }}'
+            supplier_name: '{{ purchase_order.supplier.name|escapejs }}',
+            status: '{{ purchase_order.status }}',
+            order_date: '{{ purchase_order.order_date|date:"M d, Y" }}'
         };
         
         pendingItems = [
@@ -614,164 +750,115 @@ $(document).ready(function() {
                 id: '{{ item.id }}',
                 item_name: '{{ item.item.name|escapejs }}',
                 item_sku: '{{ item.item.sku|default:""|escapejs }}',
-                item_unit: '{{ item.item.unit|default:"units"|escapejs }}',
                 pending_quantity: {{ item.pending_quantity }},
                 unit_price: {{ item.unit_price|default:0 }}
             }{% if not forloop.last %},{% endif %}
             {% endfor %}
         ];
         
-        // Auto-populate items on page load
-        setTimeout(function() {
-            autoPopulateItems();
-        }, 500);
-    {% else %}
-        // Initialize PO selector
-        initializePOSelector();
-    {% endif %}
-    
-    // Set default receipt date to today
-    if (!$('#id_receipt_date').val()) {
-        const today = new Date().toISOString().split('T')[0];
-        $('#id_receipt_date').val(today);
+        // Initialize statistics
+        updateStatistics();
+        {% endif %}
     }
     
-    function initializePOSelector() {
-        $('#po-selector').select2({
-            placeholder: 'Search and select a purchase order...',
-            allowClear: true,
-            templateResult: formatPOOption,
-            templateSelection: formatPOSelection
-        });
+    // PO Search functionality
+    $('#po-search-input').on('input', function() {
+        const query = $(this).val().trim();
         
-        // Enable/disable load button based on selection
-        $('#po-selector').on('change', function() {
-            const hasSelection = $(this).val();
-            $('#load-po-btn').prop('disabled', !hasSelection);
-        });
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
         
-        // Load PO button click
-        $('#load-po-btn').on('click', function() {
-            const poId = $('#po-selector').val();
-            if (poId) {
-                loadPurchaseOrderData(poId);
+        if (query.length < 2) {
+            $('#po-dropdown').hide();
+            return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+            searchPurchaseOrders(query);
+        }, 300);
+    });
+    
+    // Hide dropdown when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.po-search-container').length) {
+            $('#po-dropdown').hide();
+        }
+    });
+    
+    function searchPurchaseOrders(query) {
+        $.ajax({
+            url: '{{ urls.ajax_search_purchase_orders }}',
+            method: 'GET',
+            data: { q: query },
+            success: function(data) {
+                displayPOSearchResults(data.results);
+            },
+            error: function() {
+                showAlert('Error searching purchase orders. Please try again.', 'danger');
             }
         });
     }
     
-    function formatPOOption(option) {
-        if (!option.id) return option.text;
+    function displayPOSearchResults(results) {
+        const dropdown = $('#po-dropdown');
+        dropdown.empty();
         
-        const $option = $(option.element);
-        const supplier = $option.data('supplier');
-        const items = $option.data('items');
-        const total = $option.data('total');
-        const status = $option.data('status');
-        
-        return $(`
-            <div>
-                <div class="fw-semibold">${option.text}</div>
-                <div class="small text-muted">
-                    ${items} items • KES ${parseFloat(total).toLocaleString()} • Status: ${status}
-                </div>
-            </div>
-        `);
-    }
-    
-    function formatPOSelection(option) {
-        return option.text;
-    }
-    
-    function loadPurchaseOrderData(poId) {
-        showLoading();
-        
-        // Navigate to the form with the selected PO
-        const currentUrl = new URL(window.location);
-        currentUrl.searchParams.set('po', poId);
-        window.location.href = currentUrl.toString();
-    }
-    
-    function autoPopulateItems() {
-        if (pendingItems.length === 0) {
-            showAlert('No pending items found for this purchase order.', 'info');
-            return;
+        if (results.length === 0) {
+            dropdown.html('<div class="po-dropdown-item text-muted">No purchase orders found</div>');
+        } else {
+            results.forEach(po => {
+                const item = $(`
+                    <div class="po-dropdown-item" data-po-id="${po.id}">
+                        <div class="fw-semibold">PO-${po.po_number}</div>
+                        <div class="small text-muted">
+                            ${po.supplier_name} • ${po.order_date} • 
+                            ${po.pending_items} pending items
+                        </div>
+                        <div class="small">
+                            <span class="po-status-badge status-${po.status}">${po.status_display}</span>
+                        </div>
+                    </div>
+                `);
+                
+                item.on('click', function() {
+                    selectPurchaseOrder(po);
+                });
+                
+                dropdown.append(item);
+            });
         }
         
-        // Clear existing items
-        $('#items-tbody').empty();
-        
-        // Add each pending item
-        pendingItems.forEach((item, index) => {
-            addItemRow(item, index);
-        });
-        
-        updateStatistics();
-        showAlert(`Auto-populated ${pendingItems.length} items from the purchase order.`, 'success');
+        dropdown.show();
     }
     
-    function addItemRow(item, index) {
-        const rowHtml = `
-            <tr class="item-row highlight" data-form-index="${index}" data-item-id="${item.id}">
-                <td>
-                    <div class="fw-semibold">${item.item_name}</div>
-                    <div class="small text-muted">SKU: ${item.item_sku || 'N/A'}</div>
-                    <input type="hidden" name="items-${index}-purchase_order_item" value="${item.id}" id="id_items-${index}-purchase_order_item">
-                    <input type="hidden" name="items-${index}-id" id="id_items-${index}-id">
-                    <input type="hidden" name="items-${index}-DELETE" id="id_items-${index}-DELETE">
-                </td>
-                <td>
-                    <input type="number" name="items-${index}-expected_quantity" 
-                           class="form-control auto-calculated expected-qty" 
-                           value="${item.pending_quantity}" readonly
-                           id="id_items-${index}-expected_quantity">
-                    <div class="small text-muted">${item.item_unit}</div>
-                </td>
-                <td>
-                    <input type="number" name="items-${index}-received_quantity" 
-                           class="form-control received-qty" 
-                           step="0.01" min="0" 
-                           placeholder="0.00"
-                           id="id_items-${index}-received_quantity">
-                    <div class="small text-muted">${item.item_unit}</div>
-                </td>
-                <td>
-                    <input type="number" name="items-${index}-damaged_quantity" 
-                           class="form-control damaged-qty" 
-                           step="0.01" min="0" value="0"
-                           id="id_items-${index}-damaged_quantity">
-                </td>
-                <td>
-                    <div class="variance-indicator variance-zero" data-variance="0">0</div>
-                </td>
-                <td>
-                    <div class="form-check">
-                        <input type="checkbox" name="items-${index}-quality_passed" 
-                               class="form-check-input quality-check" checked
-                               id="id_items-${index}-quality_passed">
-                        <label class="form-check-label small">Pass</label>
-                    </div>
-                </td>
-                <td>
-                    <input type="text" name="items-${index}-lot_number" 
-                           class="form-control form-control-sm" 
-                           placeholder="Batch/Lot"
-                           id="id_items-${index}-lot_number">
-                    <input type="date" name="items-${index}-expiry_date" 
-                           class="form-control form-control-sm mt-1" 
-                           id="id_items-${index}-expiry_date">
-                </td>
-                <td>
-                    <textarea name="items-${index}-quality_notes" 
-                              class="form-control form-control-sm" 
-                              rows="2" placeholder="Quality notes"
-                              id="id_items-${index}-quality_notes"></textarea>
-                </td>
-            </tr>
-        `;
-        
-        $('#items-tbody').append(rowHtml);
-        formIndex = index + 1;
+    function selectPurchaseOrder(po) {
+        // Navigate to the form with the selected PO
+        window.location.href = `{{ urls.goods_receipt_create }}?po=${po.id}`;
     }
+    
+    // PO selector dropdown
+    window.loadSelectedPO = function() {
+        const poId = $('#po-selector').val();
+        if (poId) {
+            window.location.href = `{{ urls.goods_receipt_create }}?po=${poId}`;
+        }
+    };
+    
+    // Show all available POs
+    window.showAllAvailablePOs = function() {
+        $.ajax({
+            url: '{{ urls.ajax_search_purchase_orders }}',
+            method: 'GET',
+            data: { show_all: true },
+            success: function(data) {
+                displayPOSearchResults(data.results);
+            },
+            error: function() {
+                showAlert('Error loading purchase orders. Please try again.', 'danger');
+            }
+        });
+    };
     
     // Quick action functions
     window.receiveAllItems = function() {
@@ -785,21 +872,21 @@ $(document).ready(function() {
         showAlert('Set all items to receive full expected quantities.', 'success');
     };
     
-    window.customReceiveItems = function() {
-        $('.received-qty').first().focus();
-        showAlert('Enter custom quantities for each item.', 'info');
-    };
-    
     window.partialReceiveItems = function() {
         $('.received-qty').each(function() {
             const row = $(this).closest('tr');
             const expected = parseFloat(row.find('.expected-qty').val()) || 0;
-            const partial = Math.round(expected * 0.75 * 100) / 100; // 75% rounded to 2 decimals
+            const partial = Math.round(expected * 0.75 * 100) / 100;
             $(this).val(partial);
             calculateVariance(row);
         });
         updateStatistics();
         showAlert('Set all items to receive 75% of expected quantities.', 'info');
+    };
+    
+    window.customReceiveItems = function() {
+        $('.received-qty').first().focus();
+        showAlert('Enter custom quantities for each item.', 'info');
     };
     
     window.clearAllItems = function() {
@@ -844,9 +931,9 @@ $(document).ready(function() {
             varianceEl.addClass('variance-zero');
         }
         
-        // Auto-uncheck quality if there's significant damage or major shortage
+        // Auto-uncheck quality if there's damage or major shortage
         const qualityCheck = row.find('.quality-check');
-        if (damaged > 0 || variance < -expected * 0.1) { // More than 10% shortage
+        if (damaged > 0 || variance < -expected * 0.1) {
             qualityCheck.prop('checked', false);
             
             // Auto-fill quality notes for damaged items
@@ -926,6 +1013,12 @@ $(document).ready(function() {
         // Remove existing validation classes
         $('.is-invalid').removeClass('is-invalid');
         
+        // Check if PO is selected
+        if (!$('#id_purchase_order').val()) {
+            errors.push('Please select a purchase order.');
+            isValid = false;
+        }
+        
         // Check receipt date
         if (!$('#id_receipt_date').val()) {
             errors.push('Please provide a receipt date.');
@@ -946,6 +1039,7 @@ $(document).ready(function() {
         // Validate each item row
         $('.item-row').each(function() {
             const row = $(this);
+            const expected = parseFloat(row.find('.expected-qty').val()) || 0;
             const received = parseFloat(row.find('.received-qty').val()) || 0;
             const damaged = parseFloat(row.find('.damaged-qty').val()) || 0;
             
@@ -969,6 +1063,14 @@ $(document).ready(function() {
                 row.find('.damaged-qty').addClass('is-invalid');
                 if (errors.indexOf('Damaged quantity cannot exceed received quantity.') === -1) {
                     errors.push('Damaged quantity cannot exceed received quantity.');
+                }
+                isValid = false;
+            }
+            
+            if (received > expected * 1.1) { // Allow 10% variance
+                row.find('.received-qty').addClass('is-invalid');
+                if (errors.indexOf('Received quantity significantly exceeds expected quantity.') === -1) {
+                    errors.push('Received quantity significantly exceeds expected quantity.');
                 }
                 isValid = false;
             }
@@ -1001,7 +1103,6 @@ $(document).ready(function() {
     }
     
     function showAlert(message, type) {
-        // Remove existing alerts
         $('.auto-alert').remove();
         
         const alertHtml = `
@@ -1013,7 +1114,6 @@ $(document).ready(function() {
         
         $('.form-header').after(alertHtml);
         
-        // Auto-hide success and info alerts after 4 seconds
         if (type === 'success' || type === 'info') {
             setTimeout(() => {
                 $('.auto-alert').fadeOut();
@@ -1021,10 +1121,47 @@ $(document).ready(function() {
         }
     }
     
-    function showLoading() {
-        const loadingHtml = $('#loading-template').html();
-        $('body').append(loadingHtml);
-    }
+    // Smart tab navigation
+    $(document).on('keydown', '.received-qty, .damaged-qty', function(e) {
+        if (e.keyCode === 13) { // Enter key
+            e.preventDefault();
+            const currentRow = $(this).closest('tr');
+            const nextRow = currentRow.next('.item-row');
+            
+            if (nextRow.length) {
+                nextRow.find('.received-qty').focus().select();
+            } else {
+                $('button[name="save_and_complete"]').focus();
+            }
+        }
+    });
+    
+    // Auto-select text in quantity fields
+    $(document).on('focus', '.received-qty, .damaged-qty', function() {
+        $(this).select();
+    });
+    
+    // Double-click expected quantity to copy to received
+    $(document).on('dblclick', '.expected-qty', function() {
+        const row = $(this).closest('tr');
+        const expected = $(this).val();
+        row.find('.received-qty').val(expected);
+        calculateVariance(row);
+        updateStatistics();
+        showAlert('Copied expected quantity to received quantity.', 'info');
+    });
+    
+    // Auto-uncheck quality for damaged items
+    $(document).on('input', '.damaged-qty', function() {
+        const row = $(this).closest('tr');
+        const damaged = parseFloat($(this).val()) || 0;
+        const qualityCheck = row.find('.quality-check');
+        
+        if (damaged > 0) {
+            qualityCheck.prop('checked', false);
+            updateOverallQualityCheck();
+        }
+    });
     
     // Keyboard shortcuts
     $(document).keydown(function(e) {
@@ -1045,56 +1182,6 @@ $(document).ready(function() {
             e.preventDefault();
             receiveAllItems();
         }
-        
-        // Ctrl/Cmd + R to partial receive
-        if ((e.ctrlKey || e.metaKey) && e.keyCode === 82 && $('.item-row').length > 0) {
-            e.preventDefault();
-            partialReceiveItems();
-        }
-    });
-    
-    // Auto-save functionality
-    let autoSaveTimer;
-    function scheduleAutoSave() {
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(function() {
-            const hasData = $('.received-qty').filter(function() {
-                return parseFloat($(this).val() || 0) > 0;
-            }).length > 0;
-            
-            if (hasData) {
-                autoSave();
-            }
-        }, 30000); // Auto-save every 30 seconds
-    }
-    
-    function autoSave() {
-        const formData = new FormData($('#goods-receipt-form')[0]);
-        formData.append('save_draft', 'true');
-        formData.append('auto_save', 'true');
-        
-        $.ajax({
-            url: window.location.href,
-            method: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                // Silent success - just update UI indicator
-                $('button[name="save_draft"]').html('<i class="fas fa-check me-2"></i>Auto-saved').addClass('btn-success').removeClass('btn-secondary');
-                setTimeout(() => {
-                    $('button[name="save_draft"]').html('<i class="fas fa-save me-2"></i>Save as Draft').removeClass('btn-success').addClass('btn-secondary');
-                }, 2000);
-            },
-            error: function() {
-                // Silent fail - don't disturb user
-            }
-        });
-    }
-    
-    // Track form changes for auto-save
-    $(document).on('input change', '#goods-receipt-form', function() {
-        scheduleAutoSave();
     });
     
     // Prevent accidental page navigation
@@ -1117,134 +1204,7 @@ $(document).ready(function() {
     });
     
     // Initialize statistics on page load
-    if ($('.item-row').length > 0) {
-        updateStatistics();
-    }
-    
-    // Add smart tab navigation for efficiency
-    $(document).on('keydown', '.received-qty, .damaged-qty', function(e) {
-        if (e.keyCode === 13) { // Enter key
-            e.preventDefault();
-            
-            // Move to next received quantity field
-            const currentRow = $(this).closest('tr');
-            const nextRow = currentRow.next('.item-row');
-            
-            if (nextRow.length) {
-                nextRow.find('.received-qty').focus().select();
-            } else {
-                // If last row, focus on save button
-                $('button[name="save_and_complete"]').focus();
-            }
-        }
-    });
-    
-    // Auto-select text in quantity fields for faster editing
-    $(document).on('focus', '.received-qty, .damaged-qty', function() {
-        $(this).select();
-    });
-    
-    // Add helpful tooltips
-    $('[data-bs-toggle="tooltip"]').tooltip();
-    
-    // Initialize any Select2 elements if needed
-    $('.form-select:not(.readonly-field)').select2({
-        theme: 'bootstrap-5'
-    });
-    
-    // Bulk operations shortcuts
-    $(document).on('dblclick', '.expected-qty', function() {
-        // Double-click expected quantity to copy to received
-        const row = $(this).closest('tr');
-        const expected = $(this).val();
-        row.find('.received-qty').val(expected);
-        calculateVariance(row);
-        updateStatistics();
-        showAlert('Copied expected quantity to received quantity.', 'info');
-    });
-    
-    // Smart quality check updates
-    $(document).on('input', '.damaged-qty', function() {
-        const row = $(this).closest('tr');
-        const damaged = parseFloat($(this).val()) || 0;
-        const qualityCheck = row.find('.quality-check');
-        
-        if (damaged > 0) {
-            qualityCheck.prop('checked', false);
-        }
-    });
-    
-    // Initialize form if purchase order is already selected
-    {% if purchase_order %}
-    // Set the formset management form values
-    $('#id_items-TOTAL_FORMS').val(pendingItems.length);
-    $('#id_items-INITIAL_FORMS').val(0);
-    $('#id_items-MIN_NUM_FORMS').val(0);
-    $('#id_items-MAX_NUM_FORMS').val(1000);
-    {% endif %}
-    
-    // Add context menu for quick actions
-    $(document).on('contextmenu', '.received-qty', function(e) {
-        e.preventDefault();
-        const row = $(this).closest('tr');
-        const expected = parseFloat(row.find('.expected-qty').val()) || 0;
-        
-        // Create quick action menu
-        const menu = $(`
-            <div class="quick-menu position-absolute bg-white border rounded shadow p-2" style="z-index: 1050;">
-                <div class="small text-muted mb-1">Quick Actions:</div>
-                <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-1" onclick="setFullQuantity(this)">
-                    Set Full (${expected})
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-warning w-100 mb-1" onclick="setPartialQuantity(this)">
-                    Set 75% (${(expected * 0.75).toFixed(1)})
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="clearQuantity(this)">
-                    Clear
-                </button>
-            </div>
-        `);
-        
-        // Position and show menu
-        menu.css({
-            top: e.pageY + 'px',
-            left: e.pageX + 'px'
-        });
-        
-        $('body').append(menu);
-        
-        // Remove menu on click outside
-        $(document).one('click', function() {
-            menu.remove();
-        });
-    });
-    
-    // Quick action functions for context menu
-    window.setFullQuantity = function(btn) {
-        const row = $(btn).closest('.quick-menu').remove();
-        const targetRow = $('.received-qty:focus').closest('tr');
-        const expected = parseFloat(targetRow.find('.expected-qty').val()) || 0;
-        targetRow.find('.received-qty').val(expected);
-        calculateVariance(targetRow);
-        updateStatistics();
-    };
-    
-    window.setPartialQuantity = function(btn) {
-        const row = $(btn).closest('.quick-menu').remove();
-        const targetRow = $('.received-qty:focus').closest('tr');
-        const expected = parseFloat(targetRow.find('.expected-qty').val()) || 0;
-        targetRow.find('.received-qty').val((expected * 0.75).toFixed(1));
-        calculateVariance(targetRow);
-        updateStatistics();
-    };
-    
-    window.clearQuantity = function(btn) {
-        const row = $(btn).closest('.quick-menu').remove();
-        const targetRow = $('.received-qty:focus').closest('tr');
-        targetRow.find('.received-qty').val('');
-        calculateVariance(targetRow);
-        updateStatistics();
-    };
+    updateStatistics();
 });
 </script>
 {% endblock %}
