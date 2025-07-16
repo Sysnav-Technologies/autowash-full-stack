@@ -205,6 +205,7 @@ class DepartmentForm(forms.ModelForm):
                 Submit('submit', 'Save Department', css_class='btn btn-primary')
             )
         )
+
 class PositionForm(forms.ModelForm):
     """Position form"""
     

@@ -18,7 +18,7 @@ urlpatterns = [
     path('attendance/checkin/', views.check_in_view, name='clock_in'),
     path('attendance/checkout/', views.check_out_view, name='clock_out'),
     
-    # Break Management - ADD THESE LINES
+    # Break Management
     path('attendance/take-break/', views.take_break_view, name='take_break'),
     path('attendance/end-break/', views.end_break_view, name='end_break'),
     path('attendance/break-status/', views.break_status_view, name='break_status'),
