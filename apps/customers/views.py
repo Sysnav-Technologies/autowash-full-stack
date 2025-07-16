@@ -1,3 +1,4 @@
+import csv
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -9,6 +10,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
 from django.urls import reverse
+
 from apps.core.decorators import employee_required, ajax_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
 from .models import (
@@ -21,6 +23,56 @@ from .forms import (
 )
 import json
 import uuid
+
+def get_customer_urls(request):
+    """Generate all customer URLs for templates with tenant slug."""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/customers"
+    return {
+        'list': f"{base_url}/",
+        'create': f"{base_url}/create/",
+        'detail': f"{base_url}/{{pk}}/",
+        'edit': f"{base_url}/{{pk}}/edit/",
+        'toggle_vip': f"{base_url}/{{pk}}/toggle-vip/",
+        'deactivate': f"{base_url}/{{pk}}/deactivate/",
+        'vehicle_create': f"{base_url}/{{customer_pk}}/vehicles/add/",
+        'vehicle_edit': f"{base_url}/vehicles/{{pk}}/edit/",
+        'note_create': f"{base_url}/{{customer_pk}}/notes/add/",
+        'documents': f"{base_url}/{{customer_pk}}/documents/",
+        'feedback': f"{base_url}/{{customer_pk}}/feedback/",
+        'search_ajax': f"{base_url}/ajax/search/",
+        'vehicle_search_ajax': f"{base_url}/ajax/vehicles/search/",
+        'loyalty_dashboard': f"{base_url}/loyalty/",
+        'export': f"{base_url}/export/",
+        'import': f"{base_url}/import/",
+    }
+
+def get_business_url(request, url_name, **kwargs):
+    """Helper to generate URLs with business slug for customers."""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/customers"
+    url_mapping = {
+        'customers:list': f"{base_url}/",
+        'customers:create': f"{base_url}/create/",
+        'customers:detail': f"{base_url}/{{pk}}/",
+        'customers:edit': f"{base_url}/{{pk}}/edit/",
+        'customers:toggle_vip': f"{base_url}/{{pk}}/toggle-vip/",
+        'customers:deactivate': f"{base_url}/{{pk}}/deactivate/",
+        'customers:vehicle_create': f"{base_url}/{{customer_pk}}/vehicles/add/",
+        'customers:vehicle_edit': f"{base_url}/vehicles/{{pk}}/edit/",
+        'customers:note_create': f"{base_url}/{{customer_pk}}/notes/add/",
+        'customers:documents': f"{base_url}/{{customer_pk}}/documents/",
+        'customers:feedback': f"{base_url}/{{customer_pk}}/feedback/",
+        'customers:search_ajax': f"{base_url}/ajax/search/",
+        'customers:vehicle_search_ajax': f"{base_url}/ajax/vehicles/search/",
+        'customers:loyalty_dashboard': f"{base_url}/loyalty/",
+        'customers:export': f"{base_url}/export/",
+        'customers:import': f"{base_url}/import/",
+    }
+    url = url_mapping.get(url_name, f"{base_url}/")
+    for key, value in kwargs.items():
+        url = url.replace(f"{{{key}}}", str(value))
+    return url
 
 @login_required
 @employee_required()
@@ -83,7 +135,8 @@ def customer_list_view(request):
         'customers': customers_page,
         'search_form': search_form,
         'stats': stats,
-        'title': 'Customer Management'
+        'title': 'Customer Management',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/customer_list.html', context)
 
@@ -129,9 +182,9 @@ def customer_create_view(request):
                     
                     # Redirect based on request - Django handles UUID automatically
                     if request.POST.get('create_another'):
-                        return redirect('customers:create')
+                        return redirect(get_business_url(request, 'customers:create'))
                     else:
-                        return redirect('customers:detail', pk=customer.pk)
+                        return redirect(get_business_url(request, 'customers:detail', pk=customer.pk))
                         
             except Exception as e:
                 # Handle any other errors
@@ -145,7 +198,8 @@ def customer_create_view(request):
     context = {
         'customer_form': customer_form,
         'vehicle_form': vehicle_form,
-        'title': 'Add New Customer'
+        'title': 'Add New Customer',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/customer_form.html', context)
 
@@ -202,7 +256,8 @@ def customer_detail_view(request, pk):
         'order_stats': order_stats,
         'loyalty_program': loyalty_program,
         'customer_tier': customer_tier,
-        'title': f'Customer - {customer.display_name}'
+        'title': f'Customer - {customer.display_name}',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/customer_detail.html', context)
 
@@ -231,7 +286,7 @@ def customer_edit_view(request, pk):
                 messages.success(request, success_message)
                 
                 # Convert UUID to string for redirect
-                return redirect('customers:detail', pk=customer.pk)
+                return redirect(get_business_url(request, 'customers:detail', pk=customer.pk))
             except Exception as e:
                 error_message = f'Error updating customer: {str(e)}'
                 messages.error(request, error_message)
@@ -241,7 +296,8 @@ def customer_edit_view(request, pk):
     context = {
         'form': form,
         'customer': customer,
-        'title': f'Edit Customer - {customer.display_name}'
+        'title': f'Edit Customer - {customer.display_name}',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/customer_edit.html', context)
 
@@ -271,7 +327,7 @@ def vehicle_create_view(request, customer_pk):
                 messages.success(request, success_message)
                 
                 # Convert UUID to string for redirect
-                return redirect('customers:detail', pk=customer.pk)
+                return redirect(get_business_url(request, 'customers:detail', pk=customer.pk))
             except Exception as e:
                 error_message = f'Error adding vehicle: {str(e)}'
                 messages.error(request, error_message)
@@ -281,9 +337,41 @@ def vehicle_create_view(request, customer_pk):
     context = {
         'form': form,
         'customer': customer,
-        'title': f'Add Vehicle - {customer.display_name}'
+        'title': f'Add Vehicle - {customer.display_name}',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/vehicle_form.html', context)
+
+# Vehicle detail view with UUID handling, not for customer and also intergration with service orders
+@login_required
+@employee_required()
+def vehicle_detail_view(request, pk):
+    """View vehicle details - FIXED UUID handling"""
+    # Convert string UUID to UUID object if needed
+    try:
+        if isinstance(pk, str):
+            pk = uuid.UUID(pk)
+    except (ValueError, TypeError):
+        pass
+    
+    vehicle = get_object_or_404(Vehicle, pk=pk)
+    
+    # Fetch related service orders
+    try:
+        from apps.services.models import ServiceOrder
+        service_orders = ServiceOrder.objects.filter(vehicle=vehicle).order_by('-created_at')[:5]
+    except ImportError:
+        service_orders = []
+    
+    context = {
+        'vehicle': vehicle,
+        'service_orders': service_orders,
+        'title': f'Vehicle - {vehicle.registration_number}',
+        'urls': get_customer_urls(request),
+    }
+    return render(request, 'customers/vehicle_detail.html', context)
+
+
 
 @login_required
 @employee_required()
@@ -310,7 +398,7 @@ def vehicle_edit_view(request, pk):
                 messages.success(request, success_message)
                 
                 # Convert UUID to string for redirect
-                return redirect('customers:detail', pk=str(vehicle.customer.pk))
+                return redirect(get_business_url(request, 'customers:detail', pk=str(vehicle.customer.pk)))
             except Exception as e:
                 error_message = f'Error updating vehicle: {str(e)}'
                 messages.error(request, error_message)
@@ -320,7 +408,8 @@ def vehicle_edit_view(request, pk):
     context = {
         'form': form,
         'vehicle': vehicle,
-        'title': f'Edit Vehicle - {vehicle.registration_number}'
+        'title': f'Edit Vehicle - {vehicle.registration_number}',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/vehicle_form.html', context)
 
@@ -347,7 +436,7 @@ def customer_note_create_view(request, customer_pk):
                 note.save()
                 
                 messages.success(request, 'Note added successfully!')
-                return redirect('customers:detail', pk=customer.pk)
+                return redirect(get_business_url(request, 'customers:detail', pk=customer.pk))
             except Exception as e:
                 error_message = f'Error adding note: {str(e)}'
                 messages.error(request, error_message)
@@ -357,7 +446,8 @@ def customer_note_create_view(request, customer_pk):
     context = {
         'form': form,
         'customer': customer,
-        'title': f'Add Note - {customer.display_name}'
+        'title': f'Add Note - {customer.display_name}',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/note_form.html', context)
 
@@ -471,15 +561,14 @@ def toggle_customer_vip(request, pk):
             })
         else:
             messages.success(request, success_message)
-            return redirect('customers:detail', pk=customer.pk)
-    
+            return redirect(get_business_url(request, 'customers:detail', pk=customer.pk))
     except Exception as e:
         error_message = f'Error updating VIP status: {str(e)}'
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': False, 'error': error_message})
         else:
             messages.error(request, error_message)
-            return redirect('customers:list')
+            return redirect(get_business_url(request, 'customers:list'))
 
 @login_required
 @employee_required()
@@ -505,15 +594,14 @@ def deactivate_customer(request, pk):
             return JsonResponse({'success': True, 'message': success_message})
         else:
             messages.success(request, success_message)
-            return redirect('customers:detail', pk=customer.pk)
-    
+            return redirect(get_business_url(request, 'customers:detail', pk=customer.pk))
     except Exception as e:
         error_message = f'Error deactivating customer: {str(e)}'
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': False, 'error': error_message})
         else:
             messages.error(request, error_message)
-            return redirect('customers:list')
+            return redirect(get_business_url(request, 'customers:list'))
 
 @login_required
 @employee_required()
@@ -551,10 +639,64 @@ def customer_export_view(request):
             ])
         
         return response
-    
     except Exception as e:
         messages.error(request, f'Error exporting customers: {str(e)}')
-        return redirect('customers:list')
+        return redirect(get_business_url(request, 'customers:list'))
+
+@login_required
+@employee_required()    
+def customer_import_view(request):
+    """Import customer data from CSV/Excel - FIXED UUID handling"""
+    from django.core.files.storage import FileSystemStorage
+    from django.core.exceptions import ValidationError
+    
+    if request.method == 'POST' and request.FILES.get('file'):
+        file = request.FILES['file']
+        fs = FileSystemStorage()
+        filename = fs.save(file.name, file)
+        file_path = fs.path(filename)
+        
+        try:
+            with open(file_path, 'r') as f:
+                reader = csv.reader(f)
+                next(reader)  # Skip header row
+                
+                for row in reader:
+                    if len(row) < 12:  # Ensure all required fields are present
+                        continue
+                    
+                    customer_data = {
+                        'customer_id': row[0],
+                        'first_name': row[1],
+                        'last_name': row[2],
+                        'email': row[3],
+                        'phone': row[4] if row[4] else None,
+                        'city': row[5],
+                        'customer_type': row[6],
+                        'is_vip': row[7].lower() == 'yes',
+                        'is_active': row[8].lower() == 'yes',
+                        'created_at': row[9]
+                    }
+                    
+                    # Create or update customer
+                    customer, created = Customer.objects.update_or_create(
+                        customer_id=customer_data['customer_id'],
+                        defaults=customer_data
+                    )
+                    
+                    if created:
+                        messages.success(request, f'Customer {customer.display_name} imported successfully!')
+                    else:
+                        messages.info(request, f'Customer {customer.display_name} updated successfully!')
+            
+            fs.delete(filename)  # Clean up uploaded file
+            
+            return redirect(get_business_url(request, 'customers:list'))
+        except ValidationError as ve:
+            messages.error(request, f'Validation error: {str(ve)}')
+        except Exception as e:
+            messages.error(request, f'Error importing customers: {str(e)}')
+    return render(request, 'customers/customer_import.html', {'title': 'Import Customers', 'urls': get_customer_urls(request)})
 
 # Additional utility views
 
@@ -593,7 +735,8 @@ def customer_feedback_view(request, customer_pk):
         'customer': customer,
         'feedback': feedback_page,
         'avg_ratings': avg_ratings,
-        'title': f'Feedback - {customer.display_name}'
+        'title': f'Feedback - {customer.display_name}',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/customer_feedback.html', context)
 
@@ -620,7 +763,7 @@ def customer_documents_view(request, customer_pk):
                 document.save()
                 
                 messages.success(request, 'Document uploaded successfully!')
-                return redirect('customers:documents', customer_pk=customer.pk)
+                return redirect(get_business_url(request, 'customers:documents', customer_pk=customer.pk))
             except Exception as e:
                 error_message = f'Error uploading document: {str(e)}'
                 messages.error(request, error_message)
@@ -633,7 +776,8 @@ def customer_documents_view(request, customer_pk):
         'customer': customer,
         'documents': documents,
         'form': form,
-        'title': f'Documents - {customer.display_name}'
+        'title': f'Documents - {customer.display_name}',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/customer_documents.html', context)
 
@@ -645,7 +789,7 @@ def loyalty_dashboard_view(request):
     
     if not loyalty_program:
         messages.info(request, 'No active loyalty program found.')
-        return redirect('customers:list')
+        return redirect(get_business_url(request, 'customers:list'))
     
     # Get customers by tier
     customers = Customer.objects.filter(is_active=True)
@@ -672,6 +816,7 @@ def loyalty_dashboard_view(request):
         'top_customers': top_customers,
         'recent_activity': recent_activity,
         'total_customers': customers.count(),
-        'title': 'Loyalty Program Dashboard'
+        'title': 'Loyalty Program Dashboard',
+        'urls': get_customer_urls(request),
     }
     return render(request, 'customers/loyalty_dashboard.html', context)

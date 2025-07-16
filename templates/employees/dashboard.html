@@ -8,14 +8,15 @@
 {% endblock %}
 
 {% block content %}
-<!-- Welcome Section -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="card border-0 shadow-sm bg-gradient-success text-white" data-aos="fade-down" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+        <div class="card border-0 shadow-sm bg-gradient-success text-white">
             <div class="card-body p-4">
                 <div class="row align-items-center">
                     <div class="col-lg-8">
-                        <h2 class="fw-bold mb-2">Good {{ greeting|default:"day" }}, {{ employee.user.first_name|default:employee.user.username }}!</h2>
+                        <h2 class="fw-bold mb-2">
+                            Good {{ greeting|default:"day" }}, {{ employee.user.first_name|default:employee.user.username }}!
+                        </h2>
                         <p class="mb-3 text-white-75">
                             {% if attendance_today %}
                                 You're {{ attendance_today.get_status_display|lower }} at {{ business.name }}. Here's your work summary.
@@ -32,28 +33,34 @@
                                 <i class="fas fa-calendar-day me-2"></i>
                                 <span>{{ "now"|date:"l, F j" }}</span>
                             </div>
-                            {% if attendance_today and attendance_today.clock_in %}
+                            {% if attendance_today and attendance_today.check_in_time %}
                             <div class="d-flex align-items-center">
                                 <i class="fas fa-sign-in-alt me-2"></i>
-                                <span>Clocked in: {{ attendance_today.clock_in|time:"g:i A" }}</span>
+                                <span>Clocked in: {{ attendance_today.check_in_time|time:"g:i A" }}</span>
                             </div>
                             {% endif %}
                         </div>
                     </div>
                     <div class="col-lg-4 text-lg-end">
                         <div class="d-flex flex-column flex-lg-row gap-2 justify-content-lg-end">
-                            {% if attendance_today and attendance_today.status == 'present' and not attendance_today.clock_out %}
-                                <button class="btn btn-outline-light fw-semibold" onclick="clockOut()">
-                                    <i class="fas fa-sign-out-alt me-2"></i>Clock Out
-                                </button>
-                            {% elif not attendance_today or attendance_today.status != 'present' %}
-                                <button class="btn btn-light fw-semibold" onclick="clockIn()">
-                                    <i class="fas fa-sign-in-alt me-2"></i>Clock In
-                                </button>
+                            {% if not attendance_today or not attendance_today.check_in_time %}
+                                <form action="{{ urls.clock_in }}" method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-light fw-semibold">
+                                        <i class="fas fa-sign-in-alt me-2"></i>Clock In
+                                    </button>
+                                </form>
+                            {% elif attendance_today and not attendance_today.check_out_time %}
+                                <form action="{{ urls.clock_out }}" method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-light fw-semibold">
+                                        <i class="fas fa-sign-out-alt me-2"></i>Clock Out
+                                    </button>
+                                </form>
                             {% endif %}
-                            <button class="btn btn-outline-light fw-semibold" onclick="takeBreak()">
+                            <a href="{{ urls.take_break }}" class="btn btn-outline-light fw-semibold">
                                 <i class="fas fa-coffee me-2"></i>Break
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -62,16 +69,47 @@
     </div>
 </div>
 
+<!-- Employee Actions Row -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ urls.attendance }}" class="btn btn-outline-primary">
+                <i class="fas fa-calendar-check"></i> My Attendance
+            </a>
+            <a href="{{ urls.leave_request }}" class="btn btn-outline-success">
+                <i class="fas fa-plane-departure"></i> Request Leave
+            </a>
+            <a href="{{ urls.leave_list }}" class="btn btn-outline-warning">
+                <i class="fas fa-list"></i> My Leave Requests
+            </a>
+            {% if employee.role in 'owner,manager,supervisor' %}
+            <a href="{{ urls.list }}" class="btn btn-outline-info">
+                <i class="fas fa-users"></i> All Employees
+            </a>
+            <a href="{{ urls.create }}" class="btn btn-outline-success">
+                <i class="fas fa-user-plus"></i> Add Employee
+            </a>
+            <a href="{{ urls.department_list }}" class="btn btn-outline-secondary">
+                <i class="fas fa-building"></i> Departments
+            </a>
+            <a href="{{ urls.department_create }}" class="btn btn-outline-secondary">
+                <i class="fas fa-plus"></i> New Department
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
 <!-- Employee Stats -->
 <div class="row g-4 mb-4">
     <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="100">
+        <div class="card border-0 shadow-sm h-100">
             <div class="card-body p-4">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 fw-semibold">Today's Hours</p>
                         <h3 class="fw-bold text-primary mb-0">
-                            {% if attendance_today and attendance_today.clock_in %}
+                            {% if attendance_today and attendance_today.check_in_time and attendance_today.check_out_time %}
                                 {{ attendance_today.hours_worked|default:"0.0" }}h
                             {% else %}
                                 0.0h
@@ -88,14 +126,13 @@
             </div>
         </div>
     </div>
-    
     <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="200">
+        <div class="card border-0 shadow-sm h-100">
             <div class="card-body p-4">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 fw-semibold">Attendance Rate</p>
-                        <h3 class="fw-bold text-success mb-0">{{ employee.attendance_rate|default:"95" }}%</h3>
+                        <h3 class="fw-bold text-success mb-0">{{ employee.attendance_rate|default:"0" }}%</h3>
                         <small class="text-muted">
                             <i class="fas fa-calendar-check text-success me-1"></i>This month
                         </small>
@@ -107,14 +144,13 @@
             </div>
         </div>
     </div>
-    
     <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="300">
+        <div class="card border-0 shadow-sm h-100">
             <div class="card-body p-4">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 fw-semibold">Performance</p>
-                        <h3 class="fw-bold text-info mb-0">{{ employee.performance_rating|default:"4.8" }}</h3>
+                        <h3 class="fw-bold text-info mb-0">{{ employee.performance_rating|default:"0.0" }}</h3>
                         <small class="text-muted">
                             <i class="fas fa-star text-warning me-1"></i>Average rating
                         </small>
@@ -126,14 +162,13 @@
             </div>
         </div>
     </div>
-    
     <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="400">
+        <div class="card border-0 shadow-sm h-100">
             <div class="card-body p-4">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 fw-semibold">Leave Balance</p>
-                        <h3 class="fw-bold text-warning mb-0">{{ employee.leave_balance|default:15 }}</h3>
+                        <h3 class="fw-bold text-warning mb-0">{{ employee.leave_balance|default:0 }}</h3>
                         <small class="text-muted">
                             <i class="fas fa-calendar-times text-warning me-1"></i>
                             {% if pending_leaves > 0 %}
@@ -153,90 +188,15 @@
 </div>
 
 <div class="row g-4">
-    <!-- My Schedule & Tasks -->
     <div class="col-lg-8">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-right">
+        <!-- Team or Schedule Section -->
+        {% if employee.role in 'owner,manager,supervisor' %}
+        <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">My Schedule</h5>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-outline-primary active" data-filter="today">Today</button>
-                        <button type="button" class="btn btn-outline-primary" data-filter="week">This Week</button>
-                        <button type="button" class="btn btn-outline-primary" data-filter="month">This Month</button>
-                    </div>
-                </div>
+                <h5 class="mb-0 fw-bold">My Team</h5>
             </div>
             <div class="card-body">
-                <!-- Today's Schedule -->
-                <div class="schedule-section" data-section="today">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="d-flex align-items-center p-3 bg-light rounded">
-                                <div class="bg-primary rounded-circle p-2 me-3">
-                                    <i class="fas fa-clock text-white"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-1 fw-semibold">Work Schedule</h6>
-                                    <p class="mb-0 text-muted">{{ employee.shift_start|time:"g:i A" }} - {{ employee.shift_end|time:"g:i A" }}</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        {% if upcoming_trainings %}
-                        {% for training in upcoming_trainings %}
-                        <div class="col-md-6">
-                            <div class="d-flex align-items-center p-3 bg-info bg-opacity-10 rounded">
-                                <div class="bg-info rounded-circle p-2 me-3">
-                                    <i class="fas fa-graduation-cap text-white"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-1 fw-semibold">{{ training.title }}</h6>
-                                    <p class="mb-0 text-muted">{{ training.start_date|date:"M j, g:i A" }}</p>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Employee Information & Quick Actions -->
-    <div class="col-lg-4">
-        <!-- Quick Actions -->
-        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left">
-            <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0 fw-bold">Quick Actions</h6>
-            </div>
-            <div class="card-body p-3">
-                <div class="d-grid gap-2">
-                    <a href="{% url 'employees:attendance' %}" class="btn btn-primary">
-                        <i class="fas fa-clock me-2"></i>My Attendance
-                    </a>
-                    <button class="btn btn-outline-primary" onclick="requestLeave()">
-                        <i class="fas fa-calendar-times me-2"></i>Request Leave
-                    </button>
-                    <a href="#" class="btn btn-outline-success">
-                        <i class="fas fa-file-invoice me-2"></i>Payslips
-                    </a>
-                    {% if employee.role in 'owner,manager' %}
-                    <a href="#" class="btn btn-outline-info">
-                        <i class="fas fa-users me-2"></i>Manage Team
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Team Statistics (for managers) -->
-        {% if team_stats and employee.role in 'owner,manager,supervisor' %}
-        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left" data-aos-delay="100">
-            <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0 fw-bold">My Team</h6>
-            </div>
-            <div class="card-body">
+                {% if team_stats %}
                 <div class="row g-3 text-center">
                     <div class="col-4">
                         <div class="h4 fw-bold text-primary">{{ team_stats.total_team_members }}</div>
@@ -251,29 +211,90 @@
                         <small class="text-muted">Leave Requests</small>
                     </div>
                 </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-users text-muted mb-2" style="font-size: 2rem;"></i>
+                    <p class="text-muted mb-0">No team data available.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">My Schedule</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center p-3 bg-light rounded">
+                    <div class="bg-primary rounded-circle p-2 me-3">
+                        <i class="fas fa-clock text-white"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-1 fw-semibold">Work Schedule</h6>
+                        <p class="mb-0 text-muted">{{ employee.shift_start|time:"g:i A" }} - {{ employee.shift_end|time:"g:i A" }}</p>
+                    </div>
+                </div>
+                {% if upcoming_trainings %}
+                <div class="mt-3">
+                    <h6 class="fw-semibold mb-2">Upcoming Trainings</h6>
+                    {% for training in upcoming_trainings %}
+                    <div class="d-flex align-items-center p-2 bg-info bg-opacity-10 rounded mb-2">
+                        <div class="bg-info rounded-circle p-2 me-3">
+                            <i class="fas fa-graduation-cap text-white"></i>
+                        </div>
+                        <div>
+                            <strong>{{ training.title }}</strong>
+                            <div class="text-muted small">{{ training.start_date|date:"M j, g:i A" }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
-        
-        <!-- Recent Performance Reviews -->
+    </div>
+    <div class="col-lg-4">
+        <!-- Quick Actions -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="mb-0 fw-bold">Quick Actions</h6>
+            </div>
+            <div class="card-body p-3">
+                <div class="d-grid gap-2">
+                    <a href="{{ urls.attendance }}" class="btn btn-primary">
+                        <i class="fas fa-clock me-2"></i>My Attendance
+                    </a>
+                    <a href="{{ urls.leave_request }}" class="btn btn-outline-primary">
+                        <i class="fas fa-calendar-times me-2"></i>Request Leave
+                    </a>
+                    {% if employee.role in 'owner,manager' %}
+                    <a href="{{ urls.list }}" class="btn btn-outline-info">
+                        <i class="fas fa-users me-2"></i>Manage Team
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <!-- Recent Reviews -->
         {% if recent_reviews %}
-        <div class="card border-0 shadow-sm" data-aos="fade-left" data-aos-delay="200">
+        <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom">
                 <h6 class="mb-0 fw-bold">Recent Reviews</h6>
             </div>
             <div class="card-body p-0">
                 {% for review in recent_reviews %}
                 <div class="d-flex align-items-start p-3 {% if not forloop.last %}border-bottom{% endif %}">
-                    <div class="bg-{{ review.rating_color|default:'primary' }} bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
-                        <i class="fas fa-star text-{{ review.rating_color|default:'primary' }}"></i>
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                        <i class="fas fa-star text-primary"></i>
                     </div>
                     <div class="flex-grow-1">
                         <h6 class="mb-1 fw-semibold">{{ review.title|default:"Performance Review" }}</h6>
                         <p class="mb-1 text-muted small">{{ review.summary|truncatewords:15 }}</p>
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">{{ review.review_date|date:"M j, Y" }}</small>
-                            <span class="badge bg-{{ review.rating_color|default:'primary' }}">
-                                {{ review.overall_rating|default:4.5 }}/5
+                            <span class="badge bg-primary">
+                                {{ review.overall_rating|default:0 }}/5
                             </span>
                         </div>
                     </div>
@@ -284,738 +305,26 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
 
-<!-- Upcoming Trainings -->
-{% if upcoming_trainings %}
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm" data-aos="fade-up">
-            <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0 fw-bold">Upcoming Trainings</h5>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    {% for training in upcoming_trainings %}
-                    <div class="col-md-4">
-                        <div class="card border border-info">
-                            <div class="card-body p-3">
-                                <div class="d-flex align-items-start">
-                                    <div class="bg-info bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
-                                        <i class="fas fa-graduation-cap text-info"></i>
-                                    </div>
-                                    <div class="flex-grow-1">
-                                        <h6 class="fw-semibold mb-1">{{ training.title }}</h6>
-                                        <p class="text-muted small mb-2">{{ training.description|truncatewords:10 }}</p>
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <small class="text-muted">
-                                                <i class="fas fa-calendar me-1"></i>{{ training.start_date|date:"M j" }}
-                                            </small>
-                                            <small class="text-muted">
-                                                <i class="fas fa-clock me-1"></i>{{ training.duration }} hours
-                                            </small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Schedule filter handling
-    const filterBtns = document.querySelectorAll('[data-filter]');
-    filterBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Remove active class from all buttons
-            filterBtns.forEach(b => b.classList.remove('active'));
-            // Add active class to clicked button
-            this.classList.add('active');
-            
-            const filter = this.dataset.filter;
-            loadScheduleData(filter);
-        });
-    });
-});
-
-// Employee action functions
-function clockIn() {
-    if (confirm('Clock in for your shift?')) {
-        fetch('{% url "employees:clock_in" %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showMessage('Clocked in successfully!', 'success');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showMessage('Error clocking in: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            showMessage('Network error. Please try again.', 'error');
-        });
-    }
-}
-
-function clockOut() {
-    if (confirm('Clock out for your shift?')) {
-        fetch('{% url "employees:clock_out" %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showMessage('Clocked out successfully!', 'success');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showMessage('Error clocking out: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            showMessage('Network error. Please try again.', 'error');
-        });
-    }
-}
-
-function takeBreak() {
-    if (confirm('Start your break?')) {
-        fetch('{% url "employees:take_break" %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showMessage('Break started. Enjoy your time!', 'info');
-            } else {
-                showMessage('Error starting break: ' + data.message, 'error');
-            }
-        });
-    }
-}
-
-function requestLeave() {
-    window.location.href = '{% url "employees:leave_request" %}';
-}
-
-function loadScheduleData(period) {
-    // AJAX call to load schedule data for different periods
-    fetch(`/employees/schedule-data/?period=${period}`)
-        .then(response => response.json())
-        .then(data => {
-            updateScheduleDisplay(data);
-        })
-        .catch(error => {
-            console.error('Error loading schedule data:', error);
-        });
-}
-
-function updateScheduleDisplay(data) {
-    // Update schedule display with new data
-    const scheduleSection = document.querySelector('[data-section="today"]');
-    // Implementation would depend on the data structure
-    console.log('Updating schedule display:', data);
-}
-
-function showMessage(message, type) {
-    // Create and show alert message
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    alertDiv.innerHTML = `
-        <div class="d-flex align-items-center">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
-            <div class="flex-grow-1">${message}</div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
-    
-    document.body.appendChild(alertDiv);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
-    }, 5000);
-}
-</script>
-
+{% block extra_css %}
 <style>
 .text-white-75 {
     color: rgba(255, 255, 255, 0.75) !important;
 }
-
 .bg-gradient-success {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
 }
-
 .card {
     transition: all 0.3s ease;
 }
-
 .card:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
 }
-
 .badge {
     font-size: 0.75rem;
     padding: 6px 12px;
 }
-
-.btn-group .btn.active {
-    background-color: var(--bs-primary);
-    border-color: var(--bs-primary);
-    color: white;
-}
-
-.schedule-section {
-    min-height: 200px;
-}
-
-/* Performance rating colors */
-.rating-excellent { color: #10b981 !important; }
-.rating-good { color: #3b82f6 !important; }
-.rating-average { color: #f59e0b !important; }
-.rating-poor { color: #ef4444 !important; }
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .card-body {
-        padding: 1.5rem;
-    }
-    
-    .d-flex.flex-wrap.gap-3 {
-        gap: 1rem !important;
-    }
-    
-    .position-fixed.alert {
-        position: relative !important;
-        top: auto !important;
-        right: auto !important;
-        margin-bottom: 1rem;
-    }
-}
-
-/* Custom animations */
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-.alert {
-    animation: slideInRight 0.3s ease-out;
-}
 </style>
-{% endblock %}body p-4">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted mb-1 fw-semibold">Performance</p>
-                        <h3 class="fw-bold text-info mb-0">{{ performance_rating|default:"4.8" }}</h3>
-                        <small class="text-muted">
-                            <i class="fas fa-star text-warning me-1"></i>Customer rating
-                        </small>
-                    </div>
-                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
-                        <i class="fas fa-star text-info" style="font-size: 1.5rem;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="400">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted mb-1 fw-semibold">Earnings Today</p>
-                        <h3 class="fw-bold text-warning mb-0">KES {{ earnings_today|default:0|floatformat:0 }}</h3>
-                        <small class="text-muted">
-                            <i class="fas fa-coins text-warning me-1"></i>{{ commission_rate|default:10 }}% commission
-                        </small>
-                    </div>
-                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
-                        <i class="fas fa-money-bill-wave text-warning" style="font-size: 1.5rem;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-4">
-    <!-- My Assigned Services -->
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-right">
-            <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">My Assigned Services</h5>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <input type="radio" class="btn-check" name="serviceFilter" id="pending" checked>
-                        <label class="btn btn-outline-primary" for="pending">Pending</label>
-                        
-                        <input type="radio" class="btn-check" name="serviceFilter" id="inprogress">
-                        <label class="btn btn-outline-primary" for="inprogress">In Progress</label>
-                        
-                        <input type="radio" class="btn-check" name="serviceFilter" id="completed">
-                        <label class="btn btn-outline-primary" for="completed">Completed</label>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                {% if my_assigned_services %}
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="border-0 fw-semibold">Customer</th>
-                                    <th class="border-0 fw-semibold">Vehicle</th>
-                                    <th class="border-0 fw-semibold">Service</th>
-                                    <th class="border-0 fw-semibold">Status</th>
-                                    <th class="border-0 fw-semibold">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for service in my_assigned_services %}
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-primary rounded-circle p-2 me-3 flex-shrink-0">
-                                                <i class="fas fa-user text-white"></i>
-                                            </div>
-                                            <div>
-                                                <div class="fw-semibold">{{ service.customer.full_name }}</div>
-                                                <small class="text-muted">{{ service.customer.phone }}</small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="fw-semibold">{{ service.vehicle.make }} {{ service.vehicle.model }}</div>
-                                        <small class="text-muted">{{ service.vehicle.license_plate }}</small>
-                                    </td>
-                                    <td>
-                                        <div class="fw-semibold">{{ service.service_type.name }}</div>
-                                        <small class="text-muted">KES {{ service.total_amount|floatformat:0 }}</small>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-{{ service.status|default:'secondary' }}">
-                                            {{ service.get_status_display }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if service.status == 'pending' %}
-                                            <button class="btn btn-sm btn-primary" onclick="startService({{ service.id }})">
-                                                <i class="fas fa-play me-1"></i>Start
-                                            </button>
-                                        {% elif service.status == 'in_progress' %}
-                                            <button class="btn btn-sm btn-success" onclick="completeService({{ service.id }})">
-                                                <i class="fas fa-check me-1"></i>Complete
-                                            </button>
-                                        {% else %}
-                                            <a href="{% url 'services:detail' service.id %}" class="btn btn-sm btn-outline-secondary">
-                                                <i class="fas fa-eye me-1"></i>View
-                                            </a>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-tasks text-muted mb-3" style="font-size: 3rem;"></i>
-                        <h6 class="text-muted">No assigned services</h6>
-                        <p class="text-muted mb-0">You'll see your assigned services here when they're available</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <!-- Employee Information & Quick Actions -->
-    <div class="col-lg-4">
-        <!-- My Schedule -->
-        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left">
-            <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0 fw-bold">Today's Schedule</h6>
-            </div>
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-clock text-primary me-3"></i>
-                        <div>
-                            <div class="fw-semibold">Work Hours</div>
-                            <small class="text-muted">{{ employee.shift_start|time:"g:i A" }} - {{ employee.shift_end|time:"g:i A" }}</small>
-                        </div>
-                    </div>
-                    <span class="badge bg-success">{{ shift_status|default:"On Time" }}</span>
-                </div>
-                
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-coffee text-warning me-3"></i>
-                        <div>
-                            <div class="fw-semibold">Break Time</div>
-                            <small class="text-muted">{{ break_duration|default:30 }} minutes</small>
-                        </div>
-                    </div>
-                    <span class="badge bg-{{ break_status|default:'secondary' }}">{{ break_taken|default:"Not Taken" }}</span>
-                </div>
-                
-                <div class="d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-tasks text-info me-3"></i>
-                        <div>
-                            <div class="fw-semibold">Services Assigned</div>
-                            <small class="text-muted">For today</small>
-                        </div>
-                    </div>
-                    <span class="badge bg-info">{{ my_services_today|default:0 }}</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Quick Actions -->
-        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left" data-aos-delay="100">
-            <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0 fw-bold">Quick Actions</h6>
-            </div>
-            <div class="card-body p-3">
-                <div class="d-grid gap-2">
-                    <button class="btn btn-primary" onclick="viewMySchedule()">
-                        <i class="fas fa-calendar me-2"></i>My Schedule
-                    </button>
-                    <button class="btn btn-outline-primary" onclick="requestLeave()">
-                        <i class="fas fa-calendar-times me-2"></i>Request Leave
-                    </button>
-                    <button class="btn btn-outline-success" onclick="viewMyAttendance()">
-                        <i class="fas fa-clock me-2"></i>My Attendance
-                    </button>
-                    <button class="btn btn-outline-info" onclick="viewMyPayslips()">
-                        <i class="fas fa-file-invoice me-2"></i>Payslips
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Performance Summary -->
-        <div class="card border-0 shadow-sm" data-aos="fade-left" data-aos-delay="200">
-            <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0 fw-bold">Performance This Month</h6>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <small class="text-muted">Services Completed</small>
-                        <small class="fw-semibold">{{ monthly_services|default:0 }}/{{ monthly_target|default:50 }}</small>
-                    </div>
-                    <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-primary" style="width: {{ monthly_progress|default:0 }}%"></div>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <small class="text-muted">Customer Rating</small>
-                        <small class="fw-semibold">{{ performance_rating|default:4.8 }}/5.0</small>
-                    </div>
-                    <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-warning" style="width: {{ rating_percentage|default:96 }}%"></div>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <small class="text-muted">Attendance</small>
-                        <small class="fw-semibold">{{ attendance_percentage|default:95 }}%</small>
-                    </div>
-                    <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-success" style="width: {{ attendance_percentage|default:95 }}%"></div>
-                    </div>
-                </div>
-                
-                {% if performance_bonus > 0 %}
-                <div class="alert alert-success border-0 mt-3">
-                    <small>
-                        <i class="fas fa-trophy me-1"></i>
-                        <strong>Performance Bonus:</strong> KES {{ performance_bonus|floatformat:0 }}
-                    </small>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Activity -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm" data-aos="fade-up">
-            <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0 fw-bold">Recent Activity</h5>
-            </div>
-            <div class="card-body">
-                {% if recent_activities %}
-                    <div class="timeline">
-                        {% for activity in recent_activities %}
-                        <div class="timeline-item d-flex">
-                            <div class="timeline-marker bg-{{ activity.type|default:'primary' }} rounded-circle p-2 me-3 flex-shrink-0">
-                                <i class="fas fa-{{ activity.icon|default:'clock' }} text-white small"></i>
-                            </div>
-                            <div class="timeline-content flex-grow-1">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <p class="mb-1 fw-semibold">{{ activity.description }}</p>
-                                        <small class="text-muted">{{ activity.details }}</small>
-                                    </div>
-                                    <small class="text-muted">{{ activity.created_at|timesince }} ago</small>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-history text-muted mb-2" style="font-size: 2rem;"></i>
-                        <p class="text-muted mb-0">No recent activity</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Service filter handling
-    const serviceFilters = document.querySelectorAll('input[name="serviceFilter"]');
-    serviceFilters.forEach(filter => {
-        filter.addEventListener('change', function() {
-            console.log('Filter changed to:', this.id);
-            // Implement filter logic here
-        });
-    });
-});
-
-// Employee action functions
-function clockIn() {
-    if (confirm('Clock in for your shift?')) {
-        // Implement clock in logic
-        fetch('/employees/clock-in/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error clocking in: ' + data.message);
-            }
-        });
-    }
-}
-
-function clockOut() {
-    if (confirm('Clock out for your shift?')) {
-        // Implement clock out logic
-        fetch('/employees/clock-out/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error clocking out: ' + data.message);
-            }
-        });
-    }
-}
-
-function takeBreak() {
-    if (confirm('Start your break?')) {
-        // Implement break logic
-        console.log('Taking break...');
-    }
-}
-
-function startService(serviceId) {
-    if (confirm('Start this service?')) {
-        // Implement start service logic
-        fetch(`/services/${serviceId}/start/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error starting service: ' + data.message);
-            }
-        });
-    }
-}
-
-function completeService(serviceId) {
-    if (confirm('Mark this service as completed?')) {
-        // Implement complete service logic
-        fetch(`/services/${serviceId}/complete/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error completing service: ' + data.message);
-            }
-        });
-    }
-}
-
-function viewMySchedule() {
-    window.location.href = '/employees/my-schedule/';
-}
-
-function requestLeave() {
-    window.location.href = '/employees/leave/request/';
-}
-
-function viewMyAttendance() {
-    window.location.href = '/employees/attendance/';
-}
-
-function viewMyPayslips() {
-    window.location.href = '/employees/payslips/';
-}
-</script>
-
-<style>
-.text-white-75 {
-    color: rgba(255, 255, 255, 0.75) !important;
-}
-
-.bg-gradient-success {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-}
-
-.timeline-item {
-    position: relative;
-    padding-bottom: 1.5rem;
-}
-
-.timeline-item:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    left: 20px;
-    top: 40px;
-    width: 2px;
-    height: calc(100% - 20px);
-    background-color: #e5e7eb;
-}
-
-.timeline-marker {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-    position: relative;
-}
-
-.progress {
-    border-radius: 3px;
-}
-
-.card {
-    transition: all 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
-}
-
-.badge {
-    font-size: 0.75rem;
-    padding: 6px 12px;
-}
-
-/* Status-specific badge colors */
-.bg-pending { background-color: #f59e0b !important; }
-.bg-in_progress { background-color: #3b82f6 !important; }
-.bg-completed { background-color: #10b981 !important; }
-.bg-cancelled { background-color: #ef4444 !important; }
-
-/* Button group styling */
-.btn-check:checked + .btn {
-    background-color: var(--bs-primary);
-    border-color: var(--bs-primary);
-    color: white;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .timeline-item {
-        padding-left: 0;
-    }
-    
-    .timeline-item::after {
-        display: none;
-    }
-    
-    .card-body {
-        padding: 1.5rem;
-    }
-    
-    .table-responsive {
-        font-size: 0.875rem;
-    }
-}
-</style>
-
+{% endblock %}

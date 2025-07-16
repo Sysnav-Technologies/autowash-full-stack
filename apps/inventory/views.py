@@ -23,6 +23,83 @@ from .forms import (
 from datetime import datetime, timedelta
 import json
 
+# --- Tenant-aware URL helpers ---
+
+def get_inventory_urls(request):
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/inventory"
+    return {
+        'dashboard': f"{base_url}/",
+        'list': f"{base_url}/items/",
+        'item_create': f"{base_url}/items/create/",
+        'item_detail': f"{base_url}/items/{{pk}}/",
+        'stock_adjustment': f"{base_url}/stock/adjustments/",
+        'stock_adjustment_item': f"{base_url}/stock/adjustments/{{item_id}}/",
+        'stock_movements': f"{base_url}/stock/movements/",
+        'stock_take_list': f"{base_url}/stock-takes/",
+        'stock_take_create': f"{base_url}/stock-takes/create/",
+        'stock_take_detail': f"{base_url}/stock-takes/{{pk}}/",
+        'start_stock_take': f"{base_url}/stock-takes/{{pk}}/start/",
+        'complete_stock_take': f"{base_url}/stock-takes/{{pk}}/complete/",
+        'update_stock_count': f"{base_url}/stock-takes/{{stock_take_id}}/count/{{item_id}}/",
+        'low_stock_report': f"{base_url}/reports/low-stock/",
+        'valuation_report': f"{base_url}/reports/valuation/",
+        'export_csv': f"{base_url}/reports/export/csv/",
+        'category_list': f"{base_url}/categories/",
+        'category_create': f"{base_url}/categories/create/",
+        'alerts': f"{base_url}/alerts/",
+        'resolve_alert': f"{base_url}/alerts/{{alert_id}}/resolve/",
+        'unit_list': f"{base_url}/units/",
+        'unit_create': f"{base_url}/units/create/",
+        'unit_detail': f"{base_url}/units/{{pk}}/",
+        'unit_edit': f"{base_url}/units/{{pk}}/edit/",
+        'unit_toggle_status': f"{base_url}/units/{{pk}}/toggle/",
+        'unit_delete': f"{base_url}/units/{{pk}}/delete/",
+        'populate_car_wash_units': f"{base_url}/units/populate/",
+        'unit_search': f"{base_url}/ajax/units/search/",
+        'item_search': f"{base_url}/ajax/items/search/",
+        'item_consumption': f"{base_url}/ajax/consumption/",
+    }
+
+def get_business_url(request, url_name, **kwargs):
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/inventory"
+    url_mapping = {
+        'inventory:dashboard': f"{base_url}/",
+        'inventory:list': f"{base_url}/items/",
+        'inventory:item_create': f"{base_url}/items/create/",
+        'inventory:item_detail': f"{base_url}/items/{{pk}}/",
+        'inventory:stock_adjustment': f"{base_url}/stock/adjustments/",
+        'inventory:stock_adjustment_item': f"{base_url}/stock/adjustments/{{item_id}}/",
+        'inventory:stock_movements': f"{base_url}/stock/movements/",
+        'inventory:stock_take_list': f"{base_url}/stock-takes/",
+        'inventory:stock_take_create': f"{base_url}/stock-takes/create/",
+        'inventory:stock_take_detail': f"{base_url}/stock-takes/{{pk}}/",
+        'inventory:start_stock_take': f"{base_url}/stock-takes/{{pk}}/start/",
+        'inventory:complete_stock_take': f"{base_url}/stock-takes/{{pk}}/complete/",
+        'inventory:update_stock_count': f"{base_url}/stock-takes/{{stock_take_id}}/count/{{item_id}}/",
+        'inventory:low_stock_report': f"{base_url}/reports/low-stock/",
+        'inventory:valuation_report': f"{base_url}/reports/valuation/",
+        'inventory:export_csv': f"{base_url}/reports/export/csv/",
+        'inventory:category_list': f"{base_url}/categories/",
+        'inventory:category_create': f"{base_url}/categories/create/",
+        'inventory:alerts': f"{base_url}/alerts/",
+        'inventory:resolve_alert': f"{base_url}/alerts/{{alert_id}}/resolve/",
+        'inventory:unit_list': f"{base_url}/units/",
+        'inventory:unit_create': f"{base_url}/units/create/",
+        'inventory:unit_detail': f"{base_url}/units/{{pk}}/",
+        'inventory:unit_edit': f"{base_url}/units/{{pk}}/edit/",
+        'inventory:unit_toggle_status': f"{base_url}/units/{{pk}}/toggle/",
+        'inventory:unit_delete': f"{base_url}/units/{{pk}}/delete/",
+        'inventory:populate_car_wash_units': f"{base_url}/units/populate/",
+        'inventory:unit_search': f"{base_url}/ajax/units/search/",
+        'inventory:item_search': f"{base_url}/ajax/items/search/",
+        'inventory:item_consumption': f"{base_url}/ajax/consumption/",
+    }
+    url = url_mapping.get(url_name, f"{base_url}/")
+    for key, value in kwargs.items():
+        url = url.replace(f"{{{key}}}", str(value))
+    return url
 
 @login_required
 @employee_required()
@@ -114,7 +191,8 @@ def inventory_dashboard_view(request):
         'reorder_items': reorder_items,
         'top_consumed': top_consumed,
         'category_stats': category_stats,
-        'title': 'Inventory Dashboard'
+        'title': 'Inventory Dashboard',
+        'urls': get_inventory_urls(request),
     }
     
     return render(request, 'inventory/dashboard.html', context)
@@ -183,7 +261,8 @@ def item_list_view(request):
         'items': items_page,
         'search_form': search_form,
         'filtered_stats': filtered_stats,
-        'title': 'Inventory Items'
+        'title': 'Inventory Items',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/item_list.html', context)
 
@@ -215,13 +294,14 @@ def item_create_view(request):
                 )
             
             messages.success(request, f'Inventory item "{item.name}" created successfully!')
-            return redirect('inventory:item_detail', pk=item.pk)
+            return redirect(get_business_url(request, 'inventory:item_detail', pk=item.pk))
     else:
         form = InventoryItemForm()
     
     context = {
         'form': form,
-        'title': 'Create Inventory Item'
+        'title': 'Create Inventory Item',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/item_form.html', context)
 
@@ -234,11 +314,11 @@ def start_stock_take(request, pk):
     
     if stock_take.status != 'planned':
         messages.error(request, 'Stock take cannot be started.')
-        return redirect('inventory:stock_take_detail', pk=pk)
+        return redirect(get_business_url(request, 'inventory:stock_take_detail', pk=pk))
     
     stock_take.start_stock_take()
     messages.success(request, f'Stock take "{stock_take.name}" has been started.')
-    return redirect('inventory:stock_take_detail', pk=pk)
+    return redirect(get_business_url(request, 'inventory:stock_take_detail', pk=pk))
 
 @login_required
 @employee_required(['owner', 'manager'])
@@ -249,17 +329,17 @@ def complete_stock_take(request, pk):
     
     if stock_take.status != 'in_progress':
         messages.error(request, 'Stock take is not in progress.')
-        return redirect('inventory:stock_take_detail', pk=pk)
+        return redirect(get_business_url(request, 'inventory:stock_take_detail', pk=pk))
     
     # Check if all items have been counted
     uncounted_items = stock_take.count_records.filter(counted_quantity=0).count()
     if uncounted_items > 0:
         messages.warning(request, f'{uncounted_items} items have not been counted yet.')
-        return redirect('inventory:stock_take_detail', pk=pk)
+        return redirect(get_business_url(request, 'inventory:stock_take_detail', pk=pk))
     
     stock_take.complete_stock_take()
     messages.success(request, f'Stock take "{stock_take.name}" has been completed.')
-    return redirect('inventory:stock_take_detail', pk=pk)
+    return redirect(get_business_url(request, 'inventory:stock_take_detail', pk=pk))
 
 @login_required
 @employee_required()
@@ -301,7 +381,8 @@ def alerts_view(request):
             'type': alert_type,
             'priority': priority
         },
-        'title': 'Inventory Alerts'
+        'title': 'Inventory Alerts',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/alerts.html', context)
 
@@ -317,7 +398,7 @@ def resolve_alert(request, alert_id):
     alert.resolve(employee)
     
     messages.success(request, f'Alert for {alert.item.name} has been resolved.')
-    return redirect('inventory:alerts')
+    return redirect(get_business_url(request, 'inventory:alerts'))
 
 @login_required
 @employee_required()
@@ -364,7 +445,8 @@ def stock_movements_view(request):
             'date_from': date_from,
             'date_to': date_to
         },
-        'title': 'Stock Movements'
+        'title': 'Stock Movements',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/stock_movements.html', context)
 
@@ -393,7 +475,8 @@ def category_list_view(request):
     
     context = {
         'categories': categories,
-        'title': 'Inventory Categories'
+        'title': 'Inventory Categories',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/category_list.html', context)
 
@@ -409,13 +492,14 @@ def category_create_view(request):
             category.save()
             
             messages.success(request, f'Category "{category.name}" created successfully!')
-            return redirect('inventory:category_list')
+            return redirect(get_business_url(request, 'inventory:category_list'))
     else:
         form = InventoryCategoryForm()
     
     context = {
         'form': form,
-        'title': 'Create Category'
+        'title': 'Create Category',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/category_form.html', context)
 
@@ -573,7 +657,8 @@ def inventory_valuation_report(request):
         'total_value': total_value,
         'total_items': items.count(),
         'report_date': timezone.now(),
-        'title': 'Inventory Valuation Report'
+        'title': 'Inventory Valuation Report',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/valuation_report.html', context)
 
@@ -672,7 +757,8 @@ def item_detail_view(request, pk):
             'avg_daily_consumption': avg_daily_consumption,
             'days_until_stockout': days_until_stockout,
         },
-        'title': f'Item - {item.name}'
+        'title': f'Item - {item.name}',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/item_detail.html', context)
 
@@ -716,7 +802,7 @@ def stock_adjustment_view(request, item_id=None):
                         adjustment.approve(request.user)
                     
                     messages.success(request, 'Stock adjustment created successfully!')
-                    return redirect('inventory:item_detail', pk=adjustment.item.pk)
+                    return redirect(get_business_url(request, 'inventory:item_detail', pk=adjustment.item.pk))
                     
             except Exception as e:
                 messages.error(request, f'Error creating adjustment: {str(e)}')
@@ -726,7 +812,8 @@ def stock_adjustment_view(request, item_id=None):
     context = {
         'form': form,
         'item': item,
-        'title': f'Stock Adjustment - {item.name}' if item else 'Stock Adjustment'
+        'title': f'Stock Adjustment - {item.name}' if item else 'Stock Adjustment',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/stock_adjustment.html', context)
 
@@ -766,7 +853,8 @@ def low_stock_report_view(request):
         'categories': categories,
         'total_items': low_stock_items.count(),
         'total_reorder_value': total_reorder_value,
-        'title': 'Low Stock Report'
+        'title': 'Low Stock Report',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/low_stock_report.html', context)
 
@@ -783,7 +871,8 @@ def stock_take_list_view(request):
     
     context = {
         'stock_takes': stock_takes_page,
-        'title': 'Stock Takes'
+        'title': 'Stock Takes',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/stock_take_list.html', context)
 
@@ -803,13 +892,14 @@ def stock_take_create_view(request):
             form.save_m2m()
             
             messages.success(request, f'Stock take "{stock_take.name}" created successfully!')
-            return redirect('inventory:stock_take_detail', pk=stock_take.pk)
+            return redirect(get_business_url(request, 'inventory:stock_take_detail', pk=stock_take.pk))
     else:
         form = StockTakeForm()
     
     context = {
         'form': form,
-        'title': 'Create Stock Take'
+        'title': 'Create Stock Take',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/stock_take_form.html', context)
 
@@ -841,7 +931,8 @@ def stock_take_detail_view(request, pk):
         'counted_items': counted_items,
         'progress_percentage': progress_percentage,
         'discrepancies': discrepancies,
-        'title': f'Stock Take - {stock_take.name}'
+        'title': f'Stock Take - {stock_take.name}',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/stock_take_detail.html', context)
 
@@ -959,7 +1050,8 @@ def unit_list_view(request):
         'units': units_page,
         'search_form': search_form,
         'stats': stats,
-        'title': 'Units of Measurement'
+        'title': 'Units of Measurement',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/unit_list.html', context)
 
@@ -972,13 +1064,14 @@ def unit_create_view(request):
         if form.is_valid():
             unit = form.save()
             messages.success(request, f'Unit "{unit.name} ({unit.abbreviation})" created successfully!')
-            return redirect('inventory:unit_list')
+            return redirect(get_business_url(request, 'inventory:unit_list'))
     else:
         form = UnitForm()
     
     context = {
         'form': form,
-        'title': 'Create Unit of Measurement'
+        'title': 'Create Unit of Measurement',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/unit_form.html', context)
 
@@ -993,14 +1086,15 @@ def unit_edit_view(request, pk):
         if form.is_valid():
             unit = form.save()
             messages.success(request, f'Unit "{unit.name} ({unit.abbreviation})" updated successfully!')
-            return redirect('inventory:unit_list')
+            return redirect(get_business_url(request, 'inventory:unit_list'))
     else:
         form = UnitForm(instance=unit)
     
     context = {
         'form': form,
         'unit': unit,
-        'title': f'Edit Unit - {unit.name}'
+        'title': f'Edit Unit - {unit.name}',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/unit_form.html', context)
 
@@ -1032,10 +1126,11 @@ def unit_detail_view(request, pk):
     
     context = {
         'unit': unit,
-        'items_using_unit': items_using_unit[:20],  # Show first 20
+        'items_using_unit': items_using_unit[:20],
         'recent_items': recent_items,
         'stats': stats,
-        'title': f'Unit Details - {unit.name}'
+        'title': f'Unit Details - {unit.name}',
+        'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/unit_detail.html', context)
 
@@ -1065,7 +1160,7 @@ def unit_toggle_status(request, pk):
             unit.save()
             messages.success(request, f'Unit "{unit.name}" has been deactivated.')
     
-    return redirect('inventory:unit_list')
+    return redirect(get_business_url(request, 'inventory:unit_list'))
 
 @login_required
 @employee_required(['owner', 'manager'])
@@ -1087,7 +1182,7 @@ def unit_delete_view(request, pk):
         unit.delete()
         messages.success(request, f'Unit "{unit_name}" has been deleted.')
     
-    return redirect('inventory:unit_list')
+    return redirect(get_business_url(request, 'inventory:unit_list'))
 
 @login_required
 @employee_required()
@@ -1123,7 +1218,6 @@ def populate_car_wash_units_view(request):
     if request.method == 'POST':
         from django.core.management import call_command
         from io import StringIO
-        
         try:
             # Capture command output
             out = StringIO()
@@ -1149,7 +1243,7 @@ def populate_car_wash_units_view(request):
                     'error': str(e)
                 })
     
-    return redirect('inventory:unit_list')
+    return redirect(get_business_url(request, 'inventory:unit_list'))
 
 # Additional helper views for AJAX operations
 @login_required

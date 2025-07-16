@@ -1,0 +1,321 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}{{ employee.full_name }} - Employee Details - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-user-tie text-primary"></i>
+            {{ employee.full_name }}
+        </h1>
+        <p class="page-description">
+            {{ employee.position.title }}{% if employee.department %} - {{ employee.department.name }}{% endif %}
+        </p>
+    </div>
+    <div class="page-actions">
+        <a href="{{ urls.list }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Employees
+        </a>
+        {% if request.employee.role in 'owner,manager,supervisor' or request.employee.pk == employee.pk %}
+        <a href="{{ edit_url }}" class="btn btn-outline-primary">
+            <i class="fas fa-edit"></i>
+            Edit Employee
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="content-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-id-card"></i>
+                    Employee Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-group">
+                            <label>Employee ID</label>
+                            <p>{{ employee.employee_id }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Email</label>
+                            <p>{{ employee.email }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Phone</label>
+                            <p>{{ employee.phone|default:"-" }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Department</label>
+                            <p>{{ employee.department.name|default:"-" }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Position</label>
+                            <p>{{ employee.position.title|default:"-" }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-group">
+                            <label>Role</label>
+                            <p>{{ employee.get_role_display }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Status</label>
+                            <p>
+                                {% if employee.status == 'active' %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-warning">{{ employee.get_status_display }}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="info-group">
+                            <label>Supervisor</label>
+                            <p>
+                                {% if employee.supervisor %}
+                                    {{ employee.supervisor.full_name }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="info-group">
+                            <label>Hire Date</label>
+                            <p>{{ employee.hire_date|date:"F d, Y" }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Performance Rating</label>
+                            <p>
+                                {% if avg_rating %}
+                                    <span class="badge badge-info">{{ avg_rating|floatformat:1 }}/5</span>
+                                {% else %}
+                                    <span class="text-muted">No reviews yet</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Records -->
+        <div class="content-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-calendar-check"></i>
+                    Recent Attendance
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_attendance %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for att in recent_attendance %}
+                        <tr>
+                            <td>{{ att.date|date:"M d, Y" }}</td>
+                            <td>
+                                <span class="badge badge-{{ att.status|yesno:'success,warning,danger,secondary' }}">
+                                    {{ att.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ att.check_in_time|default:"-" }}</td>
+                            <td>{{ att.check_out_time|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state-sm">
+                    <i class="fas fa-calendar-times text-muted"></i>
+                    <p>No attendance records found.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Leave Requests -->
+        <div class="content-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-plane-departure"></i>
+                    Recent Leave Requests
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_leaves %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for leave in recent_leaves %}
+                        <tr>
+                            <td>{{ leave.get_leave_type_display }}</td>
+                            <td>{{ leave.start_date|date:"M d, Y" }}</td>
+                            <td>{{ leave.end_date|date:"M d, Y" }}</td>
+                            <td>
+                                <span class="badge badge-{{ leave.status|yesno:'info,warning,success,danger' }}">
+                                    {{ leave.get_status_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state-sm">
+                    <i class="fas fa-plane-slash text-muted"></i>
+                    <p>No leave requests found.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Performance Reviews -->
+        <div class="content-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-star"></i>
+                    Performance Reviews
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if performance_reviews %}
+                <ul class="list-group">
+                    {% for review in performance_reviews %}
+                    <li class="list-group-item">
+                        <strong>{{ review.review_period }}</strong>:
+                        {{ review.overall_rating }}/5 -
+                        <span class="text-muted">{{ review.comments|truncatewords:12 }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="empty-state-sm">
+                    <i class="fas fa-star-half-alt text-muted"></i>
+                    <p>No performance reviews found.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="content-card mb-4">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-file-alt"></i>
+                    Documents
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if documents %}
+                <ul class="list-group">
+                    {% for doc in documents %}
+                    <li class="list-group-item">
+                        <a href="{{ doc.file.url }}" target="_blank">
+                            <i class="fas fa-file"></i> {{ doc.name }}
+                        </a>
+                        <span class="text-muted float-right">{{ doc.uploaded_at|date:"M d, Y" }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="empty-state-sm">
+                    <i class="fas fa-file-alt text-muted"></i>
+                    <p>No documents uploaded.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <!-- Quick Actions -->
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-bolt"></i>
+                    Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="quick-actions">
+                    {% if request.employee.role in 'owner,manager,supervisor' or request.employee.pk == employee.pk %}
+                    <a href="{{ edit_url }}" class="btn btn-outline-primary btn-sm btn-block mb-2">
+                        <i class="fas fa-edit"></i>
+                        Edit Employee
+                    </a>
+                    {% endif %}
+                    <a href="{{ urls.list }}" class="btn btn-outline-secondary btn-sm btn-block mb-2">
+                        <i class="fas fa-users"></i>
+                        All Employees
+                    </a>
+                    <a href="{{ urls.attendance }}" class="btn btn-outline-info btn-sm btn-block mb-2">
+                        <i class="fas fa-calendar-check"></i>
+                        My Attendance
+                    </a>
+                    <a href="{{ urls.leave_list }}" class="btn btn-outline-warning btn-sm btn-block mb-2">
+                        <i class="fas fa-plane-departure"></i>
+                        My Leave Requests
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.info-group {
+    margin-bottom: 1.5rem;
+}
+.info-group label {
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+.info-group p {
+    margin: 0;
+    color: var(--gray-900);
+}
+.empty-state-sm {
+    text-align: center;
+    padding: 2rem 1rem;
+}
+.empty-state-sm i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+.empty-state-sm p {
+    color: var(--gray-500);
+    margin-bottom: 1rem;
+}
+.quick-actions .btn-block {
+    width: 100%;
+    text-align: left;   
+}
+</style>
+{% endblock %}

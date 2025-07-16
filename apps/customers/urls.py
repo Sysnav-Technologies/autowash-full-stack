@@ -16,6 +16,7 @@ urlpatterns = [
     
     # Vehicle Management
     path('<uuid:customer_pk>/vehicles/add/', views.vehicle_create_view, name='vehicle_create'),
+    path('vehicles/<uuid:pk>/', views.vehicle_detail_view, name='vehicle_detail'),
     path('vehicles/<uuid:pk>/edit/', views.vehicle_edit_view, name='vehicle_edit'),
     
     # Notes and Documents
@@ -32,4 +33,7 @@ urlpatterns = [
     
     # Export
     path('export/', views.customer_export_view, name='export'),
+
+    # Import
+    path('import/', views.customer_import_view, name='import'),
 ]

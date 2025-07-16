@@ -1,52 +1,211 @@
 {% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}{{ title }} - Autowash{% endblock %}
+{% block title %}{{ title }} - Dashboard{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@4.0.1/dist/chart.umd.js">
+<style>
+.dashboard-metric {
+    transition: all 0.3s ease;
+}
+
+.dashboard-metric:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.metric-icon {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1.5rem;
+}
+
+.trend-indicator {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.trend-up { color: #10b981; }
+.trend-down { color: #ef4444; }
+.trend-neutral { color: #6b7280; }
+
+.goal-progress {
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: #e5e7eb;
+}
+
+.goal-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.activity-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-size: 0.9rem;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+.quick-action-btn {
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+    border-color: var(--bs-primary);
+    transform: translateY(-2px);
+}
+
+.alert-item {
+    background: linear-gradient(90deg, transparent, rgba(var(--bs-warning-rgb), 0.1), transparent);
+    border-left: 4px solid var(--bs-warning);
+}
+
+.dashboard-welcome {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    color: white;
+}
+
+.stats-comparison {
+    font-size: 0.8rem;
+    margin-top: 4px;
+}
+
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.dashboard-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+}
+
+.dashboard-card:hover {
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.metric-change {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.change-positive {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+.change-negative {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
+.change-neutral {
+    background-color: rgba(107, 114, 128, 0.1);
+    color: #4b5563;
+}
+
+.real-time-indicator {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    background-color: #10b981;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+    .chart-container {
+        height: 250px;
+    }
+    
+    .metric-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+    }
+    
+    .dashboard-metric h3 {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item active">Dashboard</li>
 {% endblock %}
 
 {% block content %}
-<!-- Welcome Section -->
+<!-- Welcome Banner -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="card border-0 shadow-sm bg-gradient-primary text-white" data-aos="fade-down" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            <div class="card-body p-4">
-                <div class="row align-items-center">
-                    <div class="col-lg-8">
-                        <h2 class="fw-bold mb-2">Welcome back, {{ user.get_full_name|default:user.username }}!</h2>
-                        <p class="mb-3 text-white-75">Here's what's happening at {{ business.name }} today.</p>
-                        <div class="d-flex flex-wrap gap-3">
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-calendar-day me-2"></i>
-                                <span>{{ "now"|date:"l, F j, Y" }}</span>
-                            </div>
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-clock me-2"></i>
-                                <span id="currentTime">{{ "now"|time:"g:i A" }}</span>
-                            </div>
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-map-marker-alt me-2"></i>
-                                <span>{{ business.city }}, {{ business.state }}</span>
-                            </div>
-                        </div>
+        <div class="dashboard-welcome p-4 position-relative">
+            <div class="real-time-indicator" title="Live Data"></div>
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <h2 class="fw-bold mb-2">Welcome back, {{ user.get_full_name|default:user.username }}!</h2>
+                    <p class="mb-3 opacity-75">Here's your business overview for {{ business.name }}</p>
+                    <div class="d-flex flex-wrap gap-3 small">
+                        <div><i class="fas fa-calendar me-1"></i>{{ "now"|date:"l, F j, Y" }}</div>
+                        <div><i class="fas fa-clock me-1"></i><span id="current-time">{{ "now"|time:"g:i A" }}</span></div>
+                        <div><i class="fas fa-map-marker-alt me-1"></i>{{ business.city|default:"Nairobi" }}, Kenya</div>
                     </div>
-                    <div class="col-lg-4 text-lg-end">
-                        <div class="d-flex flex-column flex-lg-row gap-2 justify-content-lg-end">
-                            {% for action in quick_actions|slice:":2" %}
-                            <a href="{{ action.url }}" class="btn {% if forloop.first %}btn-light{% else %}btn-outline-light{% endif %} fw-semibold">
-                                <i class="fas fa-{{ action.icon }} me-2"></i>{{ action.title }}
-                            </a>
-                            {% empty %}
-                            <a href="#" class="btn btn-light fw-semibold">
-                                <i class="fas fa-plus me-2"></i>New Service
-                            </a>
-                            <a href="#" class="btn btn-outline-light fw-semibold">
-                                <i class="fas fa-users me-2"></i>Add Customer
-                            </a>
-                            {% endfor %}
-                        </div>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <div class="d-flex flex-column flex-lg-row gap-2">
+                        <a href="{% url 'services:create_order' %}" class="btn btn-light btn-sm">
+                            <i class="fas fa-plus me-1"></i>New Order
+                        </a>
+                        <a href="{% url 'customers:create' %}" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-user-plus me-1"></i>Add Customer
+                        </a>
                     </div>
                 </div>
             </div>
@@ -54,19 +213,27 @@
     </div>
 </div>
 
-<!-- Performance Alerts -->
+<!-- Active Alerts -->
 {% if recent_alerts %}
 <div class="row mb-4">
     <div class="col-12">
         {% for alert in recent_alerts %}
-        <div class="alert alert-{{ alert.alert_type }} alert-dismissible fade show" role="alert" data-aos="fade-right" data-aos-delay="{{ forloop.counter0|add:100 }}">
+        <div class="alert alert-warning alert-dismissible fade show alert-item mb-2" role="alert">
             <div class="d-flex align-items-center">
-                <i class="fas fa-{{ alert.icon|default:'exclamation-triangle' }} me-3"></i>
+                <i class="fas fa-exclamation-triangle me-3"></i>
                 <div class="flex-grow-1">
                     <strong>{{ alert.title }}</strong>
-                    <p class="mb-0">{{ alert.message }}</p>
+                    <div class="small text-muted">{{ alert.message }}</div>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                {% if alert.action_url %}
+                <a href="{{ alert.action_url }}" class="btn btn-outline-warning btn-sm me-2">View</a>
+                {% endif %}
+                <form method="post" action="{% url 'businesses:resolve_alert' alert.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </form>
             </div>
         </div>
         {% endfor %}
@@ -74,91 +241,99 @@
 </div>
 {% endif %}
 
-<!-- Quick Stats -->
-<div class="row g-4 mb-4 quick-stats">
+<!-- Key Metrics -->
+<div class="row g-4 mb-4">
     <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="100">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center justify-content-between">
+        <div class="card dashboard-card dashboard-metric h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
                     <div>
-                        <p class="text-muted mb-1 fw-semibold">Today's Revenue</p>
-                        <h3 class="fw-bold text-success mb-0">KES {{ quick_stats.today_revenue|default:0|floatformat:0 }}</h3>
-                        <small class="text-muted">
-                            {% if performance_comparison.revenue_change >= 0 %}
-                                <i class="fas fa-arrow-up text-success me-1"></i>+{{ performance_comparison.revenue_change|floatformat:1 }}% from last month
-                            {% else %}
-                                <i class="fas fa-arrow-down text-danger me-1"></i>{{ performance_comparison.revenue_change|floatformat:1 }}% from last month
-                            {% endif %}
-                        </small>
+                        <p class="text-muted mb-1 small fw-semibold">TODAY'S REVENUE</p>
+                        <h3 class="fw-bold mb-0" id="revenue-value">
+                            KES {{ quick_stats.today_revenue|floatformat:0|default:0 }}
+                        </h3>
                     </div>
-                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
-                        <i class="fas fa-coins text-success" style="font-size: 1.5rem;"></i>
+                    <div class="metric-icon bg-success bg-opacity-10 text-success">
+                        <i class="fas fa-coins"></i>
                     </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="metric-change {% if performance_comparison.revenue_change >= 0 %}change-positive{% else %}change-negative{% endif %}">
+                        <i class="fas fa-arrow-{% if performance_comparison.revenue_change >= 0 %}up{% else %}down{% endif %} me-1"></i>
+                        {{ performance_comparison.revenue_change|floatformat:1|default:0 }}%
+                    </span>
+                    <small class="text-muted">vs last month</small>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="200">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center justify-content-between">
+        <div class="card dashboard-card dashboard-metric h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
                     <div>
-                        <p class="text-muted mb-1 fw-semibold">Services Today</p>
-                        <h3 class="fw-bold text-primary mb-0">{{ quick_stats.today_services|default:0 }}</h3>
-                        <small class="text-muted">
-                            {% if performance_comparison.services_change >= 0 %}
-                                <i class="fas fa-arrow-up text-success me-1"></i>+{{ performance_comparison.services_change|floatformat:1 }}% vs last month
-                            {% else %}
-                                <i class="fas fa-arrow-down text-danger me-1"></i>{{ performance_comparison.services_change|floatformat:1 }}% vs last month
-                            {% endif %}
-                        </small>
+                        <p class="text-muted mb-1 small fw-semibold">SERVICES TODAY</p>
+                        <h3 class="fw-bold mb-0" id="services-value">
+                            {{ quick_stats.today_services|default:0 }}
+                        </h3>
                     </div>
-                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                        <i class="fas fa-car-wash text-primary" style="font-size: 1.5rem;"></i>
+                    <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                        <i class="fas fa-car-wash"></i>
                     </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="metric-change {% if performance_comparison.services_change >= 0 %}change-positive{% else %}change-negative{% endif %}">
+                        <i class="fas fa-arrow-{% if performance_comparison.services_change >= 0 %}up{% else %}down{% endif %} me-1"></i>
+                        {{ performance_comparison.services_change|floatformat:1|default:0 }}%
+                    </span>
+                    <small class="text-muted">vs last month</small>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="300">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center justify-content-between">
+        <div class="card dashboard-card dashboard-metric h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
                     <div>
-                        <p class="text-muted mb-1 fw-semibold">Customers Served</p>
-                        <h3 class="fw-bold text-info mb-0">{{ quick_stats.today_customers|default:0 }}</h3>
-                        <small class="text-muted">
-                            {% if performance_comparison.customers_change >= 0 %}
-                                <i class="fas fa-arrow-up text-success me-1"></i>+{{ performance_comparison.customers_change|floatformat:1 }}% vs last month
-                            {% else %}
-                                <i class="fas fa-arrow-down text-danger me-1"></i>{{ performance_comparison.customers_change|floatformat:1 }}% vs last month
-                            {% endif %}
-                        </small>
+                        <p class="text-muted mb-1 small fw-semibold">CUSTOMERS SERVED</p>
+                        <h3 class="fw-bold mb-0" id="customers-value">
+                            {{ quick_stats.today_customers|default:0 }}
+                        </h3>
                     </div>
-                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
-                        <i class="fas fa-user-friends text-info" style="font-size: 1.5rem;"></i>
+                    <div class="metric-icon bg-info bg-opacity-10 text-info">
+                        <i class="fas fa-users"></i>
                     </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="metric-change {% if performance_comparison.customers_change >= 0 %}change-positive{% else %}change-negative{% endif %}">
+                        <i class="fas fa-arrow-{% if performance_comparison.customers_change >= 0 %}up{% else %}down{% endif %} me-1"></i>
+                        {{ performance_comparison.customers_change|floatformat:1|default:0 }}%
+                    </span>
+                    <small class="text-muted">vs last month</small>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <div class="col-lg-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-up" data-aos-delay="400">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center justify-content-between">
+        <div class="card dashboard-card dashboard-metric h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
                     <div>
-                        <p class="text-muted mb-1 fw-semibold">Staff Attendance</p>
-                        <h3 class="fw-bold text-warning mb-0">{{ quick_stats.employee_attendance|default:0|floatformat:0 }}%</h3>
-                        <small class="text-muted">
-                            <i class="fas fa-clock text-warning me-1"></i>{{ today_metrics.total_employees_present|default:0 }} of {{ today_metrics.total_employees_present|add:today_metrics.total_employees_absent|default:0 }} present
-                        </small>
+                        <p class="text-muted mb-1 small fw-semibold">STAFF ATTENDANCE</p>
+                        <h3 class="fw-bold mb-0" id="attendance-value">
+                            {{ quick_stats.employee_attendance|floatformat:0|default:0 }}%
+                        </h3>
                     </div>
-                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
-                        <i class="fas fa-users-cog text-warning" style="font-size: 1.5rem;"></i>
+                    <div class="metric-icon bg-warning bg-opacity-10 text-warning">
+                        <i class="fas fa-user-check"></i>
                     </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <small class="text-muted">{{ today_metrics.total_employees_present|default:0 }} of {{ today_metrics.total_employees_present|add:today_metrics.total_employees_absent|default:0 }} present</small>
                 </div>
             </div>
         </div>
@@ -168,27 +343,30 @@
 <div class="row g-4">
     <!-- Revenue Trend Chart -->
     <div class="col-lg-8">
-        <div class="card border-0 shadow-sm h-100" data-aos="fade-right">
-            <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">Revenue Trend (Last 7 Days)</h5>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-outline-primary active" data-period="7">7 Days</button>
-                        <button type="button" class="btn btn-outline-primary" data-period="30">30 Days</button>
-                        <button type="button" class="btn btn-outline-primary" data-period="90">3 Months</button>
-                    </div>
+        <div class="card dashboard-card h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">Revenue Trend</h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="chartPeriod" id="period7" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary" for="period7">7 Days</label>
+                    
+                    <input type="radio" class="btn-check" name="chartPeriod" id="period30" autocomplete="off">
+                    <label class="btn btn-outline-primary" for="period30">30 Days</label>
+                    
+                    <input type="radio" class="btn-check" name="chartPeriod" id="period90" autocomplete="off">
+                    <label class="btn btn-outline-primary" for="period90">3 Months</label>
                 </div>
             </div>
             <div class="card-body">
-                <div id="revenueChart" style="height: 300px;">
+                <div class="chart-container">
                     {% if revenue_trend %}
-                        <canvas id="revenueCanvas"></canvas>
+                        <canvas id="revenueChart"></canvas>
                     {% else %}
                         <div class="d-flex align-items-center justify-content-center h-100">
                             <div class="text-center">
                                 <i class="fas fa-chart-line text-muted mb-3" style="font-size: 3rem;"></i>
-                                <p class="text-muted">No revenue data available yet</p>
-                                <small class="text-muted">Start creating services to see revenue trends</small>
+                                <p class="text-muted">No revenue data available</p>
+                                <small class="text-muted">Start processing orders to see trends</small>
                             </div>
                         </div>
                     {% endif %}
@@ -196,85 +374,86 @@
             </div>
         </div>
     </div>
-    
-    <!-- Quick Actions & Goals -->
+
+    <!-- Sidebar -->
     <div class="col-lg-4">
-        <!-- Business Goals -->
+        <!-- Active Goals -->
         {% if active_goals %}
-        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left">
-            <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold">Active Goals</h6>
-                    <a href="#" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
+        <div class="card dashboard-card mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold">Active Goals</h6>
+                <a href="{% url 'businesses:goals' %}" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
-            <div class="card-body p-3">
+            <div class="card-body p-0">
                 {% for goal in active_goals %}
-                <div class="mb-3 {% if not forloop.last %}border-bottom pb-3{% endif %}">
+                <div class="p-3 {% if not forloop.last %}border-bottom{% endif %}">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h6 class="mb-1 fw-semibold">{{ goal.title }}</h6>
-                        <span class="badge bg-primary">Active</span>
+                        <h6 class="mb-0 fw-semibold">{{ goal.title }}</h6>
+                        <span class="badge bg-primary">{{ goal.progress_percentage|floatformat:0 }}%</span>
                     </div>
-                    <div class="progress mb-2" style="height: 6px;">
-                        <div class="progress-bar bg-primary" style="width: {{ goal.progress_percentage }}%"></div>
+                    <div class="goal-progress mb-2">
+                        <div class="goal-progress-bar bg-primary" style="width: {{ goal.progress_percentage }}%"></div>
                     </div>
-                    <div class="d-flex justify-content-between">
-                        <small class="text-muted">{{ goal.current_value }} / {{ goal.target_value }}</small>
-                        <small class="text-muted">Due: {{ goal.end_date|date:"M j" }}</small>
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>{{ goal.current_value }} / {{ goal.target_value }}</span>
+                        <span>Due: {{ goal.end_date|date:"M j" }}</span>
                     </div>
                 </div>
                 {% endfor %}
             </div>
         </div>
         {% endif %}
-        
+
         <!-- Quick Actions -->
-        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left" data-aos-delay="100">
-            <div class="card-header bg-white border-bottom">
+        <div class="card dashboard-card mb-4">
+            <div class="card-header bg-white">
                 <h6 class="mb-0 fw-bold">Quick Actions</h6>
             </div>
-            <div class="card-body p-3">
+            <div class="card-body">
                 <div class="d-grid gap-2">
                     {% for action in quick_actions %}
-                    <a href="{{ action.url }}" class="btn btn-primary">
+                    <a href="{{ action.url }}" class="btn btn-primary quick-action-btn">
                         <i class="fas fa-{{ action.icon }} me-2"></i>{{ action.title }}
                     </a>
                     {% empty %}
-                    <!-- Default actions when no quick actions are configured -->
-                    <a href="#" class="btn btn-primary">
+                    <!-- Default Quick Actions -->
+                    <a href="{% url 'services:create_order' %}" class="btn btn-primary quick-action-btn">
                         <i class="fas fa-plus me-2"></i>New Service Order
                     </a>
-                    <a href="#" class="btn btn-outline-primary">
+                    <a href="{% url 'customers:create' %}" class="btn btn-outline-primary quick-action-btn">
                         <i class="fas fa-user-plus me-2"></i>Add Customer
                     </a>
                     {% if employee.role == 'owner' or employee.role == 'manager' %}
-                    <a href="#" class="btn btn-outline-success">
+                    <a href="{% url 'employees:create' %}" class="btn btn-outline-success quick-action-btn">
                         <i class="fas fa-user-tie me-2"></i>Add Employee
                     </a>
-                    <a href="#" class="btn btn-outline-info">
-                        <i class="fas fa-chart-bar me-2"></i>View Reports
+                    <a href="{% url 'businesses:analytics' %}" class="btn btn-outline-info quick-action-btn">
+                        <i class="fas fa-chart-bar me-2"></i>View Analytics
                     </a>
                     {% endif %}
                     {% endfor %}
                 </div>
             </div>
         </div>
-        
+
         <!-- Pending Items -->
         {% if pending_items %}
-        <div class="card border-0 shadow-sm mb-4" data-aos="fade-left" data-aos-delay="200">
-            <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0 fw-bold">Items Requiring Attention</h6>
+        <div class="card dashboard-card mb-4">
+            <div class="card-header bg-white">
+                <h6 class="mb-0 fw-bold">
+                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                    Items Requiring Attention
+                </h6>
             </div>
             <div class="card-body p-0">
                 {% for item in pending_items %}
-                <div class="d-flex align-items-start p-3 {% if not forloop.last %}border-bottom{% endif %}">
-                    <div class="bg-{{ item.type|default:'warning' }} bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
-                        <i class="fas fa-{{ item.icon|default:'exclamation-triangle' }} text-{{ item.type|default:'warning' }}"></i>
+                <div class="d-flex align-items-center p-3 {% if not forloop.last %}border-bottom{% endif %}">
+                    <div class="activity-icon bg-{{ item.type|default:'warning' }} bg-opacity-10 text-{{ item.type|default:'warning' }}">
+                        <i class="fas fa-{{ item.icon|default:'exclamation-triangle' }}"></i>
                     </div>
                     <div class="flex-grow-1">
-                        <p class="mb-1 fw-semibold">{{ item.title }}</p>
-                        <small class="text-muted">{{ item.created_at|timesince }} ago</small>
+                        <p class="mb-0 fw-semibold">{{ item.title }}</p>
+                        <small class="text-muted">{{ item.created_at|timesince|default:"Just now" }} ago</small>
                     </div>
                     <a href="{{ item.url }}" class="btn btn-sm btn-outline-{{ item.type|default:'warning' }}">
                         View
@@ -284,32 +463,26 @@
             </div>
         </div>
         {% endif %}
-        
-        <!-- Recent Notifications -->
-        <div class="card border-0 shadow-sm" data-aos="fade-left" data-aos-delay="300">
-            <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold">Recent Activity</h6>
-                    <span class="badge bg-primary">{{ recent_notifications|length|default:0 }}</span>
-                </div>
+
+        <!-- Recent Activity -->
+        <div class="card dashboard-card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0 fw-bold">Recent Activity</h6>
             </div>
-            <div class="card-body p-0">
-                {% if recent_notifications %}
-                    {% for notification in recent_notifications %}
-                    <div class="d-flex align-items-start p-3 {% if not forloop.last %}border-bottom{% endif %}">
-                        <div class="bg-{{ notification.type|default:'primary' }} bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
-                            <i class="fas fa-{{ notification.icon|default:'bell' }} text-{{ notification.type|default:'primary' }}"></i>
+            <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                {% if recent_activities %}
+                    {% for activity in recent_activities %}
+                    <div class="activity-item d-flex align-items-start px-3">
+                        <div class="activity-icon bg-{{ activity.type|default:'primary' }} bg-opacity-10 text-{{ activity.type|default:'primary' }}">
+                            <i class="fas fa-{{ activity.icon|default:'bell' }}"></i>
                         </div>
                         <div class="flex-grow-1">
-                            <p class="mb-1 fw-semibold">{{ notification.title }}</p>
-                            <p class="mb-1 text-muted small">{{ notification.message }}</p>
-                            <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                            <p class="mb-1 fw-semibold">{{ activity.title }}</p>
+                            <p class="mb-1 small text-muted">{{ activity.description }}</p>
+                            <small class="text-muted">{{ activity.created_at|timesince }} ago</small>
                         </div>
                     </div>
                     {% endfor %}
-                    <div class="p-3 text-center border-top">
-                        <a href="#" class="btn btn-sm btn-outline-primary">View All Activity</a>
-                    </div>
                 {% else %}
                     <div class="text-center py-4">
                         <i class="fas fa-bell-slash text-muted mb-2" style="font-size: 2rem;"></i>
@@ -322,87 +495,38 @@
     </div>
 </div>
 
-<!-- Dashboard Widgets -->
-{% if dashboard_widgets %}
-<div class="row mt-4">
-    <div class="col-12">
-        <h5 class="fw-bold mb-3">Dashboard Widgets</h5>
-    </div>
-    {% for widget in dashboard_widgets %}
-    <div class="col-lg-{{ widget.width|default:6 }} col-md-6 mb-4">
-        <div class="card border-0 shadow-sm" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:100 }}">
-            <div class="card-header bg-white border-bottom">
-                <h6 class="mb-0 fw-bold">{{ widget.title }}</h6>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Widget content will appear here</p>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-
-<!-- Performance Chart Section (for owners/managers) -->
+<!-- Business Insights (for owners/managers) -->
 {% if employee.role == 'owner' or employee.role == 'manager' %}
 <div class="row mt-4">
     <div class="col-12">
-        <div class="card border-0 shadow-sm" data-aos="fade-up">
-            <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">Business Performance Overview</h5>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <input type="radio" class="btn-check" name="chartPeriod" id="week" checked>
-                        <label class="btn btn-outline-primary" for="week">7 Days</label>
-                        
-                        <input type="radio" class="btn-check" name="chartPeriod" id="month">
-                        <label class="btn btn-outline-primary" for="month">30 Days</label>
-                        
-                        <input type="radio" class="btn-check" name="chartPeriod" id="year">
-                        <label class="btn btn-outline-primary" for="year">12 Months</label>
-                    </div>
-                </div>
+        <div class="card dashboard-card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold">Business Insights</h5>
             </div>
             <div class="card-body">
                 <div class="row g-4">
-                    <div class="col-md-8">
-                        <div id="performanceChart" style="height: 300px;">
-                            <div class="d-flex align-items-center justify-content-center h-100">
-                                <div class="text-center">
-                                    <i class="fas fa-chart-line text-muted mb-3" style="font-size: 3rem;"></i>
-                                    <p class="text-muted">Performance chart will appear here</p>
-                                    <small class="text-muted">Charts will show as data becomes available</small>
-                                </div>
-                            </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h2 fw-bold text-primary">{{ total_customers|default:0 }}</div>
+                            <div class="text-muted">Total Customers</div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="border rounded p-3">
-                            <h6 class="fw-bold mb-3">Key Metrics</h6>
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between">
-                                    <span class="text-muted">Total Revenue</span>
-                                    <span class="fw-semibold">KES {{ quick_stats.today_revenue|default:0|floatformat:0 }}</span>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between">
-                                    <span class="text-muted">Services Completed</span>
-                                    <span class="fw-semibold">{{ quick_stats.today_services|default:0 }}</span>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between">
-                                    <span class="text-muted">Customer Satisfaction</span>
-                                    <span class="fw-semibold">N/A</span>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="d-flex justify-content-between">
-                                    <span class="text-muted">Staff Efficiency</span>
-                                    <span class="fw-semibold">{{ quick_stats.employee_attendance|default:0|floatformat:0 }}%</span>
-                                </div>
-                            </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h2 fw-bold text-success">{{ total_orders|default:0 }}</div>
+                            <div class="text-muted">Total Orders</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h2 fw-bold text-info">{{ average_order_value|floatformat:0|default:0 }}</div>
+                            <div class="text-muted">Avg Order Value</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h2 fw-bold text-warning">{{ customer_satisfaction|floatformat:1|default:0 }}/5</div>
+                            <div class="text-muted">Customer Rating</div>
                         </div>
                     </div>
                 </div>
@@ -412,60 +536,48 @@
 </div>
 {% endif %}
 
+<!-- JavaScript and Data -->
 <script>
-// Revenue trend data from Django
-const revenueData = {{ revenue_trend|safe|default:"[]" }};
+// Dashboard data from Django
+const dashboardData = {
+    revenueData: {{ revenue_trend|safe|default:"[]" }},
+    currentMetrics: {
+        revenue: {{ quick_stats.today_revenue|default:0 }},
+        services: {{ quick_stats.today_services|default:0 }},
+        customers: {{ quick_stats.today_customers|default:0 }},
+        attendance: {{ quick_stats.employee_attendance|default:0 }}
+    },
+    businessSlug: '{{ business.slug }}',
+    csrfToken: '{{ csrf_token }}'
+};
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Update current time every minute
-    function updateTime() {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-        });
-        const timeElement = document.getElementById('currentTime');
-        if (timeElement) {
-            timeElement.textContent = timeString;
-        }
-    }
+    // Initialize dashboard
+    initializeDashboard();
     
-    updateTime();
-    setInterval(updateTime, 60000);
-    
-    // Initialize revenue chart if data exists
-    if (revenueData && revenueData.length > 0) {
+    // Initialize chart if data exists
+    if (dashboardData.revenueData && dashboardData.revenueData.length > 0) {
         initializeRevenueChart();
     }
     
-    // Handle period filter buttons
-    document.querySelectorAll('[data-period]').forEach(button => {
-        button.addEventListener('click', function() {
-            // Remove active class from all buttons
-            document.querySelectorAll('[data-period]').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            // Add active class to clicked button
-            this.classList.add('active');
-            
-            const period = this.dataset.period;
-            loadRevenueData(period);
-        });
-    });
+    // Setup real-time updates
+    setupRealTimeUpdates();
     
-    // Initialize chart period handlers
-    const chartPeriodInputs = document.querySelectorAll('input[name="chartPeriod"]');
-    chartPeriodInputs.forEach(input => {
-        input.addEventListener('change', function() {
-            console.log('Chart period changed to:', this.id);
-            // Implement chart update logic here
-        });
-    });
+    // Setup period filter handlers
+    setupPeriodFilters();
+    
+    // Update time display
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 60000);
 });
 
+function initializeDashboard() {
+    console.log('Dashboard initialized');
+    // Add any initialization logic here
+}
+
 function initializeRevenueChart() {
-    const canvas = document.getElementById('revenueCanvas');
+    const canvas = document.getElementById('revenueChart');
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
@@ -473,25 +585,39 @@ function initializeRevenueChart() {
     new Chart(ctx, {
         type: 'line',
         data: {
-            labels: revenueData.map(item => new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+            labels: dashboardData.revenueData.map(item => {
+                const date = new Date(item.date);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
             datasets: [
                 {
                     label: 'Revenue (KES)',
-                    data: revenueData.map(item => item.revenue),
+                    data: dashboardData.revenueData.map(item => item.revenue),
                     borderColor: '#3b82f6',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
                     borderWidth: 3,
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointBackgroundColor: '#3b82f6',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
                 },
                 {
                     label: 'Customers',
-                    data: revenueData.map(item => item.customers),
+                    data: dashboardData.revenueData.map(item => item.customers),
                     borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
                     borderWidth: 2,
                     fill: false,
-                    yAxisID: 'y1'
+                    tension: 0.4,
+                    yAxisID: 'y1',
+                    pointBackgroundColor: '#10b981',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }
             ]
         },
@@ -502,14 +628,60 @@ function initializeRevenueChart() {
                 mode: 'index',
                 intersect: false,
             },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: 'white',
+                    bodyColor: 'white',
+                    borderColor: '#3b82f6',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    displayColors: true,
+                    callbacks: {
+                        label: function(context) {
+                            if (context.datasetIndex === 0) {
+                                return `Revenue: KES ${context.parsed.y.toLocaleString()}`;
+                            } else {
+                                return `Customers: ${context.parsed.y}`;
+                            }
+                        }
+                    }
+                }
+            },
             scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#6b7280'
+                    }
+                },
                 y: {
                     type: 'linear',
                     display: true,
                     position: 'left',
                     title: {
                         display: true,
-                        text: 'Revenue (KES)'
+                        text: 'Revenue (KES)',
+                        color: '#6b7280'
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    },
+                    ticks: {
+                        color: '#6b7280',
+                        callback: function(value) {
+                            return 'KES ' + value.toLocaleString();
+                        }
                     }
                 },
                 y1: {
@@ -518,314 +690,355 @@ function initializeRevenueChart() {
                     position: 'right',
                     title: {
                         display: true,
-                        text: 'Customers'
+                        text: 'Customers',
+                        color: '#6b7280'
                     },
                     grid: {
                         drawOnChartArea: false,
                     },
-                }
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleColor: 'white',
-                    bodyColor: 'white'
+                    ticks: {
+                        color: '#6b7280'
+                    }
                 }
             }
         }
     });
 }
 
-function loadRevenueData(period) {
-    // AJAX call to load revenue data for different periods
-    fetch(`/api/dashboard-data/?period=${period}`)
-        .then(response => response.json())
-        .then(data => {
-            // Update chart with new data
-            console.log('Loading data for period:', period);
-        })
-        .catch(error => {
-            console.error('Error loading revenue data:', error);
-        });
+function setupRealTimeUpdates() {
+    // Update metrics every 5 minutes
+    setInterval(function() {
+        refreshDashboardMetrics();
+    }, 300000);
 }
 
-// Auto-refresh dashboard every 5 minutes
-setInterval(function() {
-    // Refresh specific elements without full page reload
-    refreshDashboardMetrics();
-}, 300000);
+function setupPeriodFilters() {
+    const periodInputs = document.querySelectorAll('input[name="chartPeriod"]');
+    periodInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const period = this.id.replace('period', '');
+            loadPeriodData(period);
+        });
+    });
+}
+
+function updateCurrentTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+    });
+    const timeElement = document.getElementById('current-time');
+    if (timeElement) {
+        timeElement.textContent = timeString;
+    }
+}
 
 function refreshDashboardMetrics() {
-    fetch('/api/dashboard-data/')
-        .then(response => response.json())
-        .then(data => {
-            // Update quick stats
-            updateQuickStats(data);
-        })
-        .catch(error => {
-            console.error('Error refreshing metrics:', error);
-        });
+    fetch(`/business/${dashboardData.businessSlug}/api/dashboard-data/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': dashboardData.csrfToken,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateMetricsDisplay(data);
+    })
+    .catch(error => {
+        console.error('Error refreshing metrics:', error);
+    });
 }
 
-function updateQuickStats(data) {
+function updateMetricsDisplay(data) {
     // Update revenue
-    if (data.today_revenue !== undefined) {
-        const revenueElement = document.querySelector('.quick-stats h3.text-success');
-        if (revenueElement) {
-            revenueElement.textContent = `KES ${data.today_revenue.toLocaleString()}`;
-        }
+    const revenueElement = document.getElementById('revenue-value');
+    if (revenueElement && data.today_revenue !== undefined) {
+        revenueElement.textContent = `KES ${data.today_revenue.toLocaleString()}`;
     }
     
     // Update services
-    if (data.today_services !== undefined) {
-        const servicesElement = document.querySelector('.quick-stats h3.text-primary');
-        if (servicesElement) {
-            servicesElement.textContent = data.today_services;
-        }
+    const servicesElement = document.getElementById('services-value');
+    if (servicesElement && data.today_services !== undefined) {
+        servicesElement.textContent = data.today_services;
     }
     
     // Update customers
-    if (data.today_customers !== undefined) {
-        const customersElement = document.querySelector('.quick-stats h3.text-info');
-        if (customersElement) {
-            customersElement.textContent = data.today_customers;
-        }
+    const customersElement = document.getElementById('customers-value');
+    if (customersElement && data.today_customers !== undefined) {
+        customersElement.textContent = data.today_customers;
     }
     
     // Update attendance
-    if (data.employee_attendance !== undefined) {
-        const attendanceElement = document.querySelector('.quick-stats h3.text-warning');
-        if (attendanceElement) {
-            attendanceElement.textContent = `${data.employee_attendance.toFixed(0)}%`;
+    const attendanceElement = document.getElementById('attendance-value');
+    if (attendanceElement && data.employee_attendance !== undefined) {
+        attendanceElement.textContent = `${data.employee_attendance.toFixed(0)}%`;
+    }
+    
+    // Update dashboard data for future use
+    dashboardData.currentMetrics = {
+        revenue: data.today_revenue || 0,
+        services: data.today_services || 0,
+        customers: data.today_customers || 0,
+        attendance: data.employee_attendance || 0
+    };
+}
+
+function loadPeriodData(period) {
+    // Show loading state
+    showChartLoading();
+    
+    fetch(`/business/${dashboardData.businessSlug}/api/dashboard-data/?period=${period}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': dashboardData.csrfToken,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateChartData(data.revenue_trend || []);
+    })
+    .catch(error => {
+        console.error('Error loading period data:', error);
+        hideChartLoading();
+    });
+}
+
+function showChartLoading() {
+    const chartContainer = document.querySelector('.chart-container');
+    if (chartContainer) {
+        chartContainer.style.opacity = '0.5';
+    }
+}
+
+function hideChartLoading() {
+    const chartContainer = document.querySelector('.chart-container');
+    if (chartContainer) {
+        chartContainer.style.opacity = '1';
+    }
+}
+
+function updateChartData(newData) {
+    const canvas = document.getElementById('revenueChart');
+    if (!canvas) return;
+    
+    // Destroy existing chart and create new one with updated data
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) {
+        existingChart.destroy();
+    }
+    
+    // Update dashboard data
+    dashboardData.revenueData = newData;
+    
+    // Recreate chart
+    initializeRevenueChart();
+    hideChartLoading();
+}
+
+// Additional utility functions
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-KE', {
+        style: 'currency',
+        currency: 'KES',
+        minimumFractionDigits: 0
+    }).format(amount);
+}
+
+function formatNumber(num) {
+    return new Intl.NumberFormat('en-KE').format(num);
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Handle quick action button clicks
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.quick-action-btn')) {
+        const btn = e.target.closest('.quick-action-btn');
+        btn.classList.add('loading');
+        
+        // Remove loading state after navigation starts
+        setTimeout(() => {
+            btn.classList.remove('loading');
+        }, 1000);
+    }
+});
+
+// Handle alert dismissal
+document.addEventListener('submit', function(e) {
+    if (e.target.closest('form[action*="resolve_alert"]')) {
+        e.preventDefault();
+        
+        const form = e.target;
+        const formData = new FormData(form);
+        
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': dashboardData.csrfToken,
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.ok) {
+                // Remove alert from DOM
+                const alert = form.closest('.alert');
+                if (alert) {
+                    alert.remove();
+                }
+                showNotification('Alert resolved successfully', 'success');
+            } else {
+                showNotification('Error resolving alert', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Error resolving alert', 'danger');
+        });
+    }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + N for new order
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        const newOrderBtn = document.querySelector('a[href*="create_order"]');
+        if (newOrderBtn) {
+            newOrderBtn.click();
         }
     }
+    
+    // Ctrl/Cmd + U for add customer
+    if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
+        e.preventDefault();
+        const addCustomerBtn = document.querySelector('a[href*="customers"][href*="add"]');
+        if (addCustomerBtn) {
+            addCustomerBtn.click();
+        }
+    }
+});
+
+// Touch gestures for mobile
+let touchStartX = 0;
+let touchStartY = 0;
+
+document.addEventListener('touchstart', function(e) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+});
+
+document.addEventListener('touchend', function(e) {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = touchEndY - touchStartY;
+    
+    // Swipe right to left (next period)
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+        const chartContainer = document.querySelector('.chart-container');
+        if (chartContainer && e.target.closest('.chart-container')) {
+            if (deltaX < 0) {
+                // Swipe left - next period
+                const currentPeriod = document.querySelector('input[name="chartPeriod"]:checked');
+                const nextPeriod = currentPeriod.parentElement.nextElementSibling?.querySelector('input');
+                if (nextPeriod) {
+                    nextPeriod.checked = true;
+                    nextPeriod.dispatchEvent(new Event('change'));
+                }
+            } else {
+                // Swipe right - previous period
+                const currentPeriod = document.querySelector('input[name="chartPeriod"]:checked');
+                const prevPeriod = currentPeriod.parentElement.previousElementSibling?.querySelector('input');
+                if (prevPeriod) {
+                    prevPeriod.checked = true;
+                    prevPeriod.dispatchEvent(new Event('change'));
+                }
+            }
+        }
+    }
+});
+
+// Performance monitoring
+const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+        if (entry.entryType === 'navigation') {
+            console.log('Dashboard load time:', entry.loadEventEnd - entry.loadEventStart, 'ms');
+        }
+    }
+});
+
+if ('PerformanceObserver' in window) {
+    observer.observe({entryTypes: ['navigation']});
 }
+
+// Service Worker registration for offline functionality
+if ('serviceWorker' in navigator && 'caches' in window) {
+    navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+            console.log('ServiceWorker registered successfully');
+        })
+        .catch(error => {
+            console.log('ServiceWorker registration failed:', error);
+        });
+}
+
+// Add loading class for buttons
+const style = document.createElement('style');
+style.textContent = `
+    .btn.loading {
+        position: relative;
+        color: transparent !important;
+    }
+    
+    .btn.loading::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin-left: -8px;
+        margin-top: -8px;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(style);
 </script>
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.0.1/dist/chart.umd.js"></script>
 
-<style>
-.text-white-75 {
-    color: rgba(255, 255, 255, 0.75) !important;
-}
-
-.bg-gradient-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-}
-
-.card {
-    transition: all 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
-}
-
-.quick-stats .card:hover {
-    transform: translateY(-5px) scale(1.02);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-}
-
-.badge {
-    font-size: 0.75rem;
-    padding: 6px 12px;
-}
-
-.progress {
-    border-radius: 3px;
-}
-
-.btn-group .btn.active {
-    background-color: var(--bs-primary);
-    border-color: var(--bs-primary);
-    color: white;
-}
-
-/* Status-specific badge colors */
-.bg-pending { background-color: #f59e0b !important; }
-.bg-in_progress { background-color: #3b82f6 !important; }
-.bg-completed { background-color: #10b981 !important; }
-.bg-cancelled { background-color: #ef4444 !important; }
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .card-body {
-        padding: 1.5rem;
-    }
-    
-    .d-flex.flex-wrap.gap-3 {
-        gap: 1rem !important;
-    }
-    
-    #revenueChart {
-        height: 250px !important;
-    }
-    
-    .quick-stats .card {
-        margin-bottom: 1rem;
-    }
-    
-    .btn-group-sm .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .card-body {
-        padding: 1rem;
-    }
-    
-    .quick-stats h3 {
-        font-size: 1.5rem;
-    }
-    
-    .btn-group .btn {
-        padding: 0.375rem 0.5rem;
-        font-size: 0.8rem;
-    }
-    
-    .welcome-section h2 {
-        font-size: 1.5rem;
-    }
-}
-
-/* Animation improvements */
-.quick-stats .card {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.quick-stats .card:hover {
-    transform: translateY(-5px) scale(1.02);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-}
-
-/* Loading states */
-.loading-placeholder {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-    background-size: 200% 100%;
-    animation: loading 1.5s infinite;
-}
-
-@keyframes loading {
-    0% {
-        background-position: 200% 0;
-    }
-    100% {
-        background-position: -200% 0;
-    }
-}
-
-/* Chart container */
-#revenueChart, #performanceChart {
-    position: relative;
-}
-
-/* Custom scrollbar for notification area */
-.card-body::-webkit-scrollbar {
-    width: 4px;
-}
-
-.card-body::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 2px;
-}
-
-.card-body::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 2px;
-}
-
-.card-body::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* Alert animations */
-.alert {
-    animation: slideInRight 0.5s ease-out;
-}
-
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-/* Button loading state */
-.btn.loading {
-    position: relative;
-    color: transparent;
-}
-
-.btn.loading::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    margin-left: -8px;
-    margin-top: -8px;
-    width: 16px;
-    height: 16px;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
-    border-top-color: transparent;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-/* Dark mode support (if implemented) */
-@media (prefers-color-scheme: dark) {
-    .card {
-        background-color: #1a1a1a;
-        border-color: #333;
-    }
-    
-    .text-muted {
-        color: #888 !important;
-    }
-    
-    .bg-white {
-        background-color: #1a1a1a !important;
-    }
-    
-    .border-bottom {
-        border-color: #333 !important;
-    }
-}
-
-/* Print styles */
-@media print {
-    .btn, .alert-dismissible .btn-close, 
-    .card:hover, .quick-stats .card:hover {
-        transform: none !important;
-        box-shadow: none !important;
-    }
-    
-    .bg-gradient-primary {
-        background: #6c757d !important;
-        color: white !important;
-    }
-    
-    .card {
-        break-inside: avoid;
-        margin-bottom: 1rem;
-    }
-}
-</style>
 {% endblock %}

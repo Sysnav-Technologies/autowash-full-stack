@@ -1,0 +1,28 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+    <hr>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="mb-4">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="file" class="form-label">Select CSV File</label>
+            <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Import Customers</button>
+        <a href="{% url 'customers:list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+
+    <div class="alert alert-info mt-3">
+        <strong>CSV Format:</strong> Customer ID, First Name, Last Name, Email, Phone, City, Type, VIP (Yes/No), Active (Yes/No), Created Date, ...<br>
+        <small>Ensure your file matches the required columns.</small>
+    </div>
+</div>
+{% endblock %}

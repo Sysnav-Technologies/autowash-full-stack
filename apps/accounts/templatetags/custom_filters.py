@@ -16,3 +16,11 @@ def status_class(status):
         'completed': 'badge badge-info',
     }
     return status_classes.get(status, 'badge badge-secondary')
+
+@register.filter(name='replace')
+def replace(value, args):
+    """
+    Usage: {{ value|replace:"old,new" }}
+    """
+    old, new = args.split(',', 1)
+    return
