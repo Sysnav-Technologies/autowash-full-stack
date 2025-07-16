@@ -1,11 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import User
-from apps.core.tenant_models import TenantTimeStampedModel  # Changed import
+from apps.core.tenant_models import TenantTimeStampedModel  
 from django.utils import timezone
 from decimal import Decimal
 
 
-class BusinessMetrics(TenantTimeStampedModel):  # Changed base class
+class BusinessMetrics(TenantTimeStampedModel): 
     """Daily business metrics tracking"""
     date = models.DateField(unique=True)
     
@@ -40,9 +40,7 @@ class BusinessMetrics(TenantTimeStampedModel):  # Changed base class
     low_stock_items = models.IntegerField(default=0)
     out_of_stock_items = models.IntegerField(default=0)
 
-    # REMOVED: Problematic FK fields that cause cross-schema constraints
-    # created_by = models.ForeignKey(User, related_name='business_metrics_created', on_delete=models.CASCADE)
-    # updated_by = models.ForeignKey(User, related_name='business_metrics_updated', on_delete=models.CASCADE)
+ 
 
     def __str__(self):
         return f"Metrics for {self.date}"
@@ -74,7 +72,7 @@ class BusinessMetrics(TenantTimeStampedModel):  # Changed base class
         verbose_name_plural = "Business Metrics"
         ordering = ['-date']
 
-class BusinessGoal(TenantTimeStampedModel):  # Changed base class
+class BusinessGoal(TenantTimeStampedModel): 
     """Business goals and targets"""
     
     GOAL_TYPES = [
@@ -146,7 +144,7 @@ class BusinessGoal(TenantTimeStampedModel):  # Changed base class
         verbose_name_plural = "Business Goals"
         ordering = ['-created_at']
 
-class BusinessAlert(TenantTimeStampedModel):  # Changed base class
+class BusinessAlert(TenantTimeStampedModel):  
     """Business alerts and notifications"""
     
     ALERT_TYPES = [
@@ -219,7 +217,7 @@ class BusinessAlert(TenantTimeStampedModel):  # Changed base class
         verbose_name_plural = "Business Alerts"
         ordering = ['-created_at']
 
-class QuickAction(TenantTimeStampedModel):  # Changed base class
+class QuickAction(TenantTimeStampedModel): 
     """Quick actions for dashboard"""
     
     ACTION_TYPES = [
@@ -277,7 +275,7 @@ class QuickAction(TenantTimeStampedModel):  # Changed base class
         verbose_name_plural = "Quick Actions"
         ordering = ['display_order', 'title']
 
-class DashboardWidget(TenantTimeStampedModel):  # Changed base class
+class DashboardWidget(TenantTimeStampedModel):  
     """Customizable dashboard widgets"""
     
     WIDGET_TYPES = [

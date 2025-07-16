@@ -48,7 +48,6 @@ def dashboard_view(request):
         today_metrics.set_updated_by(request.user)
         today_metrics.save()
     
-    # Update metrics with real-time data
     if created or True:  # Always update for real-time data
         update_daily_metrics(today_metrics, request.user)  # Pass user for audit trail
     

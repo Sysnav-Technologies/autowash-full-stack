@@ -23,11 +23,11 @@ urlpatterns = [
     
     # API Endpoints
     path('api/dashboard-data/', views.api_dashboard_data, name='api_dashboard_data'),
-    # Debug endpoints (for troubleshooting user role issues)
+    # Debug endpoints 
     path('debug/user-context/', views.debug_user_context, name='debug_user_context'),
     path('debug/fix-employee/', views.fix_user_employee_record, name='fix_user_employee'),
 
-    # Settings section (add after existing paths)
+    # Settings 
     path('settings/', views.settings_overview, name='settings_overview'),
     path('settings/business/', views.business_settings_view, name='business_settings'),
     path('settings/services/', views.service_settings_view, name='service_settings'),

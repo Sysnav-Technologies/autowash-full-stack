@@ -53,11 +53,10 @@ urlpatterns = [
     # Subscriptions (public schema)
     path('subscriptions/', include('apps.subscriptions.urls')),
          
-    # CRITICAL: Business path routing - this triggers the middleware
+    
     # When someone visits /business/slug/, the middleware intercepts and switches tenant
     re_path(r'^business/(?P<slug>[\w-]+)/', include([
-        # This is a placeholder - the middleware will handle the actual routing
-        # by switching to tenant schema and stripping the business prefix
+        
         path('', lambda request, slug: HttpResponseRedirect('/'), name='business_root'),
     ])),
          
@@ -69,7 +68,7 @@ urlpatterns = [
     path('', public_root_redirect, name='public_root_redirect'),
 ]
 
-# Debug Toolbar - Only when debugging is enabled
+# Debug Toolbar
 if settings.DEBUG:
     try:
         import debug_toolbar
@@ -80,7 +79,6 @@ if settings.DEBUG:
     except ImportError:
         print("[WARNING] Debug toolbar not available (not installed)")
 
-# Serve media files when in local development or when debugging on Render
 if not getattr(settings, 'RENDER', True) or settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

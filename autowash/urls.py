@@ -114,7 +114,7 @@ urlpatterns = [
     path('', root_redirect, name='root_redirect'),
 ]
 
-# Debug Toolbar - Only when debugging is enabled
+# Debug Toolbar 
 if settings.DEBUG:
     try:
         import debug_toolbar
@@ -125,7 +125,6 @@ if settings.DEBUG:
     except ImportError:
         print("Debug toolbar not available (not installed)")
 
-# Serve media files when in local development or when debugging on Render
-if not getattr(settings, 'RENDER', True) or settings.DEBUG:
+# Serve media files when in local development or when debugging
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
