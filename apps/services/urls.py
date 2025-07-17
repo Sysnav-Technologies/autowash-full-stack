@@ -20,7 +20,7 @@ urlpatterns = [
     
     # Service Orders
     path('orders/', views.order_list_view, name='order_list'),
-    path('orders/create/', views.order_create_view, name='create_order'),
+    path('orders/create/', views.quick_order_view, name='create_order'),
     path('orders/quick/', views.quick_order_view, name='quick_order'),
     path('orders/<uuid:pk>/', views.order_detail_view, name='order_detail'),
     path('orders/<uuid:pk>/edit/', views.order_edit_view, name='order_edit'),
