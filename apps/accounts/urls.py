@@ -8,6 +8,9 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+
+    # Password Reset
+    path('password-reset/', views.password_reset_view, name='password_reset'),
     
     # Dashboard redirect
     path('dashboard/', views.dashboard_redirect, name='dashboard_redirect'),

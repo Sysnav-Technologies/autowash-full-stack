@@ -117,6 +117,44 @@ def login_view(request):
     
     return render(request, 'auth/login.html')
 
+# Password Reset view
+def password_reset_view(request):
+    """Password reset view"""
+    if request.user.is_authenticated:
+        return redirect('accounts:dashboard_redirect')
+    
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        if email:
+            try:
+                user = User.objects.get(email=email)
+                # Trigger password reset email (using Django's built-in functionality)
+                from django.contrib.auth.tokens import default_token_generator
+                from django.core.mail import send_mail
+                from django.urls import reverse
+                
+                token = default_token_generator.make_token(user)
+                reset_url = request.build_absolute_uri(
+                    reverse('accounts:password_reset_confirm', kwargs={'uidb64': user.pk, 'token': token})
+                )
+                
+                send_mail(
+                    'Password Reset Request',
+                    f'Click the link to reset your password: {reset_url}',
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=False,
+                )
+                
+                messages.success(request, 'Password reset email sent! Please check your inbox.')
+            except User.DoesNotExist:
+                messages.error(request, 'No user found with that email address.')
+        else:
+            messages.error(request, 'Email is required.')
+    
+    return render(request, 'auth/password_reset.html')
+
+
 @login_required
 def dashboard_redirect(request):
     """Smart dashboard redirect based on user context and verification status"""

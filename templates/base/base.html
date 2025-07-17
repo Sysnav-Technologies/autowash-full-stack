@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ title|default:"Autowash - Professional Car Wash Management" }}{% endblock %}</title>
+    <title>{% block title %}{{ title|default:"Autowash App - Car Wash Management" }}{% endblock %}</title>
     {% load static %}
     
     <!-- Favicon -->
@@ -23,20 +23,77 @@
     
     <!-- Main CSS -->
     <link href="{% static 'css/main.css' %}" rel="stylesheet">
+    <link href="{% static 'css/auth.css' %}" rel="stylesheet">
     
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Debug Panel (Remove this in production) -->
+    <!-- Loading Animation -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="ripple-container">
+            <div class="ripple-circle">
+                <i class="fas fa-car-wash fa-3x"></i>
+            </div>
+            <div class="ripple ripple-1"></div>
+            <div class="ripple ripple-2"></div>
+            <div class="ripple ripple-3"></div>
+            <img src="{% static 'img/water-splash.svg' %}" alt="Water Splash" class="loading-illustration">
+        </div>
+    </div>
+
+    {% if not user.is_authenticated or request.tenant.schema_name == 'public' %}
+        <!-- Public Navbar for App -->
+        <nav class="navbar navbar-expand-lg public-navbar fixed-top">
+            <div class="container">
+                <a class="navbar-brand" href="https://autowash.co.ke">
+                    <i class="fas fa-car-wash"></i>
+                    Autowash App
+                </a>
+                
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav ms-auto">
+                        {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="/auth/dashboard/">
+                                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-danger" href="/auth/logout/">
+                                <i class="fas fa-sign-out-alt me-1"></i>Logout
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="/auth/login/">Sign In</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="btn btn-primary ms-2" href="/auth/register/">
+                                Get Started
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    {% endif %}
+
+    <!-- Debug Panel -->
     {% if settings.DEBUG %}
-    <div id="debug-toggle" style="position: fixed; top: 10px; right: 10px; z-index: 9999; background: #f44336; color: white; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;">
+    <div id="debug-toggle" class="debug-toggle">
         🐛 Debug
     </div>
-    <div id="debug-panel" style="display: none; position: fixed; top: 0; right: 0; width: 400px; height: 100vh; background: white; border-left: 2px solid #f44336; z-index: 9998; overflow-y: auto; padding: 15px; font-size: 12px; box-shadow: -5px 0 15px rgba(0,0,0,0.1);">
+    <div id="debug-panel" class="debug-panel">
         <h4>🐛 Debug Information</h4>
         
         <h6>User Info:</h6>
-        <ul style="margin: 0; padding-left: 20px;">
+        <ul>
             <li>Authenticated: {{ user.is_authenticated|yesno:"Yes,No" }}</li>
             <li>Username: {{ user.username|default:"N/A" }}</li>
             <li>User ID: {{ user.id|default:"N/A" }}</li>
@@ -44,7 +101,7 @@
         </ul>
 
         <h6>Tenant/Business Info:</h6>
-        <ul style="margin: 0; padding-left: 20px;">
+        <ul>
             <li>request.tenant exists: {{ request.tenant|yesno:"Yes,No" }}</li>
             <li>request.business exists: {{ request.business|yesno:"Yes,No" }}</li>
             {% if request.tenant %}
@@ -60,7 +117,7 @@
         </ul>
 
         <h6>User Role Context:</h6>
-        <ul style="margin: 0; padding-left: 20px;">
+        <ul>
             <li>user_role: "{{ user_role|default:"None" }}"</li>
             <li>is_owner: {{ is_owner|yesno:"Yes,No" }}</li>
             <li>is_manager: {{ is_manager|yesno:"Yes,No" }}</li>
@@ -71,7 +128,7 @@
 
         {% if employee %}
         <h6>Employee Details:</h6>
-        <ul style="margin: 0; padding-left: 20px;">
+        <ul>
             <li>Employee ID: {{ employee.employee_id }}</li>
             <li>Full Name: {{ employee.full_name }}</li>
             <li>Role: {{ employee.role }}</li>
@@ -80,24 +137,24 @@
         {% endif %}
 
         <h6>Navigation:</h6>
-        <ul style="margin: 0; padding-left: 20px;">
+        <ul>
             <li>nav_items count: {{ nav_items|length }}</li>
             <li>current_section: {{ current_section|default:"None" }}</li>
         </ul>
 
         {% if nav_items %}
         <h6>Nav Items:</h6>
-        <ol style="margin: 0; padding-left: 20px;">
+        <ol>
             {% for item in nav_items %}
             <li>{{ item.name }} ({{ item.section }})</li>
             {% endfor %}
         </ol>
         {% else %}
-        <p style="color: red; font-weight: bold;">❌ NO NAV ITEMS!</p>
+        <p class="text-danger">❌ NO NAV ITEMS!</p>
         {% endif %}
 
         <h6>Path Info:</h6>
-        <ul style="margin: 0; padding-left: 20px;">
+        <ul>
             <li>Path: {{ request.path }}</li>
             <li>Path Info: {{ request.path_info }}</li>
         </ul>
@@ -141,11 +198,8 @@
                 </div>
             </div>
         </div>
-        
     {% else %}
         <!-- Public Layout -->
-        {% include 'includes/navbar/public.html' %}
-        
         <main class="public-main">
             <!-- Messages -->
             {% include 'includes/messages.html' %}
@@ -155,8 +209,6 @@
                 {% block public_content %}{% endblock %}
             </div>
         </main>
-        
-        {% include 'includes/footer/public.html' %}
     {% endif %}
     
     <!-- Bootstrap JS -->
@@ -173,6 +225,24 @@
     
     <!-- Topbar JavaScript -->
     <script src="{% static 'js/topbar.js' %}"></script>
+    
+    <!-- Loading Animation Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize AOS
+            AOS.init({
+                once: true,
+                duration: 1000
+            });
+
+            // Hide loading overlay after 1.5 seconds
+            setTimeout(function() {
+                const loadingOverlay = document.getElementById('loading-overlay');
+                loadingOverlay.classList.add('hide');
+                setTimeout(() => loadingOverlay.remove(), 500);
+            }, 1500);
+        });
+    </script>
     
     <!-- Set tenant slug globally for JavaScript -->
     {% if request.tenant %}
