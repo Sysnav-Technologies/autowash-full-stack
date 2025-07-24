@@ -80,7 +80,7 @@ def currency(value, currency_code="KES"):
     """Format value as currency."""
     try:
         amount = float(value)
-        if currency_code.upper() == "KES":
+        if currency_code.upper() in ["KES"]:
             return f"KES {amount:,.2f}"
         elif currency_code.upper() == "USD":
             return f"${amount:,.2f}"

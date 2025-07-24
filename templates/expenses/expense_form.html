@@ -1,0 +1,503 @@
+<!-- templates/expenses/expense_form.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+{% if expense %}Edit Expense{% else %}Create Expense{% endif %} - {{ block.super }}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-receipt text-danger"></i>
+            {% if expense %}Edit Expense{% else %}Create New Expense{% endif %}
+        </h1>
+        <p class="page-description">
+            {% if expense %}
+            Update expense details and information
+            {% else %}
+            Add a new expense to your records
+            {% endif %}
+        </p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/expenses/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Expenses
+        </a>
+        {% if expense %}
+        <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" class="btn btn-outline-info">
+            <i class="fas fa-eye"></i>
+            View Details
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-edit"></i>
+                    Expense Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" class="expense-form" novalidate>
+                    {% csrf_token %}
+                    {% crispy form %}
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Quick Actions -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-zap"></i>
+                    Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="quick-actions">
+                    <a href="/business/{{ request.tenant.slug }}/expenses/vendors/create/" class="quick-action-btn" target="_blank">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Add New Vendor</span>
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/expenses/categories/create/" class="quick-action-btn" target="_blank">
+                        <i class="fas fa-tag"></i>
+                        <span>Add New Category</span>
+                    </a>
+                    {% if not expense %}
+                    <button type="button" class="quick-action-btn" onclick="fillSampleData()">
+                        <i class="fas fa-magic"></i>
+                        <span>Fill Sample Data</span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tips & Guidelines -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-lightbulb"></i>
+                    Tips & Guidelines
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="tips-list">
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <div class="tip-content">
+                            <strong>Clear Titles:</strong>
+                            Use descriptive titles that clearly identify the expense
+                        </div>
+                    </div>
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <div class="tip-content">
+                            <strong>Proper Categories:</strong>
+                            Choose the most appropriate category for better reporting
+                        </div>
+                    </div>
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <div class="tip-content">
+                            <strong>Reference Numbers:</strong>
+                            Always include receipt/invoice numbers for tracking
+                        </div>
+                    </div>
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <div class="tip-content">
+                            <strong>Due Dates:</strong>
+                            Set due dates for expenses that need to be paid later
+                        </div>
+                    </div>
+                    <div class="tip-item">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <div class="tip-content">
+                            <strong>Recurring Expenses:</strong>
+                            Mark recurring expenses to automate future entries
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Expense Types Info -->
+        <div class="content-card">
+            <div class="card-header">
+                <h6 class="card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Expense Types
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="expense-types-info">
+                    <div class="type-info">
+                        <span class="type-label type-manual">Manual</span>
+                        <span class="type-description">Regular business expenses entered manually</span>
+                    </div>
+                    <div class="type-info">
+                        <span class="type-label type-inventory">Inventory</span>
+                        <span class="type-description">Automatically linked from inventory purchases</span>
+                    </div>
+                    <div class="type-info">
+                        <span class="type-label type-salary">Salary</span>
+                        <span class="type-description">Employee salary payments</span>
+                    </div>
+                    <div class="type-info">
+                        <span class="type-label type-commission">Commission</span>
+                        <span class="type-description">Service commissions paid to employees</span>
+                    </div>
+                    <div class="type-info">
+                        <span class="type-label type-utility">Utility</span>
+                        <span class="type-description">Electricity, water, internet bills</span>
+                    </div>
+                    <div class="type-info">
+                        <span class="type-label type-maintenance">Maintenance</span>
+                        <span class="type-description">Equipment and facility maintenance</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-calculate total amount
+    const amountInput = document.getElementById('id_amount');
+    const taxInput = document.getElementById('id_tax_amount');
+    const totalInput = document.getElementById('total_amount');
+    
+    if (amountInput && taxInput && totalInput) {
+        function calculateTotal() {
+            const amount = parseFloat(amountInput.value) || 0;
+            const tax = parseFloat(taxInput.value) || 0;
+            const total = amount + tax;
+            totalInput.value = total.toFixed(2);
+            
+            // Update the display with proper formatting
+            if (total > 0) {
+                totalInput.style.color = '#dc3545';
+                totalInput.style.fontWeight = 'bold';
+            }
+        }
+        
+        amountInput.addEventListener('input', calculateTotal);
+        taxInput.addEventListener('input', calculateTotal);
+        
+        // Calculate on page load
+        calculateTotal();
+    }
+    
+    // Show/hide recurring frequency field based on recurring checkbox
+    const recurringCheckbox = document.getElementById('id_is_recurring');
+    const frequencyField = document.getElementById('id_recurring_frequency').closest('.form-group');
+    
+    if (recurringCheckbox && frequencyField) {
+        function toggleFrequencyField() {
+            if (recurringCheckbox.checked) {
+                frequencyField.style.display = 'block';
+                document.getElementById('id_recurring_frequency').required = true;
+            } else {
+                frequencyField.style.display = 'none';
+                document.getElementById('id_recurring_frequency').required = false;
+            }
+        }
+        
+        recurringCheckbox.addEventListener('change', toggleFrequencyField);
+        toggleFrequencyField(); // Set initial state
+    }
+    
+    // Auto-suggest based on expense type
+    const typeSelect = document.getElementById('id_expense_type');
+    const titleInput = document.getElementById('id_title');
+    const categorySelect = document.getElementById('id_category');
+    
+    if (typeSelect && titleInput) {
+        typeSelect.addEventListener('change', function() {
+            const selectedType = typeSelect.value;
+            
+            // Auto-suggest titles based on type
+            const suggestions = {
+                'inventory': 'Inventory Purchase - ',
+                'salary': 'Employee Salary - ',
+                'commission': 'Service Commission - ',
+                'utility': 'Utility Bill - ',
+                'rent': 'Rent Payment - ',
+                'maintenance': 'Maintenance - ',
+                'fuel': 'Fuel/Transportation - ',
+                'marketing': 'Marketing Expense - ',
+                'insurance': 'Insurance Premium - ',
+                'tax': 'Tax Payment - ',
+                'loan': 'Loan Payment - '
+            };
+            
+            if (suggestions[selectedType] && !titleInput.value) {
+                titleInput.value = suggestions[selectedType];
+                titleInput.focus();
+                titleInput.setSelectionRange(suggestions[selectedType].length, suggestions[selectedType].length);
+            }
+        });
+    }
+    
+    // Form validation
+    const form = document.querySelector('.expense-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const amount = parseFloat(document.getElementById('id_amount').value) || 0;
+            
+            if (amount <= 0) {
+                e.preventDefault();
+                alert('Please enter a valid amount greater than 0.');
+                document.getElementById('id_amount').focus();
+                return false;
+            }
+            
+            const title = document.getElementById('id_title').value.trim();
+            if (!title) {
+                e.preventDefault();
+                alert('Please enter a title for this expense.');
+                document.getElementById('id_title').focus();
+                return false;
+            }
+            
+            return true;
+        });
+    }
+});
+
+// Fill sample data for testing
+function fillSampleData() {
+    if (confirm('This will fill the form with sample data. Continue?')) {
+        document.getElementById('id_title').value = 'Office Supplies Purchase';
+        document.getElementById('id_description').value = 'Monthly office supplies including paper, pens, and cleaning materials';
+        document.getElementById('id_amount').value = '150.00';
+        document.getElementById('id_tax_amount').value = '15.00';
+        
+        // Set expense date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('id_expense_date').value = today;
+        
+        // Set due date to next month
+        const nextMonth = new Date();
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        document.getElementById('id_due_date').value = nextMonth.toISOString().split('T')[0];
+        
+        // Trigger calculation
+        document.getElementById('id_amount').dispatchEvent(new Event('input'));
+    }
+}
+
+// Auto-save draft functionality (optional)
+let autoSaveTimeout;
+
+function autoSaveDraft() {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(function() {
+        const formData = new FormData(document.querySelector('.expense-form'));
+        const data = Object.fromEntries(formData.entries());
+        
+        // Save to localStorage as draft
+        localStorage.setItem('expenseDraft', JSON.stringify(data));
+        
+        // Show auto-save indicator
+        showAutoSaveIndicator();
+    }, 2000); // Save after 2 seconds of inactivity
+}
+
+function showAutoSaveIndicator() {
+    // You can implement a visual indicator here
+    console.log('Draft saved automatically');
+}
+
+// Add auto-save listeners to form inputs
+document.querySelectorAll('.expense-form input, .expense-form select, .expense-form textarea').forEach(input => {
+    input.addEventListener('input', autoSaveDraft);
+});
+
+// Load draft on page load if available
+window.addEventListener('load', function() {
+    const draft = localStorage.getItem('expenseDraft');
+    if (draft && confirm('A draft was found. Would you like to restore it?')) {
+        const data = JSON.parse(draft);
+        
+        Object.keys(data).forEach(key => {
+            const input = document.querySelector(`[name="${key}"]`);
+            if (input && !input.value) {
+                input.value = data[key];
+            }
+        });
+        
+        // Clear the draft after restoring
+        localStorage.removeItem('expenseDraft');
+    }
+});
+</script>
+
+<style>
+.expense-form {
+    max-width: none;
+}
+
+.quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.quick-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    text-decoration: none;
+    color: #666;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.quick-action-btn:hover {
+    color: #007bff;
+    border-color: #007bff;
+    background-color: #f8f9ff;
+    text-decoration: none;
+}
+
+.tips-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tip-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.tip-content {
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.tip-content strong {
+    color: #333;
+}
+
+.expense-types-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.type-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.type-label {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    width: fit-content;
+}
+
+.type-manual {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+.type-inventory {
+    background-color: #e7f3ff;
+    color: #0066cc;
+}
+
+.type-salary {
+    background-color: #fff2e7;
+    color: #cc6600;
+}
+
+.type-commission {
+    background-color: #e7ffe7;
+    color: #006600;
+}
+
+.type-utility {
+    background-color: #fff0e6;
+    color: #b8860b;
+}
+
+.type-maintenance {
+    background-color: #f0e6ff;
+    color: #8b00ff;
+}
+
+.type-description {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.3;
+}
+
+/* Form enhancements */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.invalid-feedback {
+    display: block;
+}
+
+/* Amount calculation styling */
+#total_amount {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #dc3545;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .page-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .quick-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .quick-action-btn {
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}

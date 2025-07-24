@@ -100,7 +100,7 @@ urlpatterns = [
     path('suppliers/', include('apps.suppliers.urls')),
     path('payments/', include('apps.payments.urls')),
     path('reports/', include('apps.reports.urls')),
-    # path('expenses/', include('apps.expenses.urls')),
+    path('expenses/', include('apps.expenses.urls')),
     path('notifications/', include('apps.notification.urls')),
     
     # # Business dashboard and settings

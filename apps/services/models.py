@@ -96,6 +96,30 @@ class Service(SoftDeleteModel):
     image = models.ImageField(upload_to='service_images/', blank=True, null=True)
     display_order = models.IntegerField(default=0)
     
+    # Commission settings
+    commission_rate = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Default commission percentage for employees"
+    )
+    commission_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('percentage', 'Percentage of Service Price'),
+            ('fixed', 'Fixed Amount'),
+            ('none', 'No Commission'),
+        ],
+        default='percentage'
+    )
+    fixed_commission = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Fixed commission amount (if commission_type is 'fixed')"
+    )
+    
     # ADDED: Cross-schema user tracking
     created_by_id = models.IntegerField(null=True, blank=True, help_text="User ID from public schema")
     
@@ -694,11 +718,101 @@ class ServiceOrderItem(models.Model):
     )
     comments = models.TextField(blank=True)
     
+    # Commission tracking
+    commission_rate = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Commission percentage for the assigned employee"
+    )
+    commission_amount = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Calculated commission amount"
+    )
+    commission_paid = models.BooleanField(
+        default=False,
+        help_text="Whether commission has been paid/recorded as expense"
+    )
+    commission_expense_id = models.UUIDField(
+        null=True, 
+        blank=True,
+        help_text="Reference to the expense record for this commission"
+    )
+    
     def save(self, *args, **kwargs):
         if not self.unit_price:
             self.unit_price = self.service.base_price
         self.total_price = self.quantity * self.unit_price
+        
+        # Calculate commission if assigned to employee and service is completed
+        if self.assigned_to and self.completed_at and not self.commission_paid:
+            if not self.commission_rate and self.service.commission_rate:
+                self.commission_rate = self.service.commission_rate
+            
+            if self.commission_rate > 0:
+                self.commission_amount = (self.total_price * self.commission_rate) / 100
+        
         super().save(*args, **kwargs)
+        
+        # Create commission expense if service is completed and commission not yet paid
+        if (self.assigned_to and self.completed_at and not self.commission_paid 
+            and self.commission_amount > 0 and not self.commission_expense_id):
+            self._create_commission_expense()
+    
+    def _create_commission_expense(self):
+        """Create expense record for commission payment"""
+        try:
+            from apps.expenses.models import Expense, ExpenseCategory
+            from django.utils import timezone
+            
+            # Get or create commission category
+            commission_category, created = ExpenseCategory.objects.get_or_create(
+                name='Employee Commissions',
+                defaults={
+                    'description': 'Commission payments to employees for completed services',
+                    'is_active': True
+                }
+            )
+            
+            # Create expense record
+            expense = Expense.objects.create(
+                category=commission_category,
+                amount=self.commission_amount,
+                description=f"Commission for {self.service.name} - Order #{self.order.order_number}",
+                date=timezone.now().date(),
+                status='pending',
+                employee=self.assigned_to,
+                service_order_item=self,
+                notes=f"Auto-generated commission expense for service completion"
+            )
+            
+            # Update commission tracking
+            self.commission_expense_id = expense.id
+            self.commission_paid = True
+            ServiceOrderItem.objects.filter(id=self.id).update(
+                commission_expense_id=expense.id,
+                commission_paid=True
+            )
+            
+        except Exception as e:
+            # Log error but don't fail the save
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create commission expense: {str(e)}")
+    
+    def calculate_commission(self):
+        """Calculate commission amount for this service item"""
+        if self.assigned_to and self.commission_rate > 0:
+            return (self.total_price * self.commission_rate) / 100
+        return Decimal('0.00')
+    
+    @property
+    def has_commission(self):
+        """Check if this service item has commission"""
+        return self.commission_amount > 0
     
     @property
     def duration_minutes(self):

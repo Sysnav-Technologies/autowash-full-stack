@@ -1,0 +1,169 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}{{ vendor.name }} - Vendor Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-truck mr-2"></i>{{ vendor.name }}
+                    </h5>
+                    <div class="btn-group">
+                        <a href="/business/{{ business.slug }}/expenses/vendors/{{ vendor.pk }}/edit/" class="btn btn-primary btn-sm">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="/business/{{ business.slug }}/expenses/vendors/{{ vendor.pk }}/delete/" class="btn btn-danger btn-sm">
+                            <i class="fas fa-trash"></i> Delete
+                        </a>
+                        <a href="/business/{{ business.slug }}/expenses/vendors/" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back to List
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3">Basic Information</h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Name:</strong></td>
+                                    <td>{{ vendor.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Contact Person:</strong></td>
+                                    <td>{{ vendor.contact_person|default:"Not specified" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Email:</strong></td>
+                                    <td>
+                                        {% if vendor.email %}
+                                            <a href="mailto:{{ vendor.email }}">{{ vendor.email }}</a>
+                                        {% else %}
+                                            Not specified
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Phone:</strong></td>
+                                    <td>
+                                        {% if vendor.phone %}
+                                            <a href="tel:{{ vendor.phone }}">{{ vendor.phone }}</a>
+                                        {% else %}
+                                            Not specified
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Address:</strong></td>
+                                    <td>{{ vendor.address|default:"Not specified" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td>
+                                        {% if vendor.is_active %}
+                                            <span class="badge badge-success">Active</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3">Financial Summary</h6>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <h4 class="text-primary">{{ total_expenses|currency }}</h4>
+                                            <small class="text-muted">Total Expenses</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <h4 class="text-info">{{ expense_count }}</h4>
+                                            <small class="text-muted">Total Transactions</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if vendor.notes %}
+                            <div class="mt-4">
+                                <h6 class="text-muted">Notes</h6>
+                                <div class="card">
+                                    <div class="card-body">
+                                        {{ vendor.notes|linebreaks }}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Expenses -->
+    {% if recent_expenses %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Recent Expenses</h6>
+                    <a href="/business/{{ business.slug }}/expenses/list/?vendor={{ vendor.pk }}" class="btn btn-sm btn-outline-primary">
+                        View All
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for expense in recent_expenses %}
+                                <tr>
+                                    <td>{{ expense.expense_date|date:"M d, Y" }}</td>
+                                    <td>
+                                        <a href="/business/{{ business.slug }}/expenses/{{ expense.pk }}/">
+                                            {{ expense.description|truncatechars:50 }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if expense.category %}
+                                            <span class="badge badge-secondary">{{ expense.category.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted">Uncategorized</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ expense.amount|currency }}</td>
+                                    <td>
+                                        <a href="/business/{{ business.slug }}/expenses/{{ expense.pk }}/" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

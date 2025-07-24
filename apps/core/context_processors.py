@@ -65,11 +65,15 @@ def user_role_context(request):
         'can_manage_business': False,
         'can_manage_employees': False,
         'can_view_reports': False,
+        'can_manage_expenses': False,
+        'can_approve_expenses': False,
         'employee': None,
         'user_clocked_in': False,
         'user_on_break': False,
         'pending_orders_count': 0,
         'active_queue_count': 0,
+        'pending_expense_approvals': 0,
+        'overdue_expenses_count': 0,
     }
     
     # Only for authenticated users in tenant schemas
@@ -109,6 +113,8 @@ def user_role_context(request):
                 # Get queue counts based on role
                 pending_orders = 0
                 active_queue = 0
+                pending_expense_approvals = 0
+                overdue_expenses = 0
                 
                 if employee.role in ['owner', 'manager', 'supervisor', 'attendant']:
                     try:
@@ -119,6 +125,26 @@ def user_role_context(request):
                         
                         active_queue = ServiceOrder.objects.filter(
                             status='in_progress'
+                        ).count()
+                    except Exception:
+                        pass
+                
+                # Get expense-related counts for managers and owners
+                if employee.role in ['owner', 'manager']:
+                    try:
+                        from apps.expenses.models import Expense
+                        from django.utils import timezone
+                        from datetime import timedelta
+                        
+                        pending_expense_approvals = Expense.objects.filter(
+                            status='pending_approval'
+                        ).count()
+                        
+                        # Overdue expenses (due more than 7 days ago)
+                        seven_days_ago = timezone.now() - timedelta(days=7)
+                        overdue_expenses = Expense.objects.filter(
+                            status='pending',
+                            due_date__lt=seven_days_ago
                         ).count()
                     except Exception:
                         pass
@@ -136,11 +162,15 @@ def user_role_context(request):
                     'can_manage_business': role in ['owner', 'manager'],
                     'can_manage_employees': role in ['owner', 'manager'],
                     'can_view_reports': role in ['owner', 'manager', 'supervisor'],
+                    'can_manage_expenses': role in ['owner', 'manager'],
+                    'can_approve_expenses': role in ['owner', 'manager'],
                     'employee': employee,
                     'user_clocked_in': user_clocked_in,
                     'user_on_break': user_on_break,
                     'pending_orders_count': pending_orders,
                     'active_queue_count': active_queue,
+                    'pending_expense_approvals': pending_expense_approvals,
+                    'overdue_expenses_count': overdue_expenses,
                 })
                 
             else:
@@ -153,6 +183,8 @@ def user_role_context(request):
                         'can_manage_business': True,
                         'can_manage_employees': True,
                         'can_view_reports': True,
+                        'can_manage_expenses': True,
+                        'can_approve_expenses': True,
                         'is_employee': False,
                         'employee': None,
                     })
@@ -191,6 +223,8 @@ def navigation_context(request):
             context['current_section'] = 'services'
         elif section_path.startswith('/inventory/'):
             context['current_section'] = 'inventory'
+        elif section_path.startswith('/expenses/'):
+            context['current_section'] = 'expenses'
         elif section_path.startswith('/suppliers/'):
             context['current_section'] = 'suppliers'
         elif section_path.startswith('/payments/'):

@@ -1,0 +1,99 @@
+<!-- templates/expenses/budget_list.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}Expense Budgets - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-chart-pie text-success"></i>
+            Expense Budgets
+        </h1>
+        <p class="page-description">Monitor and control spending limits</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/expenses/budgets/create/" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            Create Budget
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    {% for budget in budgets %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="content-card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="card-title mb-1">{{ budget.category.name }}</h5>
+                        <p class="text-muted small mb-0">{{ budget.month|date:"F Y" }}</p>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-h"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/expenses/budgets/{{ budget.pk }}/edit/">
+                                <i class="fas fa-edit me-2"></i> Edit
+                            </a></li>
+                            <li><a class="dropdown-item text-danger" href="/business/{{ request.tenant.slug }}/expenses/budgets/{{ budget.pk }}/delete/">
+                                <i class="fas fa-trash me-2"></i> Delete
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="budget-summary">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Spent: {{ budget.spent_amount|currency }}</span>
+                        <span>Budget: {{ budget.amount|currency }}</span>
+                    </div>
+                    
+                    <div class="progress mb-2" style="height: 8px;">
+                        <div class="progress-bar {% if budget.utilization_percentage > 90 %}bg-danger{% elif budget.utilization_percentage > 75 %}bg-warning{% else %}bg-success{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ budget.utilization_percentage|default:0 }}%">
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">{{ budget.utilization_percentage|floatformat:1 }}% used</small>
+                        {% if budget.utilization_percentage > 100 %}
+                        <span class="badge bg-danger">Over Budget</span>
+                        {% elif budget.utilization_percentage > 90 %}
+                        <span class="badge bg-warning">Near Limit</span>
+                        {% else %}
+                        <span class="badge bg-success">On Track</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if budget.remaining_amount < 0 %}
+                <div class="alert alert-danger mt-3 py-2">
+                    <small><i class="fas fa-exclamation-triangle me-1"></i> 
+                    Over budget by {{ budget.remaining_amount|currency|slice:"1:" }}</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="empty-state text-center py-5">
+            <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+            <h4>No Budgets Set</h4>
+            <p class="text-muted">Create budgets to monitor your spending limits.</p>
+            <a href="/business/{{ request.tenant.slug }}/expenses/budgets/create/" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                Create First Budget
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

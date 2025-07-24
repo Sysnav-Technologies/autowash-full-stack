@@ -1,0 +1,57 @@
+<!-- templates/expenses/recurring_confirm_delete.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}Delete Recurring Expense - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-trash text-danger"></i>
+            Delete Recurring Expense
+        </h1>
+        <p class="page-description">Confirm recurring expense deletion</p>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="content-card">
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-exclamation-triangle fa-4x text-warning mb-3"></i>
+                    <h4>Are you sure?</h4>
+                    <p class="text-muted">
+                        This will permanently delete the recurring expense <strong>"{{ recurring_expense.title }}"</strong> 
+                        and stop future automatic expense generation.
+                    </p>
+                </div>
+                
+                <div class="expense-info bg-light p-3 rounded mb-4">
+                    <h5>{{ recurring_expense.title }}</h5>
+                    <p class="mb-1"><strong>{{ recurring_expense.amount|currency }}</strong> - {{ recurring_expense.get_frequency_display }}</p>
+                    {% if recurring_expense.description %}
+                    <p class="mb-1">{{ recurring_expense.description }}</p>
+                    {% endif %}
+                    <p class="mb-0"><small class="text-muted">Category: {{ recurring_expense.category.name }}</small></p>
+                </div>
+                
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger me-2">
+                        <i class="fas fa-trash"></i>
+                        Yes, Delete Recurring Expense
+                    </button>
+                </form>
+                
+                <a href="{{ urls.recurring_list }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

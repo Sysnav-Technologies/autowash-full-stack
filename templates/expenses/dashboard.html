@@ -1,0 +1,457 @@
+<!-- templates/expenses/dashboard.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}Expense Dashboard - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.expense-dashboard {
+    background: #f8f9fa;
+    min-height: 100vh;
+}
+
+.dashboard-header {
+    background: white;
+    padding: 2rem;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 2rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.stat-content h3 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem 0;
+    color: #2c3e50;
+}
+
+.stat-content p {
+    color: #6c757d;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.content-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+.card-title {
+    margin: 0;
+    font-weight: 600;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.expense-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.expense-item:last-child {
+    border-bottom: none;
+}
+
+.expense-info h6 {
+    margin: 0 0 0.25rem 0;
+    font-weight: 600;
+}
+
+.expense-info small {
+    color: #6c757d;
+}
+
+.expense-amount {
+    font-weight: 600;
+    color: #dc3545;
+}
+
+.budget-item {
+    margin-bottom: 1rem;
+}
+
+.budget-progress {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.budget-bar {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.quick-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #495057;
+    transition: all 0.2s ease;
+}
+
+.quick-link:hover {
+    background: #e9ecef;
+    color: #212529;
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .dashboard-header {
+        padding: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="expense-dashboard">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h3 mb-2">
+                    <i class="fas fa-chart-line text-danger me-2"></i>
+                    Expense Dashboard
+                </h1>
+                <p class="text-muted mb-0">Monitor and manage your business expenses</p>
+            </div>
+            
+            <div class="d-flex gap-2">
+                <a href="{{ urls.create }}" class="btn btn-danger">
+                    <i class="fas fa-plus me-1"></i>
+                    Add Expense
+                </a>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{{ urls.export }}">
+                            <i class="fas fa-download me-2"></i> Export Data
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ urls.reports }}">
+                            <i class="fas fa-chart-bar me-2"></i> Reports
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid px-4">
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon bg-danger">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.total_expenses|currency }}</h3>
+                    <p>Total Expenses</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon bg-warning">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.this_month_expenses|currency }}</h3>
+                    <p>This Month</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon bg-info">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.pending_approvals }}</h3>
+                    <p>Pending Approvals</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon bg-secondary">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.overdue_expenses }}</h3>
+                    <p>Overdue</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Left Column -->
+            <div>
+                <!-- Monthly Trend Chart -->
+                <div class="content-card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-chart-area"></i>
+                            Monthly Expense Trend
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="monthlyTrendChart" height="100"></canvas>
+                    </div>
+                </div>
+
+                <!-- Recent Expenses -->
+                <div class="content-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title">
+                            <i class="fas fa-receipt"></i>
+                            Recent Expenses
+                        </h5>
+                        <a href="{{ urls.list }}" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                    <div class="card-body">
+                        {% for expense in recent_expenses %}
+                        <div class="expense-item">
+                            <div class="expense-info">
+                                <h6><a href="{{ urls.detail|stringformat:'s'|add:expense.pk|add:'/' }}" class="text-decoration-none">{{ expense.title }}</a></h6>
+                                <small>{{ expense.category.name }} • {{ expense.expense_date|date:"M d, Y" }}</small>
+                            </div>
+                            <div class="expense-amount">
+                                {{ expense.total_amount|currency }}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-receipt fa-2x mb-2"></i>
+                            <p>No expenses recorded yet</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div>
+                <!-- Pending Approvals -->
+                {% if pending_expenses %}
+                <div class="content-card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-clock text-warning"></i>
+                            Pending Approvals
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for expense in pending_expenses %}
+                        <div class="expense-item">
+                            <div class="expense-info">
+                                <h6><a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" class="text-decoration-none">{{ expense.title }}</a></h6>
+                                <small>{{ expense.expense_date|date:"M d, Y" }}</small>
+                            </div>
+                            <div class="expense-amount">
+                                {{ expense.total_amount|currency }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Top Categories -->
+                <div class="content-card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-tags"></i>
+                            Top Categories
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for category in top_categories %}
+                        <div class="budget-item">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-medium">{{ category.name }}</span>
+                                <span class="text-danger fw-bold">{{ category.total_spent|currency }}</span>
+                            </div>
+                            <div class="budget-progress">
+                                <div class="budget-bar bg-danger" style="width: {{ category.percentage|default:0 }}%"></div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-tags fa-2x mb-2"></i>
+                            <p>No spending data available</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Budget Status -->
+                {% if current_budgets %}
+                <div class="content-card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title">
+                            <i class="fas fa-chart-pie"></i>
+                            Budget Status
+                        </h5>
+                        <a href="{{ urls.budget_list }}" class="btn btn-sm btn-outline-primary">Manage</a>
+                    </div>
+                    <div class="card-body">
+                        {% for budget in current_budgets %}
+                        <div class="budget-item">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-medium">{{ budget.category.name }}</span>
+                                <span class="small text-muted">{{ budget.spent_amount|currency }} / {{ budget.amount|currency }}</span>
+                            </div>
+                            <div class="budget-progress">
+                                <div class="budget-bar {% if budget.utilization_percentage > 90 %}bg-danger{% elif budget.utilization_percentage > 75 %}bg-warning{% else %}bg-success{% endif %}" 
+                                     style="width: {{ budget.utilization_percentage|default:0 }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Quick Actions -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-bolt"></i>
+                            Quick Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="quick-actions">
+                            <a href="{{ urls.list }}" class="quick-link">
+                                <i class="fas fa-list text-primary"></i>
+                                <div>
+                                    <div class="fw-medium">All Expenses</div>
+                                    <small class="text-muted">View & manage</small>
+                                </div>
+                            </a>
+                            
+                            <a href="{{ urls.vendor_list }}" class="quick-link">
+                                <i class="fas fa-truck text-success"></i>
+                                <div>
+                                    <div class="fw-medium">Vendors</div>
+                                    <small class="text-muted">Manage suppliers</small>
+                                </div>
+                            </a>
+                            
+                            <a href="{{ urls.category_list }}" class="quick-link">
+                                <i class="fas fa-tags text-warning"></i>
+                                <div>
+                                    <div class="fw-medium">Categories</div>
+                                    <small class="text-muted">Organize expenses</small>
+                                </div>
+                            </a>
+                            
+                            <a href="{{ urls.recurring_list }}" class="quick-link">
+                                <i class="fas fa-repeat text-info"></i>
+                                <div>
+                                    <div class="fw-medium">Recurring</div>
+                                    <small class="text-muted">Auto expenses</small>
+                                </div>
+                            </a>
+                            
+                            <a href="{{ urls.budget_list }}" class="quick-link">
+                                <i class="fas fa-chart-pie text-purple"></i>
+                                <div>
+                                    <div class="fw-medium">Budgets</div>
+                                    <small class="text-muted">Set limits</small>
+                                </div>
+                            </a>
+                            
+                            <a href="{{ urls.reports }}" class="quick-link">
+                                <i class="fas fa-chart-bar text-dark"></i>
+                                <div>
+                                    <div class="fw-medium">Reports</div>
+                                    <small class="text-muted">Analytics</small>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

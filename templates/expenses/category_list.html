@@ -1,0 +1,94 @@
+<!-- templates/expenses/category_list.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load math_filters %}
+
+{% block title %}Expense Categories - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-tags text-primary"></i>
+            Expense Categories
+        </h1>
+        <p class="page-description">Organize and manage expense categories</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/expenses/categories/create/" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            Add Category
+        </a>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="card-body">
+        {% if categories %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Parent Category</th>
+                        <th>Description</th>
+                        <th>Total Expenses</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category in categories %}
+                    <tr>
+                        <td>
+                            <strong>{{ category.name }}</strong>
+                        </td>
+                        <td>
+                            {% if category.parent %}
+                                {{ category.parent.name }}
+                            {% else %}
+                                <span class="text-muted">Top Level</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ category.description|default:'-' }}</td>
+                        <td>{{ category.total_expenses|default:0|currency }}</td>
+                        <td>
+                            {% if category.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/business/{{ request.tenant.slug }}/expenses/categories/{{ category.pk }}/edit/" 
+                                   class="btn btn-outline-primary" title="Edit Category">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="/business/{{ request.tenant.slug }}/expenses/categories/{{ category.pk }}/delete/" 
+                                   class="btn btn-outline-danger" title="Delete Category"
+                                   onclick="return confirm('Are you sure you want to delete this category?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state text-center py-5">
+            <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+            <h4>No Categories Yet</h4>
+            <p class="text-muted">Create your first expense category to get started.</p>
+            <a href="/business/{{ request.tenant.slug }}/expenses/categories/create/" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                Add First Category
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
