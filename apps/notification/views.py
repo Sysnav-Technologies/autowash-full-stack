@@ -24,6 +24,58 @@ from .forms import (
 )
 from .utils import NotificationManager
 
+def get_notification_urls(request):
+    """Generate all notification URLs for templates with tenant slug."""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/notifications"
+    
+    return {
+        # Main URLs
+        'dashboard': f"{base_url}/",
+        'list': f"{base_url}/list/",
+        'detail': f"{base_url}/{{}}/" ,  # Use string formatting in template
+        'mark_read': f"{base_url}/{{}}/read/",
+        'mark_unread': f"{base_url}/{{}}/unread/",
+        'archive': f"{base_url}/{{}}/archive/",
+        'delete': f"{base_url}/{{}}/delete/",
+        'bulk_action': f"{base_url}/bulk-action/",
+        
+        # Preference URLs
+        'preferences': f"{base_url}/preferences/",
+        'preferences_edit': f"{base_url}/preferences/edit/",
+        
+        # Template URLs
+        'template_list': f"{base_url}/templates/",
+        'template_create': f"{base_url}/templates/create/",
+        'template_edit': f"{base_url}/templates/{{}}/edit/",
+        'template_delete': f"{base_url}/templates/{{}}/delete/",
+        'template_preview': f"{base_url}/templates/{{}}/preview/",
+        
+        # Category URLs
+        'category_list': f"{base_url}/categories/",
+        'category_create': f"{base_url}/categories/create/",
+        'category_edit': f"{base_url}/categories/{{}}/edit/",
+        'category_delete': f"{base_url}/categories/{{}}/delete/",
+        
+        # Digest URLs
+        'digest_list': f"{base_url}/digests/",
+        'digest_detail': f"{base_url}/digests/{{}}/",
+        'digest_settings': f"{base_url}/digests/settings/",
+        
+        # Log URLs
+        'log_list': f"{base_url}/logs/",
+        'log_detail': f"{base_url}/logs/{{}}/",
+        
+        # Ajax URLs
+        'mark_all_read': f"{base_url}/ajax/mark-all-read/",
+        'notification_count': f"{base_url}/ajax/count/",
+        'test_notification': f"{base_url}/ajax/test/",
+        'send_notification': f"{base_url}/ajax/send/",
+        
+        # Navigation
+        'businesses_dashboard': f"/business/{tenant_slug}/dashboard/",
+    }
+
 @method_decorator([login_required, business_required], name='dispatch')
 class NotificationListView(ListView):
     """List user notifications"""

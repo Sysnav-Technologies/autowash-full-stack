@@ -27,6 +27,63 @@ from .forms import (
 )
 from .utils import ReportGenerator, DashboardDataProvider
 
+def get_reports_urls(request):
+    """Generate all reports URLs for templates with tenant slug."""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/reports"
+    
+    return {
+        # Main URLs
+        'dashboard': f"{base_url}/",
+        'list': f"{base_url}/list/",
+        'create': f"{base_url}/create/",
+        'detail': f"{base_url}/{{}}/" ,  # Use string formatting in template
+        'edit': f"{base_url}/{{}}/edit/",
+        'delete': f"{base_url}/{{}}/delete/",
+        'generate': f"{base_url}/{{}}/generate/",
+        'download': f"{base_url}/{{}}/download/",
+        
+        # Template URLs
+        'template_list': f"{base_url}/templates/",
+        'template_create': f"{base_url}/templates/create/",
+        'template_edit': f"{base_url}/templates/{{}}/edit/",
+        'template_delete': f"{base_url}/templates/{{}}/delete/",
+        
+        # Dashboard URLs
+        'dashboard_create': f"{base_url}/dashboards/create/",
+        'dashboard_edit': f"{base_url}/dashboards/{{}}/edit/",
+        'dashboard_view': f"{base_url}/dashboards/{{}}/",
+        
+        # Widget URLs
+        'widget_create': f"{base_url}/widgets/create/",
+        'widget_edit': f"{base_url}/widgets/{{}}/edit/",
+        'widget_delete': f"{base_url}/widgets/{{}}/delete/",
+        
+        # Analytics URLs
+        'analytics': f"{base_url}/analytics/",
+        'analytics_events': f"{base_url}/analytics/events/",
+        'kpi_list': f"{base_url}/kpi/",
+        'kpi_create': f"{base_url}/kpi/create/",
+        
+        # Export URLs
+        'export_csv': f"{base_url}/export/csv/",
+        'export_pdf': f"{base_url}/export/pdf/",
+        'export_excel': f"{base_url}/export/excel/",
+        
+        # Schedule URLs
+        'schedule_list': f"{base_url}/schedules/",
+        'schedule_create': f"{base_url}/schedules/create/",
+        'schedule_edit': f"{base_url}/schedules/{{}}/edit/",
+        
+        # Ajax URLs
+        'report_data': f"{base_url}/ajax/{{}}/data/",
+        'widget_data': f"{base_url}/ajax/widgets/{{}}/data/",
+        'preview_report': f"{base_url}/ajax/preview/",
+        
+        # Navigation
+        'businesses_dashboard': f"/business/{tenant_slug}/dashboard/",
+    }
+
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
 class ReportsDashboardView(ListView):
     """Main reports dashboard"""

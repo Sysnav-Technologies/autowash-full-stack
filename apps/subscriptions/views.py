@@ -21,6 +21,53 @@ from .forms import SubscriptionForm, PaymentForm
 from .utils import create_mpesa_payment, verify_discount_code
 from apps.accounts.models import Business
 
+def get_subscription_urls(request):
+    """Generate all subscription URLs for templates with tenant slug."""
+    tenant_slug = request.tenant.slug if hasattr(request, 'tenant') else None
+    base_url = f"/business/{tenant_slug}/subscriptions" if tenant_slug else "/subscriptions"
+    
+    return {
+        # Main URLs
+        'pricing': "/pricing/",  # Public URL
+        'current': f"{base_url}/current/",
+        'upgrade': f"{base_url}/upgrade/",
+        'downgrade': f"{base_url}/downgrade/",
+        'cancel': f"{base_url}/cancel/",
+        'reactivate': f"{base_url}/reactivate/",
+        
+        # Payment URLs
+        'payment_create': f"{base_url}/payment/create/",
+        'payment_success': f"{base_url}/payment/success/",
+        'payment_failed': f"{base_url}/payment/failed/",
+        'payment_callback': f"{base_url}/payment/callback/",
+        
+        # Plan URLs
+        'plan_details': f"{base_url}/plans/{{}}/",
+        'plan_compare': f"{base_url}/plans/compare/",
+        
+        # Invoice URLs
+        'invoice_list': f"{base_url}/invoices/",
+        'invoice_detail': f"{base_url}/invoices/{{}}/",
+        'invoice_download': f"{base_url}/invoices/{{}}/download/",
+        
+        # Usage URLs
+        'usage_dashboard': f"{base_url}/usage/",
+        'usage_details': f"{base_url}/usage/details/",
+        'usage_history': f"{base_url}/usage/history/",
+        
+        # Discount URLs
+        'apply_discount': f"{base_url}/discount/apply/",
+        'remove_discount': f"{base_url}/discount/remove/",
+        
+        # Ajax URLs
+        'check_discount': f"{base_url}/ajax/discount/check/",
+        'usage_stats': f"{base_url}/ajax/usage/stats/",
+        'plan_pricing': f"{base_url}/ajax/plans/{{}}/pricing/",
+        
+        # Navigation
+        'businesses_dashboard': f"/business/{tenant_slug}/dashboard/" if tenant_slug else "/dashboard/",
+    }
+
 def pricing_view(request):
     """Display subscription plans"""
     plans = SubscriptionPlan.objects.filter(is_active=True).order_by('sort_order', 'price')

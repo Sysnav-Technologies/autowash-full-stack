@@ -28,6 +28,56 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def get_payment_urls(request):
+    """Generate all payment URLs for templates with tenant slug."""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}/payments"
+    
+    return {
+        # Main URLs
+        'dashboard': f"{base_url}/",
+        'list': f"{base_url}/list/",
+        'create': f"{base_url}/create/",
+        'detail': f"{base_url}/{{}}/" ,  # Use string formatting in template
+        'edit': f"{base_url}/{{}}/edit/",
+        'delete': f"{base_url}/{{}}/delete/",
+        'refund': f"{base_url}/{{}}/refund/",
+        'verify': f"{base_url}/{{}}/verify/",
+        'bulk_action': f"{base_url}/bulk-action/",
+        
+        # Payment Method URLs
+        'method_list': f"{base_url}/methods/",
+        'method_create': f"{base_url}/methods/create/",
+        'method_edit': f"{base_url}/methods/{{}}/edit/",
+        'method_delete': f"{base_url}/methods/{{}}/delete/",
+        
+        # MPesa URLs
+        'mpesa_payment': f"{base_url}/mpesa/pay/",
+        'mpesa_callback': f"{base_url}/mpesa/callback/",
+        'mpesa_status': f"{base_url}/mpesa/status/{{}}/",
+        
+        # Card Payment URLs
+        'card_payment': f"{base_url}/card/pay/",
+        'card_callback': f"{base_url}/card/callback/",
+        
+        # Cash Payment URLs
+        'cash_payment': f"{base_url}/cash/pay/",
+        
+        # Reports URLs
+        'reports': f"{base_url}/reports/",
+        'export': f"{base_url}/export/",
+        'daily_summary': f"{base_url}/reports/daily/",
+        'method_analysis': f"{base_url}/reports/methods/",
+        
+        # Ajax URLs
+        'payment_details': f"{base_url}/ajax/{{}}/details/",
+        'payment_status': f"{base_url}/ajax/{{}}/status/",
+        'validate_payment': f"{base_url}/ajax/validate/",
+        
+        # Navigation
+        'businesses_dashboard': f"/business/{tenant_slug}/dashboard/",
+    }
+
 @login_required
 # Owner or manager required for payment dashboard
 @employee_required(['owner', 'manager'])

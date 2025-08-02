@@ -21,6 +21,77 @@ from .views_settings import (
     create_backup_ajax, download_backup, test_integration_ajax
 )
 
+def get_business_urls(request):
+    """Generate all business URLs for templates with tenant slug."""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}"
+    
+    return {
+        # Main Dashboard URLs
+        'dashboard': f"{base_url}/dashboard/",
+        'metrics': f"{base_url}/metrics/",
+        'performance': f"{base_url}/performance/",
+        'analytics': f"{base_url}/analytics/",
+        
+        # Settings URLs
+        'settings': f"{base_url}/settings/",
+        'business_settings': f"{base_url}/settings/business/",
+        'service_settings': f"{base_url}/settings/services/",
+        'payment_settings': f"{base_url}/settings/payments/",
+        'notification_settings': f"{base_url}/settings/notifications/",
+        'integration_settings': f"{base_url}/settings/integrations/",
+        'backup_settings': f"{base_url}/settings/backup/",
+        'security_settings': f"{base_url}/settings/security/",
+        'user_management': f"{base_url}/settings/users/",
+        
+        # Goal URLs
+        'goals': f"{base_url}/goals/",
+        'goal_create': f"{base_url}/goals/create/",
+        'goal_edit': f"{base_url}/goals/{{}}/edit/",
+        'goal_delete': f"{base_url}/goals/{{}}/delete/",
+        
+        # Alert URLs
+        'alerts': f"{base_url}/alerts/",
+        'alert_create': f"{base_url}/alerts/create/",
+        'alert_edit': f"{base_url}/alerts/{{}}/edit/",
+        'alert_delete': f"{base_url}/alerts/{{}}/delete/",
+        
+        # Widget URLs
+        'widgets': f"{base_url}/widgets/",
+        'widget_add': f"{base_url}/widgets/add/",
+        'widget_remove': f"{base_url}/widgets/{{}}/remove/",
+        'widget_config': f"{base_url}/widgets/{{}}/config/",
+        
+        # Quick Action URLs
+        'quick_actions': f"{base_url}/quick-actions/",
+        'quick_action_create': f"{base_url}/quick-actions/create/",
+        'quick_action_edit': f"{base_url}/quick-actions/{{}}/edit/",
+        
+        # Ajax URLs
+        'metrics_data': f"{base_url}/ajax/metrics/",
+        'performance_data': f"{base_url}/ajax/performance/",
+        'dashboard_data': f"{base_url}/ajax/dashboard/",
+        'widget_data': f"{base_url}/ajax/widgets/{{}}/data/",
+        'test_integration': f"{base_url}/ajax/test-integration/",
+        'create_backup': f"{base_url}/ajax/create-backup/",
+        
+        # Export URLs
+        'export_data': f"{base_url}/export/",
+        'download_backup': f"{base_url}/backup/download/",
+        
+        # Module Navigation
+        'services': f"{base_url}/services/",
+        'customers': f"{base_url}/customers/",
+        'employees': f"{base_url}/employees/",
+        'inventory': f"{base_url}/inventory/",
+        'payments': f"{base_url}/payments/",
+        'reports': f"{base_url}/reports/",
+        'expenses': f"{base_url}/expenses/",
+        'suppliers': f"{base_url}/suppliers/",
+        'subscriptions': f"{base_url}/subscriptions/",
+        'notifications': f"{base_url}/notifications/",
+    }
+
 @login_required
 @employee_required()
 def dashboard_view(request):
