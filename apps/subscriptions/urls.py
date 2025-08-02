@@ -23,7 +23,7 @@ urlpatterns = [
     path('check-discount/', views.check_discount_code_view, name='check_discount'),
     
     # Invoices
-    path('invoice/<int:invoice_id>/download/', views.download_invoice_view, name='download_invoice'),
+    path('invoice/<uuid:invoice_id>/download/', views.download_invoice_view, name='download_invoice'),
     
     # Callbacks
     path('mpesa-callback/', views.mpesa_callback_view, name='mpesa_callback'),

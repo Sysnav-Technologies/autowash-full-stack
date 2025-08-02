@@ -297,6 +297,37 @@ class TenantDatabaseManager:
         except Exception as e:
             print(f"Error removing database for tenant {tenant.name}: {e}")
             return False
+    
+    @staticmethod
+    def database_exists(database_name):
+        """Check if a database exists"""
+        import pymysql
+        
+        default_db = settings.DATABASES['default']
+        
+        try:
+            # Connect to MySQL server
+            connection = pymysql.connect(
+                host=default_db['HOST'],
+                user=default_db['USER'],
+                password=default_db['PASSWORD'],
+                port=int(default_db.get('PORT', 3306))
+            )
+            
+            cursor = connection.cursor()
+            
+            # Check if database exists
+            cursor.execute("SHOW DATABASES LIKE %s", (database_name,))
+            result = cursor.fetchone()
+            
+            cursor.close()
+            connection.close()
+            
+            return bool(result)
+            
+        except Exception as e:
+            print(f"Error checking database existence for {database_name}: {e}")
+            return False
 
 
 # Utility functions for tenant context management

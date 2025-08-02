@@ -407,7 +407,7 @@ class SubscriptionInvoice(TimeStampedModel):
     
     # Invoice details
     invoice_number = models.CharField(max_length=50, unique=True)
-    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='invoices')
+    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='subscription_invoices')
     payment = models.OneToOneField(Payment, on_delete=models.SET_NULL, null=True, blank=True)
     
     # Amounts

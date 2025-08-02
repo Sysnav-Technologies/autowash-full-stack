@@ -2,6 +2,7 @@
 {% load math_filters %}
 
 {% block content %}
+{% csrf_token %}
 <!-- Statistics Cards -->
 <div class="row mb-4">
     <div class="col-md-2 mb-3">
@@ -192,12 +193,16 @@
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <a href="/admin/subscriptions/subscription/{{ subscription.id }}/change/" 
-                                               class="btn btn-outline-primary btn-sm" title="View Details">
-                                                <i class="fas fa-eye"></i>
+                                            <a href="{% url 'system_admin:record_payment' subscription.id %}" 
+                                               class="btn btn-success btn-sm" title="Record Payment">
+                                                <i class="fas fa-plus"></i> Payment
+                                            </a>
+                                            <a href="{% url 'system_admin:generate_invoice' subscription.id %}" 
+                                               class="btn btn-info btn-sm" title="Generate Invoice">
+                                                <i class="fas fa-file-invoice"></i> Invoice
                                             </a>
                                             {% if subscription.status == 'trial' %}
-                                                <button class="btn btn-success btn-sm" title="Activate" 
+                                                <button class="btn btn-primary btn-sm" title="Activate" 
                                                         onclick="updateSubscriptionStatus('{{ subscription.id }}', 'active')">
                                                     <i class="fas fa-check"></i>
                                                 </button>
@@ -275,9 +280,29 @@
 <script>
 function updateSubscriptionStatus(subscriptionId, newStatus) {
     if (confirm(`Are you sure you want to change this subscription to ${newStatus}?`)) {
-        // In a real implementation, you'd make an AJAX call to update the status
-        // For now, we'll redirect to Django admin
-        window.location.href = `/admin/subscriptions/subscription/${subscriptionId}/change/`;
+        // Make AJAX call to update the status
+        fetch('{% url "system_admin:update_subscription_status" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                subscription_id: subscriptionId,
+                status: newStatus
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error updating subscription status: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Error updating subscription status');
+        });
     }
 }
 </script>

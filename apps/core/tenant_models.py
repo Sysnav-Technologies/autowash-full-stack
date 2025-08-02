@@ -169,6 +169,16 @@ class Tenant(TimeStampedModel, Address, ContactInfo):
         """Get the URL for this tenant"""
         from django.urls import reverse
         return reverse('tenant_dashboard', kwargs={'tenant_slug': self.slug})
+    
+    def tenant_database_exists(self):
+        """Check if the tenant database exists"""
+        try:
+            from apps.core.database_router import TenantDatabaseManager
+            manager = TenantDatabaseManager()
+            return manager.database_exists(self.database_name)
+        except Exception as e:
+            print(f"Error checking tenant database existence for {self.name}: {e}")
+            return False
 
 
 class TenantUser(models.Model):

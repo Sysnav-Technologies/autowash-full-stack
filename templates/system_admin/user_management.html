@@ -1,6 +1,7 @@
 {% extends 'system_admin/base.html' %}
 
 {% block content %}
+{% csrf_token %}
 <!-- User Statistics -->
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
@@ -88,7 +89,7 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">User Management</h5>
                 <div>
-                    <a href="/admin/auth/user/add/" class="btn btn-success btn-sm me-2">
+                    <a href="{% url 'system_admin:create_user' %}" class="btn btn-success btn-sm me-2">
                         <i class="fas fa-plus me-1"></i>Add User
                     </a>
                     <span class="badge bg-secondary">{{ page_obj.paginator.count }} users</span>
@@ -181,7 +182,7 @@
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <a href="/admin/auth/user/{{ user.id }}/change/" 
+                                            <a href="{% url 'system_admin:edit_user' user.id %}" 
                                                class="btn btn-outline-primary btn-sm" title="Edit User">
                                                 <i class="fas fa-edit"></i>
                                             </a>
@@ -264,9 +265,27 @@
 function toggleUserStatus(userId, activate) {
     const action = activate ? 'activate' : 'deactivate';
     if (confirm(`Are you sure you want to ${action} this user?`)) {
-        // In a real implementation, you'd make an AJAX call to update the status
-        // For now, we'll redirect to Django admin
-        window.location.href = `/admin/auth/user/${userId}/change/`;
+        // Make AJAX call to toggle user status
+        fetch(`{% url 'system_admin:toggle_user_status' 0 %}`.replace('0', userId), {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ activate: activate })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error updating user status: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating user status');
+        });
     }
 }
 

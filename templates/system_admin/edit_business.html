@@ -1,0 +1,205 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Edit Business: {{ business.name }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">
+                                Business Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="name" id="name" class="form-control" 
+                                   value="{{ business.name }}" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="slug" class="form-label">
+                                Business Slug <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="slug" id="slug" class="form-control" 
+                                   value="{{ business.slug }}" required>
+                            <div class="form-text">URL-friendly name (lowercase, hyphens only)</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="business_type" class="form-label">
+                                Business Type <span class="text-danger">*</span>
+                            </label>
+                            <select name="business_type" id="business_type" class="form-select" required>
+                                {% for value, label in business_types %}
+                                    <option value="{{ value }}" {% if business.business_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="email" class="form-label">
+                                Business Email
+                            </label>
+                            <input type="email" name="email" id="email" class="form-control" 
+                                   value="{{ business.email }}">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="phone" class="form-label">
+                                Phone Number
+                            </label>
+                            <input type="text" name="phone" id="phone" class="form-control" 
+                                   value="{{ business.phone }}">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="city" class="form-label">
+                                City
+                            </label>
+                            <input type="text" name="city" id="city" class="form-control" 
+                                   value="{{ business.city }}">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="country" class="form-label">
+                                Country
+                            </label>
+                            <input type="text" name="country" id="country" class="form-control" 
+                                   value="{{ business.country }}">
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="address" class="form-label">
+                                Address
+                            </label>
+                            <textarea name="address" id="address" class="form-control" 
+                                      rows="2">{{ business.address }}</textarea>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="description" class="form-label">
+                                Description
+                            </label>
+                            <textarea name="description" id="description" class="form-control" 
+                                      rows="3">{{ business.description }}</textarea>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_approved" id="is_approved" 
+                                       class="form-check-input" {% if business.is_approved %}checked{% endif %}>
+                                <label class="form-check-label" for="is_approved">
+                                    Business is approved
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Update Business
+                        </button>
+                        <a href="{% url 'system_admin:business_management' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-12 col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Business Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Business ID:</strong> {{ business.id }}
+                </div>
+                <div class="mb-3">
+                    <strong>Owner:</strong> 
+                    <a href="{% url 'system_admin:edit_user' business.owner.id %}">
+                        {{ business.owner.get_full_name|default:business.owner.username }}
+                    </a>
+                    <br>
+                    <small class="text-muted">{{ business.owner.email }}</small>
+                </div>
+                <div class="mb-3">
+                    <strong>Created:</strong> {{ business.created_at|date:"M d, Y H:i" }}
+                </div>
+                <div class="mb-3">
+                    <strong>Status:</strong>
+                    {% if business.is_approved %}
+                        <span class="badge bg-success">Approved</span>
+                    {% else %}
+                        <span class="badge bg-warning">Pending</span>
+                    {% endif %}
+                </div>
+                
+                {% if business.subscription_set.exists %}
+                    <hr>
+                    <h6>Current Subscription</h6>
+                    {% for subscription in business.subscription_set.all %}
+                        <div class="mb-2">
+                            <strong>{{ subscription.plan.name }}</strong><br>
+                            <small class="text-muted">
+                                Status: {{ subscription.get_status_display }}<br>
+                                Expires: {{ subscription.end_date|date:"M d, Y" }}
+                            </small>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                {% if not business.is_approved %}
+                    <a href="{% url 'system_admin:approve_business' business.id %}" 
+                       class="btn btn-success btn-sm w-100 mb-2">
+                        <i class="fas fa-check me-1"></i> Approve Business
+                    </a>
+                    <a href="{% url 'system_admin:reject_business' business.id %}" 
+                       class="btn btn-danger btn-sm w-100 mb-2">
+                        <i class="fas fa-times me-1"></i> Reject Business
+                    </a>
+                {% endif %}
+                <a href="{% url 'system_admin:subscription_management' %}?business={{ business.id }}" 
+                   class="btn btn-info btn-sm w-100 mb-2">
+                    <i class="fas fa-credit-card me-1"></i> Manage Subscriptions
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const nameField = document.getElementById('name');
+    const slugField = document.getElementById('slug');
+    
+    // Auto-generate slug from name
+    nameField.addEventListener('input', function() {
+        const slug = this.value
+            .toLowerCase()
+            .replace(/[^a-z0-9 -]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim('-');
+        slugField.value = slug;
+    });
+});
+</script>
+{% endblock %}

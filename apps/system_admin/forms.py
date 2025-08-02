@@ -324,3 +324,136 @@ class AdvancedSearchForm(forms.Form):
         initial='desc',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+
+class PaymentRecordForm(forms.Form):
+    """Form for recording manual payments"""
+    
+    subscription = forms.CharField(
+        widget=forms.HiddenInput()
+    )
+    
+    amount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': '0.00'
+        }),
+        help_text="Payment amount in currency"
+    )
+    
+    PAYMENT_METHOD_CHOICES = [
+        ('cash', 'Cash'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('check', 'Check'),
+        ('mobile_money', 'Mobile Money'),
+        ('other', 'Other'),
+    ]
+    
+    payment_method = forms.ChoiceField(
+        choices=PAYMENT_METHOD_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        help_text="Method of payment"
+    )
+    
+    reference_number = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Transaction reference number...'
+        }),
+        help_text="Bank reference, check number, or transaction ID"
+    )
+    
+    payment_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        }),
+        help_text="Date when payment was received"
+    )
+    
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Additional notes about the payment...'
+        }),
+        help_text="Optional notes about the payment"
+    )
+
+
+class InvoiceGenerationForm(forms.Form):
+    """Form for generating subscription invoices"""
+    
+    subscription = forms.CharField(
+        widget=forms.HiddenInput()
+    )
+    
+    subtotal = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': '0.00'
+        }),
+        help_text="Invoice subtotal amount"
+    )
+    
+    discount_amount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        validators=[MinValueValidator(0)],
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': '0.00'
+        }),
+        help_text="Discount amount (if any)"
+    )
+    
+    tax_amount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        validators=[MinValueValidator(0)],
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': '0.00'
+        }),
+        help_text="Tax amount"
+    )
+    
+    due_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        }),
+        help_text="Payment due date"
+    )
+    
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Additional notes...'
+        }),
+        help_text="Optional invoice notes"
+    )
+    
+    send_notification = forms.BooleanField(
+        initial=True,
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        label="Send invoice notification to business owner"
+    )

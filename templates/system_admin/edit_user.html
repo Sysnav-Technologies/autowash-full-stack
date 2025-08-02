@@ -1,0 +1,182 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Edit User: {{ edit_user.username }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="username" class="form-label">
+                                Username <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="username" id="username" class="form-control" 
+                                   value="{{ edit_user.username }}" required>
+                            <div class="form-text">Must be unique and contain only letters, numbers, and @/./+/-/_ characters</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="email" class="form-label">
+                                Email Address <span class="text-danger">*</span>
+                            </label>
+                            <input type="email" name="email" id="email" class="form-control" 
+                                   value="{{ edit_user.email }}" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="first_name" class="form-label">
+                                First Name
+                            </label>
+                            <input type="text" name="first_name" id="first_name" class="form-control" 
+                                   value="{{ edit_user.first_name }}">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="last_name" class="form-label">
+                                Last Name
+                            </label>
+                            <input type="text" name="last_name" id="last_name" class="form-control" 
+                                   value="{{ edit_user.last_name }}">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="new_password" class="form-label">
+                                New Password
+                            </label>
+                            <input type="password" name="new_password" id="new_password" class="form-control">
+                            <div class="form-text">Leave blank to keep current password</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="confirm_password" class="form-label">
+                                Confirm New Password
+                            </label>
+                            <input type="password" name="confirm_password" id="confirm_password" class="form-control">
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_staff" id="is_staff" class="form-check-input" 
+                                       {% if edit_user.is_staff %}checked{% endif %}>
+                                <label class="form-check-label" for="is_staff">
+                                    Staff member (can access admin interface)
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_active" id="is_active" class="form-check-input" 
+                                       {% if edit_user.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="is_active">
+                                    User account is active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Update User
+                        </button>
+                        <a href="{% url 'system_admin:user_management' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-12 col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">User Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>User ID:</strong> {{ edit_user.id }}
+                </div>
+                <div class="mb-3">
+                    <strong>Date Joined:</strong> {{ edit_user.date_joined|date:"M d, Y H:i" }}
+                </div>
+                <div class="mb-3">
+                    <strong>Last Login:</strong> 
+                    {% if edit_user.last_login %}
+                        {{ edit_user.last_login|date:"M d, Y H:i" }}
+                    {% else %}
+                        Never
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <strong>Status:</strong>
+                    {% if edit_user.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <strong>Role:</strong>
+                    {% if edit_user.is_superuser %}
+                        <span class="badge bg-danger">Superuser</span>
+                    {% elif edit_user.is_staff %}
+                        <span class="badge bg-warning">Staff</span>
+                    {% else %}
+                        <span class="badge bg-secondary">User</span>
+                    {% endif %}
+                </div>
+                
+                {% if edit_user.tenant_set.exists %}
+                    <hr>
+                    <h6>Business Ownership</h6>
+                    {% for business in edit_user.tenant_set.all %}
+                        <div class="mb-2">
+                            <strong>{{ business.name }}</strong><br>
+                            <small class="text-muted">{{ business.slug }}</small>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">Security Notes</h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> Changing user details may affect their access to businesses and subscriptions.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordField = document.getElementById('new_password');
+    const confirmPasswordField = document.getElementById('confirm_password');
+    
+    function validatePasswords() {
+        if (passwordField.value !== confirmPasswordField.value) {
+            confirmPasswordField.setCustomValidity('Passwords do not match');
+        } else {
+            confirmPasswordField.setCustomValidity('');
+        }
+    }
+    
+    passwordField.addEventListener('change', validatePasswords);
+    confirmPasswordField.addEventListener('keyup', validatePasswords);
+});
+</script>
+{% endblock %}
