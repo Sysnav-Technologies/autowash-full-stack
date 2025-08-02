@@ -1,0 +1,297 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-credit-card fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">{{ payment_stats.total_payments }}</h5>
+                <p class="card-text text-muted">Total</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                <h5 class="card-title text-success">{{ payment_stats.completed }}</h5>
+                <p class="card-text text-muted">Completed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                <h5 class="card-title text-warning">{{ payment_stats.pending }}</h5>
+                <p class="card-text text-muted">Pending</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-times-circle fa-2x text-danger mb-2"></i>
+                <h5 class="card-title text-danger">{{ payment_stats.failed }}</h5>
+                <p class="card-text text-muted">Failed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-center border-success">
+            <div class="card-body">
+                <i class="fas fa-money-bill-wave fa-2x text-success mb-2"></i>
+                <h5 class="card-title text-success">KES {{ payment_stats.total_amount|floatformat:0 }}</h5>
+                <p class="card-text text-muted">Total Amount</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Statuses</option>
+                            {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="method" class="form-label">Payment Method</label>
+                        <select name="method" id="method" class="form-select">
+                            <option value="">All Methods</option>
+                            {% for value, label in method_choices %}
+                                <option value="{{ value }}" {% if current_method == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" name="search" id="search" class="form-control" 
+                               placeholder="Payment ID, transaction ID, business..." value="{{ current_search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payments Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Payment Management</h5>
+                <div>
+                    <a href="/admin/subscriptions/payment/add/" class="btn btn-success btn-sm me-2">
+                        <i class="fas fa-plus me-1"></i>Manual Payment
+                    </a>
+                    <span class="badge bg-secondary">{{ page_obj.paginator.count }} payments</span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Payment ID</th>
+                                    <th>Business</th>
+                                    <th>Subscription</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in page_obj %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <strong class="font-monospace">{{ payment.payment_id|truncatechars:16 }}</strong><br>
+                                            {% if payment.transaction_id %}
+                                                <small class="text-muted">TXN: {{ payment.transaction_id|truncatechars:12 }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if payment.subscription.business.logo %}
+                                                <img src="{{ payment.subscription.business.logo.url }}" 
+                                                     alt="{{ payment.subscription.business.name }}" 
+                                                     class="rounded me-2 payment-logo">
+                                            {% else %}
+                                                <div class="bg-primary text-white rounded me-2 d-flex align-items-center justify-content-center payment-logo-placeholder">
+                                                    {{ payment.subscription.business.name|first|upper }}
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ payment.subscription.business.name }}</strong><br>
+                                                <small class="text-muted">{{ payment.subscription.business.slug }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ payment.subscription.plan.name }}</strong><br>
+                                            <small class="text-muted">{{ payment.subscription.get_status_display }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>KES {{ payment.amount|floatformat:0 }}</strong><br>
+                                        <small class="text-muted">{{ payment.currency }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ payment.get_payment_method_display }}</span>
+                                        {% if payment.reference_number %}
+                                            <br><small class="text-muted">Ref: {{ payment.reference_number|truncatechars:10 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if payment.status == 'completed' %}
+                                            <span class="status-badge status-active">Completed</span>
+                                        {% elif payment.status == 'pending' %}
+                                            <span class="status-badge status-pending">Pending</span>
+                                        {% elif payment.status == 'failed' %}
+                                            <span class="status-badge status-rejected">Failed</span>
+                                        {% else %}
+                                            <span class="status-badge status-pending">{{ payment.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ payment.created_at|date:"M d, Y" }}</strong><br>
+                                            <small class="text-muted">{{ payment.created_at|time:"H:i" }}</small>
+                                            {% if payment.paid_at and payment.status == 'completed' %}
+                                                <br><small class="text-success">Paid: {{ payment.paid_at|date:"M d, Y" }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="/admin/subscriptions/payment/{{ payment.id }}/change/" 
+                                               class="btn btn-outline-primary btn-sm" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if payment.status == 'pending' %}
+                                                <button class="btn btn-success btn-sm" title="Mark as Completed" 
+                                                        onclick="updatePaymentStatus('{{ payment.id }}', 'completed')">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm" title="Mark as Failed" 
+                                                        onclick="updatePaymentStatus('{{ payment.id }}', 'failed')">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            {% endif %}
+                                            {% if payment.status == 'completed' %}
+                                                <button class="btn btn-info btn-sm" title="Generate Receipt" 
+                                                        onclick="generateReceipt('{{ payment.id }}')">
+                                                    <i class="fas fa-receipt"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if page_obj.has_other_pages %}
+                        <nav aria-label="Payment pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_method %}method={{ current_method }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page=1">First</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_method %}method={{ current_method }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                                </li>
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_method %}method={{ current_method }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_method %}method={{ current_method }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No payments found</h5>
+                        <p class="text-muted">No payments match your current filters.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.payment-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+}
+.payment-logo-placeholder {
+    width: 32px;
+    height: 32px;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+</style>
+
+<script>
+function updatePaymentStatus(paymentId, newStatus) {
+    const action = newStatus === 'completed' ? 'complete' : 'mark as failed';
+    if (confirm(`Are you sure you want to ${action} this payment?`)) {
+        // In a real implementation, you'd make an AJAX call to update the status
+        // For now, we'll redirect to Django admin
+        window.location.href = `/admin/subscriptions/payment/${paymentId}/change/`;
+    }
+}
+
+function generateReceipt(paymentId) {
+    // In a real implementation, you'd generate and download a PDF receipt
+    alert('Receipt generation feature will be implemented. For now, use Django admin to view payment details.');
+    window.open(`/admin/subscriptions/payment/${paymentId}/change/`, '_blank');
+}
+
+// Add tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

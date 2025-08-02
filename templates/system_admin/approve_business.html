@@ -1,0 +1,152 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Business Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        {% if business.logo %}
+                            <img src="{{ business.logo.url }}" alt="{{ business.name }}" 
+                                 class="img-fluid rounded business-logo">
+                        {% else %}
+                            <div class="business-logo-placeholder bg-primary text-white rounded d-flex align-items-center justify-content-center">
+                                {{ business.name|first|upper }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-9">
+                        <h4>{{ business.name }}</h4>
+                        <p class="text-muted">{{ business.description|default:"No description provided" }}</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Owner:</strong> {{ business.owner.get_full_name|default:business.owner.username }}<br>
+                                <strong>Email:</strong> {{ business.owner.email }}<br>
+                                {% if business.phone %}
+                                    <strong>Phone:</strong> {{ business.phone }}<br>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Slug:</strong> {{ business.slug }}<br>
+                                <strong>Created:</strong> {{ business.created_at|date:"M d, Y" }}<br>
+                                <strong>Status:</strong> 
+                                {% if not business.is_active %}
+                                    <span class="status-badge status-rejected">Suspended</span>
+                                {% elif not business.is_approved %}
+                                    <span class="status-badge status-pending">Pending Approval</span>
+                                {% else %}
+                                    <span class="status-badge status-active">Active</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Approve Business</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="subscription_plan" class="form-label">Select Subscription Plan</label>
+                        <select name="subscription_plan" id="subscription_plan" class="form-select" required>
+                            <option value="">Choose a plan...</option>
+                            {% for plan in plans %}
+                                <option value="{{ plan.id }}">
+                                    {{ plan.name }} - KES {{ plan.price|floatformat:0 }}/{{ plan.get_plan_type_display }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Select the initial subscription plan for this business.</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        The business will start with a trial period and can upgrade later.
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check me-2"></i>Approve Business
+                        </button>
+                        <a href="{% url 'system_admin:business_management' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Management
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Subscription Plans Comparison</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Plan</th>
+                                <th>Price</th>
+                                <th>Duration</th>
+                                <th>Max Employees</th>
+                                <th>Max Customers</th>
+                                <th>Features</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for plan in plans %}
+                            <tr>
+                                <td><strong>{{ plan.name }}</strong></td>
+                                <td>KES {{ plan.price|floatformat:0 }}</td>
+                                <td>{{ plan.get_plan_type_display }}</td>
+                                <td>{{ plan.max_employees|default:"Unlimited" }}</td>
+                                <td>{{ plan.max_customers|default:"Unlimited" }}</td>
+                                <td>
+                                    {% if plan.features %}
+                                        {{ plan.features|truncatewords:10 }}
+                                    {% else %}
+                                        Standard features
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.business-logo {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+}
+.business-logo-placeholder {
+    width: 100px;
+    height: 100px;
+    font-size: 2rem;
+    font-weight: bold;
+}
+</style>
+{% endblock %}

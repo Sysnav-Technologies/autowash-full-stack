@@ -1,0 +1,284 @@
+{% extends 'system_admin/base.html' %}
+{% load math_filters %}
+
+{% block content %}
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-credit-card fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">{{ subscription_stats.total }}</h5>
+                <p class="card-text text-muted">Total</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                <h5 class="card-title text-success">{{ subscription_stats.active }}</h5>
+                <p class="card-text text-muted">Active</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                <h5 class="card-title text-info">{{ subscription_stats.trial }}</h5>
+                <p class="card-text text-muted">Trial</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-times-circle fa-2x text-danger mb-2"></i>
+                <h5 class="card-title text-danger">{{ subscription_stats.expired }}</h5>
+                <p class="card-text text-muted">Expired</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-ban fa-2x text-warning mb-2"></i>
+                <h5 class="card-title text-warning">{{ subscription_stats.cancelled }}</h5>
+                <p class="card-text text-muted">Cancelled</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card text-center border-success">
+            <div class="card-body">
+                <i class="fas fa-money-bill-wave fa-2x text-success mb-2"></i>
+                <h5 class="card-title text-success">KES {{ revenue_stats.total_revenue|floatformat:0 }}</h5>
+                <p class="card-text text-muted">Total Revenue</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Statuses</option>
+                            {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="plan" class="form-label">Plan</label>
+                        <select name="plan" id="plan" class="form-select">
+                            <option value="">All Plans</option>
+                            {% for plan in plans %}
+                                <option value="{{ plan.id }}" {% if current_plan == plan.id|stringformat:"s" %}selected{% endif %}>{{ plan.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" name="search" id="search" class="form-control" 
+                               placeholder="Business name, subscription ID..." value="{{ current_search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Subscriptions Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Subscription Management</h5>
+                <div>
+                    <span class="badge bg-secondary">{{ page_obj.paginator.count }} subscriptions</span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Subscription ID</th>
+                                    <th>Business</th>
+                                    <th>Plan</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Duration</th>
+                                    <th>Revenue</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for subscription in page_obj %}
+                                <tr>
+                                    <td>
+                                        <small class="font-monospace">{{ subscription.subscription_id|truncatechars:16 }}</small><br>
+                                        <small class="text-muted">{{ subscription.created_at|date:"M d, Y" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if subscription.business.logo %}
+                                                <img src="{{ subscription.business.logo.url }}" alt="{{ subscription.business.name }}" 
+                                                     class="rounded me-2 subscription-logo">
+                                            {% else %}
+                                                <div class="bg-primary text-white rounded me-2 d-flex align-items-center justify-content-center subscription-logo-placeholder">
+                                                    {{ subscription.business.name|first|upper }}
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ subscription.business.name }}</strong><br>
+                                                <small class="text-muted">{{ subscription.business.slug }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>{{ subscription.plan.name }}</strong><br>
+                                        <small class="text-muted">{{ subscription.plan.get_plan_type_display }}</small>
+                                    </td>
+                                    <td>
+                                        <strong>KES {{ subscription.amount|floatformat:0 }}</strong><br>
+                                        <small class="text-muted">{{ subscription.currency }}</small>
+                                    </td>
+                                    <td>
+                                        {% if subscription.status == 'active' %}
+                                            <span class="status-badge status-active">Active</span>
+                                        {% elif subscription.status == 'trial' %}
+                                            <span class="status-badge status-trial">Trial</span>
+                                        {% elif subscription.status == 'expired' %}
+                                            <span class="status-badge status-expired">Expired</span>
+                                        {% elif subscription.status == 'cancelled' %}
+                                            <span class="status-badge status-rejected">Cancelled</span>
+                                        {% else %}
+                                            <span class="status-badge status-pending">{{ subscription.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>
+                                            <strong>Start:</strong> {{ subscription.start_date|date:"M d, Y" }}<br>
+                                            <strong>End:</strong> {{ subscription.end_date|date:"M d, Y" }}
+                                            {% if subscription.trial_end_date and subscription.status == 'trial' %}
+                                                <br><strong>Trial ends:</strong> {{ subscription.trial_end_date|date:"M d, Y" }}
+                                            {% endif %}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        {% with subscription.payments.all as payments %}
+                                            {% if payments %}
+                                                <strong>KES {{ payments|length|mul:subscription.amount|floatformat:0 }}</strong><br>
+                                                <small class="text-muted">{{ payments|length }} payment{{ payments|length|pluralize }}</small>
+                                            {% else %}
+                                                <span class="text-muted">No payments</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="/admin/subscriptions/subscription/{{ subscription.id }}/change/" 
+                                               class="btn btn-outline-primary btn-sm" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if subscription.status == 'trial' %}
+                                                <button class="btn btn-success btn-sm" title="Activate" 
+                                                        onclick="updateSubscriptionStatus('{{ subscription.id }}', 'active')">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            {% endif %}
+                                            {% if subscription.status == 'active' %}
+                                                <button class="btn btn-warning btn-sm" title="Suspend" 
+                                                        onclick="updateSubscriptionStatus('{{ subscription.id }}', 'suspended')">
+                                                    <i class="fas fa-pause"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if page_obj.has_other_pages %}
+                        <nav aria-label="Subscription pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_plan %}plan={{ current_plan }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page=1">First</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_plan %}plan={{ current_plan }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                                </li>
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_plan %}plan={{ current_plan }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_plan %}plan={{ current_plan }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No subscriptions found</h5>
+                        <p class="text-muted">No subscriptions match your current filters.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.subscription-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+}
+.subscription-logo-placeholder {
+    width: 40px;
+    height: 40px;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+</style>
+
+<script>
+function updateSubscriptionStatus(subscriptionId, newStatus) {
+    if (confirm(`Are you sure you want to change this subscription to ${newStatus}?`)) {
+        // In a real implementation, you'd make an AJAX call to update the status
+        // For now, we'll redirect to Django admin
+        window.location.href = `/admin/subscriptions/subscription/${subscriptionId}/change/`;
+    }
+}
+</script>
+{% endblock %}

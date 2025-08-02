@@ -1,0 +1,184 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Business Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        {% if business.logo %}
+                            <img src="{{ business.logo.url }}" alt="{{ business.name }}" 
+                                 class="img-fluid rounded business-logo">
+                        {% else %}
+                            <div class="business-logo-placeholder bg-danger text-white rounded d-flex align-items-center justify-content-center">
+                                {{ business.name|first|upper }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-9">
+                        <h4>{{ business.name }}</h4>
+                        <p class="text-muted">{{ business.description|default:"No description provided" }}</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Owner:</strong> {{ business.owner.get_full_name|default:business.owner.username }}<br>
+                                <strong>Email:</strong> {{ business.owner.email }}<br>
+                                {% if business.phone %}
+                                    <strong>Phone:</strong> {{ business.phone }}<br>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Slug:</strong> {{ business.slug }}<br>
+                                <strong>Created:</strong> {{ business.created_at|date:"M d, Y" }}<br>
+                                <strong>Current Status:</strong> 
+                                <span class="status-badge status-pending">Pending Approval</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-times-circle me-2"></i>Reject Business
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="rejection_reason" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
+                        <select name="rejection_reason" id="rejection_reason" class="form-select" required>
+                            <option value="">Select reason...</option>
+                            <option value="incomplete_information">Incomplete Information</option>
+                            <option value="invalid_documents">Invalid Documents</option>
+                            <option value="business_type_not_supported">Business Type Not Supported</option>
+                            <option value="duplicate_application">Duplicate Application</option>
+                            <option value="non_compliance">Non-Compliance with Terms</option>
+                            <option value="geographic_restrictions">Geographic Restrictions</option>
+                            <option value="other">Other (please specify below)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="additional_comments" class="form-label">Additional Comments</label>
+                        <textarea name="additional_comments" id="additional_comments" 
+                                  class="form-control" rows="4" 
+                                  placeholder="Provide detailed feedback to help the business owner understand the rejection..."></textarea>
+                        <div class="form-text">This will be sent to the business owner.</div>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This action will reject the business application and notify the owner.
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-times me-2"></i>Reject Business
+                        </button>
+                        <a href="{% url 'system_admin:business_management' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Management
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Common Rejection Reasons & Guidelines</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Documentation Issues</h6>
+                        <ul>
+                            <li>Missing business registration certificate</li>
+                            <li>Invalid or expired identification documents</li>
+                            <li>Unclear or low-quality document images</li>
+                            <li>Mismatched information between documents</li>
+                        </ul>
+                        
+                        <h6>Business Information</h6>
+                        <ul>
+                            <li>Incomplete business description</li>
+                            <li>Invalid business category</li>
+                            <li>Missing contact information</li>
+                            <li>Unclear business model</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Compliance Issues</h6>
+                        <ul>
+                            <li>Business type not supported on platform</li>
+                            <li>Non-compliance with terms of service</li>
+                            <li>Previous violations or suspensions</li>
+                            <li>Geographic restrictions</li>
+                        </ul>
+                        
+                        <h6>Best Practices</h6>
+                        <ul>
+                            <li>Provide clear and detailed feedback</li>
+                            <li>Specify exactly what needs to be corrected</li>
+                            <li>Include steps for reapplication if applicable</li>
+                            <li>Be professional and helpful in communications</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.business-logo {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+}
+.business-logo-placeholder {
+    width: 100px;
+    height: 100px;
+    font-size: 2rem;
+    font-weight: bold;
+}
+</style>
+
+<script>
+document.getElementById('rejection_reason').addEventListener('change', function() {
+    const commentsField = document.getElementById('additional_comments');
+    const selectedReason = this.value;
+    
+    // Auto-populate common rejection templates
+    const templates = {
+        'incomplete_information': 'Your business application is missing required information. Please ensure all fields are completed and resubmit your application.',
+        'invalid_documents': 'The documents provided are invalid or unclear. Please upload clear, valid business registration and identification documents.',
+        'duplicate_application': 'We found an existing application for this business. Please contact support if you believe this is an error.',
+        'geographic_restrictions': 'Unfortunately, we do not currently support businesses in your location. We are working to expand our coverage area.',
+        'non_compliance': 'Your business application does not comply with our terms of service. Please review our guidelines and resubmit.',
+        'business_type_not_supported': 'Your business type is not currently supported on our platform. We are continuously expanding our supported business categories.'
+    };
+    
+    if (templates[selectedReason]) {
+        commentsField.value = templates[selectedReason];
+    } else if (selectedReason === 'other') {
+        commentsField.focus();
+    }
+});
+</script>
+{% endblock %}
