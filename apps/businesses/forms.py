@@ -10,7 +10,9 @@ from crispy_forms.layout import Layout, Submit, Row, Column, Field, HTML, Div
 from crispy_forms.bootstrap import FormActions
 from phonenumber_field.formfields import PhoneNumberField
 from django.utils import timezone
+from django.utils.text import slugify
 import os
+import re
 from apps.accounts.models import Business
 from .models import  BusinessGoal, BusinessAlert, QuickAction, DashboardWidget
 
@@ -33,7 +35,7 @@ class BusinessRegistrationForm(forms.ModelForm):
     class Meta:
         model = Business
         # Use only fields that definitely exist in the Business model
-        fields = ['name', 'business_type', 'description', 'phone', 'email', 'website']
+        fields = ['name', 'business_type', 'description', 'phone', 'email']
         widgets = {
             'name': forms.TextInput(attrs={
                 'placeholder': 'Your Business Name', 
@@ -53,10 +55,6 @@ class BusinessRegistrationForm(forms.ModelForm):
                 'placeholder': 'business@email.com',
                 'class': 'form-control'
             }),
-            'website': forms.URLInput(attrs={
-                'placeholder': 'https://yourwebsite.com (optional)',
-                'class': 'form-control'
-            }),
         }
     
     def __init__(self, *args, **kwargs):
@@ -71,7 +69,6 @@ class BusinessRegistrationForm(forms.ModelForm):
         
         # Optional fields
         self.fields['description'].required = False
-        self.fields['website'].required = False
         
         # Set up crispy forms layout
         self.helper = FormHelper()
@@ -85,7 +82,6 @@ class BusinessRegistrationForm(forms.ModelForm):
                 Column('phone', css_class='form-group col-md-6 mb-3'),
                 Column('email', css_class='form-group col-md-6 mb-3'),
             ),
-            Field('website', css_class='mb-3'),
             FormActions(
                 Submit('submit', 'Register Business', css_class='btn btn-primary btn-lg w-100')
             )
@@ -108,9 +104,39 @@ class BusinessRegistrationForm(forms.ModelForm):
             raise ValidationError("A business with this email already exists.")
         return email
     
+    def clean(self):
+        """Auto-generate subdomain from business name"""
+        cleaned_data = super().clean()
+        name = cleaned_data.get('name')
+        
+        if name:
+            # Auto-generate subdomain from business name
+            subdomain = slugify(name).lower()
+            # Remove any characters that aren't allowed in subdomains
+            subdomain = re.sub(r'[^a-z0-9-]', '', subdomain)
+            if not subdomain or not subdomain[0].isalpha():
+                subdomain = 'biz' + subdomain
+            
+            # Ensure subdomain is unique
+            original_subdomain = subdomain
+            counter = 1
+            while Business.objects.filter(subdomain__iexact=subdomain).exists():
+                subdomain = f"{original_subdomain}{counter}"
+                counter += 1
+            
+            # Add subdomain to cleaned data
+            cleaned_data['subdomain'] = subdomain
+        
+        return cleaned_data
+    
     def save(self, commit=True):
-        """Save the business and handle the location field"""
+        """Save the business and handle the location field and auto-generated subdomain"""
         business = super().save(commit=False)
+        
+        # Set the auto-generated subdomain
+        subdomain = self.cleaned_data.get('subdomain')
+        if subdomain:
+            business.subdomain = subdomain
         
         # Handle location - you can store it in a field that exists in your model
         # Based on your model, it looks like you have fields from Address and ContactInfo mixins
@@ -120,8 +146,8 @@ class BusinessRegistrationForm(forms.ModelForm):
             # Otherwise, you might want to store it in description or create a location field
             if hasattr(business, 'address'):
                 business.address = location
-            elif hasattr(business, 'street_address'):
-                business.street_address = location
+            elif hasattr(business, 'address_line_1'):
+                business.address_line_1 = location
             # If no address field exists, you might want to add location to description
             elif location and not business.description:
                 business.description = f"Location: {location}"
@@ -139,7 +165,7 @@ class BusinessSettingsForm(forms.ModelForm):
         model = Business
         fields = [
             'name', 'business_type', 'description', 'logo',
-            'phone', 'email', 'website',
+            'phone', 'email',
             'opening_time', 'closing_time', 'timezone'
         ]
         widgets = {
@@ -168,10 +194,6 @@ class BusinessSettingsForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'business@email.com'
             }),
-            'website': forms.URLInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'https://yourwebsite.com'
-            }),
             'opening_time': forms.TimeInput(attrs={
                 'class': 'form-control',
                 'type': 'time'
@@ -186,7 +208,7 @@ class BusinessSettingsForm(forms.ModelForm):
         }
     
     # Add custom address fields since they're not directly on the model
-    street_address = forms.CharField(
+    address_line_1 = forms.CharField(
         max_length=200,
         required=False,
         widget=forms.TextInput(attrs={
@@ -255,13 +277,12 @@ class BusinessSettingsForm(forms.ModelForm):
         
         # Optional fields
         self.fields['description'].required = False
-        self.fields['website'].required = False
         self.fields['logo'].required = False
         
         # Load address fields from business instance if editing
         if self.instance and self.instance.pk:
             # Try to get address fields from the instance if they exist
-            for field_name in ['street_address', 'city', 'state', 'postal_code', 'country']:
+            for field_name in ['address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country']:
                 if hasattr(self.instance, field_name):
                     self.fields[field_name].initial = getattr(self.instance, field_name, '')
     
@@ -309,7 +330,7 @@ class BusinessSettingsForm(forms.ModelForm):
         business = super().save(commit=False)
         
         # Handle address fields if they exist on the model
-        address_fields = ['street_address', 'city', 'state', 'postal_code', 'country']
+        address_fields = ['address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country']
         for field_name in address_fields:
             field_value = self.cleaned_data.get(field_name)
             if field_value and hasattr(business, field_name):

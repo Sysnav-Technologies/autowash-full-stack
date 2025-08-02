@@ -3,12 +3,13 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
-from apps.core.models import TimeStampedModel, Address, ContactInfo, SoftDeleteModel
+from apps.core.tenant_models import TenantTimeStampedModel, TenantSoftDeleteModel
+from apps.core.models import Address, ContactInfo
 from apps.core.utils import upload_to_path
 from decimal import Decimal
 import uuid
 
-class SupplierCategory(TimeStampedModel):
+class SupplierCategory(TenantTimeStampedModel):
     """Categories for organizing suppliers"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -27,7 +28,7 @@ class SupplierCategory(TimeStampedModel):
         verbose_name_plural = "Supplier Categories"
         ordering = ['name']
 
-class Supplier(SoftDeleteModel, Address, ContactInfo):
+class Supplier(TenantSoftDeleteModel, Address, ContactInfo):
     """Supplier/Vendor management"""
     
     SUPPLIER_TYPES = [
@@ -217,7 +218,7 @@ class Supplier(SoftDeleteModel, Address, ContactInfo):
         verbose_name_plural = "Suppliers"
         ordering = ['name']
 
-class SupplierContact(TimeStampedModel):
+class SupplierContact(TenantTimeStampedModel):
     """Additional contacts for suppliers"""
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='contacts')
     
@@ -242,7 +243,7 @@ class SupplierContact(TimeStampedModel):
         verbose_name_plural = "Supplier Contacts"
         ordering = ['-is_primary', 'name']
 
-class PurchaseOrder(TimeStampedModel):
+class PurchaseOrder(TenantTimeStampedModel):
     """Purchase orders to suppliers"""
     
     STATUS_CHOICES = [
@@ -397,7 +398,7 @@ class PurchaseOrder(TimeStampedModel):
         verbose_name_plural = "Purchase Orders"
         ordering = ['-created_at']
 
-class PurchaseOrderItem(TimeStampedModel):
+class PurchaseOrderItem(TenantTimeStampedModel):
     """Items in a purchase order"""
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='items')
     item = models.ForeignKey('inventory.InventoryItem', on_delete=models.CASCADE, related_name='purchase_order_items')
@@ -460,7 +461,7 @@ class PurchaseOrderItem(TimeStampedModel):
         verbose_name_plural = "Purchase Order Items"
         unique_together = ['purchase_order', 'item']
 
-class GoodsReceipt(TimeStampedModel):
+class GoodsReceipt(TenantTimeStampedModel):
     """Goods receipt/receiving records"""
     
     STATUS_CHOICES = [
@@ -563,7 +564,7 @@ class GoodsReceipt(TimeStampedModel):
         verbose_name_plural = "Goods Receipts"
         ordering = ['-receipt_date']
 
-class GoodsReceiptItem(TimeStampedModel):
+class GoodsReceiptItem(TenantTimeStampedModel):
     """Items in a goods receipt"""
     goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.CASCADE, related_name='items')
     purchase_order_item = models.ForeignKey(PurchaseOrderItem, on_delete=models.CASCADE)
@@ -613,7 +614,7 @@ class GoodsReceiptItem(TimeStampedModel):
         verbose_name = "Goods Receipt Item"
         verbose_name_plural = "Goods Receipt Items"
 
-class SupplierEvaluation(TimeStampedModel):
+class SupplierEvaluation(TenantTimeStampedModel):
     """Supplier performance evaluations"""
     
     EVALUATION_PERIODS = [
@@ -722,7 +723,7 @@ class SupplierEvaluation(TimeStampedModel):
         verbose_name_plural = "Supplier Evaluations"
         ordering = ['-period_end']
 
-class SupplierPayment(TimeStampedModel):
+class SupplierPayment(TenantTimeStampedModel):
     """Payments made to suppliers"""
     
     PAYMENT_METHODS = [
@@ -813,7 +814,7 @@ class SupplierPayment(TimeStampedModel):
         verbose_name_plural = "Supplier Payments"
         ordering = ['-payment_date']
 
-class SupplierDocument(TimeStampedModel):
+class SupplierDocument(TenantTimeStampedModel):
     """Documents related to suppliers"""
     
     DOCUMENT_TYPES = [
@@ -909,7 +910,7 @@ class SupplierDocument(TimeStampedModel):
         verbose_name_plural = "Supplier Documents"
         ordering = ['-created_at']
 
-class Invoice(TimeStampedModel):
+class Invoice(TenantTimeStampedModel):
     """Invoices from suppliers"""
     
     STATUS_CHOICES = [
@@ -1058,7 +1059,7 @@ class Invoice(TimeStampedModel):
         ordering = ['-invoice_date']
 
 
-class InvoiceItem(TimeStampedModel):
+class InvoiceItem(TenantTimeStampedModel):
     """Items in an invoice"""
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='items')
     purchase_order_item = models.ForeignKey(

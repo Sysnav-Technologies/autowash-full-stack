@@ -2,10 +2,10 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.urls import reverse
-from apps.core.models import TimeStampedModel
+from apps.core.tenant_models import TenantTimeStampedModel
 import uuid
 
-class NotificationCategory(TimeStampedModel):
+class NotificationCategory(TenantTimeStampedModel):
     """Categories for organizing notifications"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -21,7 +21,7 @@ class NotificationCategory(TimeStampedModel):
         verbose_name_plural = "Notification Categories"
         ordering = ['name']
 
-class Notification(TimeStampedModel):
+class Notification(TenantTimeStampedModel):
     """User notifications and alerts"""
     
     NOTIFICATION_TYPES = [
@@ -182,7 +182,7 @@ class Notification(TimeStampedModel):
             models.Index(fields=['scheduled_for']),
         ]
 
-class NotificationTemplate(TimeStampedModel):
+class NotificationTemplate(TenantTimeStampedModel):
     """Templates for automated notifications"""
     
     TRIGGER_EVENTS = [
@@ -294,7 +294,7 @@ class NotificationTemplate(TimeStampedModel):
         verbose_name_plural = "Notification Templates"
         ordering = ['name']
 
-class NotificationPreference(TimeStampedModel):
+class NotificationPreference(TenantTimeStampedModel):
     """User notification preferences"""
     
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_preferences')
@@ -376,7 +376,7 @@ class NotificationPreference(TimeStampedModel):
         verbose_name = "Notification Preference"
         verbose_name_plural = "Notification Preferences"
 
-class NotificationLog(TimeStampedModel):
+class NotificationLog(TenantTimeStampedModel):
     """Log of notification delivery attempts"""
     
     DELIVERY_STATUS = [
@@ -457,7 +457,7 @@ class NotificationLog(TimeStampedModel):
         verbose_name_plural = "Notification Logs"
         ordering = ['-created_at']
 
-class NotificationDigest(TimeStampedModel):
+class NotificationDigest(TenantTimeStampedModel):
     """Periodic notification digests"""
     
     DIGEST_TYPES = [

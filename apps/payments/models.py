@@ -1,12 +1,12 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
-from apps.core.models import TimeStampedModel, SoftDeleteModel
+from apps.core.tenant_models import TenantTimeStampedModel, TenantSoftDeleteModel
 from apps.core.utils import generate_unique_code
 from decimal import Decimal
 import uuid
 
-class PaymentMethod(TimeStampedModel):
+class PaymentMethod(TenantTimeStampedModel):
     """Payment methods configuration"""
     
     METHOD_TYPES = [
@@ -116,7 +116,7 @@ class PaymentMethod(TimeStampedModel):
         verbose_name_plural = "Payment Methods"
         ordering = ['display_order', 'name']
 
-class Payment(TimeStampedModel):
+class Payment(TenantTimeStampedModel):
     """Payment transactions - UPDATED with metadata field"""
     
     STATUS_CHOICES = [
@@ -255,9 +255,7 @@ class Payment(TimeStampedModel):
         if not self.created_by_user_id:
             return None
         try:
-            from django_tenants.utils import schema_context, get_public_schema_name
-            with schema_context(get_public_schema_name()):
-                return User.objects.get(id=self.created_by_user_id)
+            return User.objects.using('default').get(id=self.created_by_user_id)
         except User.DoesNotExist:
             return None
     
@@ -267,9 +265,7 @@ class Payment(TimeStampedModel):
         if not self.updated_by_user_id:
             return None
         try:
-            from django_tenants.utils import schema_context, get_public_schema_name
-            with schema_context(get_public_schema_name()):
-                return User.objects.get(id=self.updated_by_user_id)
+            return User.objects.using('default').get(id=self.updated_by_user_id)
         except User.DoesNotExist:
             return None
     
@@ -388,7 +384,7 @@ class Payment(TimeStampedModel):
         verbose_name_plural = "Payments"
         ordering = ['-created_at']
 
-class PaymentRefund(TimeStampedModel):
+class PaymentRefund(TenantTimeStampedModel):
     """Payment refunds"""
     
     STATUS_CHOICES = [
@@ -462,7 +458,7 @@ class PaymentRefund(TimeStampedModel):
         verbose_name_plural = "Payment Refunds"
         ordering = ['-created_at']
 
-class MPesaTransaction(TimeStampedModel):
+class MPesaTransaction(TenantTimeStampedModel):
     """M-Pesa specific transaction details"""
     payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name='mpesa_details')
     
@@ -487,7 +483,7 @@ class MPesaTransaction(TimeStampedModel):
         verbose_name = "M-Pesa Transaction"
         verbose_name_plural = "M-Pesa Transactions"
 
-class CardTransaction(TimeStampedModel):
+class CardTransaction(TenantTimeStampedModel):
     """Card payment transaction details"""
     payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name='card_details')
     
@@ -512,7 +508,7 @@ class CardTransaction(TimeStampedModel):
         verbose_name = "Card Transaction"
         verbose_name_plural = "Card Transactions"
 
-class CashTransaction(TimeStampedModel):
+class CashTransaction(TenantTimeStampedModel):
     """Cash payment transaction details"""
     payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name='cash_details')
     
@@ -566,7 +562,7 @@ class CashTransaction(TimeStampedModel):
         verbose_name = "Cash Transaction"
         verbose_name_plural = "Cash Transactions"
 
-class PaymentGateway(TimeStampedModel):
+class PaymentGateway(TenantTimeStampedModel):
     """Payment gateway configurations"""
     
     GATEWAY_TYPES = [
@@ -611,7 +607,7 @@ class PaymentGateway(TimeStampedModel):
         verbose_name = "Payment Gateway"
         verbose_name_plural = "Payment Gateways"
 
-class PaymentSplit(TimeStampedModel):
+class PaymentSplit(TenantTimeStampedModel):
     """Payment splitting for commission/revenue sharing"""
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='splits')
     
@@ -643,7 +639,7 @@ class PaymentSplit(TimeStampedModel):
         verbose_name = "Payment Split"
         verbose_name_plural = "Payment Splits"
 
-class RecurringPayment(TimeStampedModel):
+class RecurringPayment(TenantTimeStampedModel):
     """Recurring payment subscriptions"""
     
     FREQUENCY_CHOICES = [

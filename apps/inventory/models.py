@@ -1,12 +1,12 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
-from apps.core.models import TimeStampedModel, SoftDeleteModel
+from apps.core.tenant_models import TenantTimeStampedModel, TenantSoftDeleteModel
 from apps.core.utils import upload_to_path
 from decimal import Decimal
 import uuid
 from django.utils import timezone
-class InventoryCategory(TimeStampedModel):
+class InventoryCategory(TenantTimeStampedModel):
     """Categories for organizing inventory items"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -44,7 +44,7 @@ class InventoryCategory(TimeStampedModel):
         verbose_name_plural = "Inventory Categories"
         ordering = ['name']
 
-class Unit(TimeStampedModel):
+class Unit(TenantTimeStampedModel):
     """Units of measurement for inventory items"""
     name = models.CharField(max_length=50, unique=True)
     abbreviation = models.CharField(max_length=10, unique=True)
@@ -59,7 +59,7 @@ class Unit(TimeStampedModel):
         verbose_name_plural = "Units of Measurement"
         ordering = ['name']
 
-class InventoryItem(SoftDeleteModel):
+class InventoryItem(TenantSoftDeleteModel):
     """Inventory items/products"""
     
     ITEM_TYPES = [
@@ -185,7 +185,7 @@ class InventoryItem(SoftDeleteModel):
         verbose_name_plural = "Inventory Items"
         ordering = ['name']
 
-class StockMovement(TimeStampedModel):
+class StockMovement(TenantTimeStampedModel):
     """Stock movement tracking"""
     
     MOVEMENT_TYPES = [
@@ -252,7 +252,7 @@ class StockMovement(TimeStampedModel):
         verbose_name_plural = "Stock Movements"
         ordering = ['-created_at']
 
-class StockAdjustment(TimeStampedModel):
+class StockAdjustment(TenantTimeStampedModel):
     """Stock adjustments and corrections"""
     
     ADJUSTMENT_TYPES = [
@@ -321,7 +321,7 @@ class StockAdjustment(TimeStampedModel):
         verbose_name_plural = "Stock Adjustments"
         ordering = ['-created_at']
 
-class ItemConsumption(TimeStampedModel):
+class ItemConsumption(TenantTimeStampedModel):
     """Track item consumption for services"""
     item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='consumption_records')
     service_order = models.ForeignKey(
@@ -362,7 +362,7 @@ class ItemConsumption(TimeStampedModel):
         verbose_name_plural = "Item Consumptions"
         ordering = ['-created_at']
 
-class StockTake(TimeStampedModel):
+class StockTake(TenantTimeStampedModel):
     """Stock take/physical inventory count"""
     
     STATUS_CHOICES = [
@@ -482,7 +482,7 @@ class StockTake(TimeStampedModel):
         verbose_name_plural = "Stock Takes"
         ordering = ['-created_at']
 
-class StockTakeCount(TimeStampedModel):
+class StockTakeCount(TenantTimeStampedModel):
     """Individual item counts during stock take"""
     stock_take = models.ForeignKey(StockTake, on_delete=models.CASCADE, related_name='count_records')
     item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE)
@@ -543,7 +543,7 @@ class StockTakeCount(TimeStampedModel):
         verbose_name = "Stock Take Count"
         verbose_name_plural = "Stock Take Counts"
 
-class InventoryAlert(TimeStampedModel):
+class InventoryAlert(TenantTimeStampedModel):
     """Inventory alerts and notifications"""
     
     ALERT_TYPES = [
@@ -602,7 +602,7 @@ class InventoryAlert(TimeStampedModel):
         verbose_name_plural = "Inventory Alerts"
         ordering = ['-created_at']
 
-class ItemLocation(TimeStampedModel):
+class ItemLocation(TenantTimeStampedModel):
     """Track item locations within warehouse/storage"""
     item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='locations')
     
@@ -653,7 +653,7 @@ class ItemLocation(TimeStampedModel):
         verbose_name = "Item Location"
         verbose_name_plural = "Item Locations"
 
-class ItemSerial(TimeStampedModel):
+class ItemSerial(TenantTimeStampedModel):
     """Serial number tracking for items"""
     item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='serials')
     serial_number = models.CharField(max_length=100, unique=True)
@@ -719,7 +719,7 @@ class ItemSerial(TimeStampedModel):
         verbose_name_plural = "Item Serial Numbers"
         ordering = ['serial_number']
 
-class ItemExpiry(TimeStampedModel):
+class ItemExpiry(TenantTimeStampedModel):
     """Track expiry dates for items"""
     item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='expiry_records')
     batch_number = models.CharField(max_length=100, blank=True)

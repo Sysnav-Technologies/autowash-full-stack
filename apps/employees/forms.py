@@ -5,7 +5,6 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column, Field, HTML, Div
 from crispy_forms.bootstrap import FormActions
 from phonenumber_field.formfields import PhoneNumberField
-from django_tenants.utils import get_public_schema_name, schema_context  
 from .models import (
     Employee, Department, Position, Attendance, Leave, 
     PerformanceReview, Training, TrainingParticipant, Payroll, EmployeeDocument
@@ -26,8 +25,8 @@ class EmployeeForm(forms.ModelForm):
             'photo', 'department', 'position', 'role', 'employment_type',
             'hire_date', 'probation_end_date', 'salary', 'hourly_rate',
             'commission_rate', 'supervisor', 'phone', 'date_of_birth',
-            'gender', 'marital_status', 'national_id', 'street_address',
-            'city', 'state', 'postal_code', 'emergency_contact_name',
+            'gender', 'marital_status', 'national_id', 'address_line_1',
+            'address_line_2', 'city', 'state', 'postal_code', 'emergency_contact_name',
             'emergency_contact_phone', 'emergency_contact_relationship',
             'is_active', 'can_login', 'receive_notifications'
         ]
@@ -111,7 +110,8 @@ class EmployeeForm(forms.ModelForm):
             ),
             
             HTML('<h5 class="mt-4">Address Information</h5>'),
-            'street_address',
+            'address_line_1',
+            'address_line_2',
             Row(
                 Column('city', css_class='form-group col-md-4'),
                 Column('state', css_class='form-group col-md-4'),
@@ -148,13 +148,12 @@ class EmployeeForm(forms.ModelForm):
                 exclude_user_id = self.instance.user_id
             
             # Check if username already exists in User model (public schema)
-            with schema_context(get_public_schema_name()):
-                existing_user = User.objects.filter(username=username)
-                if exclude_user_id:
-                    existing_user = existing_user.exclude(pk=exclude_user_id)
-                
-                if existing_user.exists():
-                    raise ValidationError("Username already exists.")
+            existing_user = User.objects.using('default').filter(username=username)
+            if exclude_user_id:
+                existing_user = existing_user.exclude(pk=exclude_user_id)
+            
+            if existing_user.exists():
+                raise ValidationError("Username already exists.")
         
         return username
     
@@ -169,13 +168,12 @@ class EmployeeForm(forms.ModelForm):
                 exclude_user_id = self.instance.user_id
             
             # Check if email already exists in User model (public schema)
-            with schema_context(get_public_schema_name()):
-                existing_user = User.objects.filter(email=email)
-                if exclude_user_id:
-                    existing_user = existing_user.exclude(pk=exclude_user_id)
-                
-                if existing_user.exists():
-                    raise ValidationError("Email already exists.")
+            existing_user = User.objects.using('default').filter(email=email)
+            if exclude_user_id:
+                existing_user = existing_user.exclude(pk=exclude_user_id)
+            
+            if existing_user.exists():
+                raise ValidationError("Email already exists.")
             
         return email
 

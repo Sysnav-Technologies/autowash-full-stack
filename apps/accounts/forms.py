@@ -7,6 +7,7 @@ from crispy_forms.layout import Layout, Submit, Row, Column, Field, HTML, Div
 from crispy_forms.bootstrap import FormActions
 from phonenumber_field.formfields import PhoneNumberField
 from .models import UserProfile, Business, BusinessSettings, BusinessVerification
+from apps.core.tenant_models import Tenant
 from django.utils import timezone
 import os
 
@@ -146,23 +147,12 @@ class UserProfileForm(forms.ModelForm):
         return profile
 
 class BusinessRegistrationForm(forms.ModelForm):
-    """Business registration form - simplified to match actual Business model fields"""
-    
-    # Add custom location field since your model doesn't have address fields directly
-    location = forms.CharField(
-        max_length=200,
-        required=True,
-        widget=forms.TextInput(attrs={
-            'placeholder': 'Business location/address',
-            'class': 'form-control'
-        }),
-        help_text='Enter your business address or location'
-    )
+    """Business registration form - updated to use Tenant model"""
     
     class Meta:
-        model = Business
-        # Use only fields that definitely exist in the Business model
-        fields = ['name', 'business_type', 'description', 'phone', 'email', 'website']
+        model = Tenant
+        # Use only fields that exist in the Tenant model
+        fields = ['name', 'business_type', 'description', 'phone', 'email', 'subdomain']
         widgets = {
             'name': forms.TextInput(attrs={
                 'placeholder': 'Your Business Name', 
@@ -182,8 +172,8 @@ class BusinessRegistrationForm(forms.ModelForm):
                 'placeholder': 'business@email.com',
                 'class': 'form-control'
             }),
-            'website': forms.URLInput(attrs={
-                'placeholder': 'https://yourwebsite.com (optional)',
+            'subdomain': forms.TextInput(attrs={
+                'placeholder': 'yourbusiness (for yourbusiness.autowash.co.ke)',
                 'class': 'form-control'
             }),
         }
@@ -196,11 +186,10 @@ class BusinessRegistrationForm(forms.ModelForm):
         self.fields['business_type'].required = True
         self.fields['phone'].required = True
         self.fields['email'].required = True
-        self.fields['location'].required = True
+        self.fields['subdomain'].required = True
         
         # Optional fields
         self.fields['description'].required = False
-        self.fields['website'].required = False
         
         # Set up crispy forms layout
         self.helper = FormHelper()
@@ -209,12 +198,11 @@ class BusinessRegistrationForm(forms.ModelForm):
             Field('name', css_class='mb-3'),
             Field('business_type', css_class='mb-3'),
             Field('description', css_class='mb-3'),
-            Field('location', css_class='mb-3'),
+            Field('subdomain', css_class='mb-3'),
             Row(
                 Column('phone', css_class='form-group col-md-6 mb-3'),
                 Column('email', css_class='form-group col-md-6 mb-3'),
             ),
-            Field('website', css_class='mb-3'),
             FormActions(
                 Submit('submit', 'Register Business', css_class='btn btn-primary btn-lg w-100')
             )
@@ -225,57 +213,45 @@ class BusinessRegistrationForm(forms.ModelForm):
         if not name:
             raise ValidationError("Business name is required.")
         
-        # Check for duplicate business names
-        if Business.objects.filter(name__iexact=name).exists():
+        # Check for duplicate tenant names
+        if Tenant.objects.filter(name__iexact=name).exists():
             raise ValidationError("A business with this name already exists.")
         
         return name
     
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and Business.objects.filter(email__iexact=email).exists():
+        if email and Tenant.objects.filter(email__iexact=email).exists():
             raise ValidationError("A business with this email already exists.")
         return email
+        
+    def clean_subdomain(self):
+        subdomain = self.cleaned_data.get('subdomain')
+        if subdomain and Tenant.objects.filter(subdomain__iexact=subdomain).exists():
+            raise ValidationError("This subdomain is already taken.")
+        return subdomain
     
     def save(self, commit=True):
-        """Save the business and handle the location field"""
-        business = super().save(commit=False)
-        
-        # Handle location - you can store it in a field that exists in your model
-        # Based on your model, it looks like you have fields from Address and ContactInfo mixins
-        location = self.cleaned_data.get('location')
-        if location:
-            # If you have an address field in your Address mixin, use that
-            # Otherwise, you might want to store it in description or create a location field
-            if hasattr(business, 'address'):
-                business.address = location
-            elif hasattr(business, 'street_address'):
-                business.street_address = location
-            # If no address field exists, you might want to add location to description
-            elif location and not business.description:
-                business.description = f"Location: {location}"
-            elif location and business.description:
-                business.description = f"{business.description}\nLocation: {location}"
+        """Save the tenant"""
+        tenant = super().save(commit=False)
         
         if commit:
-            business.save()
-        return business
+            tenant.save()
+        return tenant
 
 class BusinessSettingsForm(forms.ModelForm):
-    """Business settings form - aligned with BusinessSettings model"""
+    """Business settings form - aligned with TenantSettings model"""
     
     class Meta:
-        model = BusinessSettings
+        model = BusinessSettings  # This is aliased to TenantSettings
         fields = [
-            'sms_notifications', 'email_notifications', 'customer_sms_notifications',
-            'auto_assign_attendants', 'require_customer_approval', 'send_service_reminders',
-            'accept_cash', 'accept_card', 'accept_mpesa', 'require_payment_confirmation',
-            'track_inventory', 'auto_reorder', 'low_stock_threshold',
-            'daily_reports', 'weekly_reports', 'monthly_reports',
-            'loyalty_program', 'customer_rating', 'customer_feedback'
+            'sms_notifications', 'email_notifications',
+            'enable_loyalty_program', 'enable_online_booking', 'enable_mobile_app',
+            'primary_color', 'secondary_color'
         ]
         widgets = {
-            'low_stock_threshold': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'primary_color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control'}),
+            'secondary_color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control'}),
         }
     
     def __init__(self, *args, **kwargs):
@@ -290,45 +266,25 @@ class BusinessSettingsForm(forms.ModelForm):
         self.helper.layout = Layout(
             HTML('<h5 class="mb-3">Notifications</h5>'),
             Row(
-                Column('sms_notifications', css_class='form-group col-md-4 mb-3'),
-                Column('email_notifications', css_class='form-group col-md-4 mb-3'),
-                Column('customer_sms_notifications', css_class='form-group col-md-4 mb-3'),
+                Column('sms_notifications', css_class='form-group col-md-6 mb-3'),
+                Column('email_notifications', css_class='form-group col-md-6 mb-3'),
             ),
-            HTML('<h5 class="mt-4 mb-3">Service Settings</h5>'),
+            HTML('<h5 class="mt-4 mb-3">Feature Settings</h5>'),
             Row(
-                Column('auto_assign_attendants', css_class='form-group col-md-4 mb-3'),
-                Column('require_customer_approval', css_class='form-group col-md-4 mb-3'),
-                Column('send_service_reminders', css_class='form-group col-md-4 mb-3'),
+                Column('enable_loyalty_program', css_class='form-group col-md-4 mb-3'),
+                Column('enable_online_booking', css_class='form-group col-md-4 mb-3'),
+                Column('enable_mobile_app', css_class='form-group col-md-4 mb-3'),
             ),
-            HTML('<h5 class="mt-4 mb-3">Payment Settings</h5>'),
+            HTML('<h5 class="mt-4 mb-3">Branding</h5>'),
             Row(
-                Column('accept_cash', css_class='form-group col-md-3 mb-3'),
-                Column('accept_card', css_class='form-group col-md-3 mb-3'),
-                Column('accept_mpesa', css_class='form-group col-md-3 mb-3'),
-                Column('require_payment_confirmation', css_class='form-group col-md-3 mb-3'),
-            ),
-            HTML('<h5 class="mt-4 mb-3">Inventory Settings</h5>'),
-            Row(
-                Column('track_inventory', css_class='form-group col-md-4 mb-3'),
-                Column('auto_reorder', css_class='form-group col-md-4 mb-3'),
-                Column('low_stock_threshold', css_class='form-group col-md-4 mb-3'),
-            ),
-            HTML('<h5 class="mt-4 mb-3">Reports</h5>'),
-            Row(
-                Column('daily_reports', css_class='form-group col-md-4 mb-3'),
-                Column('weekly_reports', css_class='form-group col-md-4 mb-3'),
-                Column('monthly_reports', css_class='form-group col-md-4 mb-3'),
-            ),
-            HTML('<h5 class="mt-4 mb-3">Customer Features</h5>'),
-            Row(
-                Column('loyalty_program', css_class='form-group col-md-4 mb-3'),
-                Column('customer_rating', css_class='form-group col-md-4 mb-3'),
-                Column('customer_feedback', css_class='form-group col-md-4 mb-3'),
+                Column('primary_color', css_class='form-group col-md-6 mb-3'),
+                Column('secondary_color', css_class='form-group col-md-6 mb-3'),
             ),
             FormActions(
                 Submit('submit', 'Save Settings', css_class='btn btn-primary')
             )
         )
+
 
 def validate_file_size(value):
     """Validate that file size is not larger than 5MB"""

@@ -507,19 +507,15 @@ def debug_user_context(request):
     }
     
     # Add current business info if available
-    if hasattr(request, 'business') and request.business:
-        business = request.business
+    if hasattr(request, 'tenant') and request.tenant:
+        business = request.tenant
         
-        # FIXED: Get owner info from public schema safely
+        # Get owner info directly (no schema context needed)
         try:
-            from django_tenants.utils import schema_context, get_public_schema_name
-            with schema_context(get_public_schema_name()):
-                # Get owner info from public schema
-                owner_id = business.owner_id  # Use the FK field directly
-                owner = business.owner  # This should work now
-                owner_username = owner.username
-                owner_email = owner.email
-                is_current_user_owner = owner.id == request.user.id
+            owner = business.owner
+            owner_username = owner.username
+            owner_email = owner.email
+            is_current_user_owner = owner.id == request.user.id
         except Exception as e:
             print(f"Error getting owner info: {e}")
             # Fallback values
@@ -661,9 +657,9 @@ def debug_user_context(request):
     
     # Schema info
     context['debug_info']['schema_info'] = {
-        'current_schema': connection.get_schema(),
-        'public_schema': get_public_schema_name(),
-        'is_tenant_schema': hasattr(request, 'business') and request.business is not None,
+        'current_database': connection.settings_dict.get('NAME', 'Unknown'),
+        'is_tenant_context': hasattr(request, 'tenant') and request.tenant is not None,
+        'tenant_slug': getattr(request, 'tenant_slug', None),
     }
     
     return render(request, 'debug_user_context.html', context)
@@ -731,16 +727,13 @@ def fix_user_employee_record(request):
         # Get user profile for additional info from public schema
         user_profile = None
         try:
-            from django_tenants.utils import schema_context, get_public_schema_name
-            with schema_context(get_public_schema_name()):
-                user_profile = user.profile
+            user_profile = user.profile
         except Exception as profile_error:
             print(f"Could not get user profile: {profile_error}")
         
-        # FIXED: Determine role based on business ownership using proper cross-schema check
+        # Determine role based on business ownership 
         try:
-            with schema_context(get_public_schema_name()):
-                is_business_owner = business.owner.id == user.id
+            is_business_owner = business.owner.id == user.id
         except Exception:
             # Fallback check using owner_id field
             is_business_owner = getattr(business, 'owner_id', None) == user.id

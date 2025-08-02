@@ -166,7 +166,7 @@ def dashboard_redirect(request):
     print(f"="*50)
     
     # First check if user owns a business
-    business = request.user.owned_businesses.first()
+    business = request.user.owned_tenants.first()
     print(f"User owned business: {business}")
     
     if business:
@@ -188,37 +188,35 @@ def dashboard_redirect(request):
     # User doesn't own a business - check if they're an employee
     print("No owned business found, checking for employee records...")
     
-    # Search across all verified businesses for this user's employee record
+    # Search across all verified tenants for this user's employee record
     try:
-        from django_tenants.utils import get_tenant_model, schema_context
+        from apps.core.tenant_models import Tenant
         
-        tenant_model = get_tenant_model()
-        verified_businesses = tenant_model.objects.filter(is_verified=True, is_active=True)
+        verified_tenants = Tenant.objects.filter(is_verified=True, is_active=True)
         
         employee_business = None
         
-        for biz in verified_businesses:
+        for tenant in verified_tenants:
             try:
-                # Switch to the business schema to check for employee record
-                with schema_context(biz.schema_name):
-                    from apps.employees.models import Employee
-                    
-                    # Check if user has an employee record in this business
-                    employee = Employee.objects.filter(
-                        user_id=request.user.id, 
-                        is_active=True
-                    ).first()
-                    
-                    if employee:
-                        employee_business = biz
-                        print(f"Found employee record in business: {biz.name}")
-                        print(f"Employee ID: {employee.employee_id}")
-                        print(f"Employee role: {employee.role}")
-                        break
+                # Use the tenant database to check for employee record
+                from apps.employees.models import Employee
+                
+                # Check if user has an employee record in this tenant
+                employee = Employee.objects.using(tenant.get_database_name()).filter(
+                    user_id=request.user.id, 
+                    is_active=True
+                ).first()
+                
+                if employee:
+                    employee_business = tenant
+                    print(f"Found employee record in business: {tenant.name}")
+                    print(f"Employee ID: {employee.employee_id}")
+                    print(f"Employee role: {employee.role}")
+                    break
                         
             except Exception as e:
-                # Skip businesses where we can't check (maybe schema doesn't exist yet)
-                print(f"Could not check business {biz.name}: {e}")
+                # Skip tenants where we can't check (maybe database doesn't exist yet)
+                print(f"Could not check tenant {tenant.name}: {e}")
                 continue
         
         if employee_business:
@@ -236,14 +234,13 @@ def dashboard_redirect(request):
     
     # Check if user has multiple business access options
     try:
-        from django_tenants.utils import get_tenant_model
-        tenant_model = get_tenant_model()
+        from apps.core.tenant_models import Tenant
         
         # Get all businesses where user might have access
         all_businesses = []
         
         # Add owned businesses (even unverified ones)
-        owned_businesses = request.user.owned_businesses.all()
+        owned_businesses = request.user.owned_tenants.all()
         for biz in owned_businesses:
             all_businesses.append({
                 'business': biz,
@@ -252,23 +249,22 @@ def dashboard_redirect(request):
             })
         
         # Add employee businesses
-        verified_businesses = tenant_model.objects.filter(is_verified=True, is_active=True)
-        for biz in verified_businesses:
+        verified_tenants = Tenant.objects.filter(is_verified=True, is_active=True)
+        for tenant in verified_tenants:
             try:
-                with schema_context(biz.schema_name):
-                    from apps.employees.models import Employee
-                    employee = Employee.objects.filter(
-                        user_id=request.user.id, 
-                        is_active=True
-                    ).first()
-                    
-                    if employee:
-                        all_businesses.append({
-                            'business': biz,
-                            'access_type': 'employee',
-                            'verified': True,
-                            'employee': employee
-                        })
+                from apps.employees.models import Employee
+                employee = Employee.objects.using(tenant.get_database_name()).filter(
+                    user_id=request.user.id, 
+                    is_active=True
+                ).first()
+                
+                if employee:
+                    all_businesses.append({
+                        'business': tenant,
+                        'access_type': 'employee',
+                        'verified': True,
+                        'employee': employee
+                    })
             except:
                 continue
         
@@ -320,7 +316,7 @@ def business_register_view(request):
     print(f"="*50)
     
     # Check if user already owns a business
-    existing_businesses = request.user.owned_businesses.all()
+    existing_businesses = request.user.owned_tenants.all()
     print(f"Existing businesses count: {existing_businesses.count()}")
     
     if existing_businesses.exists():
@@ -343,43 +339,52 @@ def business_register_view(request):
             try:
                 with transaction.atomic():
                     business = form.save(commit=False)
-                    business.owner = request.user
-                    business.slug = slugify(business.name)
                     
-                    # Create schema name for tenant
-                    schema_name = re.sub(r'[^a-z0-9]', '', business.name.lower())
-                    if not schema_name or not schema_name[0].isalpha():
-                        schema_name = 'biz' + schema_name
-                    business.schema_name = schema_name[:20]
+                    # Set the owner
+                    business.owner = request.user
+                    
+                    # The subdomain is already set by the form's clean() method
+                    
+                    # Create database name for tenant based on subdomain
+                    database_name = re.sub(r'[^a-z0-9]', '', business.subdomain.lower())
+                    if not database_name or not database_name[0].isalpha():
+                        database_name = 'biz' + database_name
+                    business.database_name = database_name[:20]
+                    
+                    # Set database credentials (you can customize these)
+                    business.database_user = f"user_{business.database_name}"
+                    business.database_password = str(uuid.uuid4())[:12]  # Generate random password
                     
                     print(f"About to save business: {business.name}")
-                    print(f"Schema name: {business.schema_name}")
+                    print(f"Subdomain: {business.subdomain}")
+                    print(f"Database name: {business.database_name}")
                     print(f"Business slug: {business.slug}")
                     print(f"Environment: {environment}")
                     
                     # Check for conflicts
-                    original_slug = business.slug
-                    original_schema = business.schema_name
+                    original_subdomain = business.subdomain
+                    original_database_name = business.database_name
                     counter = 1
-                    while (Business.objects.filter(slug=business.slug).exists() or 
-                           Business.objects.filter(schema_name=business.schema_name).exists()):
-                        business.slug = f"{original_slug}{counter}"
-                        business.schema_name = f"{original_schema}{counter}"
+                    while (Business.objects.filter(subdomain=business.subdomain).exists() or 
+                           Business.objects.filter(database_name=business.database_name).exists()):
+                        business.subdomain = f"{original_subdomain}{counter}"
+                        business.database_name = f"{original_database_name}{counter}"
                         counter += 1
-                        print(f"Conflict found, trying: {business.slug}")
+                        print(f"Conflict found, trying: {business.subdomain}")
                     
-                    # IMPORTANT: Don't create schema yet - wait for admin verification
-                    business.auto_create_schema = False
-                    business.is_verified = False  # Explicitly set to False
+                    # Set approval status
+                    business.is_active = False  # Needs admin approval
+                    business.is_verified = False
+                    business.is_approved = False
                     business.save()
                     print(f"Business saved successfully! ID: {business.id}")
                     
                     # Create domain record for path-based routing (environment-specific)
                     print("Creating domain record for path-based routing...")
-                    domain_name = get_domain_for_environment(business.slug, environment)
+                    domain_name = get_domain_for_environment(business.subdomain, environment)
                     print(f"Domain name for {environment}: {domain_name}")
 
-                    # Create domain but note that schema doesn't exist yet
+                    # Create domain but note that database doesn't exist yet
                     domain = Domain.objects.create(
                         domain=domain_name,
                         tenant=business,
@@ -387,12 +392,11 @@ def business_register_view(request):
                     )
                     print(f"Domain record created: {domain.domain}")
                     
-                    # Create business settings and verification records
-                    print("Creating business settings and verification...")
-                    BusinessSettings.objects.create(business=business)
+                    # Create business verification record
+                    print("Creating business verification...")
                     BusinessVerification.objects.create(business=business, status='pending')
                     
-                    # IMPORTANT: NO schema or employee creation here!
+                    # IMPORTANT: NO database creation here!
                     # That will be done by admin during approval process
                     print("Business registration complete - waiting for admin approval")
                     
@@ -430,7 +434,7 @@ def business_register_view(request):
 @login_required
 def verification_pending(request):
     """Show verification pending status"""
-    business = request.user.owned_businesses.first()
+    business = request.user.owned_tenants.first()
     if not business:
         messages.error(request, 'No business found.')
         return redirect('/auth/business/register/')
@@ -458,7 +462,7 @@ def verification_pending(request):
 def business_verification_view(request):
     """Business verification document upload"""
     try:
-        business = request.user.owned_businesses.first()
+        business = request.user.owned_tenants.first()
         if not business:
             messages.error(request, 'You do not own any business.')
             return redirect('/auth/business/register/')
@@ -589,7 +593,7 @@ def profile_view(request):
 def business_settings_view(request):
     """Business settings view - only for verified businesses"""
     try:
-        business = request.user.owned_businesses.first()
+        business = request.user.owned_tenants.first()
         if not business:
             messages.error(request, 'You do not own any business.')
             return redirect('/auth/business/register/')
@@ -624,10 +628,10 @@ def business_settings_view(request):
 @login_required
 def check_verification_status(request):
     """AJAX endpoint to check verification status"""
-    if not request.user.owned_businesses.exists():
+    if not request.user.owned_tenants.exists():
         return JsonResponse({'error': 'No business found'}, status=404)
     
-    business = request.user.owned_businesses.first()
+    business = request.user.owned_tenants.first()
     
     try:
         verification = business.verification
@@ -667,6 +671,16 @@ def check_business_name(request):
         'available': not exists,
         'message': 'Name is available' if not exists else 'Name is already taken',
         'suggested_url': f'/business/{slug}/' if not exists else None,
+    })
+
+@require_http_methods(["GET"])
+def check_notifications_api(request):
+    """Check for notifications - placeholder API endpoint"""
+    return JsonResponse({
+        'status': 'success',
+        'notifications': [],
+        'count': 0,
+        'message': 'No new notifications'
     })
 
 # Additional views for path-based routing management
@@ -723,7 +737,7 @@ def switch_business(request):
         return redirect('/auth/login/')
     
     # Get all businesses the user has access to
-    owned_businesses = request.user.owned_businesses.filter(is_verified=True)
+    owned_businesses = request.user.owned_tenants.filter(is_verified=True)
     
     try:
         from apps.employees.models import Employee
@@ -753,40 +767,39 @@ def switch_business(request):
     return render(request, 'auth/switch_business.html', context)
 
 @login_required 
-def create_business_schema(request):
-    """Admin function to create schema for verified business"""
+def create_tenant_database(request):
+    """Admin function to create database for verified tenant"""
     if not request.user.is_superuser:
         messages.error(request, 'Access denied.')
         return redirect('/public/')
     
-    business_id = request.GET.get('business_id')
-    if not business_id:
-        messages.error(request, 'Business ID required.')
+    tenant_id = request.GET.get('tenant_id')
+    if not tenant_id:
+        messages.error(request, 'Tenant ID required.')
         return redirect('/admin/')
     
     try:
-        business = Business.objects.get(id=business_id)
-        
-        if business.schema_name == 'public':
-            messages.error(request, 'Cannot create schema for public tenant.')
-            return redirect('/admin/')
-        
-        # Force create the schema
-        from django_tenants.utils import schema_context
+        from apps.core.tenant_models import Tenant
+        from apps.core.database_router import TenantDatabaseManager
         from django.core.management import call_command
-        from django.db import connection
         
-        # Create the schema
-        with connection.cursor() as cursor:
-            cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{business.schema_name}"')
+        tenant = Tenant.objects.get(id=tenant_id)
+        db_manager = TenantDatabaseManager()
         
-        # Run migrations for this tenant
-        call_command('migrate_schemas', '--tenant', business.schema_name, verbosity=1)
+        # Create the database
+        db_name = tenant.get_database_name()
+        if not db_manager.database_exists(db_name):
+            db_manager.create_database(db_name)
+            
+            # Run migrations for this tenant database
+            call_command('migrate', database=db_name, verbosity=1)
+            
+            messages.success(request, f'Database created successfully for tenant: {tenant.name}')
+        else:
+            messages.warning(request, f'Database already exists for tenant: {tenant.name}')
         
-        messages.success(request, f'Schema created successfully for business: {business.name}')
-        
-    except Business.DoesNotExist:
-        messages.error(request, 'Business not found.')
+    except Tenant.DoesNotExist:
+        messages.error(request, 'Tenant not found.')
     except Exception as e:
         messages.error(request, f'Error creating schema: {str(e)}')
     

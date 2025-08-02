@@ -13,9 +13,8 @@ def public_root_redirect(request):
     print("[PUBLIC] PUBLIC ROOT REDIRECT")
          
     if request.user.is_authenticated:
-        # User is logged in but in public schema - redirect to their business or dashboard
         try:
-            business = request.user.owned_businesses.first()
+            business = request.user.owned_tenants.first()
             if business and business.is_verified:
                 return HttpResponseRedirect(f'/business/{business.slug}/')
             else:
@@ -23,7 +22,6 @@ def public_root_redirect(request):
         except:
             return HttpResponseRedirect('/auth/dashboard/')
     else:
-        # Anonymous user - show public landing
         return HttpResponseRedirect('/public/')
 
 print("[PUBLIC] PUBLIC URLs configuration loaded")
@@ -31,8 +29,10 @@ print("[PUBLIC] PUBLIC URLs configuration loaded")
 urlpatterns = [
     # Health
     path('health/', health_check, name='health_check'),
-    # Public admin (system-wide)
-    path('system-admin/', admin.site.urls),
+    
+    # System Administration Interface 
+    path('admin/', admin.site.urls),  # Django admin for system management
+    path('system-admin/', include('apps.system_admin.urls')),  # Custom system admin interface
          
     # Authentication and account management (public schema)
     path('auth/', include('apps.accounts.urls')),

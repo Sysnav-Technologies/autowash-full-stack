@@ -1,14 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
-from apps.core.models import TimeStampedModel, SoftDeleteModel
+from apps.core.tenant_models import TenantTimeStampedModel, TenantSoftDeleteModel
 from apps.core.utils import generate_unique_code, upload_to_path
-from django_tenants.utils import schema_context, get_public_schema_name
 from decimal import Decimal
 import uuid
 from django.db import transaction
 
-class ServiceCategory(TimeStampedModel):
+class ServiceCategory(TenantTimeStampedModel):
     """Service categories for organizing services"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -33,8 +32,7 @@ class ServiceCategory(TimeStampedModel):
         if not self.created_by_id:
             return None
         try:
-            with schema_context(get_public_schema_name()):
-                return User.objects.get(id=self.created_by_id)
+            return User.objects.using('default').get(id=self.created_by_id)
         except User.DoesNotExist:
             return None
     
@@ -51,7 +49,7 @@ class ServiceCategory(TimeStampedModel):
         verbose_name_plural = "Service Categories"
         ordering = ['display_order', 'name']
 
-class Service(SoftDeleteModel):
+class Service(TenantSoftDeleteModel):
     """Individual services offered"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField()
@@ -132,8 +130,7 @@ class Service(SoftDeleteModel):
         if not self.created_by_id:
             return None
         try:
-            with schema_context(get_public_schema_name()):
-                return User.objects.get(id=self.created_by_id)
+            return User.objects.using('default').get(id=self.created_by_id)
         except User.DoesNotExist:
             return None
     
@@ -171,7 +168,7 @@ class Service(SoftDeleteModel):
 # Keep all your other models unchanged (ServicePackage, ServiceOrder, etc.)
 # They remain exactly as they are in your current file...
 
-class ServicePackage(SoftDeleteModel):
+class ServicePackage(TenantSoftDeleteModel):
     """Service packages (bundles of services)"""
     name = models.CharField(max_length=100)
     description = models.TextField()
@@ -234,7 +231,7 @@ class PackageService(models.Model):
     class Meta:
         unique_together = ['package', 'service']
 
-class ServiceOrder(TimeStampedModel):
+class ServiceOrder(TenantTimeStampedModel):
     """Service orders/bookings"""
     
     STATUS_CHOICES = [
@@ -336,8 +333,7 @@ class ServiceOrder(TimeStampedModel):
         if not self.created_by_id:
             return None
         try:
-            with schema_context(get_public_schema_name()):
-                return User.objects.get(id=self.created_by_id)
+            return User.objects.using('default').get(id=self.created_by_id)
         except User.DoesNotExist:
             return None
     
@@ -833,7 +829,7 @@ class ServiceOrderItem(models.Model):
     class Meta:
         unique_together = ['order', 'service']
 
-class ServiceQueue(TimeStampedModel):
+class ServiceQueue(TenantTimeStampedModel):
     """Service queue management"""
     
     QUEUE_STATUS_CHOICES = [
@@ -885,7 +881,7 @@ class ServiceQueue(TimeStampedModel):
         verbose_name_plural = "Service Queue Entries"
         ordering = ['queue_number']
 
-class ServiceBay(TimeStampedModel):
+class ServiceBay(TenantTimeStampedModel):
     """Service bays/stations for car washing"""
     name = models.CharField(max_length=50)
     bay_number = models.IntegerField(unique=True)
