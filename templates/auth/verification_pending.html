@@ -138,21 +138,12 @@
                             Verification Pending
                         </h4>
                         <p class="text-muted mb-4">
-                            Your business registration is complete! Please upload the required verification documents to activate your account and start using all features.
+                            Thank you for completing your business registration and subscription selection. Your business verification is currently being processed by our admin team.
                         </p>
                         
-                        {% if not documents_uploaded %}
-                            <div class="alert alert-info text-start mb-4">
-                                <i class="fas fa-info-circle me-2"></i>
-                                <strong>Next Step:</strong> Upload your verification documents to continue the approval process.
-                            </div>
-                        {% endif %}
-                        
-                        <div class="d-grid gap-2">
-                            <a href="{% url 'accounts:business_verification' %}" class="btn btn-primary btn-lg">
-                                <i class="fas fa-upload me-2"></i>
-                                {% if documents_uploaded %}Update{% else %}Upload{% endif %} Verification Documents
-                            </a>
+                        <div class="alert alert-info text-start mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Please wait:</strong> Our admin team will review and verify your business details. This process typically takes 1-2 business days.
                         </div>
 
                     {% elif verification.status == 'in_review' %}
@@ -170,10 +161,6 @@
                         </div>
                         
                         <div class="d-grid gap-2">
-                            <a href="{% url 'accounts:business_verification' %}" class="btn btn-outline-primary">
-                                <i class="fas fa-edit me-2"></i>
-                                Update Documents
-                            </a>
                             <button class="btn btn-outline-secondary" onclick="window.location.reload()">
                                 <i class="fas fa-sync me-2"></i>
                                 Refresh Status
@@ -213,97 +200,15 @@
                             </div>
                         {% endif %}
                         <p class="text-muted mb-4">
-                            Unfortunately, your verification was not successful. Please review the feedback above and resubmit your documents.
+                            Unfortunately, your verification was not successful. Please contact our support team for assistance with resubmission.
                         </p>
                         
                         <div class="d-grid gap-2">
-                            <a href="{% url 'accounts:business_verification' %}" class="btn btn-primary btn-lg">
-                                <i class="fas fa-redo me-2"></i>
-                                Resubmit Documents
+                            <a href="mailto:support@autowash.com" class="btn btn-outline-primary btn-lg">
+                                <i class="fas fa-envelope me-2"></i>
+                                Contact Support
                             </a>
                         </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Document Status Card -->
-            <div class="card verification-card mt-4">
-                <div class="card-body p-4">
-                    <h6 class="card-title mb-3">
-                        <i class="fas fa-file-alt me-2"></i>
-                        Required Documents
-                    </h6>
-                    
-                    <div class="document-status {% if verification.business_license %}uploaded{% else %}missing{% endif %}">
-                        <div class="me-3">
-                            {% if verification.business_license %}
-                                <i class="fas fa-check-circle text-success"></i>
-                            {% else %}
-                                <i class="fas fa-times-circle text-danger"></i>
-                            {% endif %}
-                        </div>
-                        <div class="flex-grow-1">
-                            <div class="fw-medium">Business License</div>
-                            <small class="text-muted">Certificate of incorporation or business registration</small>
-                        </div>
-                        <div class="status-badge">
-                            {% if verification.business_license %}
-                                <span class="badge bg-success">Uploaded</span>
-                            {% else %}
-                                <span class="badge bg-danger">Required</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="document-status {% if verification.tax_certificate %}uploaded{% else %}missing{% endif %}">
-                        <div class="me-3">
-                            {% if verification.tax_certificate %}
-                                <i class="fas fa-check-circle text-success"></i>
-                            {% else %}
-                                <i class="fas fa-times-circle text-danger"></i>
-                            {% endif %}
-                        </div>
-                        <div class="flex-grow-1">
-                            <div class="fw-medium">Tax Certificate</div>
-                            <small class="text-muted">KRA PIN certificate or tax registration</small>
-                        </div>
-                        <div class="status-badge">
-                            {% if verification.tax_certificate %}
-                                <span class="badge bg-success">Uploaded</span>
-                            {% else %}
-                                <span class="badge bg-danger">Required</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <div class="document-status {% if verification.id_document %}uploaded{% else %}missing{% endif %}">
-                        <div class="me-3">
-                            {% if verification.id_document %}
-                                <i class="fas fa-check-circle text-success"></i>
-                            {% else %}
-                                <i class="fas fa-times-circle text-danger"></i>
-                            {% endif %}
-                        </div>
-                        <div class="flex-grow-1">
-                            <div class="fw-medium">ID Document</div>
-                            <small class="text-muted">National ID, passport, or driver's license</small>
-                        </div>
-                        <div class="status-badge">
-                            {% if verification.id_document %}
-                                <span class="badge bg-success">Uploaded</span>
-                            {% else %}
-                                <span class="badge bg-danger">Required</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    {% if verification.submitted_at %}
-                    <div class="text-center mt-3 pt-3 border-top">
-                        <small class="text-muted">
-                            <i class="fas fa-clock me-1"></i>
-                            Last updated {{ verification.submitted_at|timesince }} ago
-                        </small>
-                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -321,22 +226,32 @@
                             <i class="fas fa-check"></i>
                         </div>
                         <div>
-                            <div class="fw-medium">Account Created</div>
-                            <small class="text-muted">Business registration completed</small>
+                            <div class="fw-medium">Business Registration</div>
+                            <small class="text-muted">Account created successfully</small>
                         </div>
                     </div>
                     
                     <div class="timeline-step">
-                        <div class="step-icon {% if verification.business_license and verification.tax_certificate and verification.id_document %}completed{% elif verification.status == 'pending' %}active{% else %}pending{% endif %}">
-                            {% if verification.business_license and verification.tax_certificate and verification.id_document %}
+                        <div class="step-icon completed">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div>
+                            <div class="fw-medium">Subscription Selected</div>
+                            <small class="text-muted">Plan chosen and payment processed</small>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-step">
+                        <div class="step-icon {% if verification.status == 'in_review' or verification.status == 'verified' or verification.status == 'approved' %}completed{% elif verification.status == 'pending' %}active{% else %}pending{% endif %}">
+                            {% if verification.status == 'in_review' or verification.status == 'verified' or verification.status == 'approved' %}
                                 <i class="fas fa-check"></i>
                             {% else %}
-                                <i class="fas fa-upload"></i>
+                                <i class="fas fa-clock"></i>
                             {% endif %}
                         </div>
                         <div>
-                            <div class="fw-medium">Documents Upload</div>
-                            <small class="text-muted">Upload required verification documents</small>
+                            <div class="fw-medium">Admin Review</div>
+                            <small class="text-muted">Business verification by admin team</small>
                         </div>
                     </div>
                     

@@ -64,20 +64,15 @@ class SubscriptionPlan(TimeStampedModel):
     
     def get_price_for_cycle(self, billing_cycle):
         """Get price for specific billing cycle"""
-        if billing_cycle == 'monthly':
-            return self.monthly_price
-        elif billing_cycle == 'quarterly':
-            return self.quarterly_price or (self.monthly_price * 3)
-        elif billing_cycle == 'annually':
-            return self.annual_price or (self.monthly_price * 12)
-        return self.monthly_price
+        # Since we have different plans for different durations,
+        # this method returns the plan's base price
+        return self.price
     
     def get_discount_percentage(self, billing_cycle):
         """Calculate discount percentage for longer billing cycles"""
-        if billing_cycle == 'monthly':
-            return 0
-        
-        monthly_total = self.monthly_price * (3 if billing_cycle == 'quarterly' else 12)
+        # Since we have separate plans for different durations,
+        # discount calculation should be handled at the plan level
+        return 0
         actual_price = self.get_price_for_cycle(billing_cycle)
         
         if monthly_total > actual_price:

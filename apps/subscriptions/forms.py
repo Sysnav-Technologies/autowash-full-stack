@@ -8,8 +8,8 @@ class SubscriptionForm(forms.ModelForm):
     
     BILLING_CYCLE_CHOICES = [
         ('monthly', 'Monthly'),
-        ('quarterly', 'Quarterly (Save 10%)'),
-        ('annually', 'Annually (Save 20%)'),
+        ('semi_annual', 'Semi-Annual'),
+        ('annual', 'Annual'),
     ]
     
     billing_cycle = forms.ChoiceField(
@@ -44,24 +44,10 @@ class SubscriptionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         if self.plan:
-            # Update billing cycle choices based on plan pricing
-            choices = [('monthly', f'Monthly - KES {self.plan.monthly_price:,.0f}')]
-            
-            if self.plan.quarterly_price:
-                discount = self.plan.get_discount_percentage('quarterly')
-                label = f'Quarterly - KES {self.plan.quarterly_price:,.0f}'
-                if discount > 0:
-                    label += f' (Save {discount}%)'
-                choices.append(('quarterly', label))
-            
-            if self.plan.annual_price:
-                discount = self.plan.get_discount_percentage('annually')
-                label = f'Annually - KES {self.plan.annual_price:,.0f}'
-                if discount > 0:
-                    label += f' (Save {discount}%)'
-                choices.append(('annually', label))
-            
+            # Simplified billing cycle choices based on plan type
+            choices = [(self.plan.plan_type, f'{self.plan.get_plan_type_display()} - KES {self.plan.price:,.0f}')]
             self.fields['billing_cycle'].choices = choices
+            self.fields['billing_cycle'].initial = self.plan.plan_type
 
 class PaymentForm(forms.ModelForm):
     """Form for processing payments"""

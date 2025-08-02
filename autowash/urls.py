@@ -52,6 +52,13 @@ def root_redirect(request):
                     print(f"User business found: {business.name}")
                     print(f"Business verified: {business.is_verified}")
                     
+                    # Check subscription status first
+                    if not hasattr(business, 'subscription') or not business.subscription or not business.subscription.is_active:
+                        # Business doesn't have an active subscription - redirect to subscription selection
+                        print(f"Business has no active subscription, redirecting to subscription selection")
+                        return HttpResponseRedirect('/subscriptions/select/')
+                    
+                    # Check verification status
                     if business.is_verified:
                         business_url = f'/business/{business.slug}/'
                         print(f"Redirecting to verified business: {business_url}")
@@ -97,6 +104,7 @@ urlpatterns = [
     path('services/', include('apps.services.urls')),
     path('inventory/', include('apps.inventory.urls')),
     path('suppliers/', include('apps.suppliers.urls')),
+    path('subscriptions/', include('apps.subscriptions.urls')),
     path('payments/', include('apps.payments.urls')),
     path('reports/', include('apps.reports.urls')),
     path('expenses/', include('apps.expenses.urls')),

@@ -9,6 +9,8 @@ from phonenumber_field.formfields import PhoneNumberField
 from .models import UserProfile, Business, BusinessSettings, BusinessVerification
 from apps.core.tenant_models import Tenant
 from django.utils import timezone
+from django.utils.text import slugify
+import re
 import os
 
 class UserRegistrationForm(UserCreationForm):
@@ -149,10 +151,50 @@ class UserProfileForm(forms.ModelForm):
 class BusinessRegistrationForm(forms.ModelForm):
     """Business registration form - updated to use Tenant model"""
     
+    # Add custom location field since address fields are separate
+    location = forms.CharField(
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Business location/address',
+            'class': 'form-control'
+        }),
+        help_text='Enter your business address or location'
+    )
+    
+    # Add website field for the template
+    website = forms.URLField(
+        max_length=200,
+        required=False,
+        widget=forms.URLInput(attrs={
+            'placeholder': 'https://yourwebsite.com',
+            'class': 'form-control'
+        }),
+        help_text='Your business website (optional)'
+    )
+    
+    # Add terms agreement field
+    terms_agreement = forms.BooleanField(
+        required=True,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input'
+        }),
+        label='I agree to the Terms of Service and Privacy Policy',
+        help_text='You must agree to the terms to register your business'
+    )
+    
     class Meta:
         model = Tenant
-        # Use only fields that exist in the Tenant model
-        fields = ['name', 'business_type', 'description', 'phone', 'email', 'subdomain']
+        # Exclude fields we don't want in the form - subdomain will be auto-generated
+        exclude = [
+            'subdomain', 'database_name', 'database_user', 'database_password', 'owner', 'slug', 
+            'custom_domain', 'database_host', 'database_port', 'registration_number', 'tax_number', 
+            'timezone', 'currency', 'language', 'opening_time', 'closing_time', 'is_active', 
+            'is_verified', 'is_approved', 'approved_by', 'approved_at', 'rejection_reason', 
+            'subscription', 'max_employees', 'max_customers', 'logo', 'created_at', 'updated_at',
+            'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
+            'id', 'created_by_id', 'updated_by_id'
+        ]
         widgets = {
             'name': forms.TextInput(attrs={
                 'placeholder': 'Your Business Name', 
@@ -172,10 +214,6 @@ class BusinessRegistrationForm(forms.ModelForm):
                 'placeholder': 'business@email.com',
                 'class': 'form-control'
             }),
-            'subdomain': forms.TextInput(attrs={
-                'placeholder': 'yourbusiness (for yourbusiness.autowash.co.ke)',
-                'class': 'form-control'
-            }),
         }
     
     def __init__(self, *args, **kwargs):
@@ -186,10 +224,11 @@ class BusinessRegistrationForm(forms.ModelForm):
         self.fields['business_type'].required = True
         self.fields['phone'].required = True
         self.fields['email'].required = True
-        self.fields['subdomain'].required = True
+        self.fields['location'].required = True
         
         # Optional fields
         self.fields['description'].required = False
+        self.fields['website'].required = False
         
         # Set up crispy forms layout
         self.helper = FormHelper()
@@ -198,11 +237,15 @@ class BusinessRegistrationForm(forms.ModelForm):
             Field('name', css_class='mb-3'),
             Field('business_type', css_class='mb-3'),
             Field('description', css_class='mb-3'),
-            Field('subdomain', css_class='mb-3'),
+            Field('location', css_class='mb-3'),
+            Field('website', css_class='mb-3'),
             Row(
                 Column('phone', css_class='form-group col-md-6 mb-3'),
                 Column('email', css_class='form-group col-md-6 mb-3'),
             ),
+            HTML('<div class="form-check mb-4">'),
+            Field('terms_agreement'),
+            HTML('</div>'),
             FormActions(
                 Submit('submit', 'Register Business', css_class='btn btn-primary btn-lg w-100')
             )
@@ -224,16 +267,53 @@ class BusinessRegistrationForm(forms.ModelForm):
         if email and Tenant.objects.filter(email__iexact=email).exists():
             raise ValidationError("A business with this email already exists.")
         return email
-        
-    def clean_subdomain(self):
-        subdomain = self.cleaned_data.get('subdomain')
-        if subdomain and Tenant.objects.filter(subdomain__iexact=subdomain).exists():
-            raise ValidationError("This subdomain is already taken.")
-        return subdomain
     
+    def clean(self):
+        """Auto-generate subdomain from business name"""
+        cleaned_data = super().clean()
+        name = cleaned_data.get('name')
+        
+        if name:
+            # Auto-generate subdomain from business name
+            subdomain = slugify(name).lower()
+            # Remove any characters that aren't allowed in subdomains
+            subdomain = re.sub(r'[^a-z0-9-]', '', subdomain)
+            if not subdomain or not subdomain[0].isalpha():
+                subdomain = 'biz' + subdomain
+            
+            # Ensure subdomain is unique
+            original_subdomain = subdomain
+            counter = 1
+            while Tenant.objects.filter(subdomain__iexact=subdomain).exists():
+                subdomain = f"{original_subdomain}{counter}"
+                counter += 1
+            
+            # Add subdomain to cleaned data
+            cleaned_data['subdomain'] = subdomain
+        
+        return cleaned_data
+        
     def save(self, commit=True):
-        """Save the tenant"""
+        """Save the tenant and handle custom fields"""
         tenant = super().save(commit=False)
+        
+        # Set the auto-generated subdomain
+        subdomain = self.cleaned_data.get('subdomain')
+        if subdomain:
+            tenant.subdomain = subdomain
+        
+        # Handle location - store in address_line_1
+        location = self.cleaned_data.get('location')
+        if location:
+            tenant.address_line_1 = location
+        
+        # Handle website - store in description for now since there's no website field in model
+        website = self.cleaned_data.get('website')
+        if website:
+            if tenant.description:
+                tenant.description = f"{tenant.description}\nWebsite: {website}"
+            else:
+                tenant.description = f"Website: {website}"
         
         if commit:
             tenant.save()

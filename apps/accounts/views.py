@@ -17,6 +17,7 @@ from django.views.decorators.csrf import csrf_protect
 
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+from django.utils import timezone
 import uuid
 from django.conf import settings
 from apps.core.decorators import ajax_required
@@ -174,11 +175,17 @@ def dashboard_redirect(request):
         print(f"Business slug: {business.slug}")
         print(f"Business verified: {business.is_verified}")
         
+        # Check subscription status first
+        if not hasattr(business, 'subscription') or not business.subscription or not business.subscription.is_active:
+            # Business doesn't have an active subscription - redirect to subscription selection
+            messages.info(request, 'Please select a subscription plan to continue.')
+            return redirect(f'/business/{business.slug}/subscriptions/select/')
+        
         # Check verification status
         if not business.is_verified:
             # Business is not verified yet
             messages.info(request, 'Your business is pending verification. Please check your verification status.')
-            return redirect('/auth/verification-pending/')
+            return redirect(f'/business/{business.slug}/verification-pending/')
         
         # Business is verified - redirect to business dashboard using path-based URL
         business_url = f'/business/{business.slug}/'
@@ -392,20 +399,25 @@ def business_register_view(request):
                     )
                     print(f"Domain record created: {domain.domain}")
                     
-                    # Create business verification record
+                    # Create business verification record with approved terms
                     print("Creating business verification...")
-                    BusinessVerification.objects.create(business=business, status='pending')
+                    BusinessVerification.objects.create(
+                        business=business, 
+                        status='pending',
+                        notes='Business registered with terms agreement - no documents uploaded',
+                        submitted_at=timezone.now()
+                    )
                     
                     # IMPORTANT: NO database creation here!
                     # That will be done by admin during approval process
                     print("Business registration complete - waiting for admin approval")
                     
                     # Environment-specific success message
-                    success_message = get_success_message(business, environment)
+                    success_message = f"Business '{business.name}' registered successfully! Please select a subscription plan to continue."
                     messages.success(request, success_message)
                     
-                    # Redirect to verification upload
-                    return redirect('/auth/business/verification/')
+                    # Redirect to subscription selection instead of verification pending
+                    return redirect('/subscriptions/select/')
                 
             except Exception as e:
                 print(f"=== SAVE ERROR ===")

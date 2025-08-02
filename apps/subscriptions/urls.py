@@ -7,6 +7,7 @@ app_name = 'subscriptions'
 urlpatterns = [
     # Pricing and subscription views
     path('', views.pricing_view, name='plans'),
+    path('select/', views.subscription_selection_view, name='select'),
     path('subscribe/<slug:plan_slug>/', views.subscribe_view, name='subscribe'),
     
     # Payment handling

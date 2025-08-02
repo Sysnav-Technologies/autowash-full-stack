@@ -32,10 +32,29 @@ class BusinessRegistrationForm(forms.ModelForm):
         help_text='Enter your business address or location'
     )
     
+    # Add website field for the template
+    website = forms.URLField(
+        max_length=200,
+        required=False,
+        widget=forms.URLInput(attrs={
+            'placeholder': 'https://yourwebsite.com',
+            'class': 'form-control'
+        }),
+        help_text='Your business website (optional)'
+    )
+    
     class Meta:
         model = Business
-        # Use only fields that definitely exist in the Business model
-        fields = ['name', 'business_type', 'description', 'phone', 'email']
+        # Explicitly exclude fields we don't want in the form
+        exclude = [
+            'subdomain', 'database_name', 'database_user', 'database_password', 'owner', 'slug', 
+            'custom_domain', 'database_host', 'database_port', 'registration_number', 'tax_number', 
+            'timezone', 'currency', 'language', 'opening_time', 'closing_time', 'is_active', 
+            'is_verified', 'is_approved', 'approved_by', 'approved_at', 'rejection_reason', 
+            'subscription', 'max_employees', 'max_customers', 'logo', 'created_at', 'updated_at',
+            'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
+            'id', 'created_by_id', 'updated_by_id'
+        ]
         widgets = {
             'name': forms.TextInput(attrs={
                 'placeholder': 'Your Business Name', 
@@ -138,21 +157,18 @@ class BusinessRegistrationForm(forms.ModelForm):
         if subdomain:
             business.subdomain = subdomain
         
-        # Handle location - you can store it in a field that exists in your model
-        # Based on your model, it looks like you have fields from Address and ContactInfo mixins
+        # Handle location - store in address_line_1
         location = self.cleaned_data.get('location')
         if location:
-            # If you have an address field in your Address mixin, use that
-            # Otherwise, you might want to store it in description or create a location field
-            if hasattr(business, 'address'):
-                business.address = location
-            elif hasattr(business, 'address_line_1'):
-                business.address_line_1 = location
-            # If no address field exists, you might want to add location to description
-            elif location and not business.description:
-                business.description = f"Location: {location}"
-            elif location and business.description:
-                business.description = f"{business.description}\nLocation: {location}"
+            business.address_line_1 = location
+        
+        # Handle website - store in description for now since there's no website field in model
+        website = self.cleaned_data.get('website')
+        if website:
+            if business.description:
+                business.description = f"{business.description}\nWebsite: {website}"
+            else:
+                business.description = f"Website: {website}"
         
         if commit:
             business.save()

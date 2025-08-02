@@ -200,3 +200,69 @@ def verification_context(request):
             })
     
     return context
+
+
+def subscription_flow_context(request):
+    """Add subscription flow context for onboarding"""
+    context = {
+        'flow_step': 'unknown',
+        'flow_completed': False,
+        'flow_progress': 0,
+        'subscription_active': False,
+        'subscription_required': True,
+    }
+    
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        try:
+            from apps.accounts.models import Business
+            business = Business.objects.get(owner=request.user)
+            
+            # Step 1: Business Registration - Always completed if we have a business
+            registration_completed = True
+            
+            # Step 2: Subscription Selection/Payment
+            subscription_completed = False
+            if hasattr(business, 'subscription') and business.subscription and business.subscription.is_active:
+                subscription_completed = True
+                context['subscription_active'] = True
+            else:
+                context['subscription_active'] = False
+                
+            # Step 3: Verification
+            verification_completed = business.is_verified
+            
+            # Determine current step and progress
+            if not registration_completed:
+                context['flow_step'] = 'registration'
+                context['flow_progress'] = 0
+            elif not subscription_completed:
+                context['flow_step'] = 'subscription'
+                context['flow_progress'] = 25
+            elif not verification_completed:
+                context['flow_step'] = 'verification'
+                context['flow_progress'] = 50
+            else:
+                context['flow_step'] = 'completed'
+                context['flow_progress'] = 100
+                context['flow_completed'] = True
+                
+            # Add step completion status
+            context.update({
+                'registration_completed': registration_completed,
+                'subscription_completed': subscription_completed,
+                'verification_completed': verification_completed,
+                'business_name': business.name,
+                'business_subdomain': business.subdomain,
+            })
+            
+        except:
+            # No business found - user needs to register
+            context.update({
+                'flow_step': 'registration',
+                'flow_progress': 0,
+                'registration_completed': False,
+                'subscription_completed': False,
+                'verification_completed': False,
+            })
+    
+    return context

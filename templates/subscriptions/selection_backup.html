@@ -1,0 +1,362 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Choose Your Plan - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .plan-card {
+        border: 2px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: white;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        max-height: 500px;
+    }
+    
+    .plan-card:hover {
+        border-color: #3b82f6;
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
+    }
+    
+    .plan-card.recommended {
+        border-color: #10b981;
+        position: relative;
+        background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+    }
+    
+    .plan-card.recommended::before {
+        content: "RECOMMENDED";
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #10b981;
+        color: white;
+        padding: 5px 20px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    
+    .plan-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    .plan-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: #1f2937;
+    }
+    
+    .plan-description {
+        color: #6b7280;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    
+    .price-section {
+        margin-bottom: 1.5rem;
+    }
+    
+    .price {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin: 1rem 0;
+    }
+    
+    .price-currency {
+        font-size: 1.2rem;
+        vertical-align: top;
+    }
+    
+    .price-period {
+        font-size: 0.9rem;
+        color: #6b7280;
+        font-weight: 400;
+    }
+    
+    .savings-badge {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;         
+        font-weight: 600;
+        display: inline-block;
+        margin-top: 0.5rem;
+    }
+    
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 1.5rem 0;
+        flex-grow: 1;
+    }
+    
+    .feature-list li {
+        padding: 0.4rem 0;
+        color: #4b5563;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        font-size: 0.9rem;
+        text-align: left;
+    }
+    
+    .feature-list li i {
+        color: #10b981;
+        margin-right: 0.75rem;
+        min-width: 16px;
+    }
+    
+    .btn-plan {
+        width: 100%;
+        padding: 1rem;
+        font-weight: 600;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        margin-top: auto;
+    }
+    
+    .btn-plan:hover {
+        transform: translateY(-2px);
+    }
+    
+    .billing-toggle {
+        background: #f3f4f6;
+        border-radius: 50px;
+        padding: 0.5rem;
+        display: inline-flex;
+        margin: 2rem 0;
+    }
+    
+    .billing-option {
+        padding: 0.75rem 1.5rem;
+        border-radius: 40px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+    
+    .billing-option.active {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 3rem;
+    }
+    
+    .step {
+        display: flex;
+        align-items: center;
+        margin: 0 1rem;
+    }
+    
+    .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        margin-right: 0.5rem;
+    }
+    
+    .step.completed .step-number {
+        background: #10b981;
+        color: white;
+    }
+    
+    .step.active .step-number {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .monthly-pricing {
+        display: block;
+    }
+    
+    .annual-pricing {
+        display: none;
+    }
+    
+    .annual-pricing.active {
+        display: block;
+    }
+    
+    .monthly-pricing.active {
+        display: block;
+    }
+    
+    .step.pending .step-number {
+        background: #e5e7eb;
+        color: #6b7280;
+    }
+    
+    .subscription-page {
+        background-color: #f8fafc;
+        min-height: 100vh;
+        padding-top: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block public_content %}
+<div class="subscription-page">
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <!-- Step Indicator -->
+            <div class="step-indicator">
+                <div class="step completed">
+                    <div class="step-number">1</div>
+                    <span>Business Registration</span>
+                </div>
+                <div class="step active">
+                    <div class="step-number">2</div>
+                    <span>Choose Plan</span>
+                </div>
+                <div class="step pending">
+                    <div class="step-number">3</div>
+                    <span>Payment</span>
+                </div>
+                <div class="step pending">
+                    <div class="step-number">4</div>
+                    <span>Verification</span>
+                </div>
+            </div>
+            
+            <!-- Header -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold mb-3">Choose Your Plan</h1>
+                <p class="lead text-muted">Welcome {{ business.name }}! Select the perfect plan for your car wash business.</p>
+                
+                <!-- Billing Toggle -->
+                <div class="billing-toggle">
+                    <div class="billing-option active" id="monthly-tab">Monthly</div>
+                    <div class="billing-option" id="annual-tab">Annual <small class="text-success">(Save up to 17%)</small></div>
+                </div>
+            </div>
+            
+            <!-- Plans -->
+            <div class="row">
+                {% for plan in plans %}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="plan-card {% if plan.name == 'Semi-Annual' %}recommended{% endif %}">
+                        <!-- Plan Header -->
+                        <div class="plan-header">
+                            <h3 class="plan-title">{{ plan.name }}</h3>
+                            <p class="plan-description">{{ plan.description }}</p>
+                        </div>
+                        
+                        <!-- Price Section -->
+                        <div class="price-section">
+                            <!-- Monthly Price -->
+                            <div class="monthly-pricing">
+                                <div class="price">
+                                    <span class="price-currency">KES</span>{{ plan.price|floatformat:0 }}
+                                    <span class="price-period">/month</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Annual Price -->
+                            <div class="annual-pricing">
+                                <div class="price">
+                                    <span class="price-currency">KES</span>{{ plan.price|floatformat:0 }}
+                                    <span class="price-period">
+                                        {% if plan.duration_months > 1 %}
+                                            /{{ plan.duration_months }} months
+                                        {% else %}
+                                            /month
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% if plan.duration_months >= 6 %}
+                                <div class="savings-badge">Save with longer commitment</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Features -->
+                        <ul class="feature-list">
+                            <li><i class="fas fa-check"></i> Up to {{ plan.max_employees }} employees</li>
+                            <li><i class="fas fa-check"></i> Up to {{ plan.max_customers }} customers</li>
+                            <li><i class="fas fa-check"></i> {{ plan.max_services }} services/month</li>
+                            <li><i class="fas fa-check"></i> Customer management</li>
+                            <li><i class="fas fa-check"></i> Service tracking</li>
+                            {% if plan.name != 'Basic' %}
+                            <li><i class="fas fa-check"></i> Advanced analytics</li>
+                            <li><i class="fas fa-check"></i> SMS notifications</li>
+                            {% endif %}
+                            {% if plan.name == 'Premium' %}
+                            <li><i class="fas fa-check"></i> Priority support</li>
+                            <li><i class="fas fa-check"></i> Custom branding</li>
+                            {% endif %}
+                        </ul>
+                        
+                        <!-- Action Button -->
+                        <a href="{% url 'subscriptions:subscribe' plan.slug %}" 
+                           class="btn btn-plan {% if plan.name == 'Semi-Annual' %}btn-success{% else %}btn-primary{% endif %}">
+                            Select {{ plan.name }}
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Footer Info -->
+            <div class="text-center mt-5 mb-4">
+                <p class="text-muted">
+                    <i class="fas fa-shield-alt text-success me-2"></i>
+                    14-day free trial • No setup fees • Cancel anytime
+                </p>
+                <p class="small text-muted">
+                    By continuing, you agree to our <a href="#" class="text-decoration-none">Terms of Service</a> 
+                    and <a href="#" class="text-decoration-none">Privacy Policy</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const monthlyTab = document.getElementById('monthly-tab');
+    const annualTab = document.getElementById('annual-tab');
+    const monthlyPricing = document.querySelectorAll('.monthly-pricing');
+    const annualPricing = document.querySelectorAll('.annual-pricing');
+    
+    monthlyTab.addEventListener('click', function() {
+        monthlyTab.classList.add('active');
+        annualTab.classList.remove('active');
+        
+        monthlyPricing.forEach(el => el.classList.add('active'));
+        annualPricing.forEach(el => el.classList.remove('active'));
+    });
+    
+    annualTab.addEventListener('click', function() {
+        annualTab.classList.add('active');
+        monthlyTab.classList.remove('active');
+        
+        monthlyPricing.forEach(el => el.classList.remove('active'));
+        annualPricing.forEach(el => el.classList.add('active'));
+    });
+});
+</script>
+{% endblock public_content %}

@@ -23,14 +23,14 @@ from apps.accounts.models import Business
 
 def pricing_view(request):
     """Display subscription plans"""
-    plans = SubscriptionPlan.objects.filter(is_active=True).order_by('sort_order', 'monthly_price')
+    plans = SubscriptionPlan.objects.filter(is_active=True).order_by('sort_order', 'price')
     
     # Calculate savings for annual billing
     for plan in plans:
-        if plan.annual_price:
-            monthly_total = plan.monthly_price * 12
-            savings = monthly_total - plan.annual_price
-            plan.annual_savings = round((savings / monthly_total) * 100, 1) if monthly_total > 0 else 0
+        if plan.duration_months >= 12:
+            monthly_equivalent = plan.price / plan.duration_months
+            # Simple savings calculation - this can be enhanced later
+            plan.annual_savings = 0
         else:
             plan.annual_savings = 0
     
@@ -52,6 +52,48 @@ def pricing_view(request):
     return render(request, 'subscriptions/pricing.html', context)
 
 @login_required
+def subscription_selection_view(request):
+    """Subscription selection for new businesses after registration"""
+    # Check if user has a business
+    try:
+        business = Business.objects.get(owner=request.user)
+    except Business.DoesNotExist:
+        messages.error(request, "You need to register a business first.")
+        return redirect('accounts:business_register')
+    
+    # Check if business already has active subscription
+    if business.subscription and business.subscription.is_active:
+        messages.info(request, "You already have an active subscription.")
+        return redirect('/auth/verification-pending/')
+    
+    # Get available plans
+    plans = SubscriptionPlan.objects.filter(is_active=True).order_by('sort_order', 'price')
+    
+    # Calculate savings for annual billing
+    for plan in plans:
+        if plan.duration_months >= 12:
+            monthly_equivalent = plan.price / plan.duration_months
+            monthly_total = monthly_equivalent * 12
+            if plan.duration_months == 12:
+                # This is an annual plan
+                savings = 0  # No savings calculation needed for base annual price
+            else:
+                # Calculate potential savings compared to monthly equivalent
+                savings = 0
+            plan.annual_savings = savings
+        else:
+            plan.annual_savings = 0
+    
+    context = {
+        'plans': plans,
+        'business': business,
+        'title': 'Choose Your Subscription Plan',
+        'step': 'subscription'
+    }
+    
+    return render(request, 'subscriptions/selection.html', context)
+
+@login_required
 def subscribe_view(request, plan_slug):
     """Subscribe to a plan"""
     plan = get_object_or_404(SubscriptionPlan, slug=plan_slug, is_active=True)
@@ -69,13 +111,13 @@ def subscribe_view(request, plan_slug):
         return redirect('subscriptions:manage_subscription')
     
     if request.method == 'POST':
-        form = SubscriptionForm(request.POST)
+        form = SubscriptionForm(request.POST, plan=plan)
         if form.is_valid():
             billing_cycle = form.cleaned_data['billing_cycle']
             discount_code = form.cleaned_data.get('discount_code')
             
-            # Calculate pricing
-            amount = plan.get_price_for_cycle(billing_cycle)
+            # Use plan's base price
+            amount = plan.price
             discount_amount = Decimal('0.00')
             
             # Apply discount if provided
@@ -87,19 +129,26 @@ def subscribe_view(request, plan_slug):
                 else:
                     messages.error(request, "Invalid or expired discount code.")
                     return render(request, 'subscriptions/subscribe.html', {
-                        'plan': plan, 'form': form
+                        'plan': plan, 'form': form, 'business': business
                     })
             
             final_amount = amount - discount_amount
             
+            # For now, create subscription without payment requirement
+            # Calculate end date based on plan duration
+            if plan.duration_months:
+                end_date = timezone.now() + timedelta(days=plan.duration_months * 30)
+            else:
+                end_date = timezone.now() + timedelta(days=30)  # Default 1 month
+            
             # Create subscription
             subscription = Subscription.objects.create(
                 plan=plan,
-                billing_cycle=billing_cycle,
+                business=business,  # Use the business object (which is a Tenant)
                 start_date=timezone.now(),
-                end_date=timezone.now() + timedelta(days=plan.trial_days),
-                trial_end_date=timezone.now() + timedelta(days=plan.trial_days),
-                status='trial',
+                end_date=end_date,
+                trial_end_date=timezone.now() + timedelta(days=14),  # 14-day trial
+                status='trial',  # Start with trial
                 amount=final_amount
             )
             
@@ -112,36 +161,16 @@ def subscribe_view(request, plan_slug):
             # Create usage tracking
             SubscriptionUsage.objects.create(subscription=subscription)
             
-            # If there's a payment required (not free trial)
-            if final_amount > 0:
-                payment = Payment.objects.create(
-                    subscription=subscription,
-                    amount=final_amount,
-                    payment_method='mpesa',  # Default to M-Pesa
-                    status='pending'
-                )
-                
-                # Create invoice
-                invoice = SubscriptionInvoice.objects.create(
-                    subscription=subscription,
-                    payment=payment,
-                    subtotal=amount,
-                    discount_amount=discount_amount,
-                    total_amount=final_amount,
-                    due_date=timezone.now().date() + timedelta(days=7),
-                    discount_code=discount
-                )
-                
-                # Use discount code
-                if discount:
-                    discount.use_discount()
-                
-                return redirect('subscriptions:payment', payment_id=payment.payment_id)
-            else:
-                messages.success(request, f"Welcome to {plan.name}! Your {plan.trial_days}-day trial has started.")
-                return redirect('accounts:dashboard_redirect')
+            # Skip payment for now - directly proceed to verification
+            messages.success(request, f"Welcome to {plan.name}! Your 14-day trial has started. Please complete verification to activate your account.")
+            return redirect('/auth/verification-pending/')
+        else:
+            # Form has errors - display them
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
     else:
-        form = SubscriptionForm()
+        form = SubscriptionForm(plan=plan)
     
     context = {
         'plan': plan,
@@ -297,7 +326,7 @@ def upgrade_subscription_view(request, plan_slug):
     # Calculate prorated amount
     days_remaining = current_subscription.days_remaining
     current_daily_rate = current_subscription.amount / 30  # Approximate
-    new_monthly_rate = new_plan.monthly_price
+    new_monthly_rate = new_plan.price
     new_daily_rate = new_monthly_rate / 30
     
     prorated_credit = current_daily_rate * days_remaining
@@ -331,7 +360,7 @@ def upgrade_subscription_view(request, plan_slug):
         'new_plan': new_plan,
         'upgrade_cost': max(0, upgrade_cost),
         'prorated_credit': prorated_credit,
-        'is_upgrade': new_plan.monthly_price > current_subscription.plan.monthly_price
+        'is_upgrade': new_plan.price > current_subscription.plan.price
     }
     
     return render(request, 'subscriptions/upgrade.html', context)
@@ -393,10 +422,10 @@ def check_discount_code_view(request):
         
         try:
             plan = SubscriptionPlan.objects.get(id=plan_id)
-            discount = verify_discount_code(code, plan, plan.monthly_price)
+            discount = verify_discount_code(code, plan, plan.price)
             
             if discount:
-                discount_amount = discount.calculate_discount(plan.monthly_price)
+                discount_amount = discount.calculate_discount(plan.price)
                 return JsonResponse({
                     'valid': True,
                     'discount_amount': float(discount_amount),
