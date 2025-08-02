@@ -87,6 +87,7 @@ def approve_business(request, business_id):
                 with transaction.atomic():
                     # 1. Approve the business
                     business.is_approved = True
+                    business.is_verified = True  # Also set verified to True
                     business.approved_by = request.user
                     business.approved_at = timezone.now()
                     business.is_active = True
@@ -108,7 +109,27 @@ def approve_business(request, business_id):
                     else:
                         subscription = business.subscription
                     
-                    # 3. Setup tenant database and employee record
+                    # 3. Update BusinessVerification status
+                    try:
+                        from apps.accounts.models import BusinessVerification
+                        verification = business.verification
+                        verification.status = 'verified'
+                        verification.verified_at = timezone.now()
+                        verification.verified_by = request.user
+                        verification.save()
+                        print(f"✓ BusinessVerification status updated to 'verified'")
+                    except BusinessVerification.DoesNotExist:
+                        # Create verification record if it doesn't exist
+                        BusinessVerification.objects.create(
+                            business=business,
+                            status='verified',
+                            verified_at=timezone.now(),
+                            verified_by=request.user,
+                            notes='Business approved by admin without document submission'
+                        )
+                        print(f"✓ BusinessVerification record created with 'verified' status")
+                    
+                    # 4. Setup tenant database and employee record
                     setup_success = setup_tenant_after_approval(business, request.user)
                     
                     if setup_success:
@@ -530,6 +551,7 @@ def bulk_approve_businesses(request):
                     with transaction.atomic():
                         # Approve the business
                         business.is_approved = True
+                        business.is_verified = True  # Also set verified to True
                         business.approved_by = request.user
                         business.approved_at = timezone.now()
                         business.is_active = True
@@ -547,6 +569,24 @@ def bulk_approve_businesses(request):
                             )
                             business.subscription = subscription
                             business.save()
+                        
+                        # Update BusinessVerification status
+                        try:
+                            from apps.accounts.models import BusinessVerification
+                            verification = business.verification
+                            verification.status = 'verified'
+                            verification.verified_at = timezone.now()
+                            verification.verified_by = request.user
+                            verification.save()
+                        except BusinessVerification.DoesNotExist:
+                            # Create verification record if it doesn't exist
+                            BusinessVerification.objects.create(
+                                business=business,
+                                status='verified',
+                                verified_at=timezone.now(),
+                                verified_by=request.user,
+                                notes='Business approved by admin without document submission'
+                            )
                         
                         # Setup tenant database and employee record
                         setup_success = setup_tenant_after_approval(business, request.user)
