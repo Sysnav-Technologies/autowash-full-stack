@@ -334,14 +334,17 @@ function initializeNotifications() {
 function checkForNewNotifications() {
     if (!window.location.pathname.includes('/business/')) return;
     
+    const tenantSlug = getTenantSlugFromURL();
+    if (!tenantSlug) return;
+    
     $.ajax({
-        url: '/api/notifications/check/',
+        url: `/business/${tenantSlug}/notifications/api/check/`,
         method: 'GET',
         success: function(data) {
-            if (data.new_count > 0) {
-                updateNotificationBadge(data.new_count);
-                if (data.latest_notification) {
-                    showNotificationToast(data.latest_notification);
+            if (data.unread_count > 0) {
+                updateNotificationBadge(data.unread_count);
+                if (data.notifications && data.notifications.length > 0) {
+                    showNotificationToast(data.notifications[0]);
                 }
             }
         },

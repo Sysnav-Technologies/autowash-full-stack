@@ -397,6 +397,38 @@ def get_notifications_api(request):
 
 @login_required
 @business_required
+def check_notifications_api(request):
+    """Simple API endpoint for checking notification count only"""
+    unread_count = Notification.objects.filter(
+        user=request.user,
+        is_read=False,
+        is_archived=False
+    ).count()
+    
+    latest_notification = None
+    if unread_count > 0:
+        latest = Notification.objects.filter(
+            user=request.user,
+            is_read=False,
+            is_archived=False
+        ).order_by('-created_at').first()
+        
+        if latest:
+            latest_notification = {
+                'id': latest.id,
+                'title': latest.title,
+                'message': latest.message,
+                'type': latest.notification_type,
+                'created_at': latest.created_at.isoformat(),
+            }
+    
+    return JsonResponse({
+        'unread_count': unread_count,
+        'latest_notification': latest_notification,
+    })
+
+@login_required
+@business_required
 @require_POST
 def test_notification(request):
     """Create a test notification (for admins)"""

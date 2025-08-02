@@ -188,7 +188,7 @@ def employee_create_view(request):
             try:
                 with transaction.atomic():
                     user_data = form.cleaned_data
-                    user = User.objects.using('default').create_user(
+                    user = User.objects.db_manager('default').create_user(
                         username=user_data['username'],
                         email=user_data['email'],
                         first_name=user_data['first_name'],

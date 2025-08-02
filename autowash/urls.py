@@ -67,6 +67,65 @@ def root_redirect(request):
                         print(f"Business not verified, redirecting to verification")
                         return HttpResponseRedirect('/auth/verification-pending/')
                 else:
+                    # User doesn't own a business - check if they're an employee
+                    print("No owned business found, checking for employee records...")
+                    
+                    try:
+                        verified_tenants = Business.objects.filter(is_verified=True, is_active=True)
+                        
+                        for tenant in verified_tenants:
+                            try:
+                                # Use the tenant database to check for employee record
+                                from apps.employees.models import Employee
+                                
+                                # Check if user has an employee record in this tenant
+                                # Use the correct database alias format for tenant routing
+                                db_alias = f"tenant_{tenant.id}"
+                                
+                                # Ensure tenant database is registered in settings
+                                from apps.core.database_router import TenantDatabaseManager
+                                TenantDatabaseManager.add_tenant_to_settings(tenant)
+                                
+                                employee = Employee.objects.using(db_alias).filter(
+                                    user_id=request.user.id, 
+                                    is_active=True
+                                ).first()
+                                
+                                if employee:
+                                    print(f"Found employee record in business: {tenant.name}")
+                                    print(f"Employee role: {employee.role}")
+                                    
+                                    # Role-based redirect
+                                    if employee.role in ['owner', 'manager']:
+                                        # Management roles get full business dashboard
+                                        business_url = f'/business/{tenant.slug}/'
+                                    elif employee.role == 'supervisor':
+                                        # Supervisors get service management focus
+                                        business_url = f'/business/{tenant.slug}/services/'
+                                    elif employee.role == 'attendant':
+                                        # Attendants get their specific dashboard
+                                        business_url = f'/business/{tenant.slug}/services/dashboard/'
+                                    elif employee.role == 'cleaner':
+                                        # Cleaners get employee dashboard
+                                        business_url = f'/business/{tenant.slug}/employees/dashboard/'
+                                    elif employee.role == 'cashier':
+                                        # Cashiers get payments focus
+                                        business_url = f'/business/{tenant.slug}/payments/'
+                                    else:
+                                        # Default to employee dashboard
+                                        business_url = f'/business/{tenant.slug}/employees/dashboard/'
+                                    
+                                    print(f"Redirecting {employee.role} to: {business_url}")
+                                    return HttpResponseRedirect(business_url)
+                                        
+                            except Exception as e:
+                                # Skip tenants where we can't check (maybe database doesn't exist yet)
+                                print(f"Could not check tenant {tenant.name}: {e}")
+                                continue
+                                
+                    except Exception as e:
+                        print(f"Error checking employee records: {e}")
+                    
                     print(f"No business found, redirecting to business registration")
                     return HttpResponseRedirect('/auth/business/register/')
                     

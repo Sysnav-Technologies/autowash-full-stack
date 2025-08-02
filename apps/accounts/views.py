@@ -209,7 +209,14 @@ def dashboard_redirect(request):
                 from apps.employees.models import Employee
                 
                 # Check if user has an employee record in this tenant
-                employee = Employee.objects.using(tenant.get_database_name()).filter(
+                # Use the correct database alias format for tenant routing
+                db_alias = f"tenant_{tenant.id}"
+                
+                # Ensure tenant database is registered in settings
+                from apps.core.database_router import TenantDatabaseManager
+                TenantDatabaseManager.add_tenant_to_settings(tenant)
+                
+                employee = Employee.objects.using(db_alias).filter(
                     user_id=request.user.id, 
                     is_active=True
                 ).first()
@@ -227,8 +234,54 @@ def dashboard_redirect(request):
                 continue
         
         if employee_business:
-            # User is an employee - redirect to their business dashboard
-            business_url = f'/business/{employee_business.slug}/services/dashboard/'
+            # User is an employee - redirect to their business dashboard based on role
+            from apps.employees.models import Employee
+            
+            try:
+                # Use the correct database alias format for tenant routing
+                db_alias = f"tenant_{employee_business.id}"
+                
+                # Ensure tenant database is registered in settings
+                from apps.core.database_router import TenantDatabaseManager
+                TenantDatabaseManager.add_tenant_to_settings(employee_business)
+                
+                employee = Employee.objects.using(db_alias).filter(
+                    user_id=request.user.id, 
+                    is_active=True
+                ).first()
+                
+                if employee:
+                    # Role-based redirect
+                    if employee.role in ['owner', 'manager']:
+                        # Management roles get full business dashboard
+                        business_url = f'/business/{employee_business.slug}/'
+                    elif employee.role == 'supervisor':
+                        # Supervisors get service management focus
+                        business_url = f'/business/{employee_business.slug}/services/'
+                    elif employee.role == 'attendant':
+                        # Attendants get their specific dashboard
+                        business_url = f'/business/{employee_business.slug}/services/dashboard/'
+                    elif employee.role == 'cleaner':
+                        # Cleaners get employee dashboard
+                        business_url = f'/business/{employee_business.slug}/employees/dashboard/'
+                    elif employee.role == 'cashier':
+                        # Cashiers get payments focus
+                        business_url = f'/business/{employee_business.slug}/payments/'
+                    else:
+                        # Default to employee dashboard
+                        business_url = f'/business/{employee_business.slug}/employees/dashboard/'
+                    
+                    print(f"Redirecting {employee.role} to: {business_url}")
+                    messages.success(request, f'Welcome back! Redirecting to your {employee_business.name} workspace.')
+                    return redirect(business_url)
+                else:
+                    # Fallback if employee object not found
+                    business_url = f'/business/{employee_business.slug}/'
+                    
+            except Exception as e:
+                print(f"Error getting employee details: {e}")
+                business_url = f'/business/{employee_business.slug}/'
+            
             print(f"Redirecting employee to business dashboard: {business_url}")
             messages.success(request, f'Welcome back! Redirecting to your {employee_business.name} dashboard.')
             return redirect(business_url)

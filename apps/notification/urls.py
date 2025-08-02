@@ -25,6 +25,7 @@ urlpatterns = [
     
     # API Endpoints
     path('api/get/', views.get_notifications_api, name='api_get'),
+    path('api/check/', views.check_notifications_api, name='api_check'),
     path('api/test/', views.test_notification, name='api_test'),
     
     # Management (Admin/Manager only)

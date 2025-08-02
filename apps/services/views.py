@@ -14,6 +14,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from apps.core.decorators import employee_required, ajax_required, owner_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
+from apps.employees.models import Employee
 from apps.payments.models import Payment
 from .models import (
     Service, ServiceCategory, ServicePackage, ServiceOrder, 
@@ -2844,6 +2845,73 @@ def bay_status_ajax(request):
         'bays': bay_data,
         'timestamp': timezone.now().isoformat()
     })
+
+
+@login_required
+@employee_required()
+@ajax_required
+def attendance_status_ajax(request):
+    """Get employee attendance status"""
+    try:
+        # Get the current employee
+        employee = Employee.objects.get(user=request.user)
+        
+        # Get today's attendance record if it exists
+        today = timezone.now().date()
+        attendance = None
+        
+        # Check if there's an attendance model
+        try:
+            from apps.employees.models import Attendance
+            attendance = Attendance.objects.filter(
+                employee=employee,
+                date=today
+            ).first()
+        except ImportError:
+            # If no attendance model exists, return basic info
+            pass
+        
+        data = {
+            'employee_name': f"{employee.first_name} {employee.last_name}",
+            'role': employee.role,
+            'check_in_time': None,
+            'check_out_time': None,
+            'hours_worked': '0.0',
+            'is_checked_in': False,
+            'timestamp': timezone.now().isoformat()
+        }
+        
+        if attendance:
+            data.update({
+                'check_in_time': attendance.check_in_time.strftime('%H:%M') if attendance.check_in_time else None,
+                'check_out_time': attendance.check_out_time.strftime('%H:%M') if attendance.check_out_time else None,
+                'hours_worked': str(attendance.hours_worked) if hasattr(attendance, 'hours_worked') else '0.0',
+                'is_checked_in': attendance.check_in_time and not attendance.check_out_time,
+            })
+        
+        return JsonResponse(data)
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({
+            'error': 'Employee record not found',
+            'employee_name': 'Unknown',
+            'role': 'unknown',
+            'check_in_time': None,
+            'check_out_time': None,
+            'hours_worked': '0.0',
+            'is_checked_in': False,
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': f'Error retrieving attendance: {str(e)}',
+            'employee_name': 'Error',
+            'role': 'unknown',
+            'check_in_time': None,
+            'check_out_time': None,
+            'hours_worked': '0.0',
+            'is_checked_in': False,
+        }, status=500)
+
 
 # Helper Functions
 def add_order_to_queue(order):

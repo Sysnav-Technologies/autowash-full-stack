@@ -80,25 +80,62 @@ def user_role_context(request):
                 context['is_admin'] = True
                 context['is_manager'] = True
             else:
-                # Check tenant membership
+                # Check if user is an employee
                 try:
-                    from apps.core.tenant_models import TenantUser
-                    membership = TenantUser.objects.get(tenant=tenant, user=request.user, is_active=True)
-                    context['user_role'] = membership.role
-                    context['is_owner'] = membership.role == 'owner'
-                    context['is_admin'] = membership.role in ['owner', 'admin']
-                    context['is_manager'] = membership.role in ['owner', 'admin', 'manager']
-                except:
+                    from apps.employees.models import Employee
+                    from apps.core.database_router import TenantDatabaseManager
+                    
+                    # Ensure tenant database is registered
+                    db_alias = f"tenant_{tenant.id}"
+                    TenantDatabaseManager.add_tenant_to_settings(tenant)
+                    
+                    employee = Employee.objects.using(db_alias).filter(
+                        user_id=request.user.id, 
+                        is_active=True
+                    ).first()
+                    
+                    if employee:
+                        context['user_role'] = employee.role
+                        context['is_owner'] = employee.role == 'owner'
+                        context['is_admin'] = employee.role in ['owner', 'manager']
+                        context['is_manager'] = employee.role in ['owner', 'manager']
+                        context['is_attendant'] = employee.role == 'attendant'
+                        context['is_supervisor'] = employee.role == 'supervisor'
+                        context['is_cashier'] = employee.role == 'cashier'
+                        context['is_cleaner'] = employee.role == 'cleaner'
+                        context['employee'] = employee
+                    else:
+                        context['user_role'] = None
+                        context['is_owner'] = False
+                        context['is_admin'] = False
+                        context['is_manager'] = False
+                        context['is_attendant'] = False
+                        context['is_supervisor'] = False
+                        context['is_cashier'] = False
+                        context['is_cleaner'] = False
+                        context['employee'] = None
+                except Exception as e:
+                    # Handle database connection errors gracefully
                     context['user_role'] = None
                     context['is_owner'] = False
                     context['is_admin'] = False
                     context['is_manager'] = False
+                    context['is_attendant'] = False
+                    context['is_supervisor'] = False
+                    context['is_cashier'] = False
+                    context['is_cleaner'] = False
+                    context['employee'] = None
         else:
             # Public context - no specific role
             context['user_role'] = None
             context['is_owner'] = False
             context['is_admin'] = False
             context['is_manager'] = False
+            context['is_attendant'] = False
+            context['is_supervisor'] = False
+            context['is_cashier'] = False
+            context['is_cleaner'] = False
+            context['employee'] = None
     else:
         context['user'] = AnonymousUser()
         context['is_authenticated'] = False
@@ -106,6 +143,11 @@ def user_role_context(request):
         context['is_owner'] = False
         context['is_admin'] = False
         context['is_manager'] = False
+        context['is_attendant'] = False
+        context['is_supervisor'] = False
+        context['is_cashier'] = False
+        context['is_cleaner'] = False
+        context['employee'] = None
     
     return context
 
