@@ -353,7 +353,6 @@ class NotificationPreferenceView(UpdateView):
     model = NotificationPreference
     form_class = NotificationPreferenceForm
     template_name = 'notifications/preferences.html'
-    success_url = reverse_lazy('notifications:preferences')
     
     def get_object(self, queryset=None):
         obj, created = NotificationPreference.objects.get_or_create(
@@ -361,8 +360,13 @@ class NotificationPreferenceView(UpdateView):
         )
         return obj
     
+    def get_success_url(self):
+        """Return the business-prefixed success URL"""
+        return f"/business/{self.request.tenant.slug}/notifications/preferences/"
+    
     def form_valid(self, form):
         messages.success(self.request, 'Notification preferences updated successfully!')
+        return super().form_valid(form)
         return super().form_valid(form)
 
 @login_required
