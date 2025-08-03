@@ -232,7 +232,8 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Theme Toggle Function
+// Theme Toggle Function - Disabled to use main.js implementation
+/*
 function toggleTheme() {
     const currentTheme = localStorage.getItem('theme') || 'light';
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
@@ -246,6 +247,7 @@ function toggleTheme() {
     // Update theme toggle button
     updateThemeToggleButton(newTheme);
 }
+*/
 
 // Initialize Theme
 function initializeTheme() {
@@ -256,16 +258,16 @@ function initializeTheme() {
 
 // Apply Theme
 function applyTheme(theme) {
-    const html = document.documentElement;
+    const body = document.body;
     
     if (theme === 'dark') {
-        html.setAttribute('data-bs-theme', 'dark');
-        html.classList.add('dark-theme');
-        html.classList.remove('light-theme');
+        body.classList.add('dark-theme');
+        body.classList.remove('light-theme');
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
     } else {
-        html.setAttribute('data-bs-theme', 'light');
-        html.classList.add('light-theme');
-        html.classList.remove('dark-theme');
+        body.classList.add('light-theme');
+        body.classList.remove('dark-theme');
+        document.documentElement.setAttribute('data-bs-theme', 'light');
     }
 }
 
