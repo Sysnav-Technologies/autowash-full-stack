@@ -155,6 +155,7 @@ class MySQLTenantMiddleware(MiddlewareMixin):
             r'^/reports/',
             r'^/payments/',
             r'^/expenses/',
+            r'^/notifications/',
         ]
         
         return any(re.match(pattern, path) for pattern in tenant_patterns)

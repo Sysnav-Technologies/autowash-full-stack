@@ -24,18 +24,17 @@ urlpatterns = [
     path('settings/', views.notification_settings, name='settings'),
     
     # API Endpoints
+    path('api/', views.check_notifications_api, name='api_default'),
     path('api/get/', views.get_notifications_api, name='api_get'),
     path('api/check/', views.check_notifications_api, name='api_check'),
     path('api/test/', views.test_notification, name='api_test'),
-    
-    # Management (Admin/Manager only)
-    path('templates/', views.NotificationTemplateListView.as_view(), name='template_list'),
-    path('templates/create/', views.NotificationTemplateCreateView.as_view(), name='template_create'),
-    path('templates/<int:pk>/edit/', views.NotificationTemplateUpdateView.as_view(), name='template_edit'),
-    
-    # Analytics and Reporting
-    path('analytics/', views.notification_analytics, name='analytics'),
-    
-    # Bulk Notifications
-    path('send-bulk/', views.send_bulk_notification, name='send_bulk'),
+    path('api/mark-all-read/', views.mark_all_read, name='api_mark_all_read'),
+    path('api/archive-old/', views.archive_old_notifications, name='api_archive_old'),
+    path('api/send/', views.send_notification_api, name='api_send'),
+    path('api/<int:pk>/read/', views.mark_notification_read, name='api_mark_read'),
+    path('api/<int:pk>/unread/', views.mark_notification_unread, name='api_mark_unread'),
+    path('api/<int:pk>/archive/', views.archive_notification, name='api_archive'),
+    path('api/bulk/mark-read/', views.bulk_mark_read, name='api_bulk_mark_read'),
+    path('api/bulk/archive/', views.bulk_archive, name='api_bulk_archive'),
+    path('api/bulk/delete/', views.bulk_delete, name='api_bulk_delete'),
 ]

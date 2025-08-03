@@ -13,7 +13,7 @@ from django.core.paginator import Paginator
 from datetime import datetime, timedelta
 import json
 
-from apps.core.decorators import business_required, employee_required
+from apps.core.decorators import employee_required
 from .models import (
     Notification, NotificationCategory, NotificationTemplate,
     NotificationPreference, NotificationLog, NotificationDigest
@@ -76,16 +76,16 @@ def get_notification_urls(request):
         'businesses_dashboard': f"/business/{tenant_slug}/dashboard/",
     }
 
-@method_decorator([login_required, business_required], name='dispatch')
+@method_decorator([login_required, employee_required()], name='dispatch')
 class NotificationListView(ListView):
     """List user notifications"""
     model = Notification
-    template_name = 'notifications/notification_list.html'
+    template_name = 'notifications/list.html'
     context_object_name = 'notifications'
     paginate_by = 20
     
     def get_queryset(self):
-        queryset = Notification.objects.filter(user=self.request.user)
+        queryset = Notification.objects.filter(user_id=self.request.user.id)
         
         # Apply filters
         status = self.request.GET.get('status')
@@ -136,7 +136,7 @@ class NotificationListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        user_notifications = Notification.objects.filter(user=self.request.user)
+        user_notifications = Notification.objects.filter(user_id=self.request.user.id)
         
         context.update({
             'filter_form': NotificationFilterForm(self.request.GET),
@@ -151,9 +151,15 @@ class NotificationListView(ListView):
             }
         })
         
+        # Add user role context (should come from context processors, but let's ensure it's available)
+        if hasattr(self.request, 'employee') and self.request.employee:
+            context['user_role'] = self.request.employee.role
+            context['is_owner'] = self.request.employee.role == 'owner'
+            context['is_manager'] = self.request.employee.role in ['owner', 'manager']
+        
         return context
 
-@method_decorator([login_required, business_required], name='dispatch')
+@method_decorator([login_required, employee_required()], name='dispatch')
 class NotificationDetailView(DetailView):
     """View notification details"""
     model = Notification
@@ -161,7 +167,7 @@ class NotificationDetailView(DetailView):
     context_object_name = 'notification'
     
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user)
+        return Notification.objects.filter(user_id=self.request.user.id)
     
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
@@ -171,10 +177,10 @@ class NotificationDetailView(DetailView):
         return obj
 
 @login_required
-@business_required
+@employee_required()
 def notification_dashboard(request):
     """Notification dashboard and overview"""
-    user_notifications = Notification.objects.filter(user=request.user)
+    user_notifications = Notification.objects.filter(user_id=request.user.id)
     
     # Recent notifications
     recent_notifications = user_notifications.filter(
@@ -236,71 +242,71 @@ def notification_dashboard(request):
     return render(request, 'notifications/dashboard.html', context)
 
 @login_required
-@business_required
+@employee_required()
 @require_POST
 def mark_notification_read(request, pk):
     """Mark single notification as read"""
     notification = get_object_or_404(
         Notification, 
         pk=pk, 
-        user=request.user
+        user_id=request.user.id
     )
     
     notification.mark_as_read()
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'status': 'success'})
+        return JsonResponse({'success': True})
     
     messages.success(request, 'Notification marked as read.')
     return redirect('notifications:list')
 
 @login_required
-@business_required
+@employee_required()
 @require_POST
 def mark_notification_unread(request, pk):
     """Mark single notification as unread"""
     notification = get_object_or_404(
         Notification, 
         pk=pk, 
-        user=request.user
+        user_id=request.user.id
     )
     
     notification.mark_as_unread()
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'status': 'success'})
+        return JsonResponse({'success': True})
     
     messages.success(request, 'Notification marked as unread.')
     return redirect('notifications:list')
 
 @login_required
-@business_required
+@employee_required()
 @require_POST
 def archive_notification(request, pk):
     """Archive single notification"""
     notification = get_object_or_404(
         Notification, 
         pk=pk, 
-        user=request.user
+        user_id=request.user.id
     )
     
     notification.archive()
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'status': 'success'})
+        return JsonResponse({'success': True})
     
     messages.success(request, 'Notification archived.')
     return redirect('notifications:list')
 
 @login_required
-@business_required
+@employee_required()
 @require_POST
 def bulk_notification_action(request):
     """Perform bulk actions on notifications"""
     notification_ids = request.POST.getlist('notification_ids')
     action = request.POST.get('action')
     
-    notifications = Notification.objects.filter(id__in=notification_ids, user=request.user)
+    notifications = Notification.objects.filter(id__in=notification_ids, user_id=request.user.id)
     count = notifications.count()
     
     if not notification_ids or not action:
@@ -323,25 +329,25 @@ def bulk_notification_action(request):
     return redirect('notifications:list')
 
 @login_required
-@business_required
+@employee_required()
 @require_POST
 def mark_all_read(request):
     """Mark all notifications as read"""
     count = Notification.objects.filter(
-        user=request.user,
+        user_id=request.user.id,
         is_read=False
     ).update(is_read=True, read_at=timezone.now())
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({
-            'status': 'success',
+            'success': True,
             'count': count
         })
     
     messages.success(request, f'{count} notifications marked as read.')
     return redirect('notifications:list')
 
-@method_decorator([login_required, business_required], name='dispatch')
+@method_decorator([login_required, employee_required()], name='dispatch')
 class NotificationPreferenceView(UpdateView):
     """Update notification preferences"""
     model = NotificationPreference
@@ -351,7 +357,7 @@ class NotificationPreferenceView(UpdateView):
     
     def get_object(self, queryset=None):
         obj, created = NotificationPreference.objects.get_or_create(
-            user=self.request.user
+            user_id=self.request.user.id
         )
         return obj
     
@@ -360,11 +366,11 @@ class NotificationPreferenceView(UpdateView):
         return super().form_valid(form)
 
 @login_required
-@business_required
+@employee_required()
 def get_notifications_api(request):
     """API endpoint for getting notifications (for AJAX)"""
     notifications = Notification.objects.filter(
-        user=request.user,
+        user_id=request.user.id,
         is_archived=False
     ).order_by('-created_at')[:10]
     
@@ -385,7 +391,7 @@ def get_notifications_api(request):
         })
     
     unread_count = Notification.objects.filter(
-        user=request.user,
+        user_id=request.user.id,
         is_read=False,
         is_archived=False
     ).count()
@@ -396,11 +402,11 @@ def get_notifications_api(request):
     })
 
 @login_required
-@business_required
+@employee_required()
 def check_notifications_api(request):
     """Simple API endpoint for checking notification count only"""
     unread_count = Notification.objects.filter(
-        user=request.user,
+        user_id=request.user.id,
         is_read=False,
         is_archived=False
     ).count()
@@ -408,7 +414,7 @@ def check_notifications_api(request):
     latest_notification = None
     if unread_count > 0:
         latest = Notification.objects.filter(
-            user=request.user,
+            user_id=request.user.id,
             is_read=False,
             is_archived=False
         ).order_by('-created_at').first()
@@ -428,30 +434,27 @@ def check_notifications_api(request):
     })
 
 @login_required
-@business_required
+@employee_required()
 @require_POST
 def test_notification(request):
-    """Create a test notification (for admins)"""
-    if not request.user.is_staff:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
+    """Create a test notification"""
     # Create test notification
     notification = Notification.objects.create(
-        user=request.user,
+        user_id=request.user.id,
         title="Test Notification",
         message="This is a test notification to verify the system is working correctly.",
         notification_type="info",
-        priority="normal",
+        priority="medium",
     )
     
     return JsonResponse({
-        'status': 'success',
+        'success': True,
         'notification_id': notification.id,
         'message': 'Test notification created successfully.'
     })
 
 # Management Views (for admins/managers)
-@method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
+@method_decorator([login_required, employee_required(['owner', 'manager'])], name='dispatch')
 class NotificationTemplateListView(ListView):
     """List notification templates"""
     model = NotificationTemplate
@@ -476,7 +479,7 @@ class NotificationTemplateListView(ListView):
         
         return queryset.order_by('name')
 
-@method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
+@method_decorator([login_required, employee_required(['owner', 'manager'])], name='dispatch')
 class NotificationTemplateCreateView(CreateView):
     """Create notification template"""
     model = NotificationTemplate
@@ -488,7 +491,7 @@ class NotificationTemplateCreateView(CreateView):
         messages.success(self.request, 'Notification template created successfully!')
         return super().form_valid(form)
 
-@method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
+@method_decorator([login_required, employee_required(['owner', 'manager'])], name='dispatch')
 class NotificationTemplateUpdateView(UpdateView):
     """Update notification template"""
     model = NotificationTemplate
@@ -501,7 +504,7 @@ class NotificationTemplateUpdateView(UpdateView):
         return super().form_valid(form)
 
 @login_required
-@business_required
+@employee_required()
 @employee_required(['owner', 'manager'])
 def notification_analytics(request):
     """Notification analytics and insights"""
@@ -590,7 +593,7 @@ def notification_analytics(request):
     return render(request, 'notifications/analytics.html', context)
 
 @login_required
-@business_required
+@employee_required()
 @employee_required(['owner', 'manager'])
 def send_bulk_notification(request):
     """Send notification to multiple users"""
@@ -659,7 +662,7 @@ def send_bulk_notification(request):
     return render(request, 'notifications/send_bulk.html', context)
 
 @login_required
-@business_required
+@employee_required()
 def notification_settings(request):
     """General notification settings"""
     if request.method == 'POST':
@@ -676,13 +679,13 @@ def notification_settings(request):
     return render(request, 'notifications/settings.html', context)
 
 @login_required
-@business_required
+@employee_required()
 def notification_redirect(request, pk):
     """Redirect to notification action URL and mark as read"""
     notification = get_object_or_404(
         Notification, 
         pk=pk, 
-        user=request.user
+        user_id=request.user.id
     )
     
     # Mark as read
@@ -703,3 +706,152 @@ def notification_redirect(request, pk):
         return redirect(notification.action_url)
     else:
         return redirect('notifications:detail', pk=pk)
+
+# Additional API endpoints for the new templates
+@login_required
+@employee_required()
+@require_POST
+def archive_old_notifications(request):
+    """Archive notifications older than specified days"""
+    days = request.POST.get('days', 30)
+    try:
+        days = int(days)
+    except ValueError:
+        days = 30
+    
+    cutoff_date = timezone.now() - timedelta(days=days)
+    count = Notification.objects.filter(
+        user_id=request.user.id,
+        created_at__lt=cutoff_date,
+        is_archived=False
+    ).update(is_archived=True, archived_at=timezone.now())
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'count': count
+        })
+    
+    messages.success(request, f'{count} old notifications archived.')
+    return redirect('notifications:list')
+
+@login_required
+@employee_required()
+@employee_required(['owner', 'manager'])
+@require_POST
+def send_notification_api(request):
+    """API endpoint to send notifications"""
+    try:
+        data = json.loads(request.body)
+        title = data.get('title')
+        message = data.get('message')
+        priority = data.get('priority', 'medium')
+        recipient = data.get('recipient', 'self')
+        
+        if not title or not message:
+            return JsonResponse({'success': False, 'error': 'Title and message required'})
+        
+        # Determine recipients
+        recipients = []
+        if recipient == 'all':
+            from apps.employees.models import Employee
+            employees = Employee.objects.filter(is_active=True)
+            recipients = [emp.user for emp in employees if emp.user]
+        elif recipient == 'managers':
+            from apps.employees.models import Employee
+            employees = Employee.objects.filter(role__in=['owner', 'manager'], is_active=True)
+            recipients = [emp.user for emp in employees if emp.user]
+        else:  # self
+            recipients = [request.user]
+        
+        # Create notifications
+        created_count = 0
+        for user in recipients:
+            try:
+                Notification.objects.create(
+                    user=user,
+                    title=title,
+                    message=message,
+                    priority=priority,
+                    notification_type='info'
+                )
+                created_count += 1
+            except Exception:
+                continue
+        
+        return JsonResponse({
+            'success': True,
+            'count': created_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+@employee_required()
+@employee_required(['owner', 'manager'])
+@require_POST
+def bulk_mark_read(request):
+    """Mark multiple notifications as read"""
+    try:
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        
+        count = Notification.objects.filter(
+            id__in=ids,
+            user_id=request.user.id
+        ).update(is_read=True, read_at=timezone.now())
+        
+        return JsonResponse({
+            'success': True,
+            'count': count
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+@employee_required()
+@employee_required(['owner', 'manager'])
+@require_POST
+def bulk_archive(request):
+    """Archive multiple notifications"""
+    try:
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        
+        count = Notification.objects.filter(
+            id__in=ids,
+            user_id=request.user.id
+        ).update(is_archived=True, archived_at=timezone.now())
+        
+        return JsonResponse({
+            'success': True,
+            'count': count
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+@employee_required()
+@employee_required(['owner', 'manager'])
+@require_POST
+def bulk_delete(request):
+    """Delete multiple notifications"""
+    try:
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        
+        count = Notification.objects.filter(
+            id__in=ids,
+            user_id=request.user.id
+        ).delete()[0]
+        
+        return JsonResponse({
+            'success': True,
+            'count': count
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
