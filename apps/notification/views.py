@@ -367,7 +367,6 @@ class NotificationPreferenceView(UpdateView):
     def form_valid(self, form):
         messages.success(self.request, 'Notification preferences updated successfully!')
         return super().form_valid(form)
-        return super().form_valid(form)
 
 @login_required
 @employee_required()
