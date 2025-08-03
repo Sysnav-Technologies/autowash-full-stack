@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ title|default:"Autowash App - Car Wash Management" }}{% endblock %}</title>
+    <title>{% block title %}{{ title|default:"Autowash" }}{% endblock %}</title>
     {% load static %}
     
     <!-- Favicon -->
@@ -16,7 +16,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- AOS Animation -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
@@ -27,174 +27,75 @@
     
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="modern-saas-app">
     {% if not user.is_authenticated or request.tenant.schema_name == 'public' %}
-        <!-- Public Navbar for App -->
-        <nav class="navbar navbar-expand-lg public-navbar fixed-top">
-            <div class="container">
-                <a class="navbar-brand" href="https://autowash.co.ke">
-                    <i class="fas fa-car-wash"></i>
-                    Autowash App
-                </a>
-                
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
-                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ms-auto">
+        <!-- Modern SaaS Navigation -->
+        <nav class="modern-navbar">
+            <div class="navbar-container">
+                <div class="navbar-content">
+                    <div class="navbar-brand">
+                        <div class="brand-logo">
+                            <div class="brand-icon">
+                                <i class="fas fa-car-wash"></i>
+                            </div>
+                            <div class="brand-text">
+                                <span class="brand-name">Autowash</span>
+                                <span class="brand-subtitle">Management System</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="navbar-actions">
                         {% if user.is_authenticated %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="/auth/dashboard/">
-                                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                            <a href="/auth/dashboard/" class="nav-action-link">
+                                <i class="fas fa-tachometer-alt me-2"></i>
+                                Dashboard
                             </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-danger" href="/auth/logout/">
-                                <i class="fas fa-sign-out-alt me-1"></i>Logout
+                            <a href="/auth/logout/" class="btn btn-outline-primary">
+                                Sign Out
                             </a>
-                        </li>
                         {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="/auth/login/">Sign In</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="btn btn-primary ms-2" href="/auth/register/">
-                                Get Started
-                            </a>
-                        </li>
+                            <a href="/auth/login/" class="nav-action-link">Sign In</a>
+                            <a href="/auth/register/" class="btn btn-purple">Get Started</a>
                         {% endif %}
-                    </ul>
+                    </div>
                 </div>
             </div>
         </nav>
     {% endif %}
 
-    <!-- Debug Panel -->
-    {% if settings.DEBUG %}
-    <div id="debug-toggle" class="debug-toggle">
-        🐛 Debug
-    </div>
-    <div id="debug-panel" class="debug-panel">
-        <h4>🐛 Debug Information</h4>
-        
-        <h6>User Info:</h6>
-        <ul>
-            <li>Authenticated: {{ user.is_authenticated|yesno:"Yes,No" }}</li>
-            <li>Username: {{ user.username|default:"N/A" }}</li>
-            <li>User ID: {{ user.id|default:"N/A" }}</li>
-            <li>Is Superuser: {{ user.is_superuser|yesno:"Yes,No" }}</li>
-        </ul>
-
-        <h6>Tenant/Business Info:</h6>
-        <ul>
-            <li>request.tenant exists: {{ request.tenant|yesno:"Yes,No" }}</li>
-            <li>request.business exists: {{ request.business|yesno:"Yes,No" }}</li>
-            {% if request.tenant %}
-            <li>Tenant name: {{ request.tenant.name }}</li>
-            <li>Tenant schema: {{ request.tenant.schema_name }}</li>
-            <li>Tenant slug: {{ request.tenant.slug }}</li>
-            {% endif %}
-            {% if request.business %}
-            <li>Business name: {{ request.business.name }}</li>
-            <li>Business schema: {{ request.business.schema_name }}</li>
-            <li>Business slug: {{ request.business.slug }}</li>
-            {% endif %}
-        </ul>
-
-        <h6>User Role Context:</h6>
-        <ul>
-            <li>user_role: "{{ user_role|default:"None" }}"</li>
-            <li>is_owner: {{ is_owner|yesno:"Yes,No" }}</li>
-            <li>is_manager: {{ is_manager|yesno:"Yes,No" }}</li>
-            <li>is_employee: {{ is_employee|yesno:"Yes,No" }}</li>
-            <li>can_manage_business: {{ can_manage_business|yesno:"Yes,No" }}</li>
-            <li>employee exists: {{ employee|yesno:"Yes,No" }}</li>
-        </ul>
-
-        {% if employee %}
-        <h6>Employee Details:</h6>
-        <ul>
-            <li>Employee ID: {{ employee.employee_id }}</li>
-            <li>Full Name: {{ employee.full_name }}</li>
-            <li>Role: {{ employee.role }}</li>
-            <li>User ID: {{ employee.user_id }}</li>
-        </ul>
-        {% endif %}
-
-        <h6>Navigation:</h6>
-        <ul>
-            <li>nav_items count: {{ nav_items|length }}</li>
-            <li>current_section: {{ current_section|default:"None" }}</li>
-        </ul>
-
-        {% if nav_items %}
-        <h6>Nav Items:</h6>
-        <ol>
-            {% for item in nav_items %}
-            <li>{{ item.name }} ({{ item.section }})</li>
-            {% endfor %}
-        </ol>
-        {% else %}
-        <p class="text-danger">❌ NO NAV ITEMS!</p>
-        {% endif %}
-
-        <h6>Path Info:</h6>
-        <ul>
-            <li>Path: {{ request.path }}</li>
-            <li>Path Info: {{ request.path_info }}</li>
-        </ul>
-    </div>
-
-    <script>
-        document.getElementById('debug-toggle').addEventListener('click', function() {
-            var panel = document.getElementById('debug-panel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        });
-    </script>
-    {% endif %}
-
     {% if user.is_authenticated and request.tenant and request.tenant.schema_name != 'public' %}
-        <!-- Authenticated Business User Layout (Tenant) -->
-        <div class="app-layout">
+        <!-- Modern SaaS App Layout -->
+        <div class="modern-app-layout">
             <!-- Mobile Sidebar Overlay -->
-            <div class="mobile-sidebar-overlay" id="mobileSidebarOverlay"></div>
+            <div class="mobile-overlay" id="mobileOverlay"></div>
             
             <!-- Sidebar -->
             {% include 'includes/sidebar/main.html' %}
             
-            <!-- Main Content Area -->
-            <div class="main-content" id="main-content">
+            <!-- Main Content -->
+            <div class="app-main-content">
                 <!-- Topbar -->
                 {% include 'includes/topbar/main.html' %}
                 
                 <!-- Page Content -->
-                <div class="content-wrapper">
+                <div class="app-content-area">
                     <!-- Messages -->
                     {% include 'includes/messages.html' %}
                     
-                    <!-- Main Content Block -->
-                    <div class="container-fluid px-0">
-                        <div class="row g-0">
-                            <div class="col-12">
-                                {% block content %}{% endblock %}
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Content Block -->
+                    {% block content %}{% endblock %}
                 </div>
             </div>
         </div>
     {% else %}
         <!-- Public Layout -->
-        <main class="public-main">
+        <main class="modern-public-main">
             <!-- Messages -->
             {% include 'includes/messages.html' %}
             
             <!-- Public Content -->
-            <div class="container-fluid">
-                {% block public_content %}{% endblock %}
-            </div>
+            {% block public_content %}{% endblock %}
         </main>
     {% endif %}
     
@@ -213,21 +114,14 @@
     <!-- Topbar JavaScript -->
     <script src="{% static 'js/topbar.js' %}"></script>
     
-    <!-- Loading Animation Script -->
+    <!-- Initialize AOS -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize AOS
             AOS.init({
                 once: true,
-                duration: 1000
+                duration: 800,
+                easing: 'ease-out'
             });
-
-            // Hide loading overlay after 1.5 seconds
-            setTimeout(function() {
-                const loadingOverlay = document.getElementById('loading-overlay');
-                loadingOverlay.classList.add('hide');
-                setTimeout(() => loadingOverlay.remove(), 500);
-            }, 1500);
         });
     </script>
     

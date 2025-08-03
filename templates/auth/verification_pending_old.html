@@ -1,0 +1,314 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Verification Pending - Autowash{% endblock %}
+
+{% block public_content %}
+<section class="auth-section min-vh-100 d-flex align-items-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6 col-md-8">
+                <div class="auth-card" data-aos="fade-up">
+                    <div class="auth-header text-center">
+                        <div class="feature-icon warning mb-3">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <h2 class="auth-title">Verification Pending</h2>
+                        <p class="auth-subtitle">Your business verification is being reviewed by our team</p>
+                    </div>
+
+                    <div class="auth-body">
+    
+    .progress-bar-custom {
+        height: 100%;
+        border-radius: 5px;
+        transition: width 0.3s ease;
+    }
+    
+    .help-section {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-top: 2rem;
+    }
+    
+    .timeline-step {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    .timeline-step:last-child {
+        margin-bottom: 0;
+    }
+    
+    .step-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .step-icon.completed {
+        background: #10b981;
+        color: white;
+    }
+    
+    .step-icon.active {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .step-icon.pending {
+        background: #e5e7eb;
+        color: #6b7280;
+    }
+</style>
+{% endblock %}
+
+{% block public_content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <!-- Main Status Card -->
+            <div class="card verification-card">
+                <div class="card-body p-5 text-center">
+                    <!-- Status Icon -->
+                    <div class="status-icon 
+                        {% if verification.status == 'pending' %}bg-warning bg-opacity-10{% endif %}
+                        {% if verification.status == 'in_review' %}bg-info bg-opacity-10{% endif %}
+                        {% if verification.status == 'verified' or verification.status == 'approved' %}bg-success bg-opacity-10{% endif %}
+                        {% if verification.status == 'rejected' %}bg-danger bg-opacity-10{% endif %}">
+                        {% if verification.status == 'pending' %}
+                            <i class="fas fa-clock text-warning" style="font-size: 2rem;"></i>
+                        {% elif verification.status == 'in_review' %}
+                            <i class="fas fa-search text-info" style="font-size: 2rem;"></i>
+                        {% elif verification.status == 'verified' or verification.status == 'approved' %}
+                            <i class="fas fa-check-circle text-success" style="font-size: 2rem;"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle text-danger" style="font-size: 2rem;"></i>
+                        {% endif %}
+                    </div>
+
+                    <!-- Business Info -->
+                    <h3 class="font-heading mb-2">{{ business.name }}</h3>
+                    <p class="text-muted mb-4">
+                        {{ business.get_business_type_display|default:business.business_type|title }}
+                        {% if business.phone %} • {{ business.phone }}{% endif %}
+                    </p>
+
+                    <!-- Status Message -->
+                    {% if verification.status == 'pending' %}
+                        <h4 class="text-warning mb-3">
+                            <i class="fas fa-hourglass-half me-2"></i>
+                            Verification Pending
+                        </h4>
+                        <p class="text-muted mb-4">
+                            Thank you for completing your business registration and subscription selection. Your business verification is currently being processed by our admin team.
+                        </p>
+                        
+                        <div class="alert alert-info text-start mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Please wait:</strong> Our admin team will review and verify your business details. This process typically takes 1-2 business days.
+                        </div>
+
+                    {% elif verification.status == 'in_review' %}
+                        <h4 class="text-info mb-3">
+                            <i class="fas fa-search me-2"></i>
+                            Under Review
+                        </h4>
+                        <p class="text-muted mb-4">
+                            Thank you for submitting your verification documents. Our team is currently reviewing them. You should hear back from us within 24-48 hours.
+                        </p>
+                        
+                        <div class="alert alert-info text-start mb-4">
+                            <i class="fas fa-clock me-2"></i>
+                            <strong>Timeline:</strong> We typically complete reviews within 1-2 business days. You'll receive an email notification once the review is complete.
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-secondary" onclick="window.location.reload()">
+                                <i class="fas fa-sync me-2"></i>
+                                Refresh Status
+                            </button>
+                        </div>
+
+                    {% elif verification.status == 'verified' or verification.status == 'approved' %}
+                        <h4 class="text-success mb-3">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Verification Complete!
+                        </h4>
+                        <p class="text-muted mb-4">
+                            Congratulations! Your business has been verified successfully. You can now access your full dashboard and start managing your car wash business.
+                        </p>
+                        
+                        <div class="alert alert-success text-start mb-4">
+                            <i class="fas fa-trophy me-2"></i>
+                            <strong>Welcome aboard!</strong> Your account is now fully activated with all features available.
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'accounts:dashboard_redirect' %}" class="btn btn-success btn-lg">
+                                <i class="fas fa-tachometer-alt me-2"></i>
+                                Go to Dashboard
+                            </a>
+                        </div>
+
+                    {% else %}
+                        <h4 class="text-danger mb-3">
+                            <i class="fas fa-times-circle me-2"></i>
+                            Verification {{ verification.get_status_display }}
+                        </h4>
+                        {% if verification.rejection_reason %}
+                            <div class="alert alert-danger text-start mb-4">
+                                <strong>Reason for rejection:</strong><br>
+                                {{ verification.rejection_reason }}
+                            </div>
+                        {% endif %}
+                        <p class="text-muted mb-4">
+                            Unfortunately, your verification was not successful. Please contact our support team for assistance with resubmission.
+                        </p>
+                        
+                        <div class="d-grid gap-2">
+                            <a href="mailto:support@autowash.com" class="btn btn-outline-primary btn-lg">
+                                <i class="fas fa-envelope me-2"></i>
+                                Contact Support
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Progress Timeline -->
+            <div class="card verification-card mt-4">
+                <div class="card-body p-4">
+                    <h6 class="card-title mb-3">
+                        <i class="fas fa-tasks me-2"></i>
+                        Verification Timeline
+                    </h6>
+                    
+                    <div class="timeline-step">
+                        <div class="step-icon completed">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div>
+                            <div class="fw-medium">Business Registration</div>
+                            <small class="text-muted">Account created successfully</small>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-step">
+                        <div class="step-icon completed">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div>
+                            <div class="fw-medium">Subscription Selected</div>
+                            <small class="text-muted">Plan chosen and payment processed</small>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-step">
+                        <div class="step-icon {% if verification.status == 'in_review' or verification.status == 'verified' or verification.status == 'approved' %}completed{% elif verification.status == 'pending' %}active{% else %}pending{% endif %}">
+                            {% if verification.status == 'in_review' or verification.status == 'verified' or verification.status == 'approved' %}
+                                <i class="fas fa-check"></i>
+                            {% else %}
+                                <i class="fas fa-clock"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="fw-medium">Admin Review</div>
+                            <small class="text-muted">Business verification by admin team</small>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-step">
+                        <div class="step-icon {% if verification.status == 'verified' or verification.status == 'approved' %}completed{% elif verification.status == 'in_review' %}active{% else %}pending{% endif %}">
+                            {% if verification.status == 'verified' or verification.status == 'approved' %}
+                                <i class="fas fa-check"></i>
+                            {% elif verification.status == 'in_review' %}
+                                <i class="fas fa-search"></i>
+                            {% else %}
+                                <i class="fas fa-clock"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="fw-medium">Review Process</div>
+                            <small class="text-muted">Our team reviews your documents</small>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-step">
+                        <div class="step-icon {% if verification.status == 'verified' or verification.status == 'approved' %}completed{% else %}pending{% endif %}">
+                            {% if verification.status == 'verified' or verification.status == 'approved' %}
+                                <i class="fas fa-check"></i>
+                            {% else %}
+                                <i class="fas fa-trophy"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="fw-medium">Account Activated</div>
+                            <small class="text-muted">Full access to all features</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="help-section">
+                <h6 class="fw-bold mb-3">
+                    <i class="fas fa-question-circle me-2"></i>
+                    Need Help?
+                </h6>
+                <p class="text-muted mb-3">
+                    If you have questions about the verification process or need assistance uploading documents, our support team is here to help.
+                </p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{% url 'contact' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-envelope me-1"></i>Contact Support
+                    </a>
+                    <a href="tel:+254700000000" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-phone me-1"></i>Call Us
+                    </a>
+                    <a href="mailto:support@autowash.com" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-at me-1"></i>Email Us
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Simple refresh functionality for in-review status
+    {% if verification.status == 'in_review' %}
+    // Add a refresh reminder every 5 minutes
+    setInterval(function() {
+        if (confirm('Would you like to refresh the page to check for verification updates?')) {
+            window.location.reload();
+        }
+    }, 300000); // 5 minutes
+    {% endif %}
+    
+    // Smooth scroll to upload button
+    $('.btn-primary').on('click', function(e) {
+        // Add a small delay to show the click effect
+        setTimeout(function() {
+            // Page will navigate to verification page
+        }, 100);
+    });
+    
+    // Auto-hide alerts after 10 seconds
+    setTimeout(function() {
+        $('.alert').fadeOut('slow');
+    }, 10000);
+});
+</script>
+{% endblock %}
