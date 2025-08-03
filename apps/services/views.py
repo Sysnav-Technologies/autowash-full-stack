@@ -167,19 +167,45 @@ def service_detail_view(request, pk):
         'avg_duration': 0,  # We'll calculate this separately
     }
     
-    # Calculate average duration using raw SQL for MySQL compatibility
-    from django.db import connection
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT AVG(TIMESTAMPDIFF(MINUTE, started_at, completed_at)) as avg_duration
-            FROM services_serviceorderitem 
-            WHERE service_id = %s 
-            AND completed_at IS NOT NULL 
-            AND started_at IS NOT NULL
-        """, [service.id])
-        result = cursor.fetchone()
-        if result and result[0]:
-            stats['avg_duration'] = float(result[0])
+    # Calculate average duration using tenant-aware database connection
+    from django.db import connections
+    from apps.core.database_router import get_current_tenant
+    
+    # Get the current tenant and use the appropriate database connection
+    current_tenant = get_current_tenant()
+    if current_tenant:
+        db_alias = f"tenant_{current_tenant.id}"
+        # Ensure tenant database is added to settings
+        if db_alias not in connections.databases:
+            from apps.core.database_router import TenantDatabaseManager
+            TenantDatabaseManager.add_tenant_to_settings(current_tenant)
+        
+        # Use tenant database connection for raw SQL
+        with connections[db_alias].cursor() as cursor:
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, started_at, completed_at)) as avg_duration
+                FROM services_serviceorderitem 
+                WHERE service_id = %s 
+                AND completed_at IS NOT NULL 
+                AND started_at IS NOT NULL
+            """, [service.id])
+            result = cursor.fetchone()
+            if result and result[0]:
+                stats['avg_duration'] = float(result[0])
+    else:
+        # Fallback: use default connection if no tenant context
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, started_at, completed_at)) as avg_duration
+                FROM services_serviceorderitem 
+                WHERE service_id = %s 
+                AND completed_at IS NOT NULL 
+                AND started_at IS NOT NULL
+            """, [service.id])
+            result = cursor.fetchone()
+            if result and result[0]:
+                stats['avg_duration'] = float(result[0])
     
     # ADDED: Split compatible vehicle types for template
     compatible_vehicle_types = []
