@@ -1,48 +1,70 @@
-<!-- Notifications -->
-<div class="dropdown">
-    <button class="notification-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+<!-- Nexus Style Notifications -->
+<div class="dropdown notifications-dropdown">
+    <button class="notification-btn" 
+            type="button" 
+            data-bs-toggle="dropdown" 
+            aria-expanded="false"
+            title="Notifications"
+            aria-label="View Notifications">
         <i class="fas fa-bell"></i>
         {% if unread_notifications_count > 0 %}
-        <span class="notification-badge">{{ unread_notifications_count }}</span>
+            <span class="notification-badge">{{ unread_notifications_count }}</span>
         {% endif %}
     </button>
-    <div class="dropdown-menu dropdown-menu-end notification-dropdown">
+    
+    <div class="dropdown-menu dropdown-menu-end notification-dropdown-menu">
+        <!-- Notification Header -->
         <div class="notification-header">
-            <h6 class="mb-0">Notifications</h6>
-            {% if unread_notifications_count > 0 %}
-            <small class="badge bg-primary">{{ unread_notifications_count }} new</small>
-            {% endif %}
+            <div class="d-flex align-items-center justify-content-between">
+                <h6 class="notification-title mb-0">
+                    <i class="fas fa-bell me-2 text-primary"></i>Notifications
+                </h6>
+                {% if unread_notifications_count > 0 %}
+                    <span class="badge bg-primary rounded-pill">{{ unread_notifications_count }}</span>
+                {% endif %}
+            </div>
         </div>
         
+        <!-- Notification Body -->
         <div class="notification-body">
             {% for notification in recent_notifications %}
-            <a class="notification-item {% if not notification.is_read %}unread{% endif %}" 
-               href="/business/{{ request.tenant.slug }}/notifications/{{ notification.id }}/redirect/">
-                <div class="notification-icon">
-                    <i class="fas fa-{{ notification.icon }} text-{{ notification.type }}"></i>
-                </div>
-                <div class="notification-content">
-                    <p class="notification-message">{{ notification.message }}</p>
-                    <small class="notification-time">{{ notification.created_at|timesince }} ago</small>
-                </div>
-                {% if not notification.is_read %}
-                <div class="notification-indicator"></div>
-                {% endif %}
-            </a>
+                <a class="notification-item {% if not notification.is_read %}notification-unread{% endif %}" 
+                   href="/business/{{ request.tenant.slug }}/notifications/{{ notification.id }}/redirect/">
+                    <div class="notification-icon-wrapper">
+                        <i class="fas fa-{{ notification.icon|default:'info-circle' }} 
+                           text-{{ notification.type|default:'primary' }}"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-message">{{ notification.message }}</div>
+                        <div class="notification-time">
+                            <i class="fas fa-clock me-1"></i>{{ notification.created_at|timesince }} ago
+                        </div>
+                    </div>
+                    {% if not notification.is_read %}
+                        <div class="notification-indicator"></div>
+                    {% endif %}
+                </a>
             {% empty %}
-            <div class="notification-empty">
-                <i class="fas fa-bell-slash text-muted mb-2"></i>
-                <p class="text-muted mb-0">No new notifications</p>
-            </div>
+                <div class="notification-empty">
+                    <div class="notification-empty-icon">
+                        <i class="fas fa-bell-slash"></i>
+                    </div>
+                    <div class="notification-empty-text">
+                        <p class="mb-1">No notifications yet</p>
+                        <small class="text-muted">We'll notify you when something important happens</small>
+                    </div>
+                </div>
             {% endfor %}
         </div>
         
+        <!-- Notification Footer -->
         {% if recent_notifications %}
-        <div class="notification-footer">
-            <a href="/business/{{ request.tenant.slug }}/notifications/" class="btn btn-sm btn-outline-primary w-100">
-                View all notifications
-            </a>
-        </div>
+            <div class="notification-footer">
+                <a href="/business/{{ request.tenant.slug }}/notifications/" 
+                   class="btn btn-nexus btn-sm w-100">
+                    <i class="fas fa-eye me-2"></i>View All Notifications
+                </a>
+            </div>
         {% endif %}
     </div>
 </div>

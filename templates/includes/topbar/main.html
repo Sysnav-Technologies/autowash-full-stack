@@ -1,153 +1,87 @@
-<!-- Top Bar -->
+<!-- Nexus Style Modern Topbar -->
+{% load static %}
+
 <header class="topbar">
     <div class="topbar-left">
-        <button type="button" class="sidebar-toggle" id="sidebarToggle">
+        <!-- Mobile Menu Toggle (Hidden on desktop) -->
+        <button type="button" 
+                class="sidebar-toggle d-lg-none" 
+                id="mobileSidebarToggle" 
+                title="Toggle Menu" 
+                aria-label="Toggle Navigation Menu">
             <i class="fas fa-bars"></i>
         </button>
         
-        <!-- Breadcrumbs -->
-        <nav aria-label="breadcrumb">
+        <!-- Desktop Sidebar Toggle -->
+        <button type="button" 
+                class="sidebar-toggle d-none d-lg-flex" 
+                id="sidebarToggle" 
+                title="Toggle Sidebar" 
+                aria-label="Toggle Sidebar">
+            <i class="fas fa-bars"></i>
+        </button>
+        
+        <!-- Breadcrumbs Navigation -->
+        <nav aria-label="breadcrumb" class="d-none d-md-block">
             <ol class="breadcrumb">
                 {% block breadcrumbs %}
-                <li class="breadcrumb-item">
-                    <a href="/business/{{ request.tenant.slug }}/">Dashboard</a>
-                </li>
+                    <li class="breadcrumb-item">
+                        <a href="/business/{{ request.tenant.slug }}/">
+                            <i class="fas fa-home me-1"></i>Dashboard
+                        </a>
+                    </li>
                 {% endblock %}
             </ol>
         </nav>
+        
+        <!-- Mobile Brand (Visible only on mobile) -->
+        <div class="mobile-brand d-lg-none">
+            {% if request.tenant.logo %}
+                <img src="{{ request.tenant.logo.url }}" alt="{{ request.tenant.name }}" class="mobile-brand-logo">
+            {% else %}
+                <div class="mobile-brand-logo">
+                    {{ request.tenant.name|first|upper }}
+                </div>
+            {% endif %}
+            <span class="mobile-brand-text">{{ request.tenant.name|truncatechars:15 }}</span>
+        </div>
     </div>
     
     <div class="topbar-right">
         <!-- Quick Actions -->
-        {% include 'includes/topbar/quick_actions.html' %}
+        <div class="d-none d-md-block">
+            {% include 'includes/topbar/quick_actions.html' %}
+        </div>
         
         <!-- Notifications -->
         {% include 'includes/topbar/notifications.html' %}
         
         <!-- User Menu -->
         {% include 'includes/topbar/user_menu.html' %}
+        
+        <!-- Mobile Menu Toggle -->
+        <button type="button" 
+                class="mobile-menu-toggle d-md-none" 
+                id="mobileMenuToggle" 
+                title="Menu" 
+                aria-label="Main Menu">
+            <i class="fas fa-ellipsis-v"></i>
+        </button>
     </div>
 </header>
 
-<script>
-// Debug script to test mobile sidebar toggle
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Topbar loaded');
-    
-    // Add click listener directly to test
-    const toggleBtn = document.getElementById('sidebarToggle');
-    if (toggleBtn) {
-        console.log('Sidebar toggle button found');
-        
-        toggleBtn.addEventListener('click', function(e) {
-            console.log('Direct click handler triggered');
-            e.preventDefault();
-            
-            if (window.toggleSidebar) {
-                window.toggleSidebar();
-            } else {
-                console.log('toggleSidebar function not available');
-            }
-        });
-    } else {
-        console.log('Sidebar toggle button NOT found');
-    }
-});
-</script>
+<!-- Mobile Menu Overlay -->
+<div class="mobile-menu-overlay d-md-none" id="mobileMenuOverlay"></div>
 
-<style>
-/* Top Bar Styles */
-.topbar {
-    height: var(--header-height);
-    background: white;
-    border-bottom: 1px solid var(--gray-200);
-    padding: 0 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 999;
-    box-shadow: var(--shadow-sm);
-}
-
-.topbar-left {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.sidebar-toggle {
-    background: none;
-    border: none;
-    color: var(--gray-600);
-    font-size: 1.125rem;
-    padding: 0.5rem;
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-}
-
-.sidebar-toggle:hover {
-    background: var(--gray-100);
-    color: var(--gray-900);
-}
-
-.breadcrumb {
-    background: none;
-    padding: 0;
-    margin: 0;
-    font-size: 0.875rem;
-}
-
-.breadcrumb-item {
-    color: var(--gray-500);
-}
-
-.breadcrumb-item a {
-    color: var(--gray-500);
-    text-decoration: none;
-    transition: color var(--transition-fast);
-}
-
-.breadcrumb-item a:hover {
-    color: var(--primary-600);
-}
-
-.breadcrumb-item.active {
-    color: var(--gray-900);
-    font-weight: 500;
-}
-
-.breadcrumb-item + .breadcrumb-item::before {
-    content: "/";
-    color: var(--gray-400);
-    margin: 0 0.5rem;
-}
-
-.topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-/* Mobile Responsive */
-@media (max-width: 768px) {
-    .topbar {
-        padding: 0 1rem;
-    }
-    
-    .topbar-right > *:not(.user-menu) {
-        display: none;
-    }
-    
-    .breadcrumb {
-        display: none;
-    }
-}
-</style>
+<!-- Mobile Quick Actions Menu -->
+<div class="mobile-quick-menu d-md-none" id="mobileQuickMenu">
+    <div class="mobile-quick-menu-content">
+        <div class="mobile-quick-menu-header">
+            <h6 class="mb-0">Quick Actions</h6>
+            <button type="button" class="btn-close" id="closeMobileMenu" aria-label="Close"></button>
+        </div>
+        <div class="mobile-quick-menu-body">
+            {% include 'includes/topbar/quick_actions.html' with mobile=True %}
+        </div>
+    </div>
+</div>

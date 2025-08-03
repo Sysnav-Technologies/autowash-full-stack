@@ -1,321 +1,112 @@
-<!-- Quick Actions Dropdown -->
-<div class="quick-actions dropdown">
-    <button class="btn btn-primary btn-sm quick-actions-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+<!-- Nexus Style Quick Actions -->
+{% if not mobile %}
+<div class="dropdown quick-actions-dropdown">
+    <button class="quick-action-btn dropdown-toggle" 
+            type="button" 
+            data-bs-toggle="dropdown" 
+            aria-expanded="false"
+            title="Quick Actions"
+            aria-label="Quick Actions Menu">
         <i class="fas fa-plus"></i>
-        <span class="d-none d-md-inline">Quick Add</span>
-        <i class="fas fa-chevron-down ms-1 d-none d-md-inline"></i>
     </button>
     
-    <div class="dropdown-menu dropdown-menu-end quick-actions-menu">
-        <!-- Header -->
-        <div class="dropdown-header">
-            <div class="d-flex align-items-center justify-content-between">
-                <span class="fw-semibold">Quick Actions</span>
-                <small class="text-muted">{{ user_role|title }}</small>
-            </div>
-        </div>
+    <ul class="dropdown-menu dropdown-menu-end quick-actions-menu">
+        <li class="dropdown-header">
+            <i class="fas fa-bolt text-primary me-2"></i>
+            Quick Actions
+        </li>
         
-        <!-- Core Operations (All Authenticated Users) -->
+        <!-- Core Service Actions -->
         {% if user_role and user_role in 'owner,manager,attendant' %}
-        <div class="action-section">
-            <div class="action-section-title">
-                <i class="fas fa-bolt text-primary"></i>
-                Core Operations
-            </div>
-            
-            <!-- Quick Service Order (Most Important for Attendants) -->
-            <a class="dropdown-item action-item featured-action" 
-               href="/business/{{ request.tenant.slug }}/services/orders/quick/">
-                <div class="action-icon bg-primary">
-                    <i class="fas fa-rocket"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Quick Service Order</div>
-                    <div class="action-description">Fast-track customer service</div>
-                </div>
-                <div class="action-badge">
-                    <span class="badge bg-primary">FAST</span>
-                </div>
-            </a>
-            
-            <!-- New Customer -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/services/quick/customer-register/">
-                <div class="action-icon bg-success">
-                    <i class="fas fa-user-plus"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">New Customer</div>
-                    <div class="action-description">Add customer to database</div>
-                </div>
-                <div class="action-shortcut">
-                    <kbd>Ctrl</kbd> + <kbd>K</kbd>
-                </div>
-            </a>
-            
-            <!-- Process Payment -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/payments/create/">
-                <div class="action-icon bg-info">
-                    <i class="fas fa-credit-card"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Process Payment</div>
-                    <div class="action-description">Handle customer payment</div>
-                </div>
-            </a>
-            
-            <!-- Service Queue Management -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/services/queue/">
-                <div class="action-icon bg-warning">
-                    <i class="fas fa-tasks"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Manage Queue</div>
-                    <div class="action-description">View and assign services</div>
-                </div>
-                {% if active_queue_count > 0 %}
-                <div class="action-badge">
-                    <span class="badge bg-warning">{{ active_queue_count }}</span>
-                </div>
-                {% endif %}
-            </a>
-        </div>
-        {% endif %}
-        
-        <!-- Management Actions (Manager & Owner Only) -->
-        {% if user_role and user_role in 'owner,manager' %}
-        <div class="dropdown-divider"></div>
-        <div class="action-section">
-            <div class="action-section-title">
-                <i class="fas fa-cogs text-secondary"></i>
-                Management
-            </div>
-            
-            <!-- New Service -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/services/create/">
-                <div class="action-icon bg-primary">
-                    <i class="fas fa-car-wash"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">New Service</div>
-                    <div class="action-description">Create service offering</div>
-                </div>
-            </a>
-            
-            <!-- New Employee -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/employees/create/">
-                <div class="action-icon bg-warning">
-                    <i class="fas fa-user-tie"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">New Employee</div>
-                    <div class="action-description">Add team member</div>
-                </div>
-            </a>
-            
-            <!-- Inventory Item -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/inventory/items/create/">
-                <div class="action-icon bg-secondary">
-                    <i class="fas fa-box"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Inventory Item</div>
-                    <div class="action-description">Add stock item</div>
-                </div>
-            </a>
-            
-            <!-- Stock Adjustment -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/">
-                <div class="action-icon bg-info">
-                    <i class="fas fa-exchange-alt"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Stock Adjustment</div>
-                    <div class="action-description">Update inventory levels</div>
-                </div>
-            </a>
-            
-            <!-- New Expense -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/expenses/create/">
-                <div class="action-icon bg-danger">
-                    <i class="fas fa-receipt"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Record Expense</div>
-                    <div class="action-description">Add business expense</div>
-                </div>
-            </a>
-            
-            <!-- New Vendor -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/expenses/vendors/create/">
-                <div class="action-icon bg-dark">
-                    <i class="fas fa-truck"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">New Vendor</div>
-                    <div class="action-description">Add supplier/vendor</div>
-                </div>
-            </a>
-        </div>
-        {% endif %}
-        
-        <!-- Owner-Only Actions -->
-        {% if user_role == 'owner' %}
-        <div class="dropdown-divider"></div>
-        <div class="action-section">
-            <div class="action-section-title">
-                <i class="fas fa-crown text-warning"></i>
-                Business Owner
-            </div>
-            
-            <!-- Business Reports -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/reports/generate/">
-                <div class="action-icon bg-purple">
-                    <i class="fas fa-chart-bar"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Generate Report</div>
-                    <div class="action-description">Business analytics</div>
-                </div>
-            </a>
-            
-            <!-- Business Settings -->
-            <a class="dropdown-item action-item" 
-               href="/auth/business/settings/">
-                <div class="action-icon bg-dark">
-                    <i class="fas fa-cog"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Business Settings</div>
-                    <div class="action-description">Configure business</div>
-                </div>
-            </a>
-        </div>
-        {% endif %}
-        
-        <!-- Personal Actions -->
-        <div class="dropdown-divider"></div>
-        <div class="action-section">
-            <div class="action-section-title">
-                <i class="fas fa-user text-info"></i>
-                Personal
-            </div>
-            
-            <!-- Clock In/Out -->
-            {% if not user_clocked_in %}
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/employees/attendance/checkin/" 
-               onclick="return confirmClockIn()">
-                <div class="action-icon bg-success">
-                    <i class="fas fa-clock"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Clock In</div>
-                    <div class="action-description">Start your work day</div>
-                </div>
-            </a>
-            {% else %}
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/employees/attendance/checkout/" 
-               onclick="return confirmClockOut()">
-                <div class="action-icon bg-danger">
-                    <i class="fas fa-clock"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Clock Out</div>
-                    <div class="action-description">End your work day</div>
-                </div>
-                <div class="action-status">
-                    <span class="status-indicator status-active"></span>
-                </div>
-            </a>
-            {% endif %}
-            
-            <!-- Break Management -->
-            {% if user_clocked_in %}
-            {% if not user_on_break %}
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/employees/attendance/take-break/" 
-               onclick="return confirmTakeBreak()">
-                <div class="action-icon bg-warning">
-                    <i class="fas fa-coffee"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Take Break</div>
-                    <div class="action-description">Pause work session</div>
-                </div>
-            </a>
-            {% else %}
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/employees/attendance/end-break/" 
-               onclick="return confirmEndBreak()">
-                <div class="action-icon bg-success">
-                    <i class="fas fa-play"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">End Break</div>
-                    <div class="action-description">Resume work session</div>
-                </div>
-                <div class="action-status">
-                    <span class="status-indicator status-break"></span>
-                </div>
-            </a>
-            {% endif %}
-            {% endif %}
-            
-            <!-- Request Leave -->
-            <a class="dropdown-item action-item" 
-               href="/business/{{ request.tenant.slug }}/employees/leave/request/">
-                <div class="action-icon bg-info">
-                    <i class="fas fa-calendar-plus"></i>
-                </div>
-                <div class="action-content">
-                    <div class="action-title">Request Leave</div>
-                    <div class="action-description">Submit leave request</div>
-                </div>
-            </a>
-        </div>
-        
-        <!-- Quick Search -->
-        <div class="dropdown-divider"></div>
-        <div class="action-section">
-            <div class="quick-search-container">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text">
-                        <i class="fas fa-search"></i>
-                    </span>
-                    <input type="text" 
-                           class="form-control" 
-                           placeholder="Quick search customers..." 
-                           id="quickSearchInput"
-                           autocomplete="off">
-                </div>
-                <div class="quick-search-results" id="quickSearchResults"></div>
-            </div>
-        </div>
-        
-        <!-- Footer -->
-        <div class="dropdown-divider"></div>
-        <div class="dropdown-footer">
-            <div class="d-flex justify-content-between align-items-center">
-                <small class="text-muted">
-                    <i class="fas fa-keyboard"></i>
-                    Use keyboard shortcuts
-                </small>
-                <a href="#" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#shortcutsModal">
-                    <i class="fas fa-question-circle"></i>
-                    Help
+            <li>
+                <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/orders/quick/">
+                    <div class="quick-action-icon">
+                        <i class="fas fa-bolt text-primary"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <div class="quick-action-title">Quick Service</div>
+                        <div class="quick-action-description">Start a new service order</div>
+                    </div>
                 </a>
-            </div>
-        </div>
-    </div>
+            </li>
+            
+            <li>
+                <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/create/">
+                    <div class="quick-action-icon">
+                        <i class="fas fa-user-plus text-success"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <div class="quick-action-title">Add Customer</div>
+                        <div class="quick-action-description">Register new customer</div>
+                    </div>
+                </a>
+            </li>
+        {% endif %}
+        
+        <!-- Quick Navigation -->
+        <li><hr class="dropdown-divider"></li>
+        <li class="dropdown-header text-muted">Quick Navigation</li>
+        
+        {% if user_role and user_role in 'owner,manager,supervisor,attendant' %}
+            <li>
+                <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/queue/">
+                    <div class="quick-action-icon">
+                        <i class="fas fa-tasks text-warning"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <span class="quick-action-title">Service Queue</span>
+                        {% if active_queue_count > 0 %}
+                            <span class="badge bg-warning ms-auto">{{ active_queue_count }}</span>
+                        {% endif %}
+                    </div>
+                </a>
+            </li>
+        {% endif %}
+        
+        {% if user_role and user_role in 'owner,manager' %}
+            <li>
+                <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/reports/">
+                    <div class="quick-action-icon">
+                        <i class="fas fa-chart-bar text-info"></i>
+                    </div>
+                    <div class="quick-action-content">
+                        <span class="quick-action-title">Reports</span>
+                    </div>
+                </a>
+            </li>
+        {% endif %}
+    </ul>
 </div>
+{% else %}
+<!-- Mobile Quick Actions -->
+<div class="mobile-quick-actions">
+    {% if user_role and user_role in 'owner,manager,attendant' %}
+        <a class="mobile-quick-action" href="/business/{{ request.tenant.slug }}/services/orders/quick/">
+            <i class="fas fa-bolt"></i>
+            <span>Quick Service</span>
+        </a>
+        
+        <a class="mobile-quick-action" href="/business/{{ request.tenant.slug }}/customers/create/">
+            <i class="fas fa-user-plus"></i>
+            <span>Add Customer</span>
+        </a>
+    {% endif %}
+    
+    {% if user_role and user_role in 'owner,manager,supervisor,attendant' %}
+        <a class="mobile-quick-action" href="/business/{{ request.tenant.slug }}/services/queue/">
+            <i class="fas fa-tasks"></i>
+            <span>Queue</span>
+            {% if active_queue_count > 0 %}
+                <span class="badge bg-warning">{{ active_queue_count }}</span>
+            {% endif %}
+        </a>
+    {% endif %}
+    
+    {% if user_role and user_role in 'owner,manager' %}
+        <a class="mobile-quick-action" href="/business/{{ request.tenant.slug }}/reports/">
+            <i class="fas fa-chart-bar"></i>
+            <span>Reports</span>
+        </a>
+    {% endif %}
+</div>
+{% endif %}

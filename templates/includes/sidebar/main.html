@@ -1,4 +1,4 @@
-<!-- Complete Sidebar Navigation -->
+<!-- Nexus Style Modern Sidebar Navigation -->
 <nav class="sidebar" id="sidebar">
     <!-- Sidebar Header -->
     <div class="sidebar-header">
@@ -17,8 +17,8 @@
     
     <!-- Sidebar Navigation -->
     <div class="sidebar-nav">
-        <!-- Main Navigation -->
-         {% if user_role and user_role in 'owner,manager' %}
+        <!-- Main Dashboard -->
+        {% if user_role and user_role in 'owner,manager' %}
         <div class="nav-section">
             <div class="nav-section-title">Main</div>
             <ul class="nav-list">
@@ -33,13 +33,13 @@
         </div>
         {% endif %}
 
-
+        <!-- Attendant Dashboard -->
         {% if user_role and user_role in 'attendant' %}
         <div class="nav-section">
             <div class="nav-section-title">Main</div>
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+                    <a class="nav-link {% if request.resolver_match.url_name == 'attendant_dashboard' %}active{% endif %}" 
                        href="/business/{{ request.tenant.slug }}/services/dashboard/">
                         <i class="nav-icon fas fa-home"></i>
                         <span class="nav-text">Dashboard</span>
@@ -52,15 +52,161 @@
         <!-- Core Operations -->
         {% if user_role and user_role in 'owner,manager,supervisor,attendant' %}
         <div class="nav-section">
-            <div class="nav-section-title">Core Operations</div>
+            <div class="nav-section-title">Operations</div>
             <ul class="nav-list">
-                <!-- Services Module -->
-                {% include 'includes/sidebar/modules/services.html' %}
+                <!-- Services Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="services-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'services' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('services-dropdown')">
+                        <i class="nav-icon fas fa-car-wash"></i>
+                        <span class="nav-text">Services</span>
+                        {% if pending_orders_count > 0 %}
+                        <span class="nav-badge nav-badge-warning">{{ pending_orders_count }}</span>
+                        {% endif %}
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        {% if user_role == 'attendant' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'my_services' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/my-services/">
+                                <i class="nav-icon fas fa-clipboard-user"></i>
+                                <span class="nav-text">My Services</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'services' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Services</span>
+                            </a>
+                        </li>
+                        
+                        {% if user_role in 'owner,manager' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'services' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/create/">
+                                <i class="nav-icon fas fa-plus-circle"></i>
+                                <span class="nav-text">Add Service</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'category_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/categories/">
+                                <i class="nav-icon fas fa-tags"></i>
+                                <span class="nav-text">Categories</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'package_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/packages/">
+                                <i class="nav-icon fas fa-box-open"></i>
+                                <span class="nav-text">Service Packages</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'bay_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/bays/">
+                                <i class="nav-icon fas fa-car"></i>
+                                <span class="nav-text">Service Bays</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <li class="nav-divider">
+                            <span class="nav-divider-text">Orders & Queue</span>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'order_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/orders/">
+                                <i class="nav-icon fas fa-clipboard-list"></i>
+                                <span class="nav-text">Service Orders</span>
+                                {% if pending_orders_count > 0 %}
+                                <span class="nav-badge nav-badge-warning">{{ pending_orders_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link nav-link-featured {% if request.resolver_match.url_name == 'quick_order' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/orders/quick/">
+                                <i class="nav-icon fas fa-bolt"></i>
+                                <span class="nav-text">Quick Order</span>
+                                <span class="nav-badge nav-badge-primary">FAST</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'queue' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/services/queue/">
+                                <i class="nav-icon fas fa-tasks"></i>
+                                <span class="nav-text">Service Queue</span>
+                                {% if active_queue_count > 0 %}
+                                <span class="nav-badge nav-badge-warning">{{ active_queue_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                    </ul>
+                </li>
                 
-                <!-- Customers Module -->
-                {% include 'includes/sidebar/modules/customers.html' %}
-                
-                
+                <!-- Customers Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="customers-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'customers' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('customers-dropdown')">
+                        <i class="nav-icon fas fa-users"></i>
+                        <span class="nav-text">Customers</span>
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'customers' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/customers/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Customers</span>
+                            </a>
+                        </li>
+                        
+                        {% if user_role in 'owner,manager,supervisor' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'customers' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/customers/create/">
+                                <i class="nav-icon fas fa-user-plus"></i>
+                                <span class="nav-text">Add Customer</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'loyalty_dashboard' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/customers/loyalty/">
+                                <i class="nav-icon fas fa-star"></i>
+                                <span class="nav-text">Loyalty Program</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'export' and 'customers' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/customers/export/">
+                                <i class="nav-icon fas fa-download"></i>
+                                <span class="nav-text">Export Data</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'import' and 'customers' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/customers/import/">
+                                <i class="nav-icon fas fa-upload"></i>
+                                <span class="nav-text">Import Data</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </li>
             </ul>
         </div>
         {% endif %}
@@ -70,26 +216,357 @@
         <div class="nav-section">
             <div class="nav-section-title">Management</div>
             <ul class="nav-list">
+                <!-- Employees Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="employees-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'employees' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('employees-dropdown')">
+                        <i class="nav-icon fas fa-user-tie"></i>
+                        <span class="nav-text">Employees</span>
+                        {% if pending_employee_requests > 0 %}
+                        <span class="nav-badge nav-badge-primary">{{ pending_employee_requests }}</span>
+                        {% endif %}
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'employees' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/employees/">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <span class="nav-text">Dashboard</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'employees' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/employees/list/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Employees</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'employees' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/employees/create/">
+                                <i class="nav-icon fas fa-user-plus"></i>
+                                <span class="nav-text">Add Employee</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'attendance' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/employees/attendance/">
+                                <i class="nav-icon fas fa-clock"></i>
+                                <span class="nav-text">Attendance</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'department_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/employees/departments/">
+                                <i class="nav-icon fas fa-building"></i>
+                                <span class="nav-text">Departments</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
 
-                <!-- Employees Module -->
-                {% include "includes/sidebar/modules/employees.html" %}
+                <!-- Inventory Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="inventory-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'inventory' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('inventory-dropdown')">
+                        <i class="nav-icon fas fa-boxes"></i>
+                        <span class="nav-text">Inventory</span>
+                        {% if low_stock_items > 0 %}
+                        <span class="nav-badge nav-badge-warning">{{ low_stock_items }}</span>
+                        {% endif %}
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'inventory' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <span class="nav-text">Dashboard</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'inventory' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/items/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Items</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'item_create' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/items/create/">
+                                <i class="nav-icon fas fa-plus-circle"></i>
+                                <span class="nav-text">Add Item</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'stock_adjustment' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/">
+                                <i class="nav-icon fas fa-exchange-alt"></i>
+                                <span class="nav-text">Stock Adjustments</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'stock_take_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/stock-takes/">
+                                <i class="nav-icon fas fa-clipboard-check"></i>
+                                <span class="nav-text">Stock Takes</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'low_stock_report' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/reports/low-stock/">
+                                <i class="nav-icon fas fa-exclamation-triangle"></i>
+                                <span class="nav-text">Low Stock Report</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
 
-                <!-- Inventory Module -->
-                 {% include "includes/sidebar/modules/inventory.html" %}
+                <!-- Expenses Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="expenses-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('expenses-dropdown')">
+                        <i class="nav-icon fas fa-receipt"></i>
+                        <span class="nav-text">Expenses</span>
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <span class="nav-text">Dashboard</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/list/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Expenses</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/create/">
+                                <i class="nav-icon fas fa-plus-circle"></i>
+                                <span class="nav-text">Add Expense</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'category_list' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/categories/">
+                                <i class="nav-icon fas fa-tags"></i>
+                                <span class="nav-text">Categories</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'vendor_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/vendors/">
+                                <i class="nav-icon fas fa-truck"></i>
+                                <span class="nav-text">Vendors</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/reports/">
+                                <i class="nav-icon fas fa-chart-bar"></i>
+                                <span class="nav-text">Reports</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
 
-                <!-- Expenses Module -->
-                {% include "includes/sidebar/modules/expenses.html" %}
+                <!-- Payments Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="payments-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'payments' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('payments-dropdown')">
+                        <i class="nav-icon fas fa-credit-card"></i>
+                        <span class="nav-text">Payments</span>
+                        {% if pending_payments > 0 %}
+                        <span class="nav-badge nav-badge-success">{{ pending_payments }}</span>
+                        {% endif %}
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/payments/">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <span class="nav-text">Dashboard</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/payments/list/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Payments</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'process' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/payments/process/">
+                                <i class="nav-icon fas fa-credit-card"></i>
+                                <span class="nav-text">Process Payment</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'methods' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/payments/methods/">
+                                <i class="nav-icon fas fa-credit-card"></i>
+                                <span class="nav-text">Payment Methods</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/payments/reports/">
+                                <i class="nav-icon fas fa-chart-bar"></i>
+                                <span class="nav-text">Reports</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
 
-                <!-- Payments Module -->
-                {% include "includes/sidebar/modules/payments.html" %}
+                <!-- Suppliers Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="suppliers-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'suppliers' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('suppliers-dropdown')">
+                        <i class="nav-icon fas fa-truck"></i>
+                        <span class="nav-text">Suppliers</span>
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'suppliers' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/suppliers/">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <span class="nav-text">Dashboard</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'suppliers' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/suppliers/list/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Suppliers</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'suppliers' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/suppliers/create/">
+                                <i class="nav-icon fas fa-plus-circle"></i>
+                                <span class="nav-text">Add Supplier</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'categories' and 'suppliers' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/suppliers/categories/">
+                                <i class="nav-icon fas fa-tags"></i>
+                                <span class="nav-text">Categories</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'purchase_order_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/suppliers/orders/">
+                                <i class="nav-icon fas fa-file-invoice"></i>
+                                <span class="nav-text">Purchase Orders</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+                <!-- Reports Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="reports-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'reports' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('reports-dropdown')">
+                        <i class="nav-icon fas fa-chart-bar"></i>
+                        <span class="nav-text">Reports</span>
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <span class="nav-text">Reports Dashboard</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'sales' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/sales/">
+                                <i class="nav-icon fas fa-chart-line"></i>
+                                <span class="nav-text">Sales Reports</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'financial' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/financial/">
+                                <i class="nav-icon fas fa-dollar-sign"></i>
+                                <span class="nav-text">Financial Reports</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'customer' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/customer/">
+                                <i class="nav-icon fas fa-users"></i>
+                                <span class="nav-text">Customer Reports</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Business Intelligence (Owner Only) -->
+        {% if user_role == 'owner' %}
+        <div class="nav-section">
+            <div class="nav-section-title">Analytics</div>
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a class="nav-link {% if 'analytics' in request.resolver_match.url_name %}active{% endif %}" 
+                       href="/business/{{ request.tenant.slug }}/analytics/">
+                        <i class="nav-icon fas fa-chart-line"></i>
+                        <span class="nav-text">Analytics</span>
+                    </a>
+                </li>
                 
-              
-
-                <!-- Suppliers Module -->
-                {% include "includes/sidebar/modules/suppliers.html" %}
-
-                <!-- Reports Module -->
-                {% include "includes/sidebar/modules/reports.html" %}
+                <li class="nav-item">
+                    <a class="nav-link {% if 'subscriptions' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="/business/{{ request.tenant.slug }}/subscriptions/">
+                        <i class="nav-icon fas fa-crown"></i>
+                        <span class="nav-text">Subscription</span>
+                        {% if subscription_status == 'trial' %}
+                        <span class="nav-badge nav-badge-warning">Trial</span>
+                        {% elif subscription_status == 'expired' %}
+                        <span class="nav-badge nav-badge-danger">Expired</span>
+                        {% endif %}
+                    </a>
+                </li>
             </ul>
         </div>
         {% endif %}
@@ -100,52 +577,74 @@
             <div class="nav-section-title">Settings</div>
             <ul class="nav-list">
                 <li class="nav-item nav-dropdown" id="settings-dropdown">
-                    <a class="nav-link nav-dropdown-toggle {% if 'settings' in request.resolver_match.namespace %}active{% endif %}" 
+                    <a class="nav-link nav-dropdown-toggle {% if 'settings' in request.resolver_match.url_name %}active{% endif %}" 
                        href="#" onclick="toggleDropdown('settings-dropdown')">
                         <i class="nav-icon fas fa-cog"></i>
                         <span class="nav-text">Settings</span>
+                        <i class="nav-arrow fas fa-chevron-down"></i>
                     </a>
                     <ul class="nav-submenu">
-                     
                         <li class="nav-item">
-                            <a class="nav-link" href="/business/{{ request.tenant.slug }}/business/settings/business/">
+                            <a class="nav-link {% if 'business_settings' in request.resolver_match.url_name %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/business/settings/business/">
                                 <i class="nav-icon fas fa-building"></i>
                                 <span class="nav-text">Business Settings</span>
                             </a>
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link" href="/business/{{ request.tenant.slug }}/business/settings/services/">
+                            <a class="nav-link {% if 'service_settings' in request.resolver_match.url_name %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/business/settings/services/">
                                 <i class="nav-icon fas fa-tools"></i>
                                 <span class="nav-text">Service Settings</span>
                             </a>
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link" href="/business/{{ request.tenant.slug }}/business/settings/payment/">
+                            <a class="nav-link {% if 'payment_settings' in request.resolver_match.url_name %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/business/settings/payment/">
                                 <i class="nav-icon fas fa-credit-card"></i>
                                 <span class="nav-text">Payment Settings</span>
                             </a>
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link" href="/business/{{ request.tenant.slug }}/business/settings/notifications/">
+                            <a class="nav-link {% if 'notification_settings' in request.resolver_match.url_name %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/business/settings/notifications/">
                                 <i class="nav-icon fas fa-bell"></i>
                                 <span class="nav-text">Notifications</span>
                             </a>
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link" href="/business/{{ request.tenant.slug }}/settings/integrations/">
+                            <a class="nav-link {% if 'integration_settings' in request.resolver_match.url_name %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/business/settings/integrations/">
                                 <i class="nav-icon fas fa-plug"></i>
                                 <span class="nav-text">Integrations</span>
                             </a>
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link" href="/business/{{ request.tenant.slug }}/business/settings/backup/">
+                            <a class="nav-link {% if 'backup_settings' in request.resolver_match.url_name %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/business/settings/backup/">
                                 <i class="nav-icon fas fa-database"></i>
-                                <span class="nav-text">Backup & Export</span>
+                                <span class="nav-text">Backup & Restore</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'security_settings' in request.resolver_match.url_name %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/business/settings/security/">
+                                <i class="nav-icon fas fa-shield-alt"></i>
+                                <span class="nav-text">Security</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'user_management' in request.resolver_match.url_name %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/business/settings/users/">
+                                <i class="nav-icon fas fa-users-cog"></i>
+                                <span class="nav-text">User Management</span>
                             </a>
                         </li>
                     </ul>
@@ -153,15 +652,59 @@
             </ul>
         </div>
         {% endif %}
+
+        <!-- Quick Actions Section -->
+        {% if user_role and user_role in 'owner,manager,attendant' %}
+        <div class="nav-section">
+            <div class="nav-section-title">Quick Actions</div>
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a class="nav-link nav-link-action" 
+                       href="/business/{{ request.tenant.slug }}/services/orders/quick/">
+                        <i class="nav-icon fas fa-plus"></i>
+                        <span class="nav-text">New Service</span>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link nav-link-featured" 
+                       href="/business/{{ request.tenant.slug }}/customers/create/">
+                        <i class="nav-icon fas fa-user-plus"></i>
+                        <span class="nav-text">Add Customer</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Help & Support -->
+        <div class="nav-section">
+            <div class="nav-section-title">Support</div>
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a class="nav-link" href="/help/" target="_blank">
+                        <i class="nav-icon fas fa-question-circle"></i>
+                        <span class="nav-text">Help Center</span>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link" href="/contact/" target="_blank">
+                        <i class="nav-icon fas fa-headset"></i>
+                        <span class="nav-text">Contact Support</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
     
-    <!-- Sidebar Footer -->
+    <!-- Sidebar Footer with User Info -->
     <div class="sidebar-footer">
         <div class="sidebar-user">
             {% if employee and employee.photo %}
                 <img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="user-avatar">
             {% else %}
-                <div class="user-avatar">
+                <div class="user-avatar placeholder">
                     {{ user.get_full_name|first|upper|default:user.username|first|upper }}
                 </div>
             {% endif %}
@@ -173,803 +716,5 @@
     </div>
 </nav>
 
-<!-- Sidebar JavaScript Functions -->
-<script>
-// Dropdown toggle function
-function toggleDropdown(dropdownId) {
-    const dropdown = document.getElementById(dropdownId);
-    const allDropdowns = document.querySelectorAll('.nav-dropdown');
-    
-    // Close other dropdowns
-    allDropdowns.forEach(dd => {
-        if (dd.id !== dropdownId) {
-            dd.classList.remove('open');
-        }
-    });
-    
-    // Toggle current dropdown
-    dropdown.classList.toggle('open');
-}
-
-// Services Module Functions
-function startNextService() {
-    fetch(`/business/${window.tenant_slug}/services/ajax/start-next/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccessToast('Service started successfully');
-            if (data.redirect_url) {
-                window.location.href = data.redirect_url;
-            }
-        } else {
-            showErrorToast(data.message || 'No services in queue');
-        }
-    })
-    .catch(error => {
-        showErrorToast('Error starting service');
-    });
-}
-
-function completeCurrentService() {
-    fetch(`/business/${window.tenant_slug}/services/ajax/current-service/`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.current_service) {
-            window.location.href = `/business/${window.tenant_slug}/services/orders/${data.current_service.id}/`;
-        } else {
-            showInfoToast('No active service to complete');
-        }
-    })
-    .catch(error => {
-        showErrorToast('Error checking current service');
-    });
-}
-
-// Customer Module Functions
-// Payment Module Functions
-function openPaymentQuickProcess() {
-    window.location.href = `/business/{{ request.tenant.slug }}/payments/create/`;
-}
-
-function openReceiptPrint() {
-    window.location.href = `/business/{{ request.tenant.slug }}/payments/receipts/`;
-}
-
-// Customer Module Functions
-function openCustomerSearch() {
-    const searchModal = document.createElement('div');
-    searchModal.className = 'search-modal';
-    searchModal.innerHTML = `
-        <div class="search-modal-content">
-            <div class="search-modal-header">
-                <h3>Find Customer</h3>
-                <button onclick="this.parentElement.parentElement.parentElement.remove()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="search-modal-body">
-                <input type="text" id="customer-search-input" placeholder="Search by name, phone, or ID..." class="form-control">
-                <div id="customer-search-results"></div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(searchModal);
-    
-    // Initialize search functionality
-    const searchInput = document.getElementById('customer-search-input');
-    searchInput.addEventListener('input', function() {
-        if (this.value.length >= 2) {
-            fetch(`/business/{{ request.tenant.slug }}/services/ajax/customer/search/?q=${encodeURIComponent(this.value)}`)
-            .then(response => response.json())
-            .then(data => {
-                const resultsDiv = document.getElementById('customer-search-results');
-                resultsDiv.innerHTML = data.results.map(customer => `
-                    <div class="search-result-item" onclick="selectCustomer('${customer.id}', '${customer.name}')">
-                        <strong>${customer.name}</strong><br>
-                        <small>${customer.phone} - ${customer.customer_id}</small>
-                    </div>
-                `).join('');
-            });
-        }
-    });
-    
-    searchInput.focus();
-}
-
-function openVehicleSearch() {
-    const searchModal = document.createElement('div');
-    searchModal.className = 'search-modal';
-    searchModal.innerHTML = `
-        <div class="search-modal-content">
-            <div class="search-modal-header">
-                <h3>Find Vehicle</h3>
-                <button onclick="this.parentElement.parentElement.parentElement.remove()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="search-modal-body">
-                <input type="text" id="vehicle-search-input" placeholder="Search by registration, make, or model..." class="form-control">
-                <div id="vehicle-search-results"></div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(searchModal);
-    
-    // Initialize search functionality
-    const searchInput = document.getElementById('vehicle-search-input');
-    searchInput.addEventListener('input', function() {
-        if (this.value.length >= 2) {
-            fetch(`/business/{{ request.tenant.slug }}/services/ajax/vehicle/search/?q=${encodeURIComponent(this.value)}`)
-            .then(response => response.json())
-            .then(data => {
-                const resultsDiv = document.getElementById('vehicle-search-results');
-                resultsDiv.innerHTML = data.results.map(vehicle => `
-                    <div class="search-result-item" onclick="selectVehicle('${vehicle.id}', '${vehicle.registration}')">
-                        <strong>${vehicle.registration}</strong> - ${vehicle.make} ${vehicle.model}<br>
-                        <small>${vehicle.color} | Owner: ${vehicle.customer_name}</small>
-                    </div>
-                `).join('');
-            });
-        }
-    });
-    
-    searchInput.focus();
-}
-
-function selectCustomer(customerId, customerName) {
-    window.location.href = `/business/{{ request.tenant.slug }}/customers/${customerId}/`;
-}
-
-function selectVehicle(vehicleId, registration) {
-    window.location.href = `/business/{{ request.tenant.slug }}/customers/vehicles/${vehicleId}/`;
-}
-
-// Toast notification functions
-function showSuccessToast(message) {
-    showToast(message, 'success', 'check-circle');
-}
-
-function showErrorToast(message) {
-    showToast(message, 'danger', 'exclamation-triangle');
-}
-
-function showInfoToast(message) {
-    showToast(message, 'info', 'info-circle');
-}
-
-function showToast(message, type, icon) {
-    const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    toast.innerHTML = `
-        <div class="toast-content">
-            <i class="fas fa-${icon}"></i>
-            <div class="toast-message">${message}</div>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-        }
-    }, 4000);
-}
-
-// Utility function to get CSRF token
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-// Set tenant slug globally for JavaScript functions
-window.tenant_slug = '{{ request.tenant.slug }}';
-
-// Initialize sidebar functionality
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto-expand active dropdown
-    const activeNavItem = document.querySelector('.nav-link.active');
-    if (activeNavItem) {
-        const parentDropdown = activeNavItem.closest('.nav-dropdown');
-        if (parentDropdown) {
-            parentDropdown.classList.add('open');
-        }
-    }
-    
-    // Handle sidebar collapse on mobile
-    const sidebarToggle = document.querySelector('.sidebar-toggle');
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            document.getElementById('sidebar').classList.toggle('mobile-open');
-        });
-    }
-});
-</script>
-
-<!-- Sidebar Styles -->
-<style>
-/* Enhanced Sidebar Styles with Modal Support */
-.sidebar {
-    width: var(--sidebar-width);
-    background: white;
-    border-right: 1px solid var(--gray-200);
-    transition: width var(--transition-normal);
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    box-shadow: var(--shadow-sm);
-}
-
-.sidebar.collapsed {
-    width: var(--sidebar-collapsed-width);
-}
-
-.sidebar-header {
-    height: var(--header-height);
-    padding: 0 1.5rem;
-    border-bottom: 1px solid var(--gray-200);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.sidebar.collapsed .sidebar-header {
-    justify-content: center;
-    padding: 0 1rem;
-}
-
-.brand-logo {
-    width: 36px;
-    height: 36px;
-    background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
-    border-radius: var(--radius-lg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 700;
-    font-size: 1.125rem;
-    flex-shrink: 0;
-}
-
-.brand-logo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: var(--radius-lg);
-}
-
-.brand-text {
-    transition: opacity var(--transition-fast);
-    min-width: 0;
-}
-
-.sidebar.collapsed .brand-text {
-    opacity: 0;
-    width: 0;
-    overflow: hidden;
-}
-
-.brand-name {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-weight: 700;
-    font-size: 1rem;
-    color: var(--gray-900);
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.brand-type {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.sidebar-nav {
-    flex: 1;
-    padding: 1rem 0;
-    overflow-y: auto;
-}
-
-.nav-section {
-    margin-bottom: 1.5rem;
-}
-
-.nav-section:last-child {
-    margin-bottom: 1rem;
-}
-
-.nav-section-title {
-    padding: 0 1.5rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    transition: opacity var(--transition-fast);
-}
-
-.sidebar.collapsed .nav-section-title {
-    opacity: 0;
-    height: 0;
-    padding: 0;
-    margin: 0;
-    overflow: hidden;
-}
-
-.nav-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.nav-item {
-    margin: 0 0.75rem 0.25rem;
-}
-
-.nav-link {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    color: var(--gray-700);
-    text-decoration: none;
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-    font-weight: 500;
-    position: relative;
-}
-
-.nav-link:hover {
-    background-color: var(--gray-100);
-    color: var(--gray-900);
-}
-
-.nav-link.active {
-    background-color: var(--primary-50);
-    color: var(--primary-700);
-}
-
-.nav-link.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 1.5rem;
-    background-color: var(--primary-600);
-    border-radius: 0 2px 2px 0;
-}
-
-.nav-icon {
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 0.75rem;
-    flex-shrink: 0;
-}
-
-.nav-text {
-    flex: 1;
-    transition: opacity var(--transition-fast);
-}
-
-.sidebar.collapsed .nav-text {
-    opacity: 0;
-    width: 0;
-    overflow: hidden;
-}
-
-.nav-dropdown {
-    position: relative;
-}
-
-.nav-dropdown-toggle::after {
-    content: '\f054';
-    font-family: 'Font Awesome 5 Free';
-    font-weight: 900;
-    font-size: 0.75rem;
-    margin-left: auto;
-    transition: transform var(--transition-fast);
-}
-
-.nav-dropdown.open .nav-dropdown-toggle::after {
-    transform: rotate(90deg);
-}
-
-.nav-submenu {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    padding-left: 2.5rem;
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height var(--transition-normal);
-}
-
-.nav-dropdown.open .nav-submenu {
-    max-height: 800px;
-    padding-top: 0.25rem;
-}
-
-.sidebar.collapsed .nav-submenu {
-    display: none;
-}
-
-.nav-submenu .nav-link {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    color: var(--gray-600);
-}
-
-.nav-submenu .nav-link:hover {
-    color: var(--gray-900);
-    background-color: var(--gray-50);
-    transform: translateX(4px);
-}
-
-.nav-submenu .nav-link.active {
-    color: var(--primary-700);
-    background-color: var(--primary-50);
-}
-
-/* Navigation Badges */
-.nav-badge {
-    font-size: 0.625rem;
-    font-weight: 700;
-    padding: 0.125rem 0.375rem;
-    border-radius: 50px;
-    margin-left: auto;
-    line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-}
-
-.nav-badge-primary {
-    background: var(--primary-100);
-    color: var(--primary-700);
-}
-
-.nav-badge-success {
-    background: var(--success-100);
-    color: var(--success-700);
-}
-
-.nav-badge-warning {
-    background: var(--warning-100);
-    color: var(--warning-700);
-}
-
-.nav-badge-secondary {
-    background: var(--gray-200);
-    color: var(--gray-600);
-}
-
-/* Section Dividers */
-.nav-divider {
-    margin: 0.75rem 0 0.5rem;
-    padding: 0 1.25rem;
-}
-
-.nav-divider-text {
-    font-size: 0.625rem;
-    font-weight: 700;
-    color: var(--gray-400);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    position: relative;
-    padding-left: 0.75rem;
-}
-
-.nav-divider-text::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 2px;
-    height: 0.75rem;
-    background: linear-gradient(to bottom, var(--primary-500), transparent);
-    border-radius: 1px;
-}
-
-/* Featured Link Styling */
-.nav-link-featured {
-    background: linear-gradient(135deg, var(--primary-50), var(--info-50));
-    border: 1px solid var(--primary-200);
-    position: relative;
-    overflow: hidden;
-}
-
-.nav-link-featured:hover {
-    background: linear-gradient(135deg, var(--primary-100), var(--info-100));
-    transform: translateX(4px) translateY(-1px);
-    box-shadow: var(--shadow-sm);
-}
-
-/* Action Link Styling */
-.nav-link-action {
-    background: var(--success-50);
-    border: 1px solid var(--success-200);
-    color: var(--success-700);
-}
-
-.nav-link-action:hover {
-    background: var(--success-100);
-    color: var(--success-800);
-    transform: translateX(4px);
-}
-
-.sidebar-footer {
-    padding: 1rem;
-    border-top: 1px solid var(--gray-200);
-}
-
-.sidebar-user {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-}
-
-.sidebar-user:hover {
-    background-color: var(--gray-50);
-}
-
-.sidebar.collapsed .sidebar-user {
-    justify-content: center;
-}
-
-.user-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 600;
-    font-size: 0.875rem;
-    flex-shrink: 0;
-}
-
-.user-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 50%;
-}
-
-.user-info {
-    flex: 1;
-    min-width: 0;
-    transition: opacity var(--transition-fast);
-}
-
-.sidebar.collapsed .user-info {
-    opacity: 0;
-    width: 0;
-    overflow: hidden;
-}
-
-.user-name {
-    font-weight: 600;
-    color: var(--gray-900);
-    font-size: 0.875rem;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.user-role {
-    color: var(--gray-500);
-    font-size: 0.75rem;
-    text-transform: capitalize;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Search Modal Styles */
-.search-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-
-.search-modal-content {
-    background: white;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    width: 90%;
-    max-width: 500px;
-    max-height: 80vh;
-    overflow: hidden;
-}
-
-.search-modal-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--gray-200);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.search-modal-header h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--gray-900);
-}
-
-.search-modal-header button {
-    background: none;
-    border: none;
-    color: var(--gray-400);
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
-}
-
-.search-modal-header button:hover {
-    background: var(--gray-100);
-    color: var(--gray-600);
-}
-
-.search-modal-body {
-    padding: 1.5rem;
-    max-height: 60vh;
-    overflow-y: auto;
-}
-
-.search-modal-body .form-control {
-    margin-bottom: 1rem;
-}
-
-.search-result-item {
-    padding: 1rem;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    margin-bottom: 0.5rem;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.search-result-item:hover {
-    background: var(--primary-50);
-    border-color: var(--primary-200);
-}
-
-/* Toast Notification Styles */
-.toast-notification {
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1rem;
-    box-shadow: var(--shadow-lg);
-    z-index: 9999;
-    min-width: 300px;
-    animation: slideInRight 0.3s ease-out;
-}
-
-.toast-notification.toast-success {
-    border-left: 4px solid var(--success-500);
-}
-
-.toast-notification.toast-danger {
-    border-left: 4px solid var(--danger-500);
-}
-
-.toast-notification.toast-info {
-    border-left: 4px solid var(--info-500);
-}
-
-.toast-content {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-}
-
-.toast-message {
-    color: var(--gray-700);
-    font-size: 0.875rem;
-}
-
-.toast-close {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: none;
-    border: none;
-    color: var(--gray-400);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
-}
-
-.toast-close:hover {
-    background: var(--gray-100);
-    color: var(--gray-600);
-}
-
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-/* Mobile Responsive */
-@media (max-width: 768px) {
-    .sidebar {
-        width: 0;
-        overflow: hidden;
-    }
-    
-    .sidebar.mobile-open {
-        width: var(--sidebar-width);
-    }
-    
-    .toast-notification {
-        top: 1rem;
-        right: 1rem;
-        left: 1rem;
-        min-width: auto;
-    }
-    
-    .search-modal-content {
-        width: 95%;
-        margin: 1rem;
-    }
-}
-</style>
+<!-- Sidebar Overlay for Mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
