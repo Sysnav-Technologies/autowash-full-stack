@@ -405,11 +405,12 @@ def business_register_view(request):
                     
                     # The subdomain is already set by the form's clean() method
                     
-                    # Create database name for tenant based on subdomain
-                    database_name = re.sub(r'[^a-z0-9]', '', business.subdomain.lower())
-                    if not database_name or not database_name[0].isalpha():
-                        database_name = 'biz' + database_name
-                    business.database_name = database_name[:20]
+                    # Create database name for tenant based on subdomain, always with autowash_ prefix
+                    clean_subdomain = re.sub(r'[^a-z0-9]', '', business.subdomain.lower())
+                    if not clean_subdomain or not clean_subdomain[0].isalpha():
+                        clean_subdomain = 'biz' + clean_subdomain
+                    db_name = f"autowash_{clean_subdomain}"
+                    business.database_name = db_name[:63]  # MySQL max db name length
                     
                     # Set database credentials (you can customize these)
                     business.database_user = f"user_{business.database_name}"

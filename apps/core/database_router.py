@@ -21,10 +21,17 @@ class TenantDatabaseRouter:
         """Set the current tenant for this thread"""
         cls._local.tenant = tenant
         
-        # Cache tenant database config for performance
+        # Cache tenant database config for performance using default cache
         if tenant:
-            cache_key = f"tenant_db_config_{tenant.id}"
-            cache.set(cache_key, tenant.database_config, 300)  # Cache for 5 minutes
+            try:
+                from django.core.cache import caches
+                default_cache = caches['default']
+                cache_key = f"tenant_db_config_{tenant.id}"
+                default_cache.set(cache_key, tenant.database_config, 300)  # Cache for 5 minutes
+            except Exception as e:
+                # If cache fails, continue without caching
+                print(f"Warning: Failed to cache tenant config: {e}")
+                pass
     
     @classmethod
     def get_tenant(cls):

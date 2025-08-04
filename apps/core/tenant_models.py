@@ -135,8 +135,14 @@ class Tenant(TimeStampedModel, Address, ContactInfo):
                 counter += 1
         
         if not self.database_name:
-            # Generate safe database name
-            self.database_name = f"autowash_{self.slug}".replace('-', '_')
+            # Generate safe database name with autowash_ prefix
+            db_slug = self.slug.replace('-', '_')
+            if not db_slug.startswith('autowash_'):
+                self.database_name = f"autowash_{db_slug}"
+            else:
+                self.database_name = db_slug
+            # Truncate to MySQL max length
+            self.database_name = self.database_name[:63]
         
         if not self.subdomain:
             self.subdomain = self.slug
