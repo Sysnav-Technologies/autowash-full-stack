@@ -1,22 +1,172 @@
 /* ========================================
-   SERVICES & WORKSON SERVICES JAVASCRIPT
+   SERVICES MODULE JAVASCRIPT - AUTOWASH DESIGN SYSTEM
 ======================================== */
 
+class ServicesManager {
+    constructor() {
+        this.initializeComponents();
+        this.setupEventListeners();
+    }
+
+    initializeComponents() {
+        // Initialize sortable table if exists
+        const table = document.querySelector('.nexus-table[data-sortable="true"]');
+        if (table) {
+            this.initializeSortableTable(table);
+        }
+
+        // Initialize filter form
+        this.initializeFilters();
+        
+        // Initialize stats cards animations
+        this.initializeStatsCards();
+    }
+
+    initializeSortableTable(table) {
+        const headers = table.querySelectorAll('.sortable-header');
+        headers.forEach(header => {
+            header.style.cursor = 'pointer';
+            header.addEventListener('click', () => this.handleSort(header));
+        });
+    }
+
+    handleSort(header) {
+        const column = header.dataset.column;
+        const currentDirection = header.dataset.direction || 'asc';
+        const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+        
+        // Update header
+        header.dataset.direction = newDirection;
+        
+        // Clear other headers
+        header.parentNode.querySelectorAll('.sortable-header').forEach(h => {
+            if (h !== header) {
+                delete h.dataset.direction;
+                h.classList.remove('sorted-asc', 'sorted-desc');
+            }
+        });
+        
+        // Add sort class
+        header.classList.remove('sorted-asc', 'sorted-desc');
+        header.classList.add(`sorted-${newDirection}`);
+        
+        console.log(`Sorting by ${column} in ${newDirection} order`);
+    }
+
+    initializeFilters() {
+        const filterForm = document.querySelector('.filter-form');
+        if (!filterForm) return;
+
+        // Auto-submit on select changes
+        const selects = filterForm.querySelectorAll('select');
+        selects.forEach(select => {
+            select.addEventListener('change', () => {
+                setTimeout(() => filterForm.submit(), 100);
+            });
+        });
+
+        // Search input with debounce
+        const searchInput = filterForm.querySelector('input[name="search"]');
+        if (searchInput) {
+            let searchTimeout;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (searchInput.value.length >= 3 || searchInput.value.length === 0) {
+                        filterForm.submit();
+                    }
+                }, 500);
+            });
+        }
+    }
+
+    initializeStatsCards() {
+        const statsCards = document.querySelectorAll('.services-stat-card');
+        
+        // Animate cards on load
+        statsCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'all 0.4s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    }
+
+    setupEventListeners() {
+        // Service deletion
+        window.deleteService = this.deleteService.bind(this);
+    }
+
+    deleteService(serviceId) {
+        const confirmed = confirm('Are you sure you want to delete this service? This action cannot be undone.');
+        
+        if (!confirmed) return;
+
+        const deleteBtn = document.querySelector(`[onclick="deleteService('${serviceId}')"]`);
+        if (deleteBtn) {
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        fetch(`/business/${window.location.pathname.split('/')[2]}/services/${serviceId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': this.getCSRFToken(),
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.ok) {
+                const row = document.querySelector(`tr[data-id="${serviceId}"]`);
+                if (row) {
+                    row.style.transition = 'all 0.3s ease';
+                    row.style.opacity = '0';
+                    row.style.transform = 'translateX(-100%)';
+                    
+                    setTimeout(() => {
+                        location.reload();
+                    }, 300);
+                } else {
+                    location.reload();
+                }
+            } else {
+                throw new Error('Delete failed');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting service. Please try again.');
+            
+            if (deleteBtn) {
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            }
+        });
+    }
+
+    getCSRFToken() {
+        const token = document.querySelector('[name=csrfmiddlewaretoken]');
+        return token ? token.value : '';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize table functionality
+    // Initialize Services Manager
+    new ServicesManager();
+    
+    // Legacy compatibility
     initializeTables();
-    
-    // Initialize form validation
     initializeFormValidation();
-    
-    // Initialize search and filters
     initializeSearchAndFilters();
-    
-    // Initialize service queue functionality
     initializeServiceQueue();
 });
 
-// Table Functionality
+// Legacy functions for compatibility
 function initializeTables() {
     // Table row selection
     const tables = document.querySelectorAll('.nexus-table');
