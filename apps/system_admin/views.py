@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.core.management import call_command
 from apps.core.tenant_models import Tenant
-from apps.core.database_router import TenantDatabaseManager, tenant_context
+from apps.core.database_router import TenantDatabaseManager, TenantDatabaseRouter, tenant_context
 from apps.core.suspension_utils import SuspensionManager, SuspensionChecker
 from apps.subscriptions.models import Subscription, SubscriptionPlan, Payment, SubscriptionInvoice
 from .models import AdminActivity
@@ -200,8 +200,9 @@ def approve_business(request, business_id):
                     if setup_success:
                         # Log the activity
                         AdminActivity.objects.create(
-                            admin=request.user,
-                            action=f"Approved business '{business.name}' with automatic tenant setup"
+                            admin_user=request.user,
+                            action='approve_business',
+                            description=f"Approved business '{business.name}' with automatic tenant setup"
                         )
                         
                         messages.success(
@@ -232,6 +233,9 @@ def approve_business(request, business_id):
                 print(f"Business approval error: {traceback.format_exc()}")
         else:
             messages.error(request, 'Please select a subscription plan.')
+    
+    # Clear any tenant context to ensure we query from default database
+    TenantDatabaseRouter.clear_tenant()
     
     # Get available subscription plans
     plans = SubscriptionPlan.objects.filter(is_active=True).order_by('price')
@@ -683,8 +687,9 @@ def bulk_approve_businesses(request):
         
         # Log the activity
         AdminActivity.objects.create(
-            admin=request.user,
-            action=f"Bulk approved {approved_count} businesses"
+            admin_user=request.user,
+            action='bulk_action',
+            description=f"Bulk approved {approved_count} businesses"
         )
             
     except SubscriptionPlan.DoesNotExist:
@@ -715,10 +720,11 @@ def bulk_reject_businesses(request):
                 
                 # Log the rejection activity
                 AdminActivity.objects.create(
-                    user=request.user,
-                    action='business_rejected',
-                    description=f'Bulk rejected business: {business.name}',
-                    metadata={'business_id': str(business.id), 'reason': rejection_reason}
+                    admin_user=request.user,
+                    action='reject_business',
+                    description=f'Bulk rejected business: {business.name} - Reason: {rejection_reason}',
+                    target_model='Tenant',
+                    target_id=str(business.id)
                 )
                 
                 rejected_count += 1
@@ -1090,8 +1096,9 @@ def create_user(request):
             
             # Log the activity
             AdminActivity.objects.create(
-                admin=request.user,
-                action=f"Created user '{user.username}'"
+                admin_user=request.user,
+                action='other',
+                description=f"Created user '{user.username}'"
             )
             
             messages.success(request, f'User "{user.username}" created successfully!')
@@ -1128,8 +1135,9 @@ def edit_user(request, user_id):
             
             # Log the activity
             AdminActivity.objects.create(
-                admin=request.user,
-                action=f"Updated user '{user.username}'"
+                admin_user=request.user,
+                action='other',
+                description=f"Updated user '{user.username}'"
             )
             
             messages.success(request, f'User "{user.username}" updated successfully!')
@@ -1160,8 +1168,9 @@ def toggle_user_status(request, user_id):
             # Log the activity
             action = "activated" if activate else "deactivated"
             AdminActivity.objects.create(
-                admin=request.user,
-                action=f"User '{user.username}' {action}"
+                admin_user=request.user,
+                action='activate_business' if activate else 'suspend_business',
+                description=f"User '{user.username}' {action}"
             )
             
             return JsonResponse({
@@ -1260,23 +1269,44 @@ def setup_tenant_after_approval(business, approving_admin):
         
         print(f"Tenant database created: {business.database_name}")
         
+        # Step 1.5: Create cache table if using database cache
+        print("Creating cache table...")
+        try:
+            from django.core.management import call_command
+            call_command('createcachetable', database=f"tenant_{business.id}", verbosity=0)
+            print("Cache table created successfully")
+        except Exception as e:
+            print(f"Warning: Failed to create cache table: {e}")
+            # Continue anyway, cache is not critical
+        
         # Step 2: Create TenantSettings record
         print("Creating tenant settings...")
         try:
-            with tenant_context(business):
-                from apps.core.tenant_models import TenantSettings
-                # Use the correct field names for TenantSettings
-                settings_obj, created = TenantSettings.objects.get_or_create(
-                    tenant_id=business.id,
-                    defaults={
-                        'sms_notifications': True,
-                        'email_notifications': True,
-                        'enable_online_booking': True,
-                        'primary_color': '#007bff',
-                        'secondary_color': '#6c757d',
-                    }
+            # Don't use tenant_context here to avoid cache issues
+            from apps.core.tenant_models import TenantSettings
+            from django.db import connections
+            
+            # Get the tenant database connection
+            tenant_db = f"tenant_{business.id}"
+            
+            # Create TenantSettings directly in tenant database
+            with connections[tenant_db].cursor() as cursor:
+                # Check if TenantSettings record exists
+                cursor.execute(
+                    "SELECT COUNT(*) FROM core_tenantsettings WHERE tenant_id = %s",
+                    [str(business.id)]
                 )
-                if created:
+                exists = cursor.fetchone()[0] > 0
+                
+                if not exists:
+                    cursor.execute("""
+                        INSERT INTO core_tenantsettings 
+                        (tenant_id, sms_notifications, email_notifications, enable_online_booking, 
+                         primary_color, secondary_color) 
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, [
+                        str(business.id), True, True, True, '#007bff', '#6c757d'
+                    ])
                     print("TenantSettings created")
                 else:
                     print("TenantSettings already exists")
@@ -1564,7 +1594,7 @@ def repair_tenant_setup(request, business_id):
         if success:
             # Log the activity
             AdminActivity.objects.create(
-                admin=request.user,
+                admin_user=request.user,
                 action=f"Repaired tenant setup for '{business.name}'"
             )
             
@@ -1602,7 +1632,7 @@ def edit_business(request, business_id):
             
             # Log the activity
             AdminActivity.objects.create(
-                admin=request.user,
+                admin_user=request.user,
                 action=f"Updated business '{business.name}'"
             )
             
@@ -1689,8 +1719,9 @@ def suspend_user(request, user_id):
         
         # Log the activity
         AdminActivity.objects.create(
-            admin=request.user,
-            action=f"Suspended user '{user.username}'"
+            admin_user=request.user,
+            action='suspend_business',
+            description=f"Suspended user '{user.username}'"
         )
     else:
         messages.error(request, f'Failed to suspend user "{user.username}".')
@@ -1714,8 +1745,9 @@ def reactivate_user(request, user_id):
         
         # Log the activity
         AdminActivity.objects.create(
-            admin=request.user,
-            action=f"Reactivated user '{user.username}'"
+            admin_user=request.user,
+            action='activate_business',
+            description=f"Reactivated user '{user.username}'"
         )
     else:
         messages.error(request, f'Failed to reactivate user "{user.username}".')
@@ -1741,7 +1773,7 @@ def suspend_business(request, business_id):
         
         # Log the activity
         AdminActivity.objects.create(
-            admin=request.user,
+            admin_user=request.user,
             action=f"Suspended business '{business.name}'"
         )
     else:
@@ -1766,7 +1798,7 @@ def reactivate_business(request, business_id):
         
         # Log the activity
         AdminActivity.objects.create(
-            admin=request.user,
+            admin_user=request.user,
             action=f"Reactivated business '{business.name}'"
         )
     else:
@@ -1793,7 +1825,7 @@ def suspend_subscription(request, subscription_id):
         
         # Log the activity
         AdminActivity.objects.create(
-            admin=request.user,
+            admin_user=request.user,
             action=f"Suspended subscription for '{subscription.business.name}'"
         )
     else:
@@ -1818,7 +1850,7 @@ def reactivate_subscription(request, subscription_id):
         
         # Log the activity
         AdminActivity.objects.create(
-            admin=request.user,
+            admin_user=request.user,
             action=f"Reactivated subscription for '{subscription.business.name}'"
         )
     else:
@@ -1850,7 +1882,7 @@ def suspend_employee(request, business_id, employee_id):
                 
                 # Log the activity
                 AdminActivity.objects.create(
-                    admin=request.user,
+                    admin_user=request.user,
                     action=f"Suspended employee '{employee.employee_id}' in '{business.name}'"
                 )
             else:
@@ -1883,7 +1915,7 @@ def reactivate_employee(request, business_id, employee_id):
                 
                 # Log the activity
                 AdminActivity.objects.create(
-                    admin=request.user,
+                    admin_user=request.user,
                     action=f"Reactivated employee '{employee.employee_id}' in '{business.name}'"
                 )
             else:
