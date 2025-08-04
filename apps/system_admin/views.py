@@ -182,7 +182,7 @@ def approve_business(request, business_id):
                         verification.verified_at = timezone.now()
                         verification.verified_by = request.user
                         verification.save()
-                        print(f"✓ BusinessVerification status updated to 'verified'")
+                        print("BusinessVerification status updated to 'verified'")
                     except BusinessVerification.DoesNotExist:
                         # Create verification record if it doesn't exist
                         BusinessVerification.objects.create(
@@ -192,7 +192,7 @@ def approve_business(request, business_id):
                             verified_by=request.user,
                             notes='Business approved by admin without document submission'
                         )
-                        print(f"✓ BusinessVerification record created with 'verified' status")
+                        print("BusinessVerification record created with 'verified' status")
                     
                     # 4. Setup tenant database and employee record
                     setup_success = setup_tenant_after_approval(business, request.user)
@@ -1258,7 +1258,7 @@ def setup_tenant_after_approval(business, approving_admin):
             print(f"Failed to create tenant database for {business.name}")
             return False
         
-        print(f"✓ Tenant database created: {business.database_name}")
+        print(f"Tenant database created: {business.database_name}")
         
         # Step 2: Create TenantSettings record
         print("Creating tenant settings...")
@@ -1277,9 +1277,9 @@ def setup_tenant_after_approval(business, approving_admin):
                     }
                 )
                 if created:
-                    print(f"✓ TenantSettings created")
+                    print("TenantSettings created")
                 else:
-                    print(f"✓ TenantSettings already exists")
+                    print("TenantSettings already exists")
         
         except Exception as e:
             print(f"Error creating tenant settings: {e}")
@@ -1301,7 +1301,7 @@ def setup_tenant_after_approval(business, approving_admin):
             print(f"Warning: Error setting up default data: {e}")
             # Continue anyway, default data can be set up later
         
-        print(f"✓ Tenant setup completed successfully for: {business.name}")
+        print(f"Tenant setup completed successfully for: {business.name}")
         return True
         
     except Exception as e:
@@ -1340,9 +1340,9 @@ def create_owner_employee_record(business):
             )
             
             if dept_created:
-                print(f"✓ Created Management department")
+                print("Created Management department")
             else:
-                print(f"✓ Found existing Management department")
+                print("Found existing Management department")
             
             # Generate unique employee ID
             employee_count = Employee.objects.count()
@@ -1383,7 +1383,7 @@ def create_owner_employee_record(business):
                 management_dept.head = employee
                 management_dept.save()
             
-            print(f"✓ Created employee record: {employee.employee_id} for {employee.full_name}")
+            print(f"Created employee record: {employee.employee_id} for {employee.full_name}")
             return True
             
     except Exception as e:
@@ -1414,7 +1414,7 @@ def setup_default_tenant_data(business):
                     defaults=method_data
                 )
             
-            print(f"✓ Created default payment methods")
+            print("Created default payment methods")
             
             # Create default service categories
             try:
@@ -1433,7 +1433,7 @@ def setup_default_tenant_data(business):
                         defaults=cat_data
                     )
                 
-                print(f"✓ Created default service categories")
+                print("Created default service categories")
                 
             except Exception as e:
                 print(f"Warning: Could not create service categories: {e}")
@@ -1456,7 +1456,7 @@ def setup_default_tenant_data(business):
                         defaults=cat_data
                     )
                 
-                print(f"✓ Created default expense categories")
+                print("Created default expense categories")
                 
             except Exception as e:
                 print(f"Warning: Could not create expense categories: {e}")
