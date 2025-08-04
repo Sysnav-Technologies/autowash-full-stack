@@ -116,7 +116,7 @@
                                 <tr>
                                     <td>
                                         <div class="d-flex align-items-center">
-                                            {% if user.profile.avatar %}
+                                            {% if user.profile and user.profile.avatar %}
                                                 <img src="{{ user.profile.avatar.url }}" alt="{{ user.get_full_name }}" 
                                                      class="rounded-circle me-2 user-avatar">
                                             {% else %}
@@ -133,7 +133,7 @@
                                     <td>
                                         <div>
                                             <i class="fas fa-envelope fa-sm me-1"></i>{{ user.email }}<br>
-                                            {% if user.profile.phone %}
+                                            {% if user.profile and user.profile.phone %}
                                                 <i class="fas fa-phone fa-sm me-1"></i>{{ user.profile.phone }}
                                             {% endif %}
                                         </div>
@@ -144,22 +144,49 @@
                                                 <span class="badge bg-danger">Superuser</span>
                                             {% elif user.is_staff %}
                                                 <span class="badge bg-warning">Staff</span>
-                                            {% elif user.tenant_set.exists %}
+                                            {% elif user.business_relationships.owned_businesses %}
                                                 <span class="badge bg-info">Business Owner</span>
+                                            {% elif user.business_relationships.employee_relationships %}
+                                                <span class="badge bg-success">
+                                                    {% with user.business_relationships.employee_relationships.0 as first_rel %}
+                                                        {{ first_rel.role }}
+                                                    {% endwith %}
+                                                </span>
                                             {% else %}
                                                 <span class="badge bg-secondary">User</span>
                                             {% endif %}
                                         </div>
                                     </td>
                                     <td>
-                                        {% if user.tenant_set.exists %}
-                                            {% for business in user.tenant_set.all %}
+                                        {% if user.business_relationships.owned_businesses %}
+                                            {% for business in user.business_relationships.owned_businesses %}
                                                 <div class="mb-1">
-                                                    <strong>{{ business.name }}</strong><br>
+                                                    <strong>{{ business.name }}</strong>
+                                                    <small class="text-success">(Owner)</small><br>
                                                     <small class="text-muted">{{ business.slug }}</small>
                                                 </div>
                                             {% endfor %}
-                                        {% else %}
+                                        {% endif %}
+                                        
+                                        {% if user.business_relationships.employee_relationships %}
+                                            {% for relationship in user.business_relationships.employee_relationships %}
+                                                <div class="mb-1">
+                                                    <strong>{{ relationship.business.name }}</strong>
+                                                    <small class="text-info">({{ relationship.role }})</small><br>
+                                                    <small class="text-muted">
+                                                        {{ relationship.business.slug }}
+                                                        {% if relationship.employee_id %}
+                                                            | ID: {{ relationship.employee_id }}
+                                                        {% endif %}
+                                                        {% if relationship.department %}
+                                                            | {{ relationship.department }}
+                                                        {% endif %}
+                                                    </small>
+                                                </div>
+                                            {% endfor %}
+                                        {% endif %}
+                                        
+                                        {% if not user.business_relationships.owned_businesses and not user.business_relationships.employee_relationships %}
                                             <span class="text-muted">No business</span>
                                         {% endif %}
                                     </td>

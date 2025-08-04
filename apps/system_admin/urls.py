@@ -20,7 +20,7 @@ urlpatterns = [
     path('subscriptions/', views.subscription_management, name='subscription_management'),
     path('subscription-plans/', views.subscription_plans, name='subscription_plans'),
     path('subscription-plans/create/', views.create_subscription_plan, name='create_subscription_plan'),
-    path('subscription-plans/edit/<int:plan_id>/', views.edit_subscription_plan, name='edit_subscription_plan'),
+    path('subscription-plans/edit/<uuid:plan_id>/', views.edit_subscription_plan, name='edit_subscription_plan'),
     path('subscriptions/update-status/', views.update_subscription_status, name='update_subscription_status'),
     
     # Payment Management

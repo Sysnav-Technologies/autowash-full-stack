@@ -19,8 +19,72 @@ from datetime import timedelta
 from decimal import Decimal
 import traceback
 import json
-import json
-import traceback
+
+
+def get_user_business_relationships(user):
+    """
+    Get all business relationships for a user (both owned and employee relationships)
+    Returns a dictionary with owned_businesses and employee_relationships
+    """
+    relationships = {
+        'owned_businesses': [],
+        'employee_relationships': []
+    }
+    
+    # Get owned businesses
+    relationships['owned_businesses'] = list(user.owned_tenants.all())
+    
+    # Get TenantUser memberships (if any)
+    tenant_memberships = list(user.tenant_memberships.all())
+    for membership in tenant_memberships:
+        relationships['employee_relationships'].append({
+            'business': membership.tenant,
+            'role': membership.get_role_display(),
+            'role_code': membership.role
+        })
+    
+    # Check employee records in each active tenant database
+    active_businesses = Tenant.objects.filter(is_active=True, is_approved=True)
+    
+    for business in active_businesses:
+        # Skip businesses the user already owns
+        if business in relationships['owned_businesses']:
+            continue
+            
+        # Skip businesses already found through TenantUser
+        already_found = any(rel['business'].id == business.id for rel in relationships['employee_relationships'])
+        if already_found:
+            continue
+            
+        try:
+            # Check if the business has a proper database setup
+            if not business.database_name:
+                continue
+                
+            with tenant_context(business):
+                from apps.employees.models import Employee
+                
+                # Check if user has an employee record in this tenant
+                employee = Employee.objects.filter(
+                    user_id=user.id,
+                    is_active=True
+                ).first()
+                
+                if employee:
+                    relationships['employee_relationships'].append({
+                        'business': business,
+                        'role': employee.get_role_display(),
+                        'role_code': employee.role,
+                        'employee_id': employee.employee_id,
+                        'department': employee.department.name if employee.department else None
+                    })
+                    
+        except Exception as e:
+            # Skip businesses where we can't query (database issues, etc.)
+            # Uncomment for debugging: print(f"Error checking employee record for user {user.id} in business {business.name}: {e}")
+            continue
+    
+    return relationships
 
 @staff_member_required
 def system_dashboard(request):
@@ -673,12 +737,12 @@ def user_management(request):
     search = request.GET.get('search', '')
     
     # Build queryset
-    users = User.objects.select_related('profile').prefetch_related('tenant_set')
+    users = User.objects.prefetch_related('owned_tenants', 'tenant_memberships__tenant')
     
     if user_type == 'business_owners':
-        users = users.filter(tenant_set__isnull=False).distinct()
+        users = users.filter(owned_tenants__isnull=False).distinct()
     elif user_type == 'regular_users':
-        users = users.filter(tenant_set__isnull=True)
+        users = users.filter(owned_tenants__isnull=True, tenant_memberships__isnull=True)
     elif user_type == 'staff':
         users = users.filter(is_staff=True)
     
@@ -700,11 +764,22 @@ def user_management(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Get business relationships for each user
+    users_with_relationships = []
+    for user in page_obj:
+        relationships = get_user_business_relationships(user)
+        user.business_relationships = relationships
+        users_with_relationships.append(user)
+    
+    # Update the page object with enriched users
+    page_obj.object_list = users_with_relationships
+    
     # User statistics
     user_stats = {
         'total_users': User.objects.count(),
         'active_users': User.objects.filter(is_active=True).count(),
         'business_owners': User.objects.filter(owned_tenants__isnull=False).distinct().count(),
+        'business_employees': User.objects.filter(tenant_memberships__isnull=False).distinct().count(),
         'staff_users': User.objects.filter(is_staff=True).count(),
     }
     
