@@ -13,14 +13,79 @@ from django.db import transaction
 from django.core.management import call_command
 from apps.core.tenant_models import Tenant
 from apps.core.database_router import TenantDatabaseManager, tenant_context
+from apps.core.suspension_utils import SuspensionManager, SuspensionChecker
 from apps.subscriptions.models import Subscription, SubscriptionPlan, Payment, SubscriptionInvoice
 from .models import AdminActivity
 from datetime import timedelta
 from decimal import Decimal
 import traceback
 import json
-import json
-import traceback
+
+
+def get_user_business_relationships(user):
+    """
+    Get all business relationships for a user (both owned and employee relationships)
+    Returns a dictionary with owned_businesses and employee_relationships
+    """
+    relationships = {
+        'owned_businesses': [],
+        'employee_relationships': []
+    }
+    
+    # Get owned businesses
+    relationships['owned_businesses'] = list(user.owned_tenants.all())
+    
+    # Get TenantUser memberships (if any)
+    tenant_memberships = list(user.tenant_memberships.all())
+    for membership in tenant_memberships:
+        relationships['employee_relationships'].append({
+            'business': membership.tenant,
+            'role': membership.get_role_display(),
+            'role_code': membership.role
+        })
+    
+    # Check employee records in each active tenant database
+    active_businesses = Tenant.objects.filter(is_active=True, is_approved=True)
+    
+    for business in active_businesses:
+        # Skip businesses the user already owns
+        if business in relationships['owned_businesses']:
+            continue
+            
+        # Skip businesses already found through TenantUser
+        already_found = any(rel['business'].id == business.id for rel in relationships['employee_relationships'])
+        if already_found:
+            continue
+            
+        try:
+            # Check if the business has a proper database setup
+            if not business.database_name:
+                continue
+                
+            with tenant_context(business):
+                from apps.employees.models import Employee
+                
+                # Check if user has an employee record in this tenant
+                employee = Employee.objects.filter(
+                    user_id=user.id,
+                    is_active=True
+                ).first()
+                
+                if employee:
+                    relationships['employee_relationships'].append({
+                        'business': business,
+                        'role': employee.get_role_display(),
+                        'role_code': employee.role,
+                        'employee_id': employee.employee_id,
+                        'department': employee.department.name if employee.department else None
+                    })
+                    
+        except Exception as e:
+            # Skip businesses where we can't query (database issues, etc.)
+            # Uncomment for debugging: print(f"Error checking employee record for user {user.id} in business {business.name}: {e}")
+            continue
+    
+    return relationships
 
 @staff_member_required
 def system_dashboard(request):
@@ -673,12 +738,12 @@ def user_management(request):
     search = request.GET.get('search', '')
     
     # Build queryset
-    users = User.objects.select_related('profile').prefetch_related('tenant_set')
+    users = User.objects.prefetch_related('owned_tenants', 'tenant_memberships__tenant')
     
     if user_type == 'business_owners':
-        users = users.filter(tenant_set__isnull=False).distinct()
+        users = users.filter(owned_tenants__isnull=False).distinct()
     elif user_type == 'regular_users':
-        users = users.filter(tenant_set__isnull=True)
+        users = users.filter(owned_tenants__isnull=True, tenant_memberships__isnull=True)
     elif user_type == 'staff':
         users = users.filter(is_staff=True)
     
@@ -700,11 +765,28 @@ def user_management(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Get business relationships and suspension status for each user
+    users_with_relationships = []
+    suspension_checker = SuspensionChecker()
+    
+    for user in page_obj:
+        relationships = get_user_business_relationships(user)
+        user.business_relationships = relationships
+        
+        # Add suspension status
+        user.suspension_status = suspension_checker.get_user_suspension_status(user)
+        
+        users_with_relationships.append(user)
+    
+    # Update the page object with enriched users
+    page_obj.object_list = users_with_relationships
+    
     # User statistics
     user_stats = {
         'total_users': User.objects.count(),
         'active_users': User.objects.filter(is_active=True).count(),
         'business_owners': User.objects.filter(owned_tenants__isnull=False).distinct().count(),
+        'business_employees': User.objects.filter(tenant_memberships__isnull=False).distinct().count(),
         'staff_users': User.objects.filter(is_staff=True).count(),
     }
     
@@ -1096,6 +1178,67 @@ def toggle_user_status(request, user_id):
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_http_methods(["POST"])
+@csrf_exempt
+def toggle_user_suspension(request, user_id):
+    """Toggle user suspension status via AJAX"""
+    try:
+        user = get_object_or_404(User, id=user_id)
+        data = json.loads(request.body)
+        action = data.get('action')  # 'suspend' or 'reactivate'
+        reason = data.get('reason', '')
+        
+        suspension_manager = SuspensionManager()
+        if action == 'suspend':
+            if not reason.strip():
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Suspension reason is required'
+                })
+            success = suspension_manager.suspend_user(
+                user=user,
+                reason=reason,
+                suspended_by=request.user
+            )
+            action_text = "suspended"
+        elif action == 'reactivate':
+            success = suspension_manager.reactivate_user(
+                user=user,
+                reactivated_by=request.user
+            )
+            action_text = "reactivated"
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid action specified'
+            })
+        
+        if success:
+            # Log the activity
+            AdminActivity.objects.create(
+                admin_user=request.user,
+                action='suspend_business' if action == 'suspend' else 'activate_business',
+                description=f"User '{user.username}' {action_text}" + (f" - Reason: {reason}" if action == 'suspend' else "")
+            )
+            return JsonResponse({
+                'success': True,
+                'message': f'User {action_text} successfully'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'Failed to {action} user'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
 def setup_tenant_after_approval(business, approving_admin):
     """
     Complete tenant setup after business approval
@@ -1482,3 +1625,271 @@ def edit_business(request, business_id):
         'business_types': business_types,
     }
     return render(request, 'system_admin/edit_business.html', context)
+
+
+# ===============================
+# SUSPENSION MANAGEMENT VIEWS
+# ===============================
+
+@staff_member_required
+def suspension_management(request):
+    """Suspension management dashboard"""
+    
+    # Get suspension statistics
+    suspension_stats = {
+        'suspended_users': User.objects.filter(is_active=False).count(),
+        'suspended_businesses': Tenant.objects.filter(is_active=False).count(),
+        'suspended_subscriptions': Subscription.objects.filter(status='suspended').count(),
+        'total_users': User.objects.count(),
+        'total_businesses': Tenant.objects.count(),
+        'total_subscriptions': Subscription.objects.count(),
+    }
+    
+    # Get recent suspension activities
+    recent_activities = AdminActivity.objects.filter(
+        action__icontains='suspend'
+    ).order_by('-created_at')[:10]
+    
+    # Get suspended entities for quick access
+    suspended_users = User.objects.filter(is_active=False).select_related().order_by('-date_joined')[:10]
+    suspended_businesses = Tenant.objects.filter(is_active=False).select_related('owner').order_by('-updated_at')[:10]
+    suspended_subscriptions = Subscription.objects.filter(status='suspended').select_related('business').order_by('-updated_at')[:10]
+    
+    context = {
+        'suspension_stats': suspension_stats,
+        'recent_activities': recent_activities,
+        'suspended_users': suspended_users,
+        'suspended_businesses': suspended_businesses,
+        'suspended_subscriptions': suspended_subscriptions,
+        'title': 'Suspension Management'
+    }
+    
+    return render(request, 'system_admin/suspension_management.html', context)
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def suspend_user(request, user_id):
+    """Suspend a user account"""
+    user = get_object_or_404(User, id=user_id)
+    reason = request.POST.get('reason', 'Administrative action')
+    
+    if user.is_superuser:
+        messages.error(request, 'Cannot suspend superuser accounts.')
+        return redirect('system_admin:user_management')
+    
+    success = SuspensionManager.suspend_user(
+        user=user,
+        reason=reason,
+        suspended_by=request.user
+    )
+    
+    if success:
+        messages.success(request, f'User "{user.username}" has been suspended.')
+        
+        # Log the activity
+        AdminActivity.objects.create(
+            admin=request.user,
+            action=f"Suspended user '{user.username}'"
+        )
+    else:
+        messages.error(request, f'Failed to suspend user "{user.username}".')
+    
+    return redirect('system_admin:user_management')
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def reactivate_user(request, user_id):
+    """Reactivate a suspended user account"""
+    user = get_object_or_404(User, id=user_id)
+    
+    success = SuspensionManager.reactivate_user(
+        user=user,
+        reactivated_by=request.user
+    )
+    
+    if success:
+        messages.success(request, f'User "{user.username}" has been reactivated.')
+        
+        # Log the activity
+        AdminActivity.objects.create(
+            admin=request.user,
+            action=f"Reactivated user '{user.username}'"
+        )
+    else:
+        messages.error(request, f'Failed to reactivate user "{user.username}".')
+    
+    return redirect('system_admin:user_management')
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def suspend_business(request, business_id):
+    """Suspend a business"""
+    business = get_object_or_404(Tenant, id=business_id)
+    reason = request.POST.get('reason', 'Administrative action')
+    
+    success = SuspensionManager.suspend_business(
+        business=business,
+        reason=reason,
+        suspended_by=request.user
+    )
+    
+    if success:
+        messages.success(request, f'Business "{business.name}" has been suspended.')
+        
+        # Log the activity
+        AdminActivity.objects.create(
+            admin=request.user,
+            action=f"Suspended business '{business.name}'"
+        )
+    else:
+        messages.error(request, f'Failed to suspend business "{business.name}".')
+    
+    return redirect('system_admin:business_management')
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def reactivate_business(request, business_id):
+    """Reactivate a suspended business"""
+    business = get_object_or_404(Tenant, id=business_id)
+    
+    success = SuspensionManager.reactivate_business(
+        business=business,
+        reactivated_by=request.user
+    )
+    
+    if success:
+        messages.success(request, f'Business "{business.name}" has been reactivated.')
+        
+        # Log the activity
+        AdminActivity.objects.create(
+            admin=request.user,
+            action=f"Reactivated business '{business.name}'"
+        )
+    else:
+        messages.error(request, f'Failed to reactivate business "{business.name}".')
+    
+    return redirect('system_admin:business_management')
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def suspend_subscription(request, subscription_id):
+    """Suspend a subscription"""
+    subscription = get_object_or_404(Subscription, id=subscription_id)
+    reason = request.POST.get('reason', 'Payment issues')
+    
+    success = SuspensionManager.suspend_subscription(
+        subscription=subscription,
+        reason=reason,
+        suspended_by=request.user
+    )
+    
+    if success:
+        messages.success(request, f'Subscription for "{subscription.business.name}" has been suspended.')
+        
+        # Log the activity
+        AdminActivity.objects.create(
+            admin=request.user,
+            action=f"Suspended subscription for '{subscription.business.name}'"
+        )
+    else:
+        messages.error(request, f'Failed to suspend subscription for "{subscription.business.name}".')
+    
+    return redirect('system_admin:subscription_management')
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def reactivate_subscription(request, subscription_id):
+    """Reactivate a suspended subscription"""
+    subscription = get_object_or_404(Subscription, id=subscription_id)
+    
+    success = SuspensionManager.reactivate_subscription(
+        subscription=subscription,
+        reactivated_by=request.user
+    )
+    
+    if success:
+        messages.success(request, f'Subscription for "{subscription.business.name}" has been reactivated.')
+        
+        # Log the activity
+        AdminActivity.objects.create(
+            admin=request.user,
+            action=f"Reactivated subscription for '{subscription.business.name}'"
+        )
+    else:
+        messages.error(request, f'Failed to reactivate subscription for "{subscription.business.name}".')
+    
+    return redirect('system_admin:subscription_management')
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def suspend_employee(request, business_id, employee_id):
+    """Suspend an employee in a specific business"""
+    business = get_object_or_404(Tenant, id=business_id)
+    reason = request.POST.get('reason', 'Policy violation')
+    
+    try:
+        with tenant_context(business):
+            from apps.employees.models import Employee
+            employee = get_object_or_404(Employee, id=employee_id)
+            
+            success = SuspensionManager.suspend_employee(
+                employee=employee,
+                reason=reason,
+                suspended_by=request.user
+            )
+            
+            if success:
+                messages.success(request, f'Employee "{employee.employee_id}" has been suspended.')
+                
+                # Log the activity
+                AdminActivity.objects.create(
+                    admin=request.user,
+                    action=f"Suspended employee '{employee.employee_id}' in '{business.name}'"
+                )
+            else:
+                messages.error(request, f'Failed to suspend employee "{employee.employee_id}".')
+    
+    except Exception as e:
+        messages.error(request, f'Error suspending employee: {str(e)}')
+    
+    return redirect('system_admin:user_management')
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def reactivate_employee(request, business_id, employee_id):
+    """Reactivate a suspended employee in a specific business"""
+    business = get_object_or_404(Tenant, id=business_id)
+    
+    try:
+        with tenant_context(business):
+            from apps.employees.models import Employee
+            employee = get_object_or_404(Employee, id=employee_id)
+            
+            success = SuspensionManager.reactivate_employee(
+                employee=employee,
+                reactivated_by=request.user
+            )
+            
+            if success:
+                messages.success(request, f'Employee "{employee.employee_id}" has been reactivated.')
+                
+                # Log the activity
+                AdminActivity.objects.create(
+                    admin=request.user,
+                    action=f"Reactivated employee '{employee.employee_id}' in '{business.name}'"
+                )
+            else:
+                messages.error(request, f'Failed to reactivate employee "{employee.employee_id}".')
+    
+    except Exception as e:
+        messages.error(request, f'Error reactivating employee: {str(e)}')
+    
+    return redirect('system_admin:user_management')

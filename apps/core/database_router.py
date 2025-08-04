@@ -337,13 +337,39 @@ def tenant_context(tenant):
         def __init__(self, tenant):
             self.tenant = tenant
             self.previous_tenant = None
+            self.db_alias = f"tenant_{tenant.id}"
+            self.db_added = False
         
         def __enter__(self):
+            from django.db import connections
+            from django.conf import settings
+            
             self.previous_tenant = TenantDatabaseRouter.get_tenant()
             TenantDatabaseRouter.set_tenant(self.tenant)
+            
+            # Add tenant database to Django settings if not already present
+            if self.db_alias not in settings.DATABASES:
+                settings.DATABASES[self.db_alias] = self.tenant.database_config
+                self.db_added = True
+                
+                # Ensure the connection object is aware of the new database
+                if hasattr(connections, '_databases'):
+                    connections._databases = settings.DATABASES
+            
             return self.tenant
         
         def __exit__(self, exc_type, exc_val, exc_tb):
+            from django.db import connections
+            from django.conf import settings
+            
+            # Clean up: remove the database setting if we added it
+            if self.db_added and self.db_alias in settings.DATABASES:
+                del settings.DATABASES[self.db_alias]
+                
+                # Update connections object
+                if hasattr(connections, '_databases'):
+                    connections._databases = settings.DATABASES
+            
             TenantDatabaseRouter.set_tenant(self.previous_tenant)
     
     return TenantContext(tenant)

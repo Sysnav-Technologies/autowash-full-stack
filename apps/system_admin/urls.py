@@ -20,7 +20,7 @@ urlpatterns = [
     path('subscriptions/', views.subscription_management, name='subscription_management'),
     path('subscription-plans/', views.subscription_plans, name='subscription_plans'),
     path('subscription-plans/create/', views.create_subscription_plan, name='create_subscription_plan'),
-    path('subscription-plans/edit/<int:plan_id>/', views.edit_subscription_plan, name='edit_subscription_plan'),
+    path('subscription-plans/edit/<uuid:plan_id>/', views.edit_subscription_plan, name='edit_subscription_plan'),
     path('subscriptions/update-status/', views.update_subscription_status, name='update_subscription_status'),
     
     # Payment Management
@@ -37,6 +37,18 @@ urlpatterns = [
     path('users/create/', views.create_user, name='create_user'),
     path('users/<int:user_id>/edit/', views.edit_user, name='edit_user'),
     path('users/<int:user_id>/toggle-status/', views.toggle_user_status, name='toggle_user_status'),
+    path('users/<int:user_id>/toggle-suspension/', views.toggle_user_suspension, name='toggle_user_suspension'),
+    
+    # Suspension Management
+    path('suspensions/', views.suspension_management, name='suspension_management'),
+    path('suspensions/user/<int:user_id>/suspend/', views.suspend_user, name='suspend_user'),
+    path('suspensions/user/<int:user_id>/reactivate/', views.reactivate_user, name='reactivate_user'),
+    path('suspensions/business/<uuid:business_id>/suspend/', views.suspend_business, name='suspend_business'),
+    path('suspensions/business/<uuid:business_id>/reactivate/', views.reactivate_business, name='reactivate_business'),
+    path('suspensions/subscription/<uuid:subscription_id>/suspend/', views.suspend_subscription, name='suspend_subscription'),
+    path('suspensions/subscription/<uuid:subscription_id>/reactivate/', views.reactivate_subscription, name='reactivate_subscription'),
+    path('suspensions/employee/<uuid:business_id>/<uuid:employee_id>/suspend/', views.suspend_employee, name='suspend_employee'),
+    path('suspensions/employee/<uuid:business_id>/<uuid:employee_id>/reactivate/', views.reactivate_employee, name='reactivate_employee'),
     
     # Analytics
     path('analytics/', views.system_analytics, name='analytics'),
