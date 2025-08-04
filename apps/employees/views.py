@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
 from django.urls import reverse
-from django_tenants.utils import schema_context, get_public_schema_name
+# Removed django_tenants import - no longer needed
 from apps.core.decorators import employee_required, manager_required, owner_required, ajax_required
 from apps.core.utils import generate_unique_code, send_email_notification, send_sms_notification
 from .models import (
@@ -143,11 +143,10 @@ def employee_list_view(request):
             Q(phone__icontains=search)
         )
         if search:
-            with schema_context(get_public_schema_name()):
-                matching_users = User.objects.filter(
-                    Q(first_name__icontains=search) |
-                    Q(last_name__icontains=search) |
-                    Q(email__icontains=search) |
+            matching_users = User.objects.using('default').filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search) |
                     Q(username__icontains=search)
                 ).values_list('id', flat=True)
             if matching_users:
@@ -189,14 +188,13 @@ def employee_create_view(request):
             try:
                 with transaction.atomic():
                     user_data = form.cleaned_data
-                    with schema_context(get_public_schema_name()):
-                        user = User.objects.create_user(
-                            username=user_data['username'],
-                            email=user_data['email'],
-                            first_name=user_data['first_name'],
-                            last_name=user_data['last_name'],
-                            password=user_data['password']
-                        )
+                    user = User.objects.db_manager('default').create_user(
+                        username=user_data['username'],
+                        email=user_data['email'],
+                        first_name=user_data['first_name'],
+                        last_name=user_data['last_name'],
+                        password=user_data['password']
+                    )
                     employee = form.save(commit=False)
                     employee.user_id = user.id
                     employee.employee_id = generate_unique_code('EMP', 6)
@@ -265,19 +263,18 @@ def employee_edit_view(request, pk):
                 with transaction.atomic():
                     employee = form.save(commit=False)
                     if employee.user_id:
-                        with schema_context(get_public_schema_name()):
-                            try:
-                                user = User.objects.get(id=employee.user_id)
-                                user.first_name = form.cleaned_data['first_name']
-                                user.last_name = form.cleaned_data['last_name']
-                                user.email = form.cleaned_data['email']
-                                if form.cleaned_data.get('username'):
-                                    user.username = form.cleaned_data['username']
-                                if form.cleaned_data.get('password'):
-                                    user.set_password(form.cleaned_data['password'])
-                                user.save()
-                            except User.DoesNotExist:
-                                messages.warning(request, 'Associated user account not found.')
+                        try:
+                            user = User.objects.using('default').get(id=employee.user_id)
+                            user.first_name = form.cleaned_data['first_name']
+                            user.last_name = form.cleaned_data['last_name']
+                            user.email = form.cleaned_data['email']
+                            if form.cleaned_data.get('username'):
+                                user.username = form.cleaned_data['username']
+                            if form.cleaned_data.get('password'):
+                                user.set_password(form.cleaned_data['password'])
+                            user.save()
+                        except User.DoesNotExist:
+                            messages.warning(request, 'Associated user account not found.')
                     employee.save()
                     messages.success(request, f'Employee {employee.full_name} updated successfully!')
                     return redirect(get_business_url(request, 'employees:detail', pk=employee.pk))
@@ -286,16 +283,15 @@ def employee_edit_view(request, pk):
     else:
         initial_data = {}
         if employee.user_id:
-            with schema_context(get_public_schema_name()):
-                try:
-                    user = User.objects.get(id=employee.user_id)
-                    initial_data = {
-                        'first_name': user.first_name,
-                        'last_name': user.last_name,
-                        'email': user.email,
-                        'username': user.username,
-                    }
-                except User.DoesNotExist:
+            try:
+                user = User.objects.using('default').get(id=employee.user_id)
+                initial_data = {
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'email': user.email,
+                    'username': user.username,
+                }
+            except User.DoesNotExist:
                     pass
         form = EmployeeForm(instance=employee, initial=initial_data)
     context = {
@@ -392,16 +388,15 @@ def leave_request_view(request):
             leave_request.save()
             if request.employee.supervisor:
                 if request.employee.supervisor.user_id:
-                    with schema_context(get_public_schema_name()):
-                        try:
-                            supervisor_user = User.objects.get(id=request.employee.supervisor.user_id)
-                            send_email_notification(
-                                subject='New Leave Request',
-                                message=f'{request.employee.full_name} has submitted a leave request.',
-                                recipient_list=[supervisor_user.email]
-                            )
-                        except User.DoesNotExist:
-                            pass
+                    try:
+                        supervisor_user = User.objects.using('default').get(id=request.employee.supervisor.user_id)
+                        send_email_notification(
+                            subject='New Leave Request',
+                            message=f'{request.employee.full_name} has submitted a leave request.',
+                            recipient_list=[supervisor_user.email]
+                        )
+                    except User.DoesNotExist:
+                        pass
             messages.success(request, 'Leave request submitted successfully!')
             return redirect(get_business_url(request, 'employees:leave_list'))
     else:

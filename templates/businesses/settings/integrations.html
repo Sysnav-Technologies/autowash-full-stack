@@ -1,0 +1,724 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Integration Settings - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.settings-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.settings-nav {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.settings-nav .nav-pills {
+    padding: 0;
+    margin: 0;
+}
+
+.settings-nav .nav-link {
+    color: #6b7280;
+    border: none;
+    padding: 1rem 1.5rem;
+    border-radius: 0;
+    transition: all 0.3s ease;
+    border-right: 1px solid #e5e7eb;
+}
+
+.settings-nav .nav-link:last-child {
+    border-right: none;
+}
+
+.settings-nav .nav-link.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.settings-nav .nav-link:hover:not(.active) {
+    background: #f9fafb;
+    color: #374151;
+}
+
+.integration-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.integration-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.integration-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-right: 1.5rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-connected {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-disconnected {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.status-testing {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.integration-config {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+    display: none;
+}
+
+.integration-config.show {
+    display: block;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.btn-test {
+    background: #f59e0b;
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.btn-test:hover {
+    background: #d97706;
+    color: white;
+}
+
+.btn-test:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.test-result {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+.test-result.success {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.test-result.error {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+@media (max-width: 768px) {
+    .settings-nav .nav-pills {
+        flex-direction: column;
+    }
+    
+    .settings-nav .nav-link {
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .settings-nav .nav-link:last-child {
+        border-bottom: none;
+    }
+    
+    .integration-card .d-flex {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .integration-icon {
+        margin: 0 auto 1rem auto;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="settings-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h3 mb-2">Integration Settings</h1>
+                <p class="mb-0 opacity-75">Connect with third-party services to enhance your business</p>
+            </div>
+            <div>
+                <a href="{% url 'businesses:settings_overview' %}" class="btn btn-light">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Overview
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Navigation -->
+    <div class="settings-nav">
+        <ul class="nav nav-pills">
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'businesses:business_settings' %}">
+                    <i class="fas fa-building me-2"></i>Business Profile
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'businesses:service_settings' %}">
+                    <i class="fas fa-car me-2"></i>Services
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'businesses:payment_settings' %}">
+                    <i class="fas fa-credit-card me-2"></i>Payments
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'businesses:notification_settings' %}">
+                    <i class="fas fa-bell me-2"></i>Notifications
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="{% url 'businesses:integration_settings' %}">
+                    <i class="fas fa-plug me-2"></i>Integrations
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'businesses:backup_settings' %}">
+                    <i class="fas fa-download me-2"></i>Backup
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="row">
+        <!-- Integrations List -->
+        <div class="col-lg-8">
+            {% for integration in integrations %}
+            <div class="integration-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <div class="integration-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="{{ integration.icon }}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h5 class="mb-1">{{ integration.name }}</h5>
+                                    <p class="text-muted mb-0">{{ integration.description }}</p>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="status-badge status-{{ integration.status }}">
+                                        {% if integration.status == 'connected' %}
+                                            <i class="fas fa-check-circle me-1"></i>Connected
+                                        {% else %}
+                                            <i class="fas fa-times-circle me-1"></i>Disconnected
+                                        {% endif %}
+                                    </span>
+                                    <div class="dropdown">
+                                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-label="Integration options">
+                                            <i class="fas fa-cog"></i>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            {% if integration.status == 'connected' %}
+                                            <li><a class="dropdown-item" href="#" onclick="toggleConfig('{{ integration.name|lower }}')">
+                                                <i class="fas fa-cog me-2"></i>Configure
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="testIntegration('{{ integration.test_url }}')">
+                                                <i class="fas fa-vial me-2"></i>Test Connection
+                                            </a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item text-danger" href="#" onclick="disconnectIntegration('{{ integration.name|lower }}')">
+                                                <i class="fas fa-unlink me-2"></i>Disconnect
+                                            </a></li>
+                                            {% else %}
+                                            <li><a class="dropdown-item" href="#" onclick="toggleConfig('{{ integration.name|lower }}')">
+                                                <i class="fas fa-plug me-2"></i>Connect
+                                            </a></li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Panel -->
+                <div class="integration-config" id="config-{{ integration.name|lower }}">
+                    {% if integration.name == 'M-Pesa' %}
+                    <h6 class="mb-3">M-Pesa Configuration</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Consumer Key</label>
+                                <input type="text" class="form-control" placeholder="Your M-Pesa consumer key" id="mpesa-consumer-key">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Consumer Secret</label>
+                                <input type="password" class="form-control" placeholder="Your M-Pesa consumer secret" id="mpesa-consumer-secret">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Shortcode</label>
+                                <input type="text" class="form-control" placeholder="Business shortcode" id="mpesa-shortcode">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Passkey</label>
+                                <input type="password" class="form-control" placeholder="Your M-Pesa passkey" id="mpesa-passkey">
+                            </div>
+                        </div>
+                    </div>
+                    {% elif integration.name == 'SMS Gateway' %}
+                    <h6 class="mb-3">SMS Gateway Configuration</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">API Key</label>
+                                <input type="text" class="form-control" placeholder="Your SMS API key" id="sms-api-key">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Sender ID</label>
+                                <input type="text" class="form-control" placeholder="SMS sender ID" id="sms-sender-id">
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label class="form-label">Gateway URL</label>
+                                <input type="url" class="form-control" placeholder="https://api.smsgateway.com/send" id="sms-gateway-url">
+                            </div>
+                        </div>
+                    </div>
+                    {% elif integration.name == 'Email Service' %}
+                    <h6 class="mb-3">Email Service Configuration</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">SMTP Host</label>
+                                <input type="text" class="form-control" placeholder="smtp.gmail.com" id="email-smtp-host">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">SMTP Port</label>
+                                <input type="number" class="form-control" placeholder="587" id="email-smtp-port">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Email Address</label>
+                                <input type="email" class="form-control" placeholder="your-email@domain.com" id="email-address">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Password</label>
+                                <input type="password" class="form-control" placeholder="App password" id="email-password">
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="email-use-tls" checked>
+                                <label class="form-check-label" for="email-use-tls">
+                                    Use TLS encryption
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button type="button" class="btn btn-test" onclick="testIntegration('{{ integration.test_url }}')">
+                            <i class="fas fa-vial me-2"></i>Test Connection
+                        </button>
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary me-2" onclick="toggleConfig('{{ integration.name|lower }}')">
+                                Cancel
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="saveIntegration('{{ integration.name|lower }}')">
+                                <i class="fas fa-save me-2"></i>Save Settings
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="test-result" id="test-result-{{ integration.name|lower }}"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Integration Guide -->
+        <div class="col-lg-4">
+            <div class="integration-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-info-circle text-primary me-2"></i>
+                    Integration Guide
+                </h5>
+                
+                <div class="mb-4">
+                    <h6 class="text-primary">M-Pesa Setup</h6>
+                    <ul class="list-unstyled small text-muted">
+                        <li class="mb-2">• Register on Safaricom Developer Portal</li>
+                        <li class="mb-2">• Create a new app and get credentials</li>
+                        <li class="mb-2">• Configure your business shortcode</li>
+                        <li class="mb-2">• Test with sandbox before going live</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="text-success">SMS Gateway</h6>
+                    <ul class="list-unstyled small text-muted">
+                        <li class="mb-2">• Choose an SMS provider (e.g., Twilio, AfricasTalking)</li>
+                        <li class="mb-2">• Get your API credentials</li>
+                        <li class="mb-2">• Register a sender ID</li>
+                        <li class="mb-2">• Test message delivery</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="text-info">Email Service</h6>
+                    <ul class="list-unstyled small text-muted">
+                        <li class="mb-2">• Use Gmail, Outlook, or dedicated SMTP</li>
+                        <li class="mb-2">• Enable app passwords for Gmail</li>
+                        <li class="mb-2">• Configure TLS/SSL settings</li>
+                        <li class="mb-2">• Test email delivery</li>
+                    </ul>
+                </div>
+                
+                <div class="text-center">
+                    <a href="#" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-book me-2"></i>
+                        Full Documentation
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Integration Status Summary -->
+            <div class="integration-card mt-3">
+                <h6 class="mb-3">Integration Status</h6>
+                
+                {% for integration in integrations %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small">{{ integration.name }}</span>
+                    <span class="status-badge status-{{ integration.status }}">
+                        {% if integration.status == 'connected' %}
+                            <i class="fas fa-check-circle me-1"></i>Active
+                        {% else %}
+                            <i class="fas fa-times-circle me-1"></i>Inactive
+                        {% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+                
+                <hr class="my-3">
+                
+                <div class="text-center">
+                    <small class="text-muted">
+                        {{ integrations|length }} integrations available
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleConfig(integrationName) {
+    const config = document.getElementById(`config-${integrationName}`);
+    config.classList.toggle('show');
+}
+
+function testIntegration(integrationUrl) {
+    const button = event.target.closest('button');
+    const resultDiv = document.getElementById(`test-result-${integrationUrl}`);
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Testing...';
+    resultDiv.innerHTML = '';
+    
+    // Make AJAX call to test integration
+    fetch(`/business/{{ request.tenant.slug }}/settings/api/integrations/test/${integrationUrl}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            test_type: integrationUrl
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `
+                <div class="test-result success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    ${data.message}
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="test-result error">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${data.message}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        resultDiv.innerHTML = `
+            <div class="test-result error">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Test failed: Network error
+            </div>
+        `;
+    })
+    .finally(() => {
+        // Reset button
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-vial me-2"></i>Test Connection';
+    });
+}
+
+function saveIntegration(integrationName) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+    
+    // Collect form data based on integration type
+    let formData = {};
+    
+    if (integrationName === 'm-pesa') {
+        formData = {
+            consumer_key: document.getElementById('mpesa-consumer-key').value,
+            consumer_secret: document.getElementById('mpesa-consumer-secret').value,
+            shortcode: document.getElementById('mpesa-shortcode').value,
+            passkey: document.getElementById('mpesa-passkey').value,
+        };
+    } else if (integrationName === 'sms gateway') {
+        formData = {
+            api_key: document.getElementById('sms-api-key').value,
+            sender_id: document.getElementById('sms-sender-id').value,
+            gateway_url: document.getElementById('sms-gateway-url').value,
+        };
+    } else if (integrationName === 'email service') {
+        formData = {
+            smtp_host: document.getElementById('email-smtp-host').value,
+            smtp_port: document.getElementById('email-smtp-port').value,
+            email_address: document.getElementById('email-address').value,
+            password: document.getElementById('email-password').value,
+            use_tls: document.getElementById('email-use-tls').checked,
+        };
+    }
+    
+    // Make AJAX call to save integration
+    fetch(`/business/{{ request.tenant.slug }}/settings/api/integrations/save/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            integration: integrationName,
+            config: formData
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Integration settings saved successfully!', 'success');
+            toggleConfig(integrationName);
+            // Update status badges
+            location.reload();
+        } else {
+            showToast('Error saving integration: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error saving integration', 'error');
+    })
+    .finally(() => {
+        // Reset button
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function disconnectIntegration(integrationName) {
+    if (confirm(`Are you sure you want to disconnect ${integrationName.replace('-', ' ')}? This will disable related features.`)) {
+        fetch(`/business/{{ request.tenant.slug }}/settings/api/integrations/disconnect/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                integration: integrationName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Integration disconnected successfully', 'success');
+                location.reload();
+            } else {
+                showToast('Error disconnecting integration', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error disconnecting integration', 'error');
+        });
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Add toast styles if not already present
+    if (!document.querySelector('style[data-toast-styles]')) {
+        const style = document.createElement('style');
+        style.setAttribute('data-toast-styles', 'true');
+        style.textContent = `
+            .toast {
+                position: fixed;
+                top: 2rem;
+                right: 2rem;
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                padding: 1rem;
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+                z-index: 9999;
+                min-width: 300px;
+                animation: slideInRight 0.3s ease-out;
+            }
+            .toast.toast-success { border-left: 4px solid #10b981; }
+            .toast.toast-error { border-left: 4px solid #ef4444; }
+            .toast-content { display: flex; align-items: center; gap: 0.75rem; }
+            .toast-close {
+                position: absolute;
+                top: 0.5rem;
+                right: 0.5rem;
+                background: none;
+                border: none;
+                color: #6b7280;
+                cursor: pointer;
+                padding: 0.25rem;
+                border-radius: 4px;
+            }
+            @keyframes slideInRight {
+                from { opacity: 0; transform: translateX(100%); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

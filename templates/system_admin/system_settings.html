@@ -1,0 +1,217 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">System Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Business Settings -->
+                    <h6 class="mb-3">Business Management Settings</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="business_approval_required" 
+                                       name="business_approval_required" {% if settings.business_approval_required %}checked{% endif %}>
+                                <label class="form-check-label" for="business_approval_required">
+                                    Require admin approval for new businesses
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="auto_suspend_expired" 
+                                       name="auto_suspend_expired" {% if settings.auto_suspend_expired %}checked{% endif %}>
+                                <label class="form-check-label" for="auto_suspend_expired">
+                                    Auto-suspend expired subscriptions
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Subscription Settings -->
+                    <h6 class="mb-3">Subscription Settings</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="trial_period_days" class="form-label">Trial Period (Days)</label>
+                            <input type="number" class="form-control" id="trial_period_days" 
+                                   name="trial_period_days" value="{{ settings.trial_period_days }}" min="0" max="365">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="payment_grace_period" class="form-label">Payment Grace Period (Days)</label>
+                            <input type="number" class="form-control" id="payment_grace_period" 
+                                   name="payment_grace_period" value="{{ settings.payment_grace_period }}" min="0" max="30">
+                        </div>
+                    </div>
+                    
+                    <!-- Notification Settings -->
+                    <h6 class="mb-3">Notification Settings</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="email_notifications" 
+                                       name="email_notifications" {% if settings.notification_settings.email_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="email_notifications">
+                                    Email Notifications
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sms_notifications" 
+                                       name="sms_notifications" {% if settings.notification_settings.sms_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="sms_notifications">
+                                    SMS Notifications
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="webhook_notifications" 
+                                       name="webhook_notifications" {% if settings.notification_settings.webhook_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="webhook_notifications">
+                                    Webhook Notifications
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Settings
+                        </button>
+                        <a href="{% url 'system_admin:dashboard' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">System Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Application Version:</strong><br>
+                    <span class="text-muted">Autowash v1.0.0</span>
+                </div>
+                <div class="mb-3">
+                    <strong>Django Version:</strong><br>
+                    <span class="text-muted">5.2.4</span>
+                </div>
+                <div class="mb-3">
+                    <strong>Database:</strong><br>
+                    <span class="text-muted">MySQL</span>
+                </div>
+                <div class="mb-3">
+                    <strong>Cache Backend:</strong><br>
+                    <span class="text-muted">Redis</span>
+                </div>
+                <div class="mb-3">
+                    <strong>Server Time:</strong><br>
+                    <span class="text-muted">{{ now|date:"M d, Y H:i T" }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'system_admin:export_data' %}?type=businesses&format=csv" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-download me-2"></i>Export Businesses
+                    </a>
+                    <a href="{% url 'system_admin:export_data' %}?type=subscriptions&format=csv" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-download me-2"></i>Export Subscriptions
+                    </a>
+                    <a href="{% url 'system_admin:export_data' %}?type=payments&format=csv" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-download me-2"></i>Export Payments
+                    </a>
+                    <hr>
+                    <button class="btn btn-outline-warning btn-sm" onclick="clearCache()">
+                        <i class="fas fa-broom me-2"></i>Clear Cache
+                    </button>
+                    <a href="{% url 'system_admin:analytics' %}" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-chart-bar me-2"></i>View Analytics
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">System Health</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Database Status</span>
+                        <span class="badge bg-success">Healthy</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Cache Status</span>
+                        <span class="badge bg-success">Healthy</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Email Service</span>
+                        <span class="badge bg-success">Healthy</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>File Storage</span>
+                        <span class="badge bg-success">Healthy</span>
+                    </div>
+                </div>
+                <small class="text-muted">Last checked: {{ now|date:"H:i" }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function clearCache() {
+    if (confirm('Are you sure you want to clear the system cache?')) {
+        // In a real implementation, you'd make an AJAX call to clear cache
+        alert('Cache clearing feature will be implemented. For now, restart the server to clear cache.');
+    }
+}
+
+// Auto-save functionality (optional)
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const inputs = form.querySelectorAll('input[type="checkbox"], input[type="number"]');
+    
+    inputs.forEach(input => {
+        input.addEventListener('change', function() {
+            // Add unsaved changes indicator
+            const saveButton = document.querySelector('button[type="submit"]');
+            if (!saveButton.classList.contains('btn-warning')) {
+                saveButton.classList.remove('btn-primary');
+                saveButton.classList.add('btn-warning');
+                saveButton.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Save Changes';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

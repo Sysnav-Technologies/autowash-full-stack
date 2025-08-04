@@ -1,0 +1,231 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Generate Invoice</h5>
+            </div>
+            <div class="card-body">
+                <!-- Subscription Info -->
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">Subscription Details</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Business:</strong> {{ subscription.business.name }}<br>
+                            <strong>Owner:</strong> {{ subscription.business.owner.get_full_name|default:subscription.business.owner.username }}<br>
+                            <strong>Plan:</strong> {{ subscription.plan.name }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Status:</strong> 
+                            <span class="badge 
+                                {% if subscription.status == 'active' %}bg-success
+                                {% elif subscription.status == 'trial' %}bg-info
+                                {% elif subscription.status == 'expired' %}bg-warning
+                                {% else %}bg-secondary{% endif %}">
+                                {{ subscription.get_status_display }}
+                            </span><br>
+                            <strong>Plan Price:</strong> KES {{ subscription.plan.price }}<br>
+                            <strong>Current Period:</strong> {{ subscription.start_date|date:"M j, Y" }} - {{ subscription.end_date|date:"M j, Y" }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invoice Form -->
+                <form method="post" id="invoiceForm">
+                    {% csrf_token %}
+                    {{ form.subscription }}
+                    
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="{{ form.subtotal.id_for_label }}" class="form-label">
+                                Subtotal <span class="text-danger">*</span>
+                            </label>
+                            {{ form.subtotal }}
+                            {% if form.subtotal.help_text %}
+                                <div class="form-text">{{ form.subtotal.help_text }}</div>
+                            {% endif %}
+                            {% if form.subtotal.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.subtotal.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="{{ form.discount_amount.id_for_label }}" class="form-label">
+                                Discount Amount
+                            </label>
+                            {{ form.discount_amount }}
+                            {% if form.discount_amount.help_text %}
+                                <div class="form-text">{{ form.discount_amount.help_text }}</div>
+                            {% endif %}
+                            {% if form.discount_amount.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.discount_amount.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="{{ form.tax_amount.id_for_label }}" class="form-label">
+                                Tax Amount
+                            </label>
+                            {{ form.tax_amount }}
+                            {% if form.tax_amount.help_text %}
+                                <div class="form-text">{{ form.tax_amount.help_text }}</div>
+                            {% endif %}
+                            {% if form.tax_amount.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.tax_amount.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="{{ form.due_date.id_for_label }}" class="form-label">
+                                Due Date <span class="text-danger">*</span>
+                            </label>
+                            {{ form.due_date }}
+                            {% if form.due_date.help_text %}
+                                <div class="form-text">{{ form.due_date.help_text }}</div>
+                            {% endif %}
+                            {% if form.due_date.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.due_date.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Total Amount</label>
+                            <div class="form-control-plaintext bg-light border rounded p-2">
+                                <strong id="totalAmount">KES 0.00</strong>
+                            </div>
+                            <div class="form-text">Calculated automatically</div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                Notes
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.help_text %}
+                                <div class="form-text">{{ form.notes.help_text }}</div>
+                            {% endif %}
+                            {% if form.notes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.notes.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.send_notification }}
+                                <label class="form-check-label" for="{{ form.send_notification.id_for_label }}">
+                                    {{ form.send_notification.label }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-file-invoice me-1"></i> Generate Invoice
+                        </button>
+                        <a href="{% url 'system_admin:invoice_management' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-12 col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Recent Invoices</h6>
+            </div>
+            <div class="card-body">
+                {% if subscription.subscription_invoices.all %}
+                    {% for invoice in subscription.subscription_invoices.all|slice:":5" %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <small class="text-muted">{{ invoice.issue_date|date:"M j, Y" }}</small><br>
+                                <strong>{{ invoice.invoice_number }}</strong><br>
+                                <small>KES {{ invoice.total_amount }}</small>
+                            </div>
+                            <span class="badge 
+                                {% if invoice.status == 'paid' %}bg-success
+                                {% elif invoice.status == 'sent' %}bg-info
+                                {% elif invoice.status == 'overdue' %}bg-danger
+                                {% else %}bg-secondary{% endif %}">
+                                {{ invoice.get_status_display }}
+                            </span>
+                        </div>
+                        {% if not forloop.last %}<hr class="my-2">{% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted mb-0">No invoices generated yet.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">Invoice Calculation</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <span>Subtotal:</span>
+                    <span id="subtotalDisplay">KES 0.00</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Discount:</span>
+                    <span id="discountDisplay">KES 0.00</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Tax:</span>
+                    <span id="taxDisplay">KES 0.00</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <strong>Total:</strong>
+                    <strong id="totalDisplay">KES 0.00</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const subtotalInput = document.getElementById('{{ form.subtotal.id_for_label }}');
+    const discountInput = document.getElementById('{{ form.discount_amount.id_for_label }}');
+    const taxInput = document.getElementById('{{ form.tax_amount.id_for_label }}');
+    
+    function updateTotal() {
+        const subtotal = parseFloat(subtotalInput.value) || 0;
+        const discount = parseFloat(discountInput.value) || 0;
+        const tax = parseFloat(taxInput.value) || 0;
+        const total = subtotal - discount + tax;
+        
+        document.getElementById('subtotalDisplay').textContent = 'KES ' + subtotal.toFixed(2);
+        document.getElementById('discountDisplay').textContent = 'KES ' + discount.toFixed(2);
+        document.getElementById('taxDisplay').textContent = 'KES ' + tax.toFixed(2);
+        document.getElementById('totalAmount').textContent = 'KES ' + total.toFixed(2);
+        document.getElementById('totalDisplay').textContent = 'KES ' + total.toFixed(2);
+    }
+    
+    subtotalInput.addEventListener('input', updateTotal);
+    discountInput.addEventListener('input', updateTotal);
+    taxInput.addEventListener('input', updateTotal);
+    
+    // Initial calculation
+    updateTotal();
+});
+</script>
+{% endblock %}

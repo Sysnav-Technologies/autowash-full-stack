@@ -2,10 +2,10 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.urls import reverse
-from apps.core.models import TimeStampedModel
+from apps.core.tenant_models import TenantTimeStampedModel
 import uuid
 
-class NotificationCategory(TimeStampedModel):
+class NotificationCategory(TenantTimeStampedModel):
     """Categories for organizing notifications"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -21,7 +21,7 @@ class NotificationCategory(TimeStampedModel):
         verbose_name_plural = "Notification Categories"
         ordering = ['name']
 
-class Notification(TimeStampedModel):
+class Notification(TenantTimeStampedModel):
     """User notifications and alerts"""
     
     NOTIFICATION_TYPES = [
@@ -45,7 +45,7 @@ class Notification(TimeStampedModel):
     notification_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     
     # Recipients
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    user_id = models.IntegerField(default=1, help_text="User ID from public schema")
     employee = models.ForeignKey(
         'employees.Employee', 
         on_delete=models.CASCADE, 
@@ -96,8 +96,21 @@ class Notification(TimeStampedModel):
     # Metadata
     metadata = models.JSONField(default=dict, blank=True, help_text="Additional notification data")
     
+    @property
+    def user(self):
+        """Get user object from main database"""
+        if not self.user_id:
+            return None
+        try:
+            return User.objects.using('default').get(id=self.user_id)
+        except User.DoesNotExist:
+            return None
+    
     def __str__(self):
-        return f"{self.title} - {self.user.get_full_name() or self.user.username}"
+        user = self.user
+        if user:
+            return f"{self.title} - {user.get_full_name() or user.username}"
+        return f"{self.title} - user {self.user_id}"
     
     @property
     def icon(self):
@@ -176,13 +189,13 @@ class Notification(TimeStampedModel):
         verbose_name_plural = "Notifications"
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['user_id', 'is_read']),
             models.Index(fields=['employee', 'is_read']),
             models.Index(fields=['notification_type', 'priority']),
             models.Index(fields=['scheduled_for']),
         ]
 
-class NotificationTemplate(TimeStampedModel):
+class NotificationTemplate(TenantTimeStampedModel):
     """Templates for automated notifications"""
     
     TRIGGER_EVENTS = [
@@ -275,7 +288,7 @@ class NotificationTemplate(TimeStampedModel):
         
         # Create notification
         notification = Notification.objects.create(
-            user=user,
+            user_id=user.id,
             employee=getattr(user, 'employee_profile', None),
             title=self.render_title(context),
             message=self.render_message(context),
@@ -294,10 +307,12 @@ class NotificationTemplate(TimeStampedModel):
         verbose_name_plural = "Notification Templates"
         ordering = ['name']
 
-class NotificationPreference(TimeStampedModel):
+class NotificationPreference(TenantTimeStampedModel):
     """User notification preferences"""
     
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_preferences')
+    # IMPORTANT: Use user_id instead of ForeignKey to avoid FK constraint
+    # in multi-tenant setup where users are in public schema
+    user_id = models.IntegerField(unique=True, default=1, help_text="User ID from public schema")
     
     # General Preferences
     email_notifications = models.BooleanField(default=True)
@@ -332,8 +347,21 @@ class NotificationPreference(TimeStampedModel):
     # Categories to mute
     muted_categories = models.ManyToManyField(NotificationCategory, blank=True)
     
+    @property
+    def user(self):
+        """Get user object from main database"""
+        if not self.user_id:
+            return None
+        try:
+            return User.objects.using('default').get(id=self.user_id)
+        except User.DoesNotExist:
+            return None
+    
     def __str__(self):
-        return f"Preferences for {self.user.get_full_name() or self.user.username}"
+        user = self.user
+        if user:
+            return f"Preferences for {user.get_full_name() or user.username}"
+        return f"Preferences for user {self.user_id}"
     
     @property
     def is_quiet_time(self):
@@ -376,7 +404,7 @@ class NotificationPreference(TimeStampedModel):
         verbose_name = "Notification Preference"
         verbose_name_plural = "Notification Preferences"
 
-class NotificationLog(TimeStampedModel):
+class NotificationLog(TenantTimeStampedModel):
     """Log of notification delivery attempts"""
     
     DELIVERY_STATUS = [
@@ -457,7 +485,7 @@ class NotificationLog(TimeStampedModel):
         verbose_name_plural = "Notification Logs"
         ordering = ['-created_at']
 
-class NotificationDigest(TimeStampedModel):
+class NotificationDigest(TenantTimeStampedModel):
     """Periodic notification digests"""
     
     DIGEST_TYPES = [
@@ -466,7 +494,7 @@ class NotificationDigest(TimeStampedModel):
         ('monthly', 'Monthly Digest'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notification_digests')
+    user_id = models.IntegerField(default=1, help_text="User ID from public schema")
     digest_type = models.CharField(max_length=20, choices=DIGEST_TYPES)
     
     # Period Covered
@@ -486,8 +514,21 @@ class NotificationDigest(TimeStampedModel):
     sent_at = models.DateTimeField(null=True, blank=True)
     is_sent = models.BooleanField(default=False)
     
+    @property
+    def user(self):
+        """Get user object from main database"""
+        if not self.user_id:
+            return None
+        try:
+            return User.objects.using('default').get(id=self.user_id)
+        except User.DoesNotExist:
+            return None
+    
     def __str__(self):
-        return f"{self.get_digest_type_display()} for {self.user.get_full_name() or self.user.username}"
+        user = self.user
+        if user:
+            return f"{self.get_digest_type_display()} for {user.get_full_name() or user.username}"
+        return f"{self.get_digest_type_display()} for user {self.user_id}"
     
     def generate_content(self):
         """Generate digest content"""

@@ -1,0 +1,235 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Notifications Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-bell me-2"></i>Notifications Dashboard</h2>
+                <div class="btn-group" role="group">
+                    <a href="/business/{{ request.tenant.slug }}/notifications/list/" class="btn btn-outline-primary">
+                        <i class="fas fa-list me-1"></i>All Notifications
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/notifications/preferences/" class="btn btn-outline-secondary">
+                        <i class="fas fa-cog me-1"></i>Preferences
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-primary mb-2">
+                        <i class="fas fa-bell fa-2x"></i>
+                    </div>
+                    <h3 class="text-primary mb-1">{{ stats.total }}</h3>
+                    <p class="text-muted mb-0">Total Notifications</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-warning mb-2">
+                        <i class="fas fa-bell-slash fa-2x"></i>
+                    </div>
+                    <h3 class="text-warning mb-1">{{ stats.unread }}</h3>
+                    <p class="text-muted mb-0">Unread</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-success mb-2">
+                        <i class="fas fa-calendar-day fa-2x"></i>
+                    </div>
+                    <h3 class="text-success mb-1">{{ stats.today }}</h3>
+                    <p class="text-muted mb-0">Today</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-info mb-2">
+                        <i class="fas fa-archive fa-2x"></i>
+                    </div>
+                    <h3 class="text-info mb-1">{{ stats.archived }}</h3>
+                    <p class="text-muted mb-0">Archived</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Notifications -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Recent Notifications</h5>
+                        <a href="/business/{{ request.tenant.slug }}/notifications/list/" class="btn btn-sm btn-outline-primary">
+                            View All
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_notifications %}
+                        <div class="list-group list-group-flush">
+                            {% for notification in recent_notifications %}
+                                <div class="list-group-item{% if not notification.is_read %} list-group-item-light{% endif %}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center mb-1">
+                                                <span class="badge bg-primary me-2">
+                                                    {{ notification.priority|capfirst }}
+                                                </span>
+                                                {% if not notification.is_read %}
+                                                    <span class="badge bg-warning text-dark">New</span>
+                                                {% endif %}
+                                            </div>
+                                            <h6 class="mb-1">{{ notification.title }}</h6>
+                                            <p class="mb-1 text-muted">{{ notification.message|truncatewords:20 }}</p>
+                                            <small class="text-muted">
+                                                <i class="fas fa-clock me-1"></i>{{ notification.created_at|timesince }} ago
+                                            </small>
+                                        </div>
+                                        <div class="ms-3">
+                                            <a href="/business/{{ request.tenant.slug }}/notifications/{{ notification.id }}/" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                View
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No notifications yet</h5>
+                            <p class="text-muted">You'll see your notifications here when they arrive.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions (only for owners/managers) -->
+    {% if is_owner or is_manager %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <button class="btn btn-primary w-100" onclick="markAllAsRead()">
+                                    <i class="fas fa-check-double me-2"></i>Mark All Read
+                                </button>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <button class="btn btn-warning w-100" onclick="archiveOldNotifications()">
+                                    <i class="fas fa-archive me-2"></i>Archive Old
+                                </button>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <button class="btn btn-info w-100" onclick="refreshDashboard()">
+                                    <i class="fas fa-sync-alt me-2"></i>Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Mark all notifications as read
+function markAllAsRead() {
+    if (confirm('Mark all notifications as read?')) {
+        fetch('{% url "notifications:api_mark_all_read" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error marking notifications as read');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error marking notifications as read');
+        });
+    }
+}
+
+// Archive old notifications
+function archiveOldNotifications() {
+    if (confirm('Archive notifications older than 30 days?')) {
+        fetch('{% url "notifications:api_archive_old" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`${data.count} notifications archived`);
+                location.reload();
+            } else {
+                alert('Error archiving notifications');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error archiving notifications');
+        });
+    }
+}
+
+// Refresh dashboard
+function refreshDashboard() {
+    location.reload();
+}
+
+// Auto-refresh every 5 minutes
+setInterval(function() {
+    const lastActivity = localStorage.getItem('lastActivity');
+    const now = Date.now();
+    
+    // Only auto-refresh if user was active in the last 10 minutes
+    if (!lastActivity || (now - parseInt(lastActivity)) < 600000) {
+        location.reload();
+    }
+}, 300000); // 5 minutes
+
+// Track user activity
+document.addEventListener('click', function() {
+    localStorage.setItem('lastActivity', Date.now());
+});
+</script>
+{% endblock %}

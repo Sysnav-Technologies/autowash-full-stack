@@ -31,8 +31,10 @@ urlpatterns = [
     # AJAX endpoints
     path('api/check-verification/', views.check_verification_status, name='check_verification_status'),
     path('api/check-business-name/', views.check_business_name, name='check_business_name'),
+    path('api/notifications/check/', views.check_notifications_api, name='check_notifications'),
+    path('business/register/api/notifications/check/', views.check_notifications_api, name='register_check_notifications'),
     path('api/business-info/<slug:slug>/', views.business_info_api, name='business_info_api'),
     
-    # Admin functions
-    path('admin/create-schema/', views.create_business_schema, name='create_business_schema'),
+    # Admin functions - Legacy URL commented out for MySQL multi-tenant system
+    # path('admin/create-schema/', views.create_business_schema, name='create_business_schema'),
 ]

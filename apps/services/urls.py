@@ -73,6 +73,7 @@ urlpatterns = [
     path('ajax/start-next/', views.start_next_service, name='start_next_service'),
     path('ajax/current-service/', views.get_current_service, name='current_service'),
     path('ajax/bay/status/', views.bay_status_ajax, name='bay_status'),
+    path('ajax/attendance-status/', views.attendance_status_ajax, name='attendance_status'),
     
     # Attendant Dashboard
     path('dashboard/', views.attendant_dashboard, name='attendant_dashboard'),

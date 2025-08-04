@@ -1,0 +1,240 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<!-- Statistics Overview -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-business-time fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">{{ monthly_stats.new_businesses }}</h5>
+                <p class="card-text text-muted">New Businesses ({{ days }} days)</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-2x text-success mb-2"></i>
+                <h5 class="card-title">{{ monthly_stats.new_subscriptions }}</h5>
+                <p class="card-text text-muted">New Subscriptions</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-money-bill-wave fa-2x text-info mb-2"></i>
+                <h5 class="card-title">KES {{ monthly_stats.total_revenue|floatformat:0 }}</h5>
+                <p class="card-text text-muted">Revenue ({{ days }} days)</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-calculator fa-2x text-warning mb-2"></i>
+                <h5 class="card-title">KES {{ monthly_stats.average_subscription_value|floatformat:0 }}</h5>
+                <p class="card-text text-muted">Avg Subscription Value</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Date Range Filter -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="days" class="form-label">Date Range</label>
+                        <select name="days" id="days" class="form-select" onchange="this.form.submit()">
+                            <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 days</option>
+                            <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
+                            <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
+                            <option value="365" {% if days == 365 %}selected{% endif %}>Last year</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Business Growth</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="businessGrowthChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Revenue Trend</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="revenueChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plan Popularity -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Subscription Plan Performance</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Plan Name</th>
+                                <th>Subscribers</th>
+                                <th>Total Revenue</th>
+                                <th>Price</th>
+                                <th>Market Share</th>
+                                <th>Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for plan in plan_stats %}
+                            <tr>
+                                <td>
+                                    <strong>{{ plan.name }}</strong><br>
+                                    <small class="text-muted">{{ plan.get_plan_type_display }}</small>
+                                </td>
+                                <td class="text-center">
+                                    <h5 class="mb-0">{{ plan.subscriber_count }}</h5>
+                                </td>
+                                <td class="text-center">
+                                    <strong>KES {{ plan.total_revenue|default:0|floatformat:0 }}</strong>
+                                </td>
+                                <td>
+                                    KES {{ plan.price|floatformat:0 }}/{{ plan.get_plan_type_display }}
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {% widthratio plan.subscriber_count monthly_stats.new_subscriptions 100 %}%"
+                                             aria-valuenow="{% widthratio plan.subscriber_count monthly_stats.new_subscriptions 100 %}" 
+                                             aria-valuemin="0" aria-valuemax="100">
+                                            {% widthratio plan.subscriber_count monthly_stats.new_subscriptions 100 %}%
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if plan.subscriber_count > 0 %}
+                                        <span class="badge bg-success">Popular</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">No Subscribers</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Business Growth Chart
+const businessGrowthData = {{ business_growth|safe }};
+const businessGrowthCtx = document.getElementById('businessGrowthChart').getContext('2d');
+new Chart(businessGrowthCtx, {
+    type: 'line',
+    data: {
+        labels: businessGrowthData.map(item => {
+            const date = new Date(item.date);
+            return date.toLocaleDateString();
+        }),
+        datasets: [{
+            label: 'New Businesses',
+            data: businessGrowthData.map(item => item.count),
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            tension: 0.1,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+
+// Revenue Chart
+const revenueData = {{ revenue_data|safe }};
+const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+new Chart(revenueCtx, {
+    type: 'bar',
+    data: {
+        labels: revenueData.map(item => {
+            const date = new Date(item.date);
+            return date.toLocaleDateString();
+        }),
+        datasets: [{
+            label: 'Revenue (KES)',
+            data: revenueData.map(item => item.revenue),
+            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+            borderColor: 'rgb(75, 192, 192)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'KES ' + value.toLocaleString();
+                    }
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Revenue: KES ' + context.parsed.y.toLocaleString();
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

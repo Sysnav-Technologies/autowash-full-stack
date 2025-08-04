@@ -1,0 +1,216 @@
+{% extends 'system_admin/base.html' %}
+{% load math_filters %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-list-alt fa-3x text-primary mb-3"></i>
+                <h5>Total Plans</h5>
+                <h2 class="text-primary">{{ plans|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-3x text-success mb-3"></i>
+                <h5>Total Subscribers</h5>
+                <h2 class="text-success">
+                    {% for plan in plans %}
+                        {{ plan.active_subscriptions|add:0 }}
+                        {% if not forloop.last %}+{% endif %}
+                    {% endfor %}
+                </h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-money-bill-wave fa-3x text-info mb-3"></i>
+                <h5>Total Revenue</h5>
+                <h2 class="text-info">
+                    KES {% for plan in plans %}{{ plan.total_revenue|default:0|floatformat:0 }}{% if not forloop.last %}+{% endif %}{% endfor %}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Subscription Plans</h5>
+                <a href="{% url 'system_admin:create_subscription_plan' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Add New Plan
+                </a>
+            </div>
+            <div class="card-body">
+                {% if plans %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Plan</th>
+                                    <th>Price</th>
+                                    <th>Duration</th>
+                                    <th>Limits</th>
+                                    <th>Active Subscriptions</th>
+                                    <th>Revenue</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for plan in plans %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <strong>{{ plan.name }}</strong><br>
+                                            <small class="text-muted">{{ plan.description|truncatewords:8|default:"No description" }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>KES {{ plan.price|floatformat:0 }}</strong><br>
+                                        <small class="text-muted">{{ plan.currency }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ plan.get_plan_type_display }}</span><br>
+                                        <small class="text-muted">{{ plan.duration_months }} month{{ plan.duration_months|pluralize }}</small>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            {% if plan.max_employees %}
+                                                <i class="fas fa-users fa-sm me-1"></i>{{ plan.max_employees }} employees<br>
+                                            {% endif %}
+                                            {% if plan.max_customers %}
+                                                <i class="fas fa-user-friends fa-sm me-1"></i>{{ plan.max_customers }} customers<br>
+                                            {% endif %}
+                                            {% if not plan.max_employees and not plan.max_customers %}
+                                                <span class="text-muted">No limits</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <h5 class="mb-0">{{ plan.active_subscriptions }}</h5>
+                                        <small class="text-muted">subscriptions</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <h5 class="mb-0">KES {{ plan.total_revenue|default:0|floatformat:0 }}</h5>
+                                        <small class="text-muted">total earned</small>
+                                    </td>
+                                    <td>
+                                        {% if plan.is_active %}
+                                            <span class="status-badge status-active">Active</span>
+                                        {% else %}
+                                            <span class="status-badge status-rejected">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'system_admin:edit_subscription_plan' plan.id %}" 
+                                               class="btn btn-outline-primary btn-sm" title="Edit Plan">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% if plan.is_active %}
+                                                <button class="btn btn-warning btn-sm" title="Deactivate" 
+                                                        onclick="togglePlanStatus('{{ plan.id }}', false)">
+                                                    <i class="fas fa-pause"></i>
+                                                </button>
+                                            {% else %}
+                                                <button class="btn btn-success btn-sm" title="Activate" 
+                                                        onclick="togglePlanStatus('{{ plan.id }}', true)">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-list-alt fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No subscription plans found</h5>
+                        <p class="text-muted">Create your first subscription plan to get started.</p>
+                        <a href="/admin/subscriptions/subscriptionplan/add/" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Add First Plan
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Plan Performance Insights</h5>
+            </div>
+            <div class="card-body">
+                {% if plans %}
+                    <div class="row">
+                        {% for plan in plans %}
+                            <div class="col-md-4 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ plan.name }}</h6>
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Popularity</span>
+                                                <span>{{ plan.active_subscriptions }}/{{ plans|length|mul:10 }}</span>
+                                            </div>
+                                            <div class="progress" style="height: 8px;">
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {% widthratio plan.active_subscriptions 10 100 %}%"></div>
+                                            </div>
+                                        </div>
+                                        <div class="row text-center">
+                                            <div class="col">
+                                                <strong>{{ plan.active_subscriptions }}</strong><br>
+                                                <small class="text-muted">Subscribers</small>
+                                            </div>
+                                            <div class="col">
+                                                <strong>KES {{ plan.total_revenue|default:0|floatformat:0 }}</strong><br>
+                                                <small class="text-muted">Revenue</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePlanStatus(planId, activate) {
+    const action = activate ? 'activate' : 'deactivate';
+    if (confirm(`Are you sure you want to ${action} this plan?`)) {
+        // In a real implementation, you'd make an AJAX call to update the status
+        // For now, we'll redirect to Django admin
+        window.location.href = `/admin/subscriptions/subscriptionplan/${planId}/change/`;
+    }
+}
+
+// Add tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

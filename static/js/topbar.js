@@ -153,6 +153,12 @@ function showAttendanceMessage(message, type = 'success') {
 // NOTIFICATIONS FUNCTIONALITY
 // ===============================
 function initializeNotifications() {
+    // Only initialize notifications if we have a tenant slug (i.e., we're in a business context)
+    const tenantSlug = window.tenant_slug || getTenantSlugFromURL();
+    if (!tenantSlug) {
+        return; // Exit early if not in a business context
+    }
+    
     // Mark notification as read when clicked
     $(document).on('click', '.notification-item', function() {
         const $item = $(this);
@@ -217,13 +223,13 @@ function checkForNewNotifications() {
     if (!tenantSlug) return;
     
     $.ajax({
-        url: `/business/${tenantSlug}/api/notifications/check/`,
+        url: `/business/${tenantSlug}/notifications/api/check/`,
         method: 'GET',
         success: function(data) {
-            if (data.new_count > 0) {
-                updateNotificationBadge(data.new_count);
-                if (data.latest_notification) {
-                    showNotificationToast(data.latest_notification);
+            if (data.unread_count > 0) {
+                updateNotificationBadge(data.unread_count);
+                if (data.notifications && data.notifications.length > 0) {
+                    showNotificationToast(data.notifications[0]);
                 }
             }
         },

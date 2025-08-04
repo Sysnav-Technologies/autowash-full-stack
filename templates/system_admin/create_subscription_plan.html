@@ -1,0 +1,168 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Create Subscription Plan</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">
+                                Plan Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="name" id="name" class="form-control" 
+                                   placeholder="e.g., Professional Plan" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="slug" class="form-label">
+                                Plan Slug <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="slug" id="slug" class="form-control" 
+                                   placeholder="e.g., professional-plan" required>
+                            <div class="form-text">URL-friendly name (lowercase, hyphens only)</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="plan_type" class="form-label">
+                                Plan Type <span class="text-danger">*</span>
+                            </label>
+                            <select name="plan_type" id="plan_type" class="form-select" required>
+                                <option value="">Select plan type...</option>
+                                {% for value, label in plan_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="duration_months" class="form-label">
+                                Duration (Months) <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="duration_months" id="duration_months" 
+                                   class="form-control" min="1" max="60" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="price" class="form-label">
+                                Price (KES) <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="price" id="price" class="form-control" 
+                                   step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="max_employees" class="form-label">
+                                Max Employees
+                            </label>
+                            <input type="number" name="max_employees" id="max_employees" 
+                                   class="form-control" min="1" placeholder="5">
+                            <div class="form-text">-1 for unlimited</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="max_customers" class="form-label">
+                                Max Customers
+                            </label>
+                            <input type="number" name="max_customers" id="max_customers" 
+                                   class="form-control" min="1" placeholder="100">
+                            <div class="form-text">-1 for unlimited</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="max_locations" class="form-label">
+                                Max Locations
+                            </label>
+                            <input type="number" name="max_locations" id="max_locations" 
+                                   class="form-control" min="1" placeholder="1">
+                            <div class="form-text">-1 for unlimited</div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="description" class="form-label">
+                                Description
+                            </label>
+                            <textarea name="description" id="description" class="form-control" 
+                                      rows="3" placeholder="Describe what this plan includes..."></textarea>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_active" id="is_active" 
+                                       class="form-check-input" checked>
+                                <label class="form-check-label" for="is_active">
+                                    Plan is active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Create Plan
+                        </button>
+                        <a href="{% url 'system_admin:subscription_plans' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-12 col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Plan Guidelines</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="fas fa-info-circle text-info me-2"></i>
+                        <strong>Plan Name:</strong> Choose a clear, descriptive name
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-link text-info me-2"></i>
+                        <strong>Slug:</strong> Must be unique and URL-friendly
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-calendar text-info me-2"></i>
+                        <strong>Duration:</strong> Monthly = 1, Annual = 12
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-money-bill text-info me-2"></i>
+                        <strong>Pricing:</strong> Set competitive prices
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-users text-info me-2"></i>
+                        <strong>Limits:</strong> Use -1 for unlimited features
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const nameInput = document.getElementById('name');
+    const slugInput = document.getElementById('slug');
+    
+    // Auto-generate slug from name
+    nameInput.addEventListener('input', function() {
+        const slug = this.value
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
+        slugInput.value = slug;
+    });
+});
+</script>
+{% endblock %}

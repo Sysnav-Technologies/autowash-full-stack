@@ -2,13 +2,13 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from phonenumber_field.modelfields import PhoneNumberField
-from apps.core.models import TimeStampedModel, SoftDeleteModel, Address, ContactInfo
+from apps.core.tenant_models import TenantTimeStampedModel, TenantSoftDeleteModel
+from apps.core.models import Address, ContactInfo
 from apps.core.utils import upload_to_path
-from django_tenants.utils import schema_context, get_public_schema_name
 from decimal import Decimal
 import uuid
 
-class Customer(SoftDeleteModel, Address, ContactInfo):
+class Customer(TenantSoftDeleteModel, Address, ContactInfo):
     """Customer model with comprehensive information - FIXED for cross-schema compatibility"""
     
     CUSTOMER_TYPE_CHOICES = [
@@ -145,7 +145,7 @@ class Customer(SoftDeleteModel, Address, ContactInfo):
         ordering = ['first_name', 'last_name']
 
 
-class Vehicle(TimeStampedModel):
+class Vehicle(TenantTimeStampedModel):
     """Customer vehicle information - FIXED for cross-schema compatibility"""
     
     VEHICLE_TYPE_CHOICES = [
@@ -227,7 +227,7 @@ class Vehicle(TimeStampedModel):
         ordering = ['registration_number']
 
 
-class CustomerNote(TimeStampedModel):
+class CustomerNote(TenantTimeStampedModel):
     """Customer notes and interactions - FIXED for cross-schema compatibility"""
     
     NOTE_TYPES = [
@@ -261,7 +261,7 @@ class CustomerNote(TimeStampedModel):
         ordering = ['-created_at']
 
 
-class CustomerDocument(TimeStampedModel):
+class CustomerDocument(TenantTimeStampedModel):
     """Customer document storage - FIXED for cross-schema compatibility"""
     
     DOCUMENT_TYPES = [
@@ -298,7 +298,7 @@ class CustomerDocument(TimeStampedModel):
         ordering = ['-created_at']
 
 
-class CustomerFeedback(TimeStampedModel):
+class CustomerFeedback(TenantTimeStampedModel):
     """Customer feedback and ratings - FIXED for cross-schema compatibility"""
     
     RATING_CHOICES = [
@@ -379,7 +379,7 @@ class CustomerFeedback(TimeStampedModel):
         ordering = ['-created_at']
 
 
-class LoyaltyProgram(TimeStampedModel):
+class LoyaltyProgram(TenantTimeStampedModel):
     """Loyalty program configuration - FIXED for cross-schema compatibility"""
     
     name = models.CharField(max_length=100)

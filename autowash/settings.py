@@ -45,7 +45,6 @@ elif CPANEL:
         ALLOWED_HOSTS.append(cpanel_domain)
 
 SHARED_APPS = [
-    'django_tenants',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -73,7 +72,6 @@ SHARED_APPS = [
     'apps.core',
     'apps.accounts',
     'apps.subscriptions',
-
 ]
 
 TENANT_APPS = [
@@ -82,6 +80,14 @@ TENANT_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.admin',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'rest_framework.authtoken',
+    'django_celery_beat',
+    'django_celery_results',
+    'apps.core',  # For TenantSettings model
     'apps.businesses',
     'apps.employees',
     'apps.customers',
@@ -92,6 +98,8 @@ TENANT_APPS = [
     'apps.reports',
     'apps.expenses',
     'apps.notification',
+    'apps.accounts',
+    'apps.system_admin',  # System administration
 ]
 
 if DEBUG:
@@ -99,19 +107,20 @@ if DEBUG:
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
-TENANT_MODEL = "accounts.Business"
-TENANT_DOMAIN_MODEL = "accounts.Domain"
-PUBLIC_SCHEMA_URLCONF = 'autowash.urls_public'
+# MySQL Multi-Tenant Configuration
+MAIN_DOMAIN = 'autowash.co.ke'
+TENANT_MODEL = "core.Tenant"
+TENANT_URLCONF = 'autowash.urls'
 ROOT_URLCONF = 'autowash.urls'
-PUBLIC_SCHEMA_NAME = 'public'
-SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
+# Public domain configuration
 public_domain = 'localhost:8000' if not RENDER and not CPANEL else \
                'autowash-3jpr.onrender.com' if RENDER else \
                'app.autowash.co.ke'
 
+# Multi-tenant routing configuration
 TENANT_ROUTING = {
-    'ROUTING_METHOD': 'path',
+    'ROUTING_METHOD': 'path',  # or 'subdomain' or 'domain'
     'TENANT_URL_PREFIX': 'business',
     'PUBLIC_TENANT_DOMAIN': public_domain,
 }
@@ -119,7 +128,7 @@ TENANT_ROUTING = {
 # Disable admin session check since we handle sessions ourselves
 SILENCED_SYSTEM_CHECKS = ['admin.E410']
 
-# ULTIMATE MIDDLEWARE ORDER - Complete session fix
+# MySQL Multi-Tenant Middleware Configuration
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -129,14 +138,13 @@ if RENDER:
     MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
 
 MIDDLEWARE.extend([
-    # CRITICAL: Our complete session middleware replacement
-    'apps.core.middleware.TenantAwareSessionMiddleware',
+    # Session middleware
+    'django.contrib.sessions.middleware.SessionMiddleware',
     
-    # Fake SessionMiddleware for admin compatibility (does nothing)
-    'apps.core.middleware.FakeSessionMiddleware',
-    
-    # Tenant middleware after session handling
-    'apps.core.middleware.PathBasedTenantMiddleware',
+    # MySQL Multi-tenant middleware
+    'apps.core.mysql_middleware.MySQLTenantMiddleware',
+    'apps.core.mysql_middleware.TenantBusinessContextMiddleware',
+    'apps.core.mysql_middleware.TenantURLMiddleware',
     
     # Standard Django middleware
     'django.middleware.common.CommonMiddleware',
@@ -144,15 +152,13 @@ MIDDLEWARE.extend([
     
     # Auth middleware after tenant middleware
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'apps.core.middleware.SharedAuthenticationMiddleware',
     
     # Message and other middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_ratelimit.middleware.RatelimitMiddleware',
     
-    # Custom business context middleware
-    'apps.core.middleware.BusinessContextMiddleware',
+    # Custom middleware
     'apps.core.middleware.TimezoneMiddleware',
     'apps.core.middleware.UserActivityMiddleware',
     
@@ -216,10 +222,10 @@ elif CPANEL:
 
 CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 
-# CRITICAL: Database configuration for sessions
-DATABASE_ROUTERS = (
-    'django_tenants.routers.TenantSyncRouter',
-)
+# CRITICAL: Database configuration for MySQL multi-tenant routing
+DATABASE_ROUTERS = [
+    'apps.core.database_router.TenantDatabaseRouter',
+]
 
 TEMPLATES = [
     {
@@ -238,6 +244,7 @@ TEMPLATES = [
                 'apps.core.context_processors.notifications_context',
                 'apps.core.context_processors.performance_context',
                 'apps.core.context_processors.verification_context',
+                'apps.core.context_processors.subscription_flow_context',
             ],
         },
     },
@@ -246,35 +253,29 @@ TEMPLATES = [
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 
-database_url = config('DATABASE_URL')
-
+# MySQL Database Configuration
 DATABASES = {
-    'default': dj_database_url.parse(
-        database_url,
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': config('DB_NAME', default='autowash_main'),
+        'USER': config('DB_USER', default='root'),
+        'PASSWORD': config('DB_PASSWORD', default=''),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'autocommit': True,
+        },
+    }
 }
 
-DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
+# Database router for multi-tenant architecture
+DATABASE_ROUTERS = [
+    'apps.core.database_router.TenantDatabaseRouter',
+]
 
-if not RENDER and not CPANEL:
-    DATABASES['default']['OPTIONS'] = {
-        'sslmode': 'disable',
-        'options': '-c search_path=public'
-    }
-elif RENDER:
-    DATABASES['default']['OPTIONS'] = {
-        'sslmode': 'require',
-        'options': '-c search_path=public -c statement_timeout=300000 -c lock_timeout=300000'
-    }
-    DATABASES['default']['CONN_MAX_AGE'] = 0 if DEBUG else 600
-elif CPANEL:
-    DATABASES['default']['OPTIONS'] = {
-        'sslmode': 'prefer',
-        'options': '-c search_path=public'
-    }
-
+# Redis and Channel Layers Configuration
 redis_url = config('REDIS_URL', default='')
 if redis_url and 'redis://' in redis_url:
     CHANNEL_LAYERS = {
@@ -292,6 +293,7 @@ else:
         },
     }
 
+# Cache Configuration
 if redis_url and redis_url != '' and 'redis://' in redis_url:
     CACHES = {
         'default': {
@@ -307,6 +309,7 @@ else:
         }
     }
 
+# Password Validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -314,11 +317,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
+# Static Files Configuration
 STATIC_URL = '/static/'
 
 if RENDER:
@@ -338,6 +343,7 @@ STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 ]
 
+# Media Files Configuration
 MEDIA_URL = '/media/'
 
 if CPANEL:
@@ -345,13 +351,16 @@ if CPANEL:
 else:
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Tenant-specific media root
 TENANT_MEDIA_ROOT = os.path.join(BASE_DIR, 'tenants', 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Crispy Forms Configuration
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
+# Celery Configuration
 if redis_url and 'redis://' in redis_url:
     CELERY_BROKER_URL = redis_url.replace('/1', '/0')
     CELERY_RESULT_BACKEND = redis_url.replace('/1', '/0')
@@ -425,6 +434,7 @@ LOGOUT_REDIRECT_URL = '/public/'
 
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_REDIRECT_URL = '/public/'

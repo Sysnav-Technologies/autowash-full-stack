@@ -2,23 +2,17 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
-from apps.core.models import TimeStampedModel
+from apps.core.models import TimeStampedModel  # Changed to use global models for system-wide subscriptions
 from decimal import Decimal
 import uuid
 
 class SubscriptionPlan(TimeStampedModel):
-    """Subscription plans available"""
+    """Global subscription plans available for all businesses"""
     
     PLAN_TYPES = [
-        ('basic', 'Basic Plan'),
-        ('professional', 'Professional Plan'),
-        ('enterprise', 'Enterprise Plan'),
-    ]
-    
-    BILLING_CYCLES = [
-        ('monthly', 'Monthly'),
-        ('quarterly', 'Quarterly'),
-        ('annually', 'Annually'),
+        ('monthly', 'Monthly Plan'),
+        ('semi_annual', 'Semi-Annual Plan'),
+        ('annual', 'Annual Plan'),
     ]
     
     name = models.CharField(max_length=100)
@@ -26,10 +20,12 @@ class SubscriptionPlan(TimeStampedModel):
     plan_type = models.CharField(max_length=20, choices=PLAN_TYPES)
     description = models.TextField()
     
-    # Pricing
-    monthly_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    quarterly_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], null=True, blank=True)
-    annual_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], null=True, blank=True)
+    # Pricing - KES amounts from your specification
+    price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    duration_months = models.IntegerField(help_text="Duration in months")
+    
+    # Features included
+    features = models.JSONField(default=list, help_text="List of features included")
     
     # Limits
     max_employees = models.IntegerField(default=5, help_text="Use -1 for unlimited")
@@ -40,12 +36,17 @@ class SubscriptionPlan(TimeStampedModel):
     # Storage limits (in MB)
     storage_limit = models.IntegerField(default=1000, help_text="Storage limit in MB, -1 for unlimited")
     
-    # Features
-    features = models.JSONField(default=list, help_text="List of features included")
-    
     # Status
     is_active = models.BooleanField(default=True)
     is_popular = models.BooleanField(default=False)
+    
+    # Support levels
+    support_level = models.CharField(max_length=50, default='Basic')
+    network_monitoring = models.BooleanField(default=True)
+    helpdesk_support = models.CharField(max_length=100, default='Limited Hours')
+    cybersecurity_level = models.CharField(max_length=50, default='Basic')
+    backup_recovery = models.BooleanField(default=False)
+    onsite_support = models.BooleanField(default=False)
     
     # Trial
     trial_days = models.IntegerField(default=14)
@@ -54,29 +55,24 @@ class SubscriptionPlan(TimeStampedModel):
     sort_order = models.IntegerField(default=0)
     
     class Meta:
-        ordering = ['sort_order', 'monthly_price']
+        ordering = ['duration_months', 'price']
         verbose_name = "Subscription Plan"
         verbose_name_plural = "Subscription Plans"
     
     def __str__(self):
-        return f"{self.name} - KES {self.monthly_price}/month"
+        return f"{self.name} - KES {self.price}"
     
     def get_price_for_cycle(self, billing_cycle):
         """Get price for specific billing cycle"""
-        if billing_cycle == 'monthly':
-            return self.monthly_price
-        elif billing_cycle == 'quarterly':
-            return self.quarterly_price or (self.monthly_price * 3)
-        elif billing_cycle == 'annually':
-            return self.annual_price or (self.monthly_price * 12)
-        return self.monthly_price
+        # Since we have different plans for different durations,
+        # this method returns the plan's base price
+        return self.price
     
     def get_discount_percentage(self, billing_cycle):
         """Calculate discount percentage for longer billing cycles"""
-        if billing_cycle == 'monthly':
-            return 0
-        
-        monthly_total = self.monthly_price * (3 if billing_cycle == 'quarterly' else 12)
+        # Since we have separate plans for different durations,
+        # discount calculation should be handled at the plan level
+        return 0
         actual_price = self.get_price_for_cycle(billing_cycle)
         
         if monthly_total > actual_price:
@@ -84,7 +80,7 @@ class SubscriptionPlan(TimeStampedModel):
         return 0
 
 class Subscription(TimeStampedModel):
-    """Active subscriptions"""
+    """Active subscriptions for businesses"""
     
     STATUS_CHOICES = [
         ('active', 'Active'),
@@ -95,16 +91,10 @@ class Subscription(TimeStampedModel):
         ('pending', 'Pending Payment'),
     ]
     
-    BILLING_CYCLES = [
-        ('monthly', 'Monthly'),
-        ('quarterly', 'Quarterly'),
-        ('annually', 'Annually'),
-    ]
-    
     # Subscription details
     subscription_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT)
-    billing_cycle = models.CharField(max_length=20, choices=BILLING_CYCLES, default='monthly')
+    business = models.ForeignKey('core.Tenant', on_delete=models.CASCADE, related_name='subscriptions')  # Link to business
     
     # Dates
     start_date = models.DateTimeField(default=timezone.now)
@@ -417,7 +407,7 @@ class SubscriptionInvoice(TimeStampedModel):
     
     # Invoice details
     invoice_number = models.CharField(max_length=50, unique=True)
-    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='invoices')
+    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='subscription_invoices')
     payment = models.OneToOneField(Payment, on_delete=models.SET_NULL, null=True, blank=True)
     
     # Amounts

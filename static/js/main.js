@@ -334,14 +334,17 @@ function initializeNotifications() {
 function checkForNewNotifications() {
     if (!window.location.pathname.includes('/business/')) return;
     
+    const tenantSlug = getTenantSlugFromURL();
+    if (!tenantSlug) return;
+    
     $.ajax({
-        url: '/api/notifications/check/',
+        url: `/business/${tenantSlug}/notifications/api/check/`,
         method: 'GET',
         success: function(data) {
-            if (data.new_count > 0) {
-                updateNotificationBadge(data.new_count);
-                if (data.latest_notification) {
-                    showNotificationToast(data.latest_notification);
+            if (data.unread_count > 0) {
+                updateNotificationBadge(data.unread_count);
+                if (data.notifications && data.notifications.length > 0) {
+                    showNotificationToast(data.notifications[0]);
                 }
             }
         },
@@ -563,16 +566,29 @@ function initializeTheme() {
     // Load theme from localStorage
     try {
         const savedTheme = localStorage.getItem('theme');
+        console.log('Initializing theme, saved theme:', savedTheme); // Debug
+        
         if (savedTheme === 'dark') {
             document.body.classList.add('dark-theme');
             updateThemeToggle(true);
+            console.log('Applied dark theme on initialization'); // Debug
         } else {
+            document.body.classList.remove('dark-theme');
             updateThemeToggle(false);
+            console.log('Applied light theme on initialization'); // Debug
         }
     } catch (e) {
         console.warn('localStorage not available for theme:', e); // Debug
         updateThemeToggle(false);
     }
+    
+    // Force a re-render to ensure CSS is applied
+    setTimeout(() => {
+        document.body.style.display = 'none';
+        document.body.offsetHeight; // Trigger reflow
+        document.body.style.display = '';
+        console.log('Theme initialization complete with forced reflow'); // Debug
+    }, 10);
 }
 
 function toggleTheme() {
@@ -586,20 +602,47 @@ function toggleTheme() {
         updateThemeToggle(false);
         try {
             localStorage.setItem('theme', 'light');
+            console.log('Theme switched to light mode'); // Debug
         } catch (e) {
             console.warn('localStorage not available for theme:', e); // Debug
         }
-        showSuccessToast('Switched to Light Mode');
+        if (typeof showSuccessToast === 'function') {
+            showSuccessToast('Switched to Light Mode');
+        }
     } else {
         body.classList.add('dark-theme');
         updateThemeToggle(true);
         try {
             localStorage.setItem('theme', 'dark');
+            console.log('Theme switched to dark mode'); // Debug
         } catch (e) {
             console.warn('localStorage not available for theme:', e); // Debug
         }
-        showSuccessToast('Switched to Dark Mode');
+        if (typeof showSuccessToast === 'function') {
+            showSuccessToast('Switched to Dark Mode');
+        }
     }
+    
+    // Force CSS recalculation to ensure all styles are applied
+    setTimeout(() => {
+        // Force reflow by temporarily hiding and showing elements
+        const appContentArea = document.querySelector('.app-content-area');
+        if (appContentArea) {
+            appContentArea.style.display = 'none';
+            appContentArea.offsetHeight; // Trigger reflow
+            appContentArea.style.display = '';
+        }
+        
+        // Also force reflow on content cards
+        const contentCards = document.querySelectorAll('.content-card, .card, .stat-card');
+        contentCards.forEach(card => {
+            card.style.display = 'none';
+            card.offsetHeight; // Trigger reflow
+            card.style.display = '';
+        });
+        
+        console.log('Theme toggle complete with forced reflow'); // Debug
+    }, 10);
 }
 
 function updateThemeToggle(isDark) {
@@ -618,7 +661,7 @@ function updateThemeToggle(isDark) {
     
     themeIcons.forEach(icon => {
         if (icon) {
-            icon.className = isDark ? 'fas fa-sun me-2' : 'fas fa-moon me-2';
+            icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
         }
     });
     

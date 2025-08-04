@@ -4,69 +4,96 @@
 
 {% block title %}Services - {{ block.super }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/data-table.css' %}">
+<link rel="stylesheet" href="{% static 'css/services.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div class="page-header-content">
         <h1 class="page-title">
             <i class="fas fa-car-wash text-primary"></i>
-            Services Management
+            Service Management
         </h1>
-        <p class="page-description">Manage your car wash services and pricing</p>
+        <p class="page-description">Manage your car wash services, pricing, and categories</p>
     </div>
     
     <div class="page-actions">
         {% if user_role in 'owner,manager' %}
         <a href="/business/{{ request.tenant.slug }}/services/create/" class="btn btn-primary">
             <i class="fas fa-plus"></i>
-            Add New Service
+            Add Service
         </a>
-        <a href="/business/{{ request.tenant.slug }}/services/categories/" class="btn btn-outline-primary">
-            <i class="fas fa-tags"></i>
-            Manage Categories
-        </a>
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-ellipsis-h"></i>
+                More Actions
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/categories/">
+                    <i class="fas fa-tags"></i> Manage Categories
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/export/">
+                    <i class="fas fa-download"></i> Export Services
+                </a></li>
+                <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/import/">
+                    <i class="fas fa-upload"></i> Import Services
+                </a></li>
+            </ul>
+        </div>
         {% endif %}
     </div>
 </div>
 
 <!-- Stats Cards -->
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-icon bg-primary">
-            <i class="fas fa-list"></i>
-        </div>
-        <div class="stat-content">
-            <h3>{{ stats.total_services }}</h3>
-            <p>Total Services</p>
-        </div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-icon bg-success">
-            <i class="fas fa-tags"></i>
-        </div>
-        <div class="stat-content">
-            <h3>{{ stats.total_categories }}</h3>
-            <p>Categories</p>
+<div class="services-stats">
+    <div class="services-stat-card">
+        <div class="services-stat-header">
+            <div class="services-stat-icon bg-primary">
+                <i class="fas fa-list"></i>
+            </div>
+            <div class="services-stat-content">
+                <h3>{{ stats.total_services }}</h3>
+                <p>Total Services</p>
+            </div>
         </div>
     </div>
     
-    <div class="stat-card">
-        <div class="stat-icon bg-warning">
-            <i class="fas fa-star"></i>
-        </div>
-        <div class="stat-content">
-            <h3>{{ stats.popular_services }}</h3>
-            <p>Popular Services</p>
+    <div class="services-stat-card">
+        <div class="services-stat-header">
+            <div class="services-stat-icon bg-success">
+                <i class="fas fa-tags"></i>
+            </div>
+            <div class="services-stat-content">
+                <h3>{{ stats.total_categories }}</h3>
+                <p>Categories</p>
+            </div>
         </div>
     </div>
     
-    <div class="stat-card">
-        <div class="stat-icon bg-info">
-            <i class="fas fa-dollar-sign"></i>
+    <div class="services-stat-card">
+        <div class="services-stat-header">
+            <div class="services-stat-icon bg-warning">
+                <i class="fas fa-star"></i>
+            </div>
+            <div class="services-stat-content">
+                <h3>{{ stats.popular_services }}</h3>
+                <p>Popular Services</p>
+            </div>
         </div>
-        <div class="stat-content">
-            <h3>KES {{ stats.avg_price|floatformat:0 }}</h3>
-            <p>Average Price</p>
+    </div>
+    
+    <div class="services-stat-card">
+        <div class="services-stat-header">
+            <div class="services-stat-icon bg-info">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="services-stat-content">
+                <h3>KES {{ stats.avg_price|floatformat:0 }}</h3>
+                <p>Average Price</p>
+            </div>
         </div>
     </div>
 </div>
@@ -79,7 +106,7 @@
     <div class="card-body">
         <form method="GET" class="filter-form">
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="category">Category</label>
                     <select name="category" id="category" class="form-select">
                         <option value="">All Categories</option>
@@ -91,13 +118,22 @@
                     </select>
                 </div>
                 
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="search">Search</label>
                     <input type="text" name="search" id="search" class="form-control" 
                            placeholder="Search services..." value="{{ current_filters.search }}">
                 </div>
                 
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label for="status">Status</label>
+                    <select name="status" id="status" class="form-select">
+                        <option value="">All Status</option>
+                        <option value="active" {% if current_filters.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if current_filters.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
                     <label>&nbsp;</label>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-fill">
@@ -115,531 +151,174 @@
     </div>
 </div>
 
-<!-- Services Grid -->
-<div class="content-card">
-    <div class="card-header">
-        <h5 class="card-title">
+<!-- Services Table -->
+<div class="data-table-container">
+    <div class="data-table-header">
+        <h5 class="data-table-title">
             Services
-            <span class="badge badge-secondary">{{ services.paginator.count }}</span>
+            <span class="table-badge table-badge-secondary">{{ services.paginator.count }}</span>
         </h5>
-        
-        <div class="card-actions">
-            {% if user_role in 'owner,manager' %}
-            <div class="dropdown">
-                <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                    <i class="fas fa-ellipsis-h"></i>
-                    Actions
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/export/">
-                        <i class="fas fa-download"></i>
-                        Export Services
-                    </a></li>
-                    <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/import/">
-                        <i class="fas fa-upload"></i>
-                        Import Services
-                    </a></li>
-                </ul>
-            </div>
-            {% endif %}
-        </div>
     </div>
     
-    <div class="card-body">
+    <div class="data-table-scroll">
         {% if services %}
-        <div class="services-grid">
-            {% for service in services %}
-            <div class="service-card">
-                <div class="service-header">
-                    {% if service.image %}
-                    <img src="{{ service.image.url }}" alt="{{ service.name }}" class="service-image">
-                    {% else %}
-                    <div class="service-image-placeholder">
-                        <i class="fas fa-car-wash"></i>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="service-badges">
-                        {% if service.is_popular %}
-                        <span class="badge badge-warning">Popular</span>
-                        {% endif %}
-                        {% if service.is_premium %}
-                        <span class="badge badge-info">Premium</span>
-                        {% endif %}
-                        {% if not service.is_active %}
-                        <span class="badge badge-secondary">Inactive</span>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <div class="service-content">
-                    <div class="service-category">
-                        <i class="fas fa-tag"></i>
-                        {{ service.category.name|default:"Uncategorized" }}
-                    </div>
-                    
-                    <h6 class="service-name">{{ service.name }}</h6>
-                    <p class="service-description">{{ service.description|truncatewords:15 }}</p>
-                    
-                    <div class="service-details">
-                        <div class="service-price">
-                            <strong>KES {{ service.base_price }}</strong>
+        <table class="data-table" data-sortable="true">
+            <thead>
+                <tr>
+                    <th class="sortable" data-column="name">Service</th>
+                    <th class="sortable" data-column="category">Category</th>
+                    <th class="sortable" data-column="price">Price</th>
+                    <th class="sortable" data-column="duration">Duration</th>
+                    <th>Popularity</th>
+                    <th class="sortable" data-column="status">Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for service in services %}
+                <tr data-id="{{ service.id }}">
+                    <td>
+                        <div class="table-cell-main">
+                            {% if service.image %}
+                            <img src="{{ service.image.url }}" alt="{{ service.name }}" 
+                                 class="table-cell-avatar" width="40" height="40">
+                            {% else %}
+                            <div class="table-cell-avatar">
+                                <i class="fas fa-car-wash"></i>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="table-cell-content">
+                                <div class="table-cell-title">{{ service.name }}</div>
+                                <div class="table-cell-subtitle">{{ service.description|truncatewords:8 }}</div>
+                                {% if service.is_popular or service.is_premium %}
+                                <div class="table-cell-badges">
+                                    {% if service.is_popular %}
+                                    <span class="table-badge table-badge-warning">Popular</span>
+                                    {% endif %}
+                                    {% if service.is_premium %}
+                                    <span class="table-badge table-badge-info">Premium</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="table-badge table-badge-secondary">
+                            {{ service.category.name|default:"Uncategorized" }}
+                        </span>
+                    </td>
+                    <td>
+                        <div>
+                            <div class="table-cell-title">KES {{ service.base_price }}</div>
                             {% if service.min_price and service.max_price %}
-                            <small class="text-muted">({{ service.min_price }} - {{ service.max_price }})</small>
+                            <div class="table-cell-subtitle">Range: {{ service.min_price }} - {{ service.max_price }}</div>
                             {% endif %}
                         </div>
-                        
-                        <div class="service-duration">
-                            <i class="fas fa-clock"></i>
-                            {{ service.estimated_duration }} min
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-clock" style="color: var(--gray-400); font-size: 0.75rem;"></i>
+                            <span>{{ service.estimated_duration }} min</span>
                         </div>
-                    </div>
-                    
-                    <div class="service-stats">
-                        <div class="stat">
-                            <i class="fas fa-shopping-cart"></i>
-                            {{ service.total_orders }} orders
+                    </td>
+                    <td>
+                        <div>
+                            <div class="table-cell-title">{{ service.orders_count|default:0 }} orders</div>
+                            <div class="table-cell-subtitle">This month</div>
                         </div>
-                        {% if service.average_rating > 0 %}
-                        <div class="stat">
-                            <i class="fas fa-star text-warning"></i>
-                            {{ service.average_rating|floatformat:1 }}
-                        </div>
+                    </td>
+                    <td>
+                        {% if service.is_active %}
+                        <span class="table-badge table-status-active">
+                            <i class="fas fa-check-circle" style="margin-right: 0.25rem;"></i>
+                            Active
+                        </span>
+                        {% else %}
+                        <span class="table-badge table-status-inactive">
+                            <i class="fas fa-pause-circle" style="margin-right: 0.25rem;"></i>
+                            Inactive
+                        </span>
                         {% endif %}
-                    </div>
-                </div>
-                
-                <div class="service-actions">
-                    <a href="/business/{{ request.tenant.slug }}/services/{{ service.pk }}/" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-eye"></i>
-                        View
-                    </a>
-                    
-                    {% if user_role in 'owner,manager' %}
-                    <a href="/business/{{ request.tenant.slug }}/services/{{ service.pk }}/edit/" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-edit"></i>
-                        Edit
-                    </a>
-                    {% endif %}
-                    
-                    {% if user_role == 'attendant' %}
-                    <button class="btn btn-sm btn-success" onclick="quickAddToOrder('{{ service.pk }}')">
-                        <i class="fas fa-plus"></i>
-                        Add to Order
-                    </button>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        
-        <!-- Pagination -->
-        {% if services.has_other_pages %}
-        <div class="pagination-wrapper">
-            <nav aria-label="Services pagination">
-                <ul class="pagination">
-                    {% if services.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ services.previous_page_number }}{% if current_filters.category %}&category={{ current_filters.category }}{% endif %}{% if current_filters.search %}&search={{ current_filters.search }}{% endif %}">
-                            <i class="fas fa-chevron-left"></i>
-                        </a>
-                    </li>
-                    {% endif %}
-                    
-                    {% for num in services.paginator.page_range %}
-                    {% if services.number == num %}
-                    <li class="page-item active">
-                        <span class="page-link">{{ num }}</span>
-                    </li>
-                    {% elif num > services.number|add:'-3' and num < services.number|add:'3' %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ num }}{% if current_filters.category %}&category={{ current_filters.category }}{% endif %}{% if current_filters.search %}&search={{ current_filters.search }}{% endif %}">{{ num }}</a>
-                    </li>
-                    {% endif %}
-                    {% endfor %}
-                    
-                    {% if services.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ services.next_page_number }}{% if current_filters.category %}&category={{ current_filters.category }}{% endif %}{% if current_filters.search %}&search={{ current_filters.search }}{% endif %}">
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        </div>
-        {% endif %}
-        
+                    </td>
+                    <td>
+                        <div class="table-actions">
+                            <a href="/business/{{ request.tenant.slug }}/services/{{ service.pk }}/" 
+                               class="table-action-btn table-action-view" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            {% if user_role in 'owner,manager' %}
+                            <a href="/business/{{ request.tenant.slug }}/services/{{ service.pk }}/edit/" 
+                               class="table-action-btn table-action-edit" title="Edit Service">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button type="button" class="table-action-btn table-action-delete" 
+                                    title="Delete Service" onclick="deleteService('{{ service.pk }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon">
+        <div class="data-table-empty">
+            <div class="data-table-empty-icon">
                 <i class="fas fa-car-wash"></i>
             </div>
-            <h5>No Services Found</h5>
-            <p>{% if current_filters.search or current_filters.category %}No services match your current filters.{% else %}You haven't created any services yet.{% endif %}</p>
-            {% if user_role in 'owner,manager' %}
-            <a href="/business/{{ request.tenant.slug }}/services/create/" class="btn btn-primary">
-                <i class="fas fa-plus"></i>
-                Create Your First Service
+            <h5 class="data-table-empty-title">No Services Found</h5>
+            <p class="data-table-empty-description">
+                {% if request.GET.search or request.GET.category or request.GET.status %}
+                    No services match your current filters. Try adjusting your search criteria.
+                {% else %}
+                    You haven't added any services yet.
+                {% endif %}
+            </p>
+            {% if user_role in 'owner,manager' and not request.GET.search and not request.GET.category and not request.GET.status %}
+            <a href="/business/{{ request.tenant.slug }}/services/add/" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>
+                Add Your First Service
             </a>
             {% endif %}
         </div>
         {% endif %}
     </div>
+    
+    {% if services.has_other_pages %}
+    <div class="data-table-pagination">
+        <div class="data-table-pagination-info">
+            Showing {{ services.start_index }}-{{ services.end_index }} of {{ services.paginator.count }} services
+        </div>
+        
+        <div class="data-table-pagination-nav">
+            {% if services.has_previous %}
+            <a class="data-table-pagination-btn" href="?page={{ services.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" aria-label="Previous page">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            {% endif %}
+            
+            {% for num in services.paginator.page_range %}
+                {% if num == services.number %}
+                <span class="data-table-pagination-btn active">{{ num }}</span>
+                {% elif num > services.number|add:'-3' and num < services.number|add:'3' %}
+                <a class="data-table-pagination-btn" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+            
+            {% if services.has_next %}
+            <a class="data-table-pagination-btn" href="?page={{ services.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" aria-label="Next page">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
-{% block extra_css %}
-<style>
-.services-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1rem;
-}
-
-.service-card {
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    transition: all var(--transition-fast);
-    box-shadow: var(--shadow-sm);
-}
-
-.service-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.service-header {
-    position: relative;
-    height: 180px;
-    overflow: hidden;
-}
-
-.service-image,
-.service-image-placeholder {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.service-image-placeholder {
-    background: linear-gradient(135deg, var(--primary-100), var(--primary-200));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3rem;
-    color: var(--primary-600);
-}
-
-.service-badges {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.service-content {
-    padding: 1.25rem;
-}
-
-.service-category {
-    font-size: 0.75rem;
-    color: var(--gray-600);
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.service-name {
-    font-weight: 600;
-    color: var(--gray-900);
-    margin-bottom: 0.5rem;
-    line-height: 1.3;
-}
-
-.service-description {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-    margin-bottom: 1rem;
-    line-height: 1.4;
-}
-
-.service-details {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--gray-100);
-}
-
-.service-price {
-    font-size: 1.125rem;
-    color: var(--gray-900);
-}
-
-.service-duration {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.service-stats {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-}
-
-.service-stats .stat {
-    font-size: 0.75rem;
-    color: var(--gray-600);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.service-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.service-actions .btn {
-    flex: 1;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    box-shadow: var(--shadow-sm);
-}
-
-.stat-icon {
-    width: 3rem;
-    height: 3rem;
-    border-radius: var(--radius-lg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1.25rem;
-}
-
-.stat-content h3 {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--gray-900);
-}
-
-.stat-content p {
-    margin: 0;
-    font-size: 0.875rem;
-    color: var(--gray-600);
-}
-
-.filter-form {
-    background: var(--gray-50);
-    padding: 1.5rem;
-    border-radius: var(--radius-md);
-}
-
-.empty-state {
-    text-align: center;
-    padding: 3rem 1rem;
-}
-
-.empty-state-icon {
-    font-size: 4rem;
-    color: var(--gray-300);
-    margin-bottom: 1rem;
-}
-
-.empty-state h5 {
-    color: var(--gray-600);
-    margin-bottom: 0.5rem;
-}
-
-.empty-state p {
-    color: var(--gray-500);
-    margin-bottom: 1.5rem;
-}
-
-@media (max-width: 768px) {
-    .services-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .service-actions {
-        flex-direction: column;
-    }
-}
-</style>
-{% endblock %}
-
 {% block extra_js %}
-<script>
-function quickAddToOrder(serviceId) {
-    // Store service in session for quick order
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/add-to-cart/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            service_id: serviceId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccessToast('Service added to order');
-            // Redirect to quick order page
-            window.location.href = '/business/{{ request.tenant.slug }}/services/orders/quick/';
-        } else {
-            showErrorToast('Error adding service to order');
-        }
-    })
-    .catch(error => {
-        showErrorToast('Error adding service to order');
-    });
-}
-
-// Auto-submit form on category change
-document.getElementById('category').addEventListener('change', function() {
-    this.form.submit();
-});
-
-// Search with debounce
-let searchTimeout;
-document.getElementById('search').addEventListener('input', function() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        this.form.submit();
-    }, 500);
-});
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-function showSuccessToast(message) {
-    showToast(message, 'success');
-}
-
-function showErrorToast(message) {
-    showToast(message, 'error');
-}
-
-function showToast(message, type) {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <div class="toast-content">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
-            <span>${message}</span>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-        }
-    }, 4000);
-}
-</style>
-
-<style>
-.toast {
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1rem;
-    box-shadow: var(--shadow-lg);
-    z-index: 9999;
-    min-width: 300px;
-    animation: slideInRight 0.3s ease-out;
-}
-
-.toast.toast-success {
-    border-left: 4px solid var(--success-500);
-}
-
-.toast.toast-error {
-    border-left: 4px solid var(--danger-500);
-}
-
-.toast-content {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.toast-close {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: none;
-    border: none;
-    color: var(--gray-400);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
-}
-
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-</style>
-</script>
+<script src="{% static 'js/services.js' %}"></script>
 {% endblock %}

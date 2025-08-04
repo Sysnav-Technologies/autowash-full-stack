@@ -1,0 +1,405 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Notification Preferences - {{ request.tenant.business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.preferences-container {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.preference-section {
+    padding: 20px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.preference-section:last-child {
+    border-bottom: none;
+}
+
+.preference-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.preference-item:last-child {
+    border-bottom: none;
+}
+
+.preference-info {
+    flex-grow: 1;
+}
+
+.preference-title {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.preference-description {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 60px;
+    height: 30px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 30px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #007bff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(30px);
+}
+
+.form-section {
+    margin-bottom: 30px;
+}
+
+.form-section h5 {
+    color: #333;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.save-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    border-radius: 5px;
+    color: white;
+    font-weight: 500;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.save-status.success {
+    background-color: #28a745;
+    opacity: 1;
+}
+
+.save-status.error {
+    background-color: #dc3545;
+    opacity: 1;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="mb-1">Notification Preferences</h4>
+                    <p class="text-muted mb-0">Manage how and when you receive notifications</p>
+                </div>
+                <a href="/business/{{ request.tenant.slug }}/notifications/" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Notifications
+                </a>
+            </div>
+
+            <div class="preferences-container">
+                <form method="post" id="preferencesForm">
+                    {% csrf_token %}
+                    
+                    <!-- General Delivery Preferences -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-bell me-2"></i>Delivery Methods</h5>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">Email Notifications</div>
+                                <div class="preference-description">Receive notifications via email</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.email_notifications }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">SMS Notifications</div>
+                                <div class="preference-description">Receive notifications via SMS</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.sms_notifications }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">Push Notifications</div>
+                                <div class="preference-description">Receive browser push notifications</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.push_notifications }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Notification Types -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-list-ul me-2"></i>Notification Types</h5>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">Order Notifications</div>
+                                <div class="preference-description">New orders, updates, and completions</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.receive_order_notifications }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">Payment Notifications</div>
+                                <div class="preference-description">Payment confirmations and failures</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.receive_payment_notifications }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">Inventory Alerts</div>
+                                <div class="preference-description">Low stock and inventory updates</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.receive_inventory_alerts }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">System Notifications</div>
+                                <div class="preference-description">System updates and maintenance</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.receive_system_notifications }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">Reminders</div>
+                                <div class="preference-description">Scheduled reminders and tasks</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.receive_reminders }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="preference-item">
+                            <div class="preference-info">
+                                <div class="preference-title">Reports</div>
+                                <div class="preference-description">Daily, weekly, and monthly reports</div>
+                            </div>
+                            <label class="toggle-switch">
+                                {{ form.receive_reports }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Quiet Hours -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-moon me-2"></i>Quiet Hours</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.quiet_hours_start.id_for_label }}" class="form-label">Start Time</label>
+                                    {{ form.quiet_hours_start }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.quiet_hours_end.id_for_label }}" class="form-label">End Time</label>
+                                    {{ form.quiet_hours_end }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.timezone.id_for_label }}" class="form-label">Timezone</label>
+                                    {{ form.timezone }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.digest_frequency.id_for_label }}" class="form-label">Digest Frequency</label>
+                                    {{ form.digest_frequency }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Muted Categories -->
+                    {% if form.muted_categories.field.queryset %}
+                    <div class="form-section">
+                        <h5><i class="fas fa-volume-mute me-2"></i>Muted Categories</h5>
+                        <p class="text-muted mb-3">Select categories you don't want to receive notifications for</p>
+                        
+                        <div class="row">
+                            {% for choice in form.muted_categories %}
+                            <div class="col-md-6 mb-2">
+                                <div class="form-check">
+                                    {{ choice.tag }}
+                                    <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                        {{ choice.choice_label }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Save Button -->
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i>Save Preferences
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Status -->
+<div id="saveStatus" class="save-status"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-save functionality
+const form = document.getElementById('preferencesForm');
+let saveTimeout;
+
+// Add change listeners to all form inputs
+form.addEventListener('change', function() {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(autoSave, 1000); // Auto-save after 1 second of inactivity
+});
+
+function autoSave() {
+    const formData = new FormData(form);
+    
+    fetch(window.location.pathname, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSaveStatus('Preferences saved automatically', 'success');
+        } else {
+            showSaveStatus('Error saving preferences', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSaveStatus('Error saving preferences', 'error');
+    });
+}
+
+function showSaveStatus(message, type) {
+    const statusDiv = document.getElementById('saveStatus');
+    statusDiv.textContent = message;
+    statusDiv.className = `save-status ${type}`;
+    
+    // Hide after 3 seconds
+    setTimeout(() => {
+        statusDiv.style.opacity = '0';
+    }, 3000);
+}
+
+// Form submission
+form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    fetch(window.location.pathname, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            showSaveStatus('Preferences saved successfully!', 'success');
+        } else {
+            showSaveStatus('Error saving preferences', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSaveStatus('Error saving preferences', 'error');
+    });
+});
+</script>
+{% endblock %}

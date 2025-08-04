@@ -14,7 +14,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from apps.core.decorators import employee_required, ajax_required, owner_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
-from django.db.models.functions import Extract
+from apps.employees.models import Employee
 from apps.payments.models import Payment
 from .models import (
     Service, ServiceCategory, ServicePackage, ServiceOrder, 
@@ -163,17 +163,49 @@ def service_detail_view(request, pk):
             service=service,
             order__status='completed'
         ).aggregate(total=Sum('total_price'))['total'] or 0,
-        # FIXED: Calculate average duration using database fields
-        'avg_duration': ServiceOrderItem.objects.filter(
-            service=service,
-            completed_at__isnull=False,
-            started_at__isnull=False
-        ).aggregate(
-            avg=Avg(
-                Extract(F('completed_at') - F('started_at'), 'epoch') / 60.0
-            )
-        )['avg'] or 0,
+        # FIXED: Calculate average duration using raw SQL for MySQL compatibility
+        'avg_duration': 0,  # We'll calculate this separately
     }
+    
+    # Calculate average duration using tenant-aware database connection
+    from django.db import connections
+    from apps.core.database_router import get_current_tenant
+    
+    # Get the current tenant and use the appropriate database connection
+    current_tenant = get_current_tenant()
+    if current_tenant:
+        db_alias = f"tenant_{current_tenant.id}"
+        # Ensure tenant database is added to settings
+        if db_alias not in connections.databases:
+            from apps.core.database_router import TenantDatabaseManager
+            TenantDatabaseManager.add_tenant_to_settings(current_tenant)
+        
+        # Use tenant database connection for raw SQL
+        with connections[db_alias].cursor() as cursor:
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, started_at, completed_at)) as avg_duration
+                FROM services_serviceorderitem 
+                WHERE service_id = %s 
+                AND completed_at IS NOT NULL 
+                AND started_at IS NOT NULL
+            """, [service.id])
+            result = cursor.fetchone()
+            if result and result[0]:
+                stats['avg_duration'] = float(result[0])
+    else:
+        # Fallback: use default connection if no tenant context
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, started_at, completed_at)) as avg_duration
+                FROM services_serviceorderitem 
+                WHERE service_id = %s 
+                AND completed_at IS NOT NULL 
+                AND started_at IS NOT NULL
+            """, [service.id])
+            result = cursor.fetchone()
+            if result and result[0]:
+                stats['avg_duration'] = float(result[0])
     
     # ADDED: Split compatible vehicle types for template
     compatible_vehicle_types = []
@@ -2235,8 +2267,10 @@ def daily_service_report(request):
             status='completed',
             actual_start_time__isnull=False,
             actual_end_time__isnull=False
+        ).extra(
+            select={'duration_minutes': "TIMESTAMPDIFF(MINUTE, actual_start_time, actual_end_time)"}
         ).aggregate(
-            avg=Avg(F('actual_end_time') - F('actual_start_time'))
+            avg=Avg('duration_minutes')
         )['avg']
     }
     
@@ -2259,6 +2293,8 @@ def service_performance_report(request):
     employee_performance = ServiceOrder.objects.filter(
         status='completed',
         actual_end_time__date__range=[date_from, date_to]
+    ).extra(
+        select={'duration_minutes': "TIMESTAMPDIFF(MINUTE, actual_start_time, actual_end_time)"}
     ).values(
         'assigned_attendant__employee_id',
         'assigned_attendant__first_name',
@@ -2267,7 +2303,7 @@ def service_performance_report(request):
         orders_completed=Count('id'),
         total_revenue=Sum('total_amount'),
         avg_rating=Avg('customer_rating'),
-        avg_service_time=Avg(F('actual_end_time') - F('actual_start_time'))
+        avg_service_time=Avg('duration_minutes')
     ).order_by('-orders_completed')
     
     context = {
@@ -2835,6 +2871,73 @@ def bay_status_ajax(request):
         'bays': bay_data,
         'timestamp': timezone.now().isoformat()
     })
+
+
+@login_required
+@employee_required()
+@ajax_required
+def attendance_status_ajax(request):
+    """Get employee attendance status"""
+    try:
+        # Get the current employee
+        employee = Employee.objects.get(user=request.user)
+        
+        # Get today's attendance record if it exists
+        today = timezone.now().date()
+        attendance = None
+        
+        # Check if there's an attendance model
+        try:
+            from apps.employees.models import Attendance
+            attendance = Attendance.objects.filter(
+                employee=employee,
+                date=today
+            ).first()
+        except ImportError:
+            # If no attendance model exists, return basic info
+            pass
+        
+        data = {
+            'employee_name': f"{employee.first_name} {employee.last_name}",
+            'role': employee.role,
+            'check_in_time': None,
+            'check_out_time': None,
+            'hours_worked': '0.0',
+            'is_checked_in': False,
+            'timestamp': timezone.now().isoformat()
+        }
+        
+        if attendance:
+            data.update({
+                'check_in_time': attendance.check_in_time.strftime('%H:%M') if attendance.check_in_time else None,
+                'check_out_time': attendance.check_out_time.strftime('%H:%M') if attendance.check_out_time else None,
+                'hours_worked': str(attendance.hours_worked) if hasattr(attendance, 'hours_worked') else '0.0',
+                'is_checked_in': attendance.check_in_time and not attendance.check_out_time,
+            })
+        
+        return JsonResponse(data)
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({
+            'error': 'Employee record not found',
+            'employee_name': 'Unknown',
+            'role': 'unknown',
+            'check_in_time': None,
+            'check_out_time': None,
+            'hours_worked': '0.0',
+            'is_checked_in': False,
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': f'Error retrieving attendance: {str(e)}',
+            'employee_name': 'Error',
+            'role': 'unknown',
+            'check_in_time': None,
+            'check_out_time': None,
+            'hours_worked': '0.0',
+            'is_checked_in': False,
+        }, status=500)
+
 
 # Helper Functions
 def add_order_to_queue(order):

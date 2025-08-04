@@ -1,0 +1,337 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <!-- Filter and Search -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="all" {% if current_status == 'all' %}selected{% endif %}>All</option>
+                            <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending Approval</option>
+                            <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="suspended" {% if current_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="type" class="form-label">Business Type</label>
+                        <select name="type" id="type" class="form-select">
+                            <option value="">All Types</option>
+                            {% for value, label in business_types %}
+                                <option value="{{ value }}" {% if current_type == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" name="search" id="search" class="form-control" 
+                               placeholder="Business name, owner, email..." value="{{ current_search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Business Management</h5>
+                <div>
+                    <button type="button" class="btn btn-success btn-sm me-2" id="bulkApproveBtn" style="display: none;">
+                        <i class="fas fa-check me-1"></i>Bulk Approve
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm me-2" id="bulkRejectBtn" style="display: none;">
+                        <i class="fas fa-times me-1"></i>Bulk Reject
+                    </button>
+                    <span class="badge bg-secondary">{{ page_obj.paginator.count }} total</span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if page_obj %}
+                    <form id="bulkActionForm" method="post" action="{% url 'system_admin:bulk_approve_businesses' %}">
+                        {% csrf_token %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" id="selectAll" class="form-check-input">
+                                        </th>
+                                        <th>Business</th>
+                                        <th>Owner</th>
+                                        <th>Contact</th>
+                                        <th>Subscription</th>
+                                        <th>Status</th>
+                                        <th>DB Status</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for business in page_obj %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" name="business_ids" value="{{ business.id }}" class="form-check-input business-checkbox">
+                                        </td>
+                                        <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if business.logo %}
+                                                <img src="{{ business.logo.url }}" alt="{{ business.name }}" 
+                                                     class="rounded me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                                            {% else %}
+                                                <div class="bg-primary text-white rounded me-2 d-flex align-items-center justify-content-center" 
+                                                     style="width: 40px; height: 40px; font-weight: bold;">
+                                                    {{ business.name|first|upper }}
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ business.name }}</strong><br>
+                                                <small class="text-muted">{{ business.slug }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            {{ business.owner.get_full_name|default:business.owner.username }}<br>
+                                            <small class="text-muted">{{ business.owner.email }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            {% if business.phone %}
+                                                <i class="fas fa-phone fa-sm me-1"></i>{{ business.phone }}<br>
+                                            {% endif %}
+                                            {% if business.email %}
+                                                <i class="fas fa-envelope fa-sm me-1"></i>{{ business.email }}
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if business.subscription %}
+                                            <div>
+                                                <strong>{{ business.subscription.plan.name }}</strong><br>
+                                                <small class="text-muted">
+                                                    KES {{ business.subscription.amount|floatformat:0 }}/{{ business.subscription.plan.get_plan_type_display }}
+                                                </small>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">No subscription</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if not business.is_active %}
+                                            <span class="status-badge status-rejected">Suspended</span>
+                                        {% elif not business.is_approved %}
+                                            <span class="status-badge status-pending">Pending</span>
+                                        {% else %}
+                                            <span class="status-badge status-active">Active</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if business.is_approved %}
+                                            {% with tenant_db_exists=business.tenant_database_exists %}
+                                                {% if tenant_db_exists %}
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-database fa-sm me-1"></i>Active
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">
+                                                        <i class="fas fa-exclamation-triangle fa-sm me-1"></i>Missing
+                                                    </span>
+                                                    <button type="button" 
+                                                            class="btn btn-outline-warning btn-xs ms-1 repair-tenant-btn" 
+                                                            data-business-id="{{ business.id }}"
+                                                            data-business-name="{{ business.name }}"
+                                                            title="Repair tenant setup">
+                                                        <i class="fas fa-tools fa-xs"></i>
+                                                    </button>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="fas fa-minus fa-sm me-1"></i>N/A
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ business.created_at|date:"M d, Y" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            {% if not business.is_approved and business.is_active %}
+                                                <a href="{% url 'system_admin:approve_business' business.id %}" 
+                                                   class="btn btn-success btn-sm" title="Approve">
+                                                    <i class="fas fa-check"></i>
+                                                </a>
+                                                <a href="{% url 'system_admin:reject_business' business.id %}" 
+                                                   class="btn btn-danger btn-sm" title="Reject">
+                                                    <i class="fas fa-times"></i>
+                                                </a>
+                                            {% endif %}
+                                            <a href="{% url 'system_admin:edit_business' business.id %}" 
+                                               class="btn btn-outline-primary btn-sm" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    </form>
+
+                    <!-- Pagination -->
+                    {% if page_obj.has_other_pages %}
+                        <nav aria-label="Business pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_type %}type={{ current_type }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page=1">First</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_type %}type={{ current_type }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                                </li>
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_type %}type={{ current_type }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_type %}type={{ current_type }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-building fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No businesses found</h5>
+                        <p class="text-muted">No businesses match your current filters.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const businessCheckboxes = document.querySelectorAll('.business-checkbox');
+    const bulkApproveBtn = document.getElementById('bulkApproveBtn');
+    const bulkRejectBtn = document.getElementById('bulkRejectBtn');
+    const bulkActionForm = document.getElementById('bulkActionForm');
+
+    // Select all functionality
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            businessCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            toggleBulkButtons();
+        });
+    }
+
+    // Individual checkbox change
+    businessCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateSelectAllState();
+            toggleBulkButtons();
+        });
+    });
+
+    function updateSelectAllState() {
+        const checkedBoxes = document.querySelectorAll('.business-checkbox:checked');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = checkedBoxes.length === businessCheckboxes.length;
+            selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < businessCheckboxes.length;
+        }
+    }
+
+    function toggleBulkButtons() {
+        const checkedBoxes = document.querySelectorAll('.business-checkbox:checked');
+        const hasSelection = checkedBoxes.length > 0;
+        
+        if (bulkApproveBtn) bulkApproveBtn.style.display = hasSelection ? 'inline-block' : 'none';
+        if (bulkRejectBtn) bulkRejectBtn.style.display = hasSelection ? 'inline-block' : 'none';
+    }
+
+    // Bulk approve
+    if (bulkApproveBtn) {
+        bulkApproveBtn.addEventListener('click', function() {
+            const checkedBoxes = document.querySelectorAll('.business-checkbox:checked');
+            if (checkedBoxes.length > 0) {
+                if (confirm(`Are you sure you want to approve ${checkedBoxes.length} business(es)?`)) {
+                    bulkActionForm.action = "{% url 'system_admin:bulk_approve_businesses' %}";
+                    bulkActionForm.submit();
+                }
+            }
+        });
+    }
+
+    // Bulk reject
+    if (bulkRejectBtn) {
+        bulkRejectBtn.addEventListener('click', function() {
+            const checkedBoxes = document.querySelectorAll('.business-checkbox:checked');
+            if (checkedBoxes.length > 0) {
+                if (confirm(`Are you sure you want to reject ${checkedBoxes.length} business(es)?`)) {
+                    bulkActionForm.action = "{% url 'system_admin:bulk_reject_businesses' %}";
+                    bulkActionForm.submit();
+                }
+            }
+        });
+    }
+
+    // Handle repair tenant setup buttons
+    const repairButtons = document.querySelectorAll('.repair-tenant-btn');
+    
+    repairButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const businessId = this.getAttribute('data-business-id');
+            const businessName = this.getAttribute('data-business-name');
+            
+            if (confirm(`Are you sure you want to repair the tenant setup for "${businessName}"? This will create the database and set up the tenant environment.`)) {
+                // Show loading state
+                const originalContent = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin fa-xs"></i>';
+                this.disabled = true;
+                
+                // Create a form and submit
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/system-admin/businesses/${businessId}/repair-setup/`;
+                
+                // Add CSRF token
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrfmiddlewaretoken';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

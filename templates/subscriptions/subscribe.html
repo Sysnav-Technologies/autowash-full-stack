@@ -61,15 +61,19 @@
                         <!-- Plan Details -->
                         <div class="text-center mb-4">
                             <div class="h2 fw-bold text-primary mb-0" id="planPrice">
-                                KES {{ plan.monthly_price|floatformat:0 }}
+                                KES {{ plan.price|floatformat:0 }}
                             </div>
-                            <small class="text-muted" id="planBilling">/month</small>
+                            <small class="text-muted" id="planBilling">
+                                {% if plan.duration_months > 1 %}
+                                    /{{ plan.duration_months }} months
+                                {% else %}
+                                    /month
+                                {% endif %}
+                            </small>
                             
-                            {% if plan.trial_days > 0 %}
                             <div class="mt-2">
-                                <span class="badge bg-success">{{ plan.trial_days }}-day FREE trial</span>
+                                <span class="badge bg-success">14-day FREE trial</span>
                             </div>
-                            {% endif %}
                         </div>
 
                         <!-- Features -->
@@ -110,15 +114,15 @@
                         <div class="border-top pt-4">
                             <div class="d-flex justify-content-between mb-2">
                                 <span class="text-muted">Plan cost:</span>
-                                <span class="fw-semibold" id="planCost">KES {{ plan.monthly_price|floatformat:0 }}</span>
+                                <span class="fw-semibold" id="planCost">KES {{ plan.price|floatformat:0 }}</span>
                             </div>
-                            <div class="d-flex justify-content-between mb-2" id="discountRow" style="display: none !important;">
+                            <div class="d-flex justify-content-between mb-2" id="discountRow" style="display: none;">
                                 <span class="text-muted">Discount:</span>
                                 <span class="text-success fw-semibold" id="discountAmount">-KES 0</span>
                             </div>
                             <div class="d-flex justify-content-between mb-3">
                                 <span class="text-muted">Free trial:</span>
-                                <span class="text-success fw-semibold">{{ plan.trial_days }} days</span>
+                                <span class="text-success fw-semibold">14 days</span>
                             </div>
                             <hr>
                             <div class="d-flex justify-content-between">
@@ -148,37 +152,25 @@
                             <div class="mb-4">
                                 <label class="form-label fw-semibold">Billing Cycle</label>
                                 <div class="row g-3">
-                                    <div class="col-6">
+                                    <div class="col-12">
                                         <div class="form-check billing-option">
-                                            <input class="form-check-input" type="radio" name="billing_cycle" id="monthly" value="monthly" checked>
-                                            <label class="form-check-label w-100" for="monthly">
+                                            <input class="form-check-input" type="radio" name="billing_cycle" id="plan_cycle" value="{{ plan.plan_type }}" checked>
+                                            <label class="form-check-label w-100" for="plan_cycle">
                                                 <div class="card border h-100">
                                                     <div class="card-body text-center py-3">
-                                                        <div class="fw-bold">Monthly</div>
-                                                        <div class="text-muted small">KES {{ plan.monthly_price|floatformat:0 }}/month</div>
+                                                        <div class="fw-bold">{{ plan.get_plan_type_display }}</div>
+                                                        <div class="text-muted small">KES {{ plan.price|floatformat:0 }}
+                                                            {% if plan.duration_months > 1 %}
+                                                                for {{ plan.duration_months }} months
+                                                            {% else %}
+                                                                /month
+                                                            {% endif %}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </label>
                                         </div>
                                     </div>
-                                    {% if plan.annual_price %}
-                                    <div class="col-6">
-                                        <div class="form-check billing-option">
-                                            <input class="form-check-input" type="radio" name="billing_cycle" id="annual" value="annual">
-                                            <label class="form-check-label w-100" for="annual">
-                                                <div class="card border h-100">
-                                                    <div class="card-body text-center py-3">
-                                                        <div class="fw-bold">Annual</div>
-                                                        <div class="text-muted small">KES {{ plan.annual_price|floatformat:0 }}/year</div>
-                                                        {% if plan.annual_savings > 0 %}
-                                                        <div class="badge bg-success mt-1">Save {{ plan.annual_savings }}%</div>
-                                                        {% endif %}
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    {% endif %}
                                 </div>
                             </div>
 
@@ -224,7 +216,7 @@
                             <!-- Terms and Conditions -->
                             <div class="mb-4">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="termsAccepted" required>
+                                    <input class="form-check-input" type="checkbox" id="termsAccepted" name="agree_terms" value="true" required>
                                     <label class="form-check-label" for="termsAccepted">
                                         I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a>
                                     </label>
@@ -273,110 +265,79 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const monthlyRadio = document.getElementById('monthly');
-    const annualRadio = document.getElementById('annual');
     const planPrice = document.getElementById('planPrice');
     const planBilling = document.getElementById('planBilling');
     const planCost = document.getElementById('planCost');
     const totalDue = document.getElementById('totalDue');
     
-    const monthlyPrice = {{ plan.monthly_price }};
-    const annualPrice = {{ plan.annual_price|default:0 }};
-    
-    let currentDiscount = 0;
-    
-    function updatePricing() {
-        const isAnnual = annualRadio && annualRadio.checked;
-        const price = isAnnual ? annualPrice : monthlyPrice;
-        const billing = isAnnual ? '/year' : '/month';
-        
-        planPrice.textContent = `KES ${price.toLocaleString()}`;
-        planBilling.textContent = billing;
-        planCost.textContent = `KES ${price.toLocaleString()}`;
-        
-        // Update total due (considering free trial)
-        const finalAmount = Math.max(0, price - currentDiscount);
-        totalDue.textContent = {% if plan.trial_days > 0 %}'KES 0'{% else %}`KES ${finalAmount.toLocaleString()}`{% endif %};
-    }
-    
-    // Billing cycle change handlers
-    if (monthlyRadio) monthlyRadio.addEventListener('change', updatePricing);
-    if (annualRadio) annualRadio.addEventListener('change', updatePricing);
+    // Initialize pricing display
+    if (planPrice) planPrice.textContent = 'KES {{ plan.price|floatformat:0 }}';
+    if (planBilling) planBilling.textContent = '{% if plan.duration_months > 1 %}/{{ plan.duration_months }} months{% else %}/month{% endif %}';
+    if (planCost) planCost.textContent = 'KES {{ plan.price|floatformat:0 }}';
+    if (totalDue) totalDue.textContent = 'KES 0';
     
     // Discount code functionality
     const discountCode = document.getElementById('discountCode');
     const applyDiscount = document.getElementById('applyDiscount');
     const discountMessage = document.getElementById('discountMessage');
-    const discountRow = document.getElementById('discountRow');
-    const discountAmount = document.getElementById('discountAmount');
     
-    applyDiscount.addEventListener('click', function() {
-        const code = discountCode.value.trim();
-        if (!code) {
-            showDiscountMessage('Please enter a discount code', 'danger');
-            return;
-        }
-        
-        // Show loading state
-        applyDiscount.disabled = true;
-        applyDiscount.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        
-        // Make AJAX request to validate discount
-        fetch(`{% url 'subscriptions:check_discount' %}?code=${encodeURIComponent(code)}&plan_id={{ plan.id }}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.valid) {
-                    currentDiscount = data.discount_amount;
-                    discountAmount.textContent = `-KES ${currentDiscount.toLocaleString()}`;
-                    discountRow.style.display = 'flex';
-                    showDiscountMessage(data.message, 'success');
-                    updatePricing();
-                } else {
-                    currentDiscount = 0;
-                    discountRow.style.display = 'none';
-                    showDiscountMessage(data.message, 'danger');
-                    updatePricing();
-                }
-            })
-            .catch(error => {
-                showDiscountMessage('Error validating discount code', 'danger');
-            })
-            .finally(() => {
+    if (applyDiscount) {
+        applyDiscount.addEventListener('click', function() {
+            const code = discountCode.value.trim();
+            if (!code) {
+                showDiscountMessage('Please enter a discount code', 'danger');
+                return;
+            }
+            
+            // Show loading state
+            applyDiscount.disabled = true;
+            applyDiscount.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            // For now, just show a message that discounts aren't implemented yet
+            setTimeout(() => {
+                showDiscountMessage('Discount codes will be available soon!', 'info');
                 applyDiscount.disabled = false;
                 applyDiscount.innerHTML = 'Apply';
-            });
-    });
+            }, 1000);
+        });
+    }
     
     function showDiscountMessage(message, type) {
-        discountMessage.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show py-2">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>`;
+        if (discountMessage) {
+            discountMessage.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show py-2">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>`;
+        }
     }
     
     // Form submission
     const subscriptionForm = document.getElementById('subscriptionForm');
-    subscriptionForm.addEventListener('submit', function(e) {
-        const termsCheckbox = document.getElementById('termsAccepted');
-        if (!termsCheckbox.checked) {
-            e.preventDefault();
-            alert('Please accept the Terms of Service and Privacy Policy to continue.');
-            return;
-        }
+    if (subscriptionForm) {
+        subscriptionForm.addEventListener('submit', function(e) {
+            const termsCheckbox = document.getElementById('termsAccepted');
+            if (termsCheckbox && !termsCheckbox.checked) {
+                e.preventDefault();
+                alert('Please accept the Terms of Service and Privacy Policy to continue.');
+                return;
+            }
 
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        
-        // Show loading state
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting Trial...';
-        
-        // Re-enable button after form submission
-        setTimeout(() => {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
-        }, 5000);
-    });
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                const originalText = submitBtn.innerHTML;
+                
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting Trial...';
+                
+                // Re-enable button after form submission
+                setTimeout(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                }, 5000);
+            }
+        });
+    }
     
     // Billing option styling
     const billingOptions = document.querySelectorAll('.billing-option input[type="radio"]');
@@ -390,14 +351,21 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add active class to selected card
             if (this.checked) {
                 const card = this.parentElement.querySelector('.card');
-                card.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+                if (card) {
+                    card.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+                }
             }
         });
     });
     
-    // Initialize with monthly selected
-    const monthlyCard = monthlyRadio.parentElement.querySelector('.card');
-    monthlyCard.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+    // Initialize with plan selected
+    const selectedOption = document.getElementById('plan_cycle');
+    if (selectedOption) {
+        const card = selectedOption.parentElement.querySelector('.card');
+        if (card) {
+            card.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+        }
+    }
 });
 </script>
 

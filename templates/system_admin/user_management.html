@@ -1,0 +1,300 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+{% csrf_token %}
+<!-- User Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">{{ user_stats.total_users }}</h5>
+                <p class="card-text text-muted">Total Users</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-user-check fa-2x text-success mb-2"></i>
+                <h5 class="card-title text-success">{{ user_stats.active_users }}</h5>
+                <p class="card-text text-muted">Active Users</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-building fa-2x text-info mb-2"></i>
+                <h5 class="card-title text-info">{{ user_stats.business_owners }}</h5>
+                <p class="card-text text-muted">Business Owners</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-user-cog fa-2x text-warning mb-2"></i>
+                <h5 class="card-title text-warning">{{ user_stats.staff_users }}</h5>
+                <p class="card-text text-muted">Staff Users</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="type" class="form-label">User Type</label>
+                        <select name="type" id="type" class="form-select">
+                            <option value="all" {% if current_type == 'all' %}selected{% endif %}>All Users</option>
+                            <option value="business_owners" {% if current_type == 'business_owners' %}selected{% endif %}>Business Owners</option>
+                            <option value="regular_users" {% if current_type == 'regular_users' %}selected{% endif %}>Regular Users</option>
+                            <option value="staff" {% if current_type == 'staff' %}selected{% endif %}>Staff Members</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Statuses</option>
+                            <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" name="search" id="search" class="form-control" 
+                               placeholder="Username, email, name..." value="{{ current_search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">User Management</h5>
+                <div>
+                    <a href="{% url 'system_admin:create_user' %}" class="btn btn-success btn-sm me-2">
+                        <i class="fas fa-plus me-1"></i>Add User
+                    </a>
+                    <span class="badge bg-secondary">{{ page_obj.paginator.count }} users</span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Contact</th>
+                                    <th>Role</th>
+                                    <th>Business</th>
+                                    <th>Status</th>
+                                    <th>Joined</th>
+                                    <th>Last Login</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in page_obj %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if user.profile.avatar %}
+                                                <img src="{{ user.profile.avatar.url }}" alt="{{ user.get_full_name }}" 
+                                                     class="rounded-circle me-2 user-avatar">
+                                            {% else %}
+                                                <div class="bg-secondary text-white rounded-circle me-2 d-flex align-items-center justify-content-center user-avatar-placeholder">
+                                                    {{ user.get_full_name|default:user.username|first|upper }}
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ user.get_full_name|default:user.username }}</strong><br>
+                                                <small class="text-muted">@{{ user.username }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <i class="fas fa-envelope fa-sm me-1"></i>{{ user.email }}<br>
+                                            {% if user.profile.phone %}
+                                                <i class="fas fa-phone fa-sm me-1"></i>{{ user.profile.phone }}
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            {% if user.is_superuser %}
+                                                <span class="badge bg-danger">Superuser</span>
+                                            {% elif user.is_staff %}
+                                                <span class="badge bg-warning">Staff</span>
+                                            {% elif user.tenant_set.exists %}
+                                                <span class="badge bg-info">Business Owner</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">User</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if user.tenant_set.exists %}
+                                            {% for business in user.tenant_set.all %}
+                                                <div class="mb-1">
+                                                    <strong>{{ business.name }}</strong><br>
+                                                    <small class="text-muted">{{ business.slug }}</small>
+                                                </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="text-muted">No business</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_active %}
+                                            <span class="status-badge status-active">Active</span>
+                                        {% else %}
+                                            <span class="status-badge status-rejected">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ user.date_joined|date:"M d, Y" }}</small>
+                                    </td>
+                                    <td>
+                                        {% if user.last_login %}
+                                            <small>{{ user.last_login|date:"M d, Y" }}</small>
+                                        {% else %}
+                                            <small class="text-muted">Never</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'system_admin:edit_user' user.id %}" 
+                                               class="btn btn-outline-primary btn-sm" title="Edit User">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% if user.is_active %}
+                                                <button class="btn btn-warning btn-sm" title="Deactivate" 
+                                                        onclick="toggleUserStatus('{{ user.id }}', false)">
+                                                    <i class="fas fa-user-slash"></i>
+                                                </button>
+                                            {% else %}
+                                                <button class="btn btn-success btn-sm" title="Activate" 
+                                                        onclick="toggleUserStatus('{{ user.id }}', true)">
+                                                    <i class="fas fa-user-check"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if page_obj.has_other_pages %}
+                        <nav aria-label="User pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_type != 'all' %}type={{ current_type }}&{% endif %}{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page=1">First</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_type != 'all' %}type={{ current_type }}&{% endif %}{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                                </li>
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_type != 'all' %}type={{ current_type }}&{% endif %}{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if current_type != 'all' %}type={{ current_type }}&{% endif %}{% if current_status != 'all' %}status={{ current_status }}&{% endif %}{% if current_search %}search={{ current_search }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No users found</h5>
+                        <p class="text-muted">No users match your current filters.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+}
+.user-avatar-placeholder {
+    width: 40px;
+    height: 40px;
+    font-weight: bold;
+    font-size: 1rem;
+}
+</style>
+
+<script>
+function toggleUserStatus(userId, activate) {
+    const action = activate ? 'activate' : 'deactivate';
+    if (confirm(`Are you sure you want to ${action} this user?`)) {
+        // Make AJAX call to toggle user status
+        fetch(`{% url 'system_admin:toggle_user_status' 0 %}`.replace('0', userId), {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ activate: activate })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error updating user status: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating user status');
+        });
+    }
+}
+
+// Add tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

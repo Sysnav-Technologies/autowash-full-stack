@@ -73,7 +73,7 @@ class CustomerForm(forms.ModelForm):
             'first_name', 'last_name', 'company_name', 'customer_type',
             'email', 'phone', 'phone_secondary', 'date_of_birth', 'gender',
             'national_id', 'business_registration_number', 'tax_number',
-            'street_address', 'city', 'state', 'postal_code',
+            'address_line_1', 'address_line_2', 'city', 'state', 'postal_code',
             'preferred_contact_method', 'receive_marketing_sms',
             'receive_marketing_email', 'receive_service_reminders',
             'is_vip', 'credit_limit', 'notes'
@@ -98,7 +98,8 @@ class CustomerForm(forms.ModelForm):
             'national_id': forms.TextInput(attrs={'class': 'form-control'}),
             'business_registration_number': forms.TextInput(attrs={'class': 'form-control'}),
             'tax_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'street_address': forms.TextInput(attrs={'class': 'form-control'}),
+            'address_line_1': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Street Address'}),
+            'address_line_2': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Apartment, Suite, etc. (optional)'}),
             'city': forms.TextInput(attrs={'class': 'form-control'}),
             'state': forms.TextInput(attrs={'class': 'form-control'}),
             'postal_code': forms.TextInput(attrs={'class': 'form-control'}),
@@ -176,7 +177,8 @@ class CustomerForm(forms.ModelForm):
             ),
             
             HTML('<h5 class="mt-4 mb-3">Address</h5>'),
-            'street_address',
+            'address_line_1',
+            'address_line_2',
             Row(
                 Column('city', css_class='form-group col-md-4 mb-3'),
                 Column('state', css_class='form-group col-md-4 mb-3'),

@@ -1,6 +1,11 @@
 {% extends "base/base.html" %}
+{% load static %}
 
-{% block title %}My Profile{% endblock %}
+{% block title %}My Profile - Autowash{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/services.css' %}" rel="stylesheet">
+{% endblock %}
 
 {% block breadcrumbs %}
 <li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
@@ -9,75 +14,116 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-body text-center">
+    <div class="col-lg-4">
+        <!-- Profile Card -->
+        <div class="service-form mb-4">
+            <div class="text-center">
                 {% if profile.photo %}
-                    <img src="{{ profile.photo.url }}" alt="Profile Photo" class="rounded-circle mb-3" width="150" height="150">
+                    <img src="{{ profile.photo.url }}" alt="Profile Photo" class="rounded-circle mb-3 profile-photo" width="150" height="150">
                 {% else %}
-                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 150px; height: 150px; font-size: 60px;">
+                    <div class="profile-avatar-large mb-3 mx-auto d-flex align-items-center justify-content-center rounded-circle">
                         {{ request.user.get_full_name|first|upper }}
                     </div>
                 {% endif %}
                 
-                <h5 class="card-title mb-1">{{ request.user.get_full_name }}</h5>
-                <p class="text-muted mb-3">{{ request.user.username }}</p>
+                <h5 class="mb-1 profile-name">{{ request.user.get_full_name }}</h5>
+                <p class="mb-3 profile-username">{{ request.user.username }}</p>
                 
-                <div class="d-flex justify-content-center mb-2">
+                <div class="d-flex justify-content-center mb-3">
                     <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changePhotoModal">
                         <i class="fas fa-camera me-1"></i> Change Photo
                     </button>
                 </div>
+                
+                <!-- Profile Stats -->
+                <div class="row text-center mt-4">
+                    <div class="col-4">
+                        <div class="service-stat-value">{{ user.date_joined|date:"M Y" }}</div>
+                        <div class="service-stat-label">Joined</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="service-stat-value">{{ user_role|title }}</div>
+                        <div class="service-stat-label">Role</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="service-stat-value">{{ request.tenant.name|truncatechars:10 }}</div>
+                        <div class="service-stat-label">Business</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="service-form">
+            <div class="service-form-section-title">Quick Actions</div>
+            <div class="d-grid gap-2">
+                <a href="/business/{{ request.tenant.slug }}/notifications/" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-bell me-2"></i>My Notifications
+                </a>
+                <a href="/business/{{ request.tenant.slug }}/employees/attendance/my/" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-clock me-2"></i>My Attendance
+                </a>
+                <a href="/auth/password_change/" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-key me-2"></i>Change Password
+                </a>
             </div>
         </div>
     </div>
     
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Profile Information</h5>
+    <div class="col-lg-8">
+        <!-- Profile Information Form -->
+        <div class="service-form">
+            <div class="service-form-section-title">
+                <i class="fas fa-user me-2"></i>Profile Information
             </div>
             
-            <div class="card-body">
-                <form method="post" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">First Name</label>
-                            {{ form.first_name }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Last Name</label>
-                            {{ form.last_name }}
-                        </div>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="service-form-row">
+                    <div class="service-form-group">
+                        <label class="service-form-label">First Name *</label>
+                        {{ form.first_name|add_class:"service-form-input" }}
                     </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Email</label>
-                        {{ form.email }}
+                    <div class="service-form-group">
+                        <label class="service-form-label">Last Name *</label>
+                        {{ form.last_name|add_class:"service-form-input" }}
                     </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Phone</label>
-                        {{ form.phone }}
+                </div>
+                
+                <div class="service-form-row">
+                    <div class="service-form-group">
+                        <label class="service-form-label">Email Address *</label>
+                        {{ form.email|add_class:"service-form-input" }}
                     </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Address</label>
-                        {{ form.address }}
+                    <div class="service-form-group">
+                        <label class="service-form-label">Phone Number</label>
+                        {{ form.phone|add_class:"service-form-input" }}
                     </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Bio</label>
-                        {{ form.bio }}
+                </div>
+                
+                <div class="service-form-group">
+                    <label class="service-form-label">Address</label>
+                    {{ form.address|add_class:"service-form-input service-form-textarea" }}
+                </div>
+                
+                <div class="service-form-group">
+                    <label class="service-form-label">Bio</label>
+                    {{ form.bio|add_class:"service-form-input service-form-textarea" }}
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mt-4">
+                    <small class="text-muted">* Required fields</small>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                            <i class="fas fa-arrow-left me-1"></i>Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Save Changes
+                        </button>
                     </div>
-                    
-                    <div class="text-end">
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
-                    </div>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>

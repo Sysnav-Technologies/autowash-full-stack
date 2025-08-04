@@ -25,6 +25,34 @@ def employee_required(roles=None):
         def _wrapped_view(request, *args, **kwargs):
             if not request.user.is_authenticated or not request.user.id:
                 return redirect('/auth/login/')
+            
+            # Check if user is the business owner directly (fallback)
+            if hasattr(request, 'tenant') and request.tenant:
+                if request.tenant.owner_id == request.user.id:
+                    # User is the business owner, grant access
+                    try:
+                        from apps.employees.models import Employee
+                        # Try to get or create employee record for owner
+                        employee, created = Employee.objects.get_or_create(
+                            user_id=request.user.id,
+                            defaults={
+                                'employee_id': f'OWN{request.user.id}',
+                                'role': 'owner',
+                                'employment_type': 'full_time',
+                                'status': 'active',
+                                'is_active': True,
+                                'can_login': True,
+                                'hire_date': request.tenant.created_at.date(),
+                            }
+                        )
+                        if created:
+                            print(f"Auto-created employee record for business owner: {request.user.username}")
+                        request.employee = employee
+                        return view_func(request, *args, **kwargs)
+                    except Exception as e:
+                        print(f"Error creating employee record for owner: {e}")
+                        # Continue with regular employee check
+                        pass
                 
             try:
                 from apps.employees.models import Employee

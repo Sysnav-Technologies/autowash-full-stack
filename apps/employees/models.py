@@ -2,13 +2,13 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
-from apps.core.models import TimeStampedModel, SoftDeleteModel, Address, ContactInfo
+from apps.core.tenant_models import TenantTimeStampedModel, TenantSoftDeleteModel
+from apps.core.models import Address, ContactInfo
 from apps.core.utils import upload_to_path
 from decimal import Decimal
-from django_tenants.utils import schema_context, get_public_schema_name
 from django.utils import timezone
 
-class Department(TimeStampedModel):
+class Department(TenantTimeStampedModel):
     """Department model for organizing employees"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -33,7 +33,7 @@ class Department(TimeStampedModel):
         verbose_name_plural = "Departments"
         ordering = ['name']
 
-class Position(TimeStampedModel):
+class Position(TenantTimeStampedModel):
     """Job position model"""
     title = models.CharField(max_length=100)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='positions')
@@ -51,7 +51,7 @@ class Position(TimeStampedModel):
         verbose_name_plural = "Positions"
         ordering = ['title']
 
-class Employee(SoftDeleteModel, Address, ContactInfo):
+class Employee(TenantSoftDeleteModel, Address, ContactInfo):
     """Employee model with comprehensive information - Fixed for django-tenants"""
     
     ROLE_CHOICES = [
@@ -177,12 +177,11 @@ class Employee(SoftDeleteModel, Address, ContactInfo):
     
     @property
     def user(self):
-        """Get user object from public schema"""
+        """Get user object from main database"""
         if not self.user_id:
             return None
         try:
-            with schema_context(get_public_schema_name()):
-                return User.objects.get(id=self.user_id)
+            return User.objects.using('default').get(id=self.user_id)
         except User.DoesNotExist:
             return None
     
@@ -250,7 +249,7 @@ class Employee(SoftDeleteModel, Address, ContactInfo):
         verbose_name_plural = "Employees"
         ordering = ['employee_id']
 
-class EmployeeDocument(TimeStampedModel):
+class EmployeeDocument(TenantTimeStampedModel):
     """Employee document storage"""
     
     DOCUMENT_TYPES = [
@@ -287,7 +286,7 @@ class EmployeeDocument(TimeStampedModel):
         verbose_name_plural = "Employee Documents"
         ordering = ['-created_at']
 
-class Attendance(TimeStampedModel):
+class Attendance(TenantTimeStampedModel):
     """Employee attendance tracking"""
     
     STATUS_CHOICES = [
@@ -386,7 +385,7 @@ class Attendance(TimeStampedModel):
         unique_together = ['employee', 'date']
         ordering = ['-date', 'employee']
 
-class Leave(TimeStampedModel):
+class Leave(TenantTimeStampedModel):
     """Employee leave management"""
     
     LEAVE_TYPES = [
@@ -446,7 +445,7 @@ class Leave(TimeStampedModel):
         verbose_name_plural = "Leave Requests"
         ordering = ['-created_at']
 
-class PerformanceReview(TimeStampedModel):
+class PerformanceReview(TenantTimeStampedModel):
     """Employee performance review"""
     
     REVIEW_TYPES = [
@@ -522,7 +521,7 @@ class PerformanceReview(TimeStampedModel):
         verbose_name_plural = "Performance Reviews"
         ordering = ['-created_at']
 
-class Training(TimeStampedModel):
+class Training(TenantTimeStampedModel):
     """Training programs and certifications"""
     
     TRAINING_TYPES = [
@@ -581,7 +580,7 @@ class Training(TimeStampedModel):
         verbose_name_plural = "Training Programs"
         ordering = ['-start_date']
 
-class TrainingParticipant(TimeStampedModel):
+class TrainingParticipant(TenantTimeStampedModel):
     """Training participation tracking"""
     
     STATUS_CHOICES = [
@@ -618,7 +617,7 @@ class TrainingParticipant(TimeStampedModel):
         verbose_name_plural = "Training Participants"
         unique_together = ['training', 'employee']
 
-class Payroll(TimeStampedModel):
+class Payroll(TenantTimeStampedModel):
     """Employee payroll records"""
     
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='payroll_records')

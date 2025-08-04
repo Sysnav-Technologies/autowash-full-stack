@@ -1,12 +1,12 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.contrib.postgres.fields import JSONField
-from apps.core.models import TimeStampedModel
+from django.db.models import JSONField
+from apps.core.tenant_models import TenantTimeStampedModel
 from django.utils import timezone
 from decimal import Decimal
 import uuid
 
-class ReportTemplate(TimeStampedModel):
+class ReportTemplate(TenantTimeStampedModel):
     """Predefined report templates"""
     
     REPORT_TYPES = [
@@ -75,7 +75,7 @@ class ReportTemplate(TimeStampedModel):
         verbose_name_plural = "Report Templates"
         ordering = ['report_type', 'name']
 
-class GeneratedReport(TimeStampedModel):
+class GeneratedReport(TenantTimeStampedModel):
     """Generated report instances"""
     
     STATUS_CHOICES = [
@@ -149,7 +149,7 @@ class GeneratedReport(TimeStampedModel):
         verbose_name_plural = "Generated Reports"
         ordering = ['-created_at']
 
-class Dashboard(TimeStampedModel):
+class Dashboard(TenantTimeStampedModel):
     """Custom dashboards for different roles"""
     
     name = models.CharField(max_length=200)
@@ -187,7 +187,7 @@ class Dashboard(TimeStampedModel):
         verbose_name_plural = "Dashboards"
         ordering = ['role', 'name']
 
-class ReportWidget(TimeStampedModel):
+class ReportWidget(TenantTimeStampedModel):
     """Individual report widgets for dashboards"""
     
     WIDGET_TYPES = [
@@ -269,7 +269,7 @@ class ReportWidget(TimeStampedModel):
         verbose_name_plural = "Report Widgets"
         ordering = ['name']
 
-class BusinessMetrics(TimeStampedModel):
+class BusinessMetrics(TenantTimeStampedModel):
     """Daily business metrics for reporting"""
     date = models.DateField(unique=True)
     
@@ -352,7 +352,7 @@ class BusinessMetrics(TimeStampedModel):
         verbose_name_plural = "Business Metrics"
         ordering = ['-date']
 
-class ReportSchedule(TimeStampedModel):
+class ReportSchedule(TenantTimeStampedModel):
     """Scheduled report generation"""
     
     template = models.ForeignKey(ReportTemplate, on_delete=models.CASCADE, related_name='schedules')
@@ -430,7 +430,7 @@ class ReportSchedule(TimeStampedModel):
         verbose_name = "Report Schedule"
         verbose_name_plural = "Report Schedules"
 
-class ReportExport(TimeStampedModel):
+class ReportExport(TenantTimeStampedModel):
     """Report export history"""
     
     EXPORT_FORMATS = [
@@ -469,7 +469,7 @@ class ReportExport(TimeStampedModel):
         verbose_name = "Report Export"
         verbose_name_plural = "Report Exports"
 
-class AnalyticsEvent(TimeStampedModel):
+class AnalyticsEvent(TenantTimeStampedModel):
     """Track analytics events for business intelligence"""
     
     EVENT_TYPES = [
@@ -515,7 +515,7 @@ class AnalyticsEvent(TimeStampedModel):
         verbose_name_plural = "Analytics Events"
         ordering = ['-created_at']
 
-class KPI(TimeStampedModel):
+class KPI(TenantTimeStampedModel):
     """Key Performance Indicators tracking"""
     
     KPI_TYPES = [

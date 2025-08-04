@@ -1,103 +1,88 @@
 from django.core.management.base import BaseCommand
-from django.db import connection, transaction
-from django_tenants.utils import schema_context
+from django.db import transaction
+from apps.core.tenant_models import Tenant
+from apps.core.database_router import TenantDatabaseManager
 from django.core.management import call_command
-from django.utils import timezone
-from django.conf import settings
-from apps.accounts.models import Business, BusinessVerification
 
 class Command(BaseCommand):
-    help = 'Create schemas for verified businesses that don\'t have them yet'
+    help = 'Create databases for verified tenants that do not have them'
 
     def add_arguments(self, parser):
         parser.add_argument(
+            '--tenant-id',
+            type=int,
+            help='Create database for specific tenant ID only',
+        )
+        parser.add_argument(
             '--dry-run',
             action='store_true',
-            help='Show what would be created without actually creating',
+            help='Show what would be done without actually doing it',
+        )
+        parser.add_argument(
+            '--run-migrations',
+            action='store_true',
+            help='Run migrations after creating databases',
         )
 
     def handle(self, *args, **options):
-        dry_run = options['dry_run']
-        
-        # Find verified businesses without schemas
-        verified_businesses = Business.objects.filter(
-            is_verified=True,
-            verification__status='verified'
-        )
-        
-        businesses_needing_schemas = []
-        for business in verified_businesses:
-            # Check if schema exists
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s",
-                    [business.schema_name]
-                )
-                if not cursor.fetchone():
-                    businesses_needing_schemas.append(business)
-        
-        if not businesses_needing_schemas:
-            self.stdout.write(self.style.SUCCESS('All verified businesses have schemas'))
-            return
-        
-        self.stdout.write(f"Found {len(businesses_needing_schemas)} businesses needing schemas:")
-        
-        for business in businesses_needing_schemas:
-            self.stdout.write(f"  - {business.name} (Schema: {business.schema_name})")
+        tenant_id = options.get('tenant_id')
+        dry_run = options.get('dry_run', False)
+        run_migrations = options.get('run_migrations', False)
         
         if dry_run:
-            self.stdout.write(self.style.WARNING('DRY RUN: No schemas were created'))
+            self.stdout.write(self.style.WARNING('DRY RUN MODE - No changes will be made'))
+        
+        if tenant_id:
+            tenants = Tenant.objects.filter(id=tenant_id, is_verified=True, is_active=True)
+        else:
+            tenants = Tenant.objects.filter(is_verified=True, is_active=True)
+        
+        if not tenants.exists():
+            self.stdout.write(self.style.WARNING('No verified tenants found'))
             return
         
+        db_manager = TenantDatabaseManager()
         created_count = 0
-        failed_count = 0
+        exists_count = 0
         
-        for business in businesses_needing_schemas:
+        for tenant in tenants:
             try:
-                self.stdout.write(f"Creating schema for: {business.name}")
+                db_name = tenant.get_database_name()
                 
-                # Create schema
-                with connection.cursor() as cursor:
-                    cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{business.schema_name}"')
+                if db_manager.database_exists(db_name):
+                    self.stdout.write(f'Database already exists for tenant: {tenant.name}')
+                    exists_count += 1
+                    continue
                 
-                # Run migrations
-                with schema_context(business.schema_name):
-                    call_command('migrate', 
-                               '--run-syncdb',
-                               verbosity=0,
-                               interactive=False)
-                
-                # Create owner employee record
-                try:
-                    with schema_context(business.schema_name):
-                        from apps.employees.models import Employee
-                        Employee.objects.get_or_create(
-                            user=business.owner,
-                            defaults={
-                                'role': 'owner',
-                                'first_name': business.owner.first_name,
-                                'last_name': business.owner.last_name,
-                                'email': business.owner.email,
-                                'is_active': True,
-                                'hire_date': timezone.now().date(),
-                            }
-                        )
-                except Exception as emp_error:
+                if not dry_run:
+                    # Create the database
+                    db_manager.create_database(db_name)
                     self.stdout.write(
-                        self.style.WARNING(f"Failed to create employee for {business.name}: {emp_error}")
+                        self.style.SUCCESS(f'Created database for tenant: {tenant.name}')
                     )
-                
-                created_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(f"✓ Schema created for: {business.name}")
-                )
-                
+                    
+                    if run_migrations:
+                        # Run migrations for the new database
+                        call_command('migrate', database=db_name, verbosity=0)
+                        self.stdout.write(f'Ran migrations for tenant: {tenant.name}')
+                        
+                        # Create default data
+                        call_command('create_payment_methods', tenant_slug=tenant.schema_name, verbosity=0)
+                        self.stdout.write(f'Created default data for tenant: {tenant.name}')
+                    
+                    created_count += 1
+                else:
+                    self.stdout.write(f'Would create database for tenant: {tenant.name}')
+                    created_count += 1
+                    
             except Exception as e:
-                failed_count += 1
                 self.stdout.write(
-                    self.style.ERROR(f"✗ Failed to create schema for {business.name}: {e}")
+                    self.style.ERROR(f'Error processing tenant {tenant.name}: {str(e)}')
                 )
         
+        action = 'Would create' if dry_run else 'Created'
         self.stdout.write(
-            self.style.SUCCESS(f'Completed: {created_count} schemas created, {failed_count} failed')
+            self.style.SUCCESS(
+                f'{action} {created_count} databases, {exists_count} already existed'
+            )
         )

@@ -1,0 +1,151 @@
+{% extends 'system_admin/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Edit Subscription Plan</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">
+                                Plan Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="name" id="name" class="form-control" 
+                                   value="{{ plan.name }}" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="slug" class="form-label">
+                                Plan Slug <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="slug" id="slug" class="form-control" 
+                                   value="{{ plan.slug }}" required>
+                            <div class="form-text">URL-friendly name (lowercase, hyphens only)</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="plan_type" class="form-label">
+                                Plan Type <span class="text-danger">*</span>
+                            </label>
+                            <select name="plan_type" id="plan_type" class="form-select" required>
+                                {% for value, label in plan_types %}
+                                    <option value="{{ value }}" {% if plan.plan_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="duration_months" class="form-label">
+                                Duration (Months) <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="duration_months" id="duration_months" 
+                                   class="form-control" min="1" max="60" value="{{ plan.duration_months }}" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="price" class="form-label">
+                                Price (KES) <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="price" id="price" class="form-control" 
+                                   step="0.01" min="0" value="{{ plan.price }}" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="max_employees" class="form-label">
+                                Max Employees
+                            </label>
+                            <input type="number" name="max_employees" id="max_employees" 
+                                   class="form-control" min="-1" value="{{ plan.max_employees }}">
+                            <div class="form-text">-1 for unlimited</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="max_customers" class="form-label">
+                                Max Customers
+                            </label>
+                            <input type="number" name="max_customers" id="max_customers" 
+                                   class="form-control" min="-1" value="{{ plan.max_customers }}">
+                            <div class="form-text">-1 for unlimited</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="max_locations" class="form-label">
+                                Max Locations
+                            </label>
+                            <input type="number" name="max_locations" id="max_locations" 
+                                   class="form-control" min="-1" value="{{ plan.max_locations }}">
+                            <div class="form-text">-1 for unlimited</div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="description" class="form-label">
+                                Description
+                            </label>
+                            <textarea name="description" id="description" class="form-control" 
+                                      rows="3">{{ plan.description }}</textarea>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_active" id="is_active" 
+                                       class="form-check-input" {% if plan.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="is_active">
+                                    Plan is active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Update Plan
+                        </button>
+                        <a href="{% url 'system_admin:subscription_plans' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-12 col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Plan Statistics</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <div class="text-center">
+                            <h4 class="text-primary">{{ plan.subscription_set.count }}</h4>
+                            <small class="text-muted">Total Subscriptions</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center">
+                            <h4 class="text-success">{{ plan.subscription_set.filter.count }}</h4>
+                            <small class="text-muted">Active Subscriptions</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> Changing plan details will affect existing subscriptions.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
