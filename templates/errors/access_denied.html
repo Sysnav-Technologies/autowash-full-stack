@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title|default:"Access Denied" }} - AutoWash</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .error-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .error-card {
+            max-width: 500px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+        }
+        .error-header {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+            text-align: center;
+            padding: 2rem;
+        }
+        .error-header .icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        .error-body {
+            padding: 2rem;
+        }
+        .btn-custom {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 50px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-card">
+            <div class="error-header">
+                <div class="icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h2 class="mb-0">{{ title|default:"Access Denied" }}</h2>
+            </div>
+            
+            <div class="error-body">
+                <h4 class="text-warning mb-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Permission Required
+                </h4>
+                
+                <p class="text-muted mb-3">
+                    {{ message|default:"You don't have permission to access this resource." }}
+                </p>
+                
+                {% if business %}
+                <div class="alert alert-info">
+                    <h6 class="mb-2">
+                        <i class="fas fa-building me-2"></i>
+                        Business: {{ business.name }}
+                    </h6>
+                    <p class="mb-0">
+                        <small>{{ business.get_business_type_display }} | {{ business.slug }}</small>
+                    </p>
+                </div>
+                {% endif %}
+                
+                {% if employee %}
+                <div class="alert alert-warning">
+                    <h6 class="mb-2">
+                        <i class="fas fa-id-badge me-2"></i>
+                        Employee Status
+                    </h6>
+                    <p class="mb-1"><strong>ID:</strong> {{ employee.employee_id }}</p>
+                    <p class="mb-1"><strong>Role:</strong> {{ employee.get_role_display }}</p>
+                    <p class="mb-0"><strong>Can Login:</strong> 
+                        {% if employee.can_login %}
+                            <span class="badge bg-success">Yes</span>
+                        {% else %}
+                            <span class="badge bg-danger">No</span>
+                        {% endif %}
+                    </p>
+                </div>
+                {% endif %}
+                
+                <div class="d-grid gap-2 mt-4">
+                    <button onclick="history.back()" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>
+                        Go Back
+                    </button>
+                    <a href="/public/" class="btn btn-custom text-white">
+                        <i class="fas fa-home me-2"></i>
+                        Go to Homepage
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

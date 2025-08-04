@@ -192,7 +192,11 @@
                                     </td>
                                     <td>
                                         {% if user.is_active %}
-                                            <span class="status-badge status-active">Active</span>
+                                            {% if user.suspension_status and user.suspension_status.user_suspended %}
+                                                <span class="status-badge status-suspended">Suspended</span>
+                                            {% else %}
+                                                <span class="status-badge status-active">Active</span>
+                                            {% endif %}
                                         {% else %}
                                             <span class="status-badge status-rejected">Inactive</span>
                                         {% endif %}
@@ -214,7 +218,18 @@
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             {% if user.is_active %}
-                                                <button class="btn btn-warning btn-sm" title="Deactivate" 
+                                                {% if user.suspension_status and user.suspension_status.user_suspended %}
+                                                    <button class="btn btn-success btn-sm" title="Reactivate User" 
+                                                            onclick="toggleSuspension('{{ user.id }}', 'reactivate')">
+                                                        <i class="fas fa-user-check"></i>
+                                                    </button>
+                                                {% else %}
+                                                    <button class="btn btn-warning btn-sm" title="Suspend User" 
+                                                            onclick="toggleSuspension('{{ user.id }}', 'suspend')">
+                                                        <i class="fas fa-ban"></i>
+                                                    </button>
+                                                {% endif %}
+                                                <button class="btn btn-outline-danger btn-sm" title="Deactivate" 
                                                         onclick="toggleUserStatus('{{ user.id }}', false)">
                                                     <i class="fas fa-user-slash"></i>
                                                 </button>
@@ -286,6 +301,24 @@
     font-weight: bold;
     font-size: 1rem;
 }
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+.status-active {
+    background-color: #d1edff;
+    color: #0d6efd;
+}
+.status-rejected {
+    background-color: #f8d7da;
+    color: #dc3545;
+}
+.status-suspended {
+    background-color: #fff3cd;
+    color: #ffc107;
+}
 </style>
 
 <script>
@@ -314,6 +347,54 @@ function toggleUserStatus(userId, activate) {
             alert('Error updating user status');
         });
     }
+}
+
+function toggleSuspension(userId, action) {
+    const actionText = action === 'suspend' ? 'suspend' : 'reactivate';
+    const reasonModal = action === 'suspend' ? true : false;
+    
+    if (reasonModal) {
+        // Show modal for suspension reason
+        showSuspensionModal(userId);
+    } else {
+        // Direct reactivation
+        if (confirm(`Are you sure you want to ${actionText} this user?`)) {
+            performSuspensionAction(userId, action, '');
+        }
+    }
+}
+
+function showSuspensionModal(userId) {
+    const reason = prompt('Please provide a reason for suspension:');
+    if (reason && reason.trim()) {
+        performSuspensionAction(userId, 'suspend', reason.trim());
+    }
+}
+
+function performSuspensionAction(userId, action, reason) {
+    fetch(`{% url 'system_admin:toggle_user_suspension' 0 %}`.replace('0', userId), {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+            action: action,
+            reason: reason 
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error updating suspension status: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating suspension status');
+    });
 }
 
 // Add tooltips

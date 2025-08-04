@@ -153,6 +153,10 @@ MIDDLEWARE.extend([
     # Auth middleware after tenant middleware
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     
+    # Suspension and access control middleware (after auth)
+    'apps.core.suspension_middleware.SuspensionCheckMiddleware',
+    'apps.core.suspension_middleware.BusinessAccessControlMiddleware',
+    
     # Message and other middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
