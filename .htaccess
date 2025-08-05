@@ -1,0 +1,36 @@
+# Django cPanel .htaccess configuration
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Set proper MIME types for static files
+<FilesMatch "\.(css)$">
+    Header set Content-Type "text/css"
+</FilesMatch>
+
+<FilesMatch "\.(js)$">
+    Header set Content-Type "application/javascript"
+</FilesMatch>
+
+<FilesMatch "\.(png|jpg|jpeg|gif|svg)$">
+    Header set Content-Type "image/\1"
+</FilesMatch>
+
+<FilesMatch "\.(woff|woff2|ttf|eot)$">
+    Header set Content-Type "font/\1"
+</FilesMatch>
+
+# Serve static files directly without going through Django
+RewriteCond %{REQUEST_URI} ^/static/
+RewriteRule ^static/(.*)$ /public_html/static/$1 [L,QSA]
+
+# Serve media files directly
+RewriteCond %{REQUEST_URI} ^/media/
+RewriteRule ^media/(.*)$ /public_html/media/$1 [L,QSA]
+
+# Don't rewrite requests for existing files or directories
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Pass all other requests to Django
+RewriteRule ^(.*)$ /passenger_wsgi.py/$1 [QSA,L]

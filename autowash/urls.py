@@ -172,6 +172,7 @@ urlpatterns = [
     path('', root_redirect, name='root_redirect'),
 ]
 
+# Add static and media URL patterns
 if settings.DEBUG:
     try:
         import debug_toolbar
@@ -182,5 +183,6 @@ if settings.DEBUG:
     except ImportError:
         print("Debug toolbar not available (not installed)")
 
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Always add static and media URLs for development and as fallback
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
