@@ -21,12 +21,16 @@ class MySQLTenantMiddleware(MiddlewareMixin):
     def process_request(self, request):
         """Process incoming request to identify and set tenant"""
         
+        # Skip tenant resolution for static and media files
+        path = request.path_info
+        if path.startswith('/static/') or path.startswith('/media/') or path.startswith('/favicon.ico'):
+            return None
+        
         # Clear any existing tenant context
         TenantDatabaseRouter.clear_tenant()
         
         # Get hostname and path
         hostname = request.get_host().lower()
-        path = request.path_info
         
         # Try to resolve tenant from different methods
         tenant = None

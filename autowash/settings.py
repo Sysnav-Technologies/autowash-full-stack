@@ -136,6 +136,9 @@ MIDDLEWARE = [
 
 if RENDER:
     MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
+elif CPANEL:
+    # Add whitenoise for cPanel static file serving
+    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
 
 MIDDLEWARE.extend([
     # Session middleware
@@ -334,7 +337,10 @@ if RENDER:
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 elif CPANEL:
+    # For cPanel, static files should be in public_html/static
     STATIC_ROOT = os.path.join(BASE_DIR, 'public_html', 'static')
+    # Use whitenoise for cPanel too to handle static files properly
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 else:
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
@@ -616,3 +622,27 @@ if DEBUG:
         '127.0.0.1',
         'localhost',
     ]
+
+# Whitenoise configuration for static files
+if CPANEL or RENDER:
+    # Whitenoise settings for production
+    WHITENOISE_USE_FINDERS = True
+    WHITENOISE_AUTOREFRESH = DEBUG
+    WHITENOISE_MAX_AGE = 31536000  # 1 year
+    
+    # Add MIME types for whitenoise
+    WHITENOISE_MIMETYPES = {
+        '.css': 'text/css',
+        '.js': 'application/javascript',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+        '.ttf': 'font/ttf',
+        '.eot': 'application/vnd.ms-fontobject',
+    }
