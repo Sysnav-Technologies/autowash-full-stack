@@ -69,6 +69,8 @@ urlpatterns = [
     path('ajax/queue/status/', views.queue_status_ajax, name='queue_status'),
     path('ajax/calculate-price/', views.calculate_order_price, name='calculate_price'),
     path('ajax/customer/search/', views.customer_search_ajax, name='customer_search'),
+    path('ajax/customer/<uuid:customer_id>/details/', views.customer_details_ajax, name='customer_details'),
+    path('ajax/customer/<uuid:customer_id>/vehicles/', views.customer_vehicles_ajax, name='customer_vehicles'),
     path('ajax/vehicle/search/', views.vehicle_search_ajax, name='vehicle_search'),
     path('ajax/start-next/', views.start_next_service, name='start_next_service'),
     path('ajax/current-service/', views.get_current_service, name='current_service'),
@@ -77,11 +79,22 @@ urlpatterns = [
     
     # Attendant Dashboard
     path('dashboard/', views.attendant_dashboard, name='attendant_dashboard'),
+    path('pos/', views.pos_dashboard, name='pos_dashboard'),
     path('my-services/', views.my_services_view, name='my_services'),
     
     # Quick Actions
     path('quick/customer-register/', views.quick_customer_register, name='quick_customer_register'),
     path('quick/service-assign/', views.quick_service_assign, name='quick_service_assign'),
+    
+    # POS System AJAX
+    path('ajax/create-pos-order/', views.create_pos_order, name='create_pos_order'),
+    path('ajax/process-pos-payment/', views.process_pos_payment, name='process_pos_payment'),
+    path('ajax/complete-pos-order/', views.complete_pos_order, name='complete_pos_order'),
+    path('ajax/create-customer/', views.create_customer_ajax, name='create_customer_ajax'),
+    path('ajax/add-vehicle/', views.add_vehicle_ajax, name='add_vehicle_ajax'),
+    path('ajax/customer/<uuid:customer_id>/vehicles/', views.get_customer_vehicles, name='get_customer_vehicles'),
+    path('ajax/inventory/<uuid:item_id>/', views.get_inventory_item_ajax, name='get_inventory_item_ajax'),
+    path('ajax/available-workers/', views.get_available_workers_ajax, name='get_available_workers_ajax'),
     
     # Export & Import
     path('export/', views.service_export_view, name='export'),

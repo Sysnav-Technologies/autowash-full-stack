@@ -39,10 +39,10 @@
             <div class="nav-section-title">Main</div>
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'attendant_dashboard' %}active{% endif %}" 
-                       href="/business/{{ request.tenant.slug }}/services/dashboard/">
-                        <i class="nav-icon fas fa-home"></i>
-                        <span class="nav-text">Dashboard</span>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'pos_dashboard' %}active{% endif %}" 
+                       href="/business/{{ request.tenant.slug }}/services/pos/">
+                        <i class="nav-icon fas fa-cash-register"></i>
+                        <span class="nav-text">POS System</span>
                     </a>
                 </li>
             </ul>
@@ -134,15 +134,6 @@
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link nav-link-featured {% if request.resolver_match.url_name == 'quick_order' %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/services/orders/quick/">
-                                <i class="nav-icon fas fa-bolt"></i>
-                                <span class="nav-text">Quick Order</span>
-                                <span class="nav-badge nav-badge-primary">FAST</span>
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'queue' %}active{% endif %}" 
                                href="/business/{{ request.tenant.slug }}/services/queue/">
                                 <i class="nav-icon fas fa-tasks"></i>
@@ -206,6 +197,96 @@
                         </li>
                         {% endif %}
                     </ul>
+                </li>
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Shift Management -->
+        {% if user_role and user_role in 'owner,manager,supervisor' %}
+        <div class="nav-section">
+            <div class="nav-section-title">Workforce</div>
+            <ul class="nav-list">
+                <!-- Shift Management Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="shifts-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'shifts' in request.resolver_match.url_name or 'shift' in request.resolver_match.url_name %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('shifts-dropdown')">
+                        <i class="nav-icon fas fa-clock"></i>
+                        <span class="nav-text">Shift Management</span>
+                        {% if active_shifts_count > 0 %}
+                        <span class="nav-badge nav-badge-success">{{ active_shifts_count }}</span>
+                        {% endif %}
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'shifts' and request.resolver_match.namespace == 'businesses' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/businesses/shifts/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Shifts</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'shift_create' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/businesses/shifts/create/">
+                                <i class="nav-icon fas fa-plus-circle"></i>
+                                <span class="nav-text">Create Shift</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" 
+                               href="/business/{{ request.tenant.slug }}/businesses/shifts?status=active">
+                                <i class="nav-icon fas fa-play-circle"></i>
+                                <span class="nav-text">Active Shifts</span>
+                                {% if active_shifts_count > 0 %}
+                                <span class="nav-badge nav-badge-success">{{ active_shifts_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'shift_reports' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/businesses/shifts/reports/">
+                                <i class="nav-icon fas fa-chart-line"></i>
+                                <span class="nav-text">Shift Reports</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Attendant Shift Access -->
+        {% if user_role and user_role == 'attendant' %}
+        <div class="nav-section">
+            <div class="nav-section-title">My Shifts</div>
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a class="nav-link" 
+                       href="/business/{{ request.tenant.slug }}/businesses/my-stats/">
+                        <i class="nav-icon fas fa-chart-line"></i>
+                        <span class="nav-text">My Statistics</span>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link" 
+                       href="/business/{{ request.tenant.slug }}/businesses/shifts/?attendant=current">
+                        <i class="nav-icon fas fa-clock"></i>
+                        <span class="nav-text">My Shifts</span>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link" id="current-shift-link"
+                       href="#" onclick="checkCurrentShift()">
+                        <i class="nav-icon fas fa-play-circle"></i>
+                        <span class="nav-text">Current Shift</span>
+                        <span class="nav-badge nav-badge-info" id="shift-status-badge" style="display: none;"></span>
+                    </a>
                 </li>
             </ul>
         </div>
@@ -658,6 +739,15 @@
         <div class="nav-section">
             <div class="nav-section-title">Quick Actions</div>
             <ul class="nav-list">
+                {% if user_role == 'attendant' %}
+                <li class="nav-item">
+                    <a class="nav-link nav-link-action" 
+                       href="/business/{{ request.tenant.slug }}/services/pos/">
+                        <i class="nav-icon fas fa-cash-register"></i>
+                        <span class="nav-text">POS System</span>
+                    </a>
+                </li>
+                {% else %}
                 <li class="nav-item">
                     <a class="nav-link nav-link-action" 
                        href="/business/{{ request.tenant.slug }}/services/orders/quick/">
@@ -665,6 +755,7 @@
                         <span class="nav-text">New Service</span>
                     </a>
                 </li>
+                {% endif %}
                 
                 <li class="nav-item">
                     <a class="nav-link nav-link-featured" 

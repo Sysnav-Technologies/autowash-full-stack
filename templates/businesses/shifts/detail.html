@@ -1,0 +1,388 @@
+{% if user_role == 'attendant' %}
+    {% extends "dashboard_base.html" %}
+{% else %}
+    {% extends "base.html" %}
+{% endif %}
+{% load static %}
+
+{% block page_title %}{{ shift.name }} - Shift Details{% endblock %}
+
+{% block extra_css %}
+<style>
+    .attendance-card {
+        border-left: 4px solid #28a745;
+    }
+    .performance-card {
+        border-left: 4px solid #007bff;
+    }
+    .status-badge {
+        font-size: 1.1em;
+    }
+    .time-entry {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .attendant-card {
+        transition: all 0.3s ease;
+    }
+    .attendant-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .status-checked-in { background-color: #28a745; }
+    .status-on-break { background-color: #ffc107; }
+    .status-checked-out { background-color: #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/shifts/">Shifts</a></li>
+                    <li class="breadcrumb-item active">{{ shift.name }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0 text-gray-800">{{ shift.name }}</h1>
+            <p class="text-muted mb-0">{{ shift.date|date:"F d, Y" }} • {{ shift.start_time|time:"H:i" }} - {{ shift.end_time|time:"H:i" }}</p>
+        </div>
+        <div>
+            <span class="badge badge-{% if shift.status == 'active' %}success{% elif shift.status == 'ended' %}secondary{% elif shift.status == 'cancelled' %}danger{% else %}primary{% endif %} status-badge">
+                {{ shift.get_status_display }}
+            </span>
+            {% if shift.status == 'active' %}
+            <button class="btn btn-danger ml-2" onclick="endShift('{{ shift.id }}')">
+                <i class="fas fa-stop"></i> End Shift
+            </button>
+            {% endif %}
+            {% if shift.status == 'planned' %}
+            <a href="/business/{{ request.tenant.slug }}/shifts/{{ shift.id }}/edit/" class="btn btn-primary ml-2">
+                <i class="fas fa-edit"></i> Edit Shift
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if shift.description %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        {{ shift.description }}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Shift Overview -->
+        <div class="col-md-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Shift Overview</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <p class="text-muted mb-1">Start Time</p>
+                            <p class="mb-3">{{ shift.start_time|time:"H:i" }}</p>
+                        </div>
+                        <div class="col-sm-6">
+                            <p class="text-muted mb-1">End Time</p>
+                            <p class="mb-3">{{ shift.end_time|time:"H:i" }}</p>
+                        </div>
+                    </div>
+                    
+                    {% if shift.actual_start_time %}
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <p class="text-muted mb-1">Actual Start</p>
+                            <p class="mb-3">{{ shift.actual_start_time|time:"H:i" }}</p>
+                        </div>
+                        {% if shift.actual_end_time %}
+                        <div class="col-sm-6">
+                            <p class="text-muted mb-1">Actual End</p>
+                            <p class="mb-3">{{ shift.actual_end_time|time:"H:i" }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-12">
+                            <p class="text-muted mb-1">Created By</p>
+                            <p class="mb-0">{{ shift.created_by.get_full_name }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Summary -->
+        <div class="col-md-4">
+            <div class="card attendance-card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">Attendance Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-right">
+                                <h3 class="text-success">{{ shift.checked_in_count }}</h3>
+                                <p class="text-muted mb-0">Checked In</p>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="text-secondary">{{ shift.total_attendants }}</h3>
+                            <p class="text-muted mb-0">Total Staff</p>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h4 class="text-warning">{{ on_break_count }}</h4>
+                            <p class="text-muted mb-0">On Break</p>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-info">{{ checked_out_count }}</h4>
+                            <p class="text-muted mb-0">Checked Out</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="col-md-4">
+            <div class="card performance-card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Performance</h6>
+                </div>
+                <div class="card-body">
+                    {% if shift.status == 'ended' %}
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-right">
+                                <h3 class="text-primary">KES {{ shift.total_revenue|floatformat:2 }}</h3>
+                                <p class="text-muted mb-0">Revenue</p>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="text-info">{{ shift.total_orders }}</h3>
+                            <p class="text-muted mb-0">Orders</p>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="text-center">
+                        <h4 class="text-success">KES {{ shift.total_commission|floatformat:2 }}</h4>
+                        <p class="text-muted mb-0">Commission Paid</p>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <p>Performance metrics will be available after the shift ends.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff Attendance -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Staff Attendance</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for attendance in attendance_records %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card attendant-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0">{{ attendance.attendant.get_full_name }}</h6>
+                                <span class="badge badge-{% if attendance.status == 'checked_in' %}success{% elif attendance.status == 'on_break' %}warning{% else %}secondary{% endif %}">
+                                    <span class="status-indicator status-{{ attendance.status }}"></span>
+                                    {{ attendance.get_status_display }}
+                                </span>
+                            </div>
+                            
+                            <p class="text-muted small mb-2">{{ attendance.attendant.role|capfirst }}</p>
+                            
+                            {% if attendance.check_in_time %}
+                            <div class="time-entry">
+                                <small class="text-muted">Check In:</small>
+                                <strong>{{ attendance.check_in_time|time:"H:i" }}</strong>
+                            </div>
+                            {% endif %}
+                            
+                            {% if attendance.check_out_time %}
+                            <div class="time-entry">
+                                <small class="text-muted">Check Out:</small>
+                                <strong>{{ attendance.check_out_time|time:"H:i" }}</strong>
+                            </div>
+                            {% endif %}
+                            
+                            {% if attendance.break_start_time %}
+                            <div class="time-entry">
+                                <small class="text-muted">Break Start:</small>
+                                <strong>{{ attendance.break_start_time|time:"H:i" }}</strong>
+                                {% if attendance.break_end_time %}
+                                - <strong>{{ attendance.break_end_time|time:"H:i" }}</strong>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Performance for this shift -->
+                            {% if shift.status == 'ended' %}
+                            <hr class="my-2">
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <small class="text-muted">Orders</small><br>
+                                    <strong>{{ attendance.orders_completed|default:0 }}</strong>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Commission</small><br>
+                                    <strong>KES {{ attendance.commission_earned|default:0|floatformat:2 }}</strong>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center text-muted py-4">
+                    <i class="fas fa-users fa-2x mb-2"></i>
+                    <p>No attendants assigned to this shift.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    {% if recent_orders %}
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Recent Orders</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Services</th>
+                            <th>Amount</th>
+                            <th>Assigned Worker</th>
+                            <th>Status</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in recent_orders %}
+                        <tr>
+                            <td>#{{ order.order_number }}</td>
+                            <td>{{ order.customer.get_full_name }}</td>
+                            <td>
+                                {% for item in order.items.all %}
+                                    {{ item.service.name }}{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>KES {{ order.total_amount }}</td>
+                            <td>
+                                {% if order.assigned_worker %}
+                                    {{ order.assigned_worker.get_full_name }}
+                                {% else %}
+                                    <span class="text-muted">Not assigned</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-{% if order.status == 'completed' %}success{% elif order.status == 'in_progress' %}primary{% else %}secondary{% endif %}">
+                                    {{ order.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ order.created_at|time:"H:i" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- End Shift Modal -->
+<div class="modal fade" id="endShiftModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">End Shift</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to end this shift?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>This will:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Automatically check out all attendants</li>
+                        <li>End any active breaks</li>
+                        <li>Calculate final performance metrics</li>
+                        <li>This action cannot be undone</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmEndShift">End Shift</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function endShift(shiftId) {
+    $('#endShiftModal').modal('show');
+    
+    $('#confirmEndShift').off('click').on('click', function() {
+        $.ajax({
+            url: `/businesses/shifts/${shiftId}/end/`,
+            type: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#endShiftModal').modal('hide');
+                    location.reload();
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('Error ending shift. Please try again.');
+            }
+        });
+    });
+}
+</script>
+{% endblock %}

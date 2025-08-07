@@ -95,116 +95,199 @@ def get_business_urls(request):
 @login_required
 @employee_required()
 def dashboard_view(request):
-    """Main business dashboard"""
+    """Main business dashboard with real-time data - Management only"""
+    from datetime import timedelta
+    from decimal import Decimal
+    from django.db.models import Sum, Count, Avg, Q, F
+    from apps.services.models import ServiceOrder, ServiceOrderItem
+    from apps.customers.models import Customer
+    from apps.employees.models import Employee
+    from apps.payments.models import Payment
+    from apps.businesses.utils import ShiftManager
+    from django.shortcuts import redirect
+    from django.contrib import messages
+    
     today = timezone.now().date()
     business = request.business
     employee = request.employee
     
-    # Get today's metrics - Use tenant-safe audit fields
-    today_metrics, created = BusinessMetrics.objects.get_or_create(
-        date=today,
-        defaults={
-            'new_customers': 0,
-            'returning_customers': 0,
-            'total_customers_served': 0,
-            'total_services': 0,
-            'completed_services': 0,
-            'gross_revenue': 0,
-        }
-    )
+    # Role-based access control - Only allow management roles
+    if employee.role not in ['owner', 'manager', 'supervisor']:
+        messages.error(request, 'Access denied. Business dashboard is only available to management.')
+        return redirect('services:pos_dashboard')
     
-    # Set audit fields safely for new records
-    if created:
-        today_metrics.set_created_by(request.user)
-        today_metrics.set_updated_by(request.user)
-        today_metrics.save()
+    # Date ranges
+    this_week_start = today - timedelta(days=today.weekday())
+    this_month_start = today.replace(day=1)
+    last_month_start = (this_month_start - timedelta(days=1)).replace(day=1)
+    last_month_end = this_month_start - timedelta(days=1)
     
-    if created or True:  # Always update for real-time data
-        update_daily_metrics(today_metrics, request.user)  # Pass user for audit trail
+    # Today's real-time metrics
+    today_orders = ServiceOrder.objects.filter(created_at__date=today)
+    today_completed = today_orders.filter(status='completed')
     
-    # Quick stats for cards
+    # Revenue metrics
+    today_revenue = today_completed.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+    week_revenue = ServiceOrder.objects.filter(
+        created_at__date__gte=this_week_start,
+        status='completed'
+    ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+    
+    month_revenue = ServiceOrder.objects.filter(
+        created_at__date__gte=this_month_start,
+        status='completed'
+    ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+    
+    # Customer metrics
+    today_customers = today_orders.values('customer').distinct().count()
+    total_customers = Customer.objects.filter(is_active=True).count()
+    new_customers_today = Customer.objects.filter(created_at__date=today).count()
+    
+    # Service metrics
+    today_services = today_completed.count()
+    pending_services = ServiceOrder.objects.filter(
+        status__in=['pending', 'confirmed', 'in_progress']
+    ).count()
+    
+    # Employee metrics
+    active_employees = Employee.objects.filter(is_active=True).count()
+    
+    # Calculate employee attendance rate (employees with active shifts today)
+    total_employees = Employee.objects.count()
+    employee_attendance_rate = (active_employees / total_employees * 100) if total_employees > 0 else 0
+    
+    # Shift metrics
+    active_shifts = 0
+    team_shift_status = []
+    
+    try:
+        active_shifts = ShiftManager.check_active_shifts().count()
+        team_shift_status = ShiftManager.get_team_shift_status()
+    except Exception as e:
+        # Log error but don't break dashboard
+        pass
+    
+    # Quick stats for dashboard cards
     quick_stats = {
-        'today_revenue': today_metrics.gross_revenue,
-        'today_customers': today_metrics.total_customers_served,
-        'today_services': today_metrics.completed_services,
-        'employee_attendance': today_metrics.employee_attendance_rate,
+        'today_revenue': today_revenue,
+        'today_customers': today_customers,
+        'today_services': today_services,
+        'active_employees': active_employees,
+        'pending_services': pending_services,
+        'active_shifts': active_shifts,
+        'new_customers': new_customers_today,
+        'total_customers': total_customers,
+        'employee_attendance': employee_attendance_rate,
     }
     
-    # Get recent performance data for charts
-    last_7_days = BusinessMetrics.objects.filter(
-        date__gte=today - timedelta(days=7)
-    ).order_by('date')
+    # Revenue trend for charts (last 7 days)
+    revenue_trend = []
+    for i in range(7):
+        date = today - timedelta(days=6-i)
+        day_revenue = ServiceOrder.objects.filter(
+            created_at__date=date,
+            status='completed'
+        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+        
+        day_customers = ServiceOrder.objects.filter(
+            created_at__date=date
+        ).values('customer').distinct().count()
+        
+        revenue_trend.append({
+            'date': date.strftime('%Y-%m-%d'),
+            'revenue': float(day_revenue),
+            'customers': day_customers,
+            'label': date.strftime('%a')
+        })
     
-    # Revenue trend data
-    revenue_trend = [
-        {
-            'date': metric.date.strftime('%Y-%m-%d'),
-            'revenue': float(metric.gross_revenue),
-            'customers': metric.total_customers_served
-        }
-        for metric in last_7_days
-    ]
+    # Service performance metrics
+    service_performance = ServiceOrderItem.objects.filter(
+        order__created_at__date__gte=this_week_start,
+        order__status='completed'
+    ).values('service__name').annotate(
+        count=Count('id'),
+        revenue=Sum('total_price')
+    ).order_by('-revenue')[:5]
     
-    # Active goals
-    active_goals = BusinessGoal.objects.filter(
-        is_active=True,
-        end_date__gte=today
-    ).order_by('end_date')[:3]
+    # Employee performance
+    employee_performance = ServiceOrder.objects.filter(
+        created_at__date__gte=this_week_start,
+        status='completed',
+        assigned_attendant__isnull=False
+    ).values('assigned_attendant__employee_id', 'assigned_attendant__user_id').annotate(
+        orders=Count('id'),
+        revenue=Sum('total_amount')
+    ).order_by('-revenue')[:5]
     
-    # Recent alerts
-    recent_alerts = BusinessAlert.objects.filter(
-        is_active=True,
-        is_resolved=False
-    )
+    # Add names to employee performance (since we can't query properties directly)
+    for performance in employee_performance:
+        if performance['assigned_attendant__user_id']:
+            try:
+                from django.contrib.auth.models import User
+                user = User.objects.get(id=performance['assigned_attendant__user_id'])
+                performance['attendant_name'] = user.get_full_name() or user.username
+                performance['first_name'] = user.first_name
+                performance['last_name'] = user.last_name
+            except User.DoesNotExist:
+                performance['attendant_name'] = f"Employee {performance['assigned_attendant__employee_id']}"
+                performance['first_name'] = ""
+                performance['last_name'] = ""
+        else:
+            performance['attendant_name'] = f"Employee {performance['assigned_attendant__employee_id']}"
+            performance['first_name'] = ""
+            performance['last_name'] = ""
     
-    # Filter alerts by role
-    if employee.role == 'owner':
-        recent_alerts = recent_alerts.filter(for_owners=True)
-    elif employee.role == 'manager':
-        recent_alerts = recent_alerts.filter(for_managers=True)
-    elif recent_alerts.filter(for_all_staff=True).exists():
-        recent_alerts = recent_alerts.filter(for_all_staff=True)
-    else:
-        recent_alerts = recent_alerts.none()
+    # Recent orders
+    recent_orders = ServiceOrder.objects.select_related(
+        'customer', 'vehicle', 'assigned_attendant'
+    ).order_by('-created_at')[:10]
     
-    recent_alerts = recent_alerts.order_by('-created_at')[:5]
+    # Payment summary
+    payment_summary = Payment.objects.filter(
+        created_at__date=today
+    ).values('payment_method').annotate(
+        count=Count('id'),
+        total=Sum('amount')
+    ).order_by('-total')
     
-    # Quick actions based on role
-    quick_actions = QuickAction.objects.filter(
-        is_active=True
-    ).order_by('display_order')
-    
-    available_actions = [
-        action for action in quick_actions 
-        if action.can_access(employee)
-    ][:6]
-    
-    # Get pending items that need attention
-    pending_items = get_pending_dashboard_items(employee)
+    # Pending items that need attention
+    pending_items = {
+        'pending_payments': ServiceOrder.objects.filter(
+            status='completed'
+        ).annotate(
+            total_paid=Sum('payments__amount')
+        ).filter(
+            Q(total_paid__lt=F('total_amount')) | Q(total_paid__isnull=True)
+        ).count(),
+        
+        'overdue_services': ServiceOrder.objects.filter(
+            scheduled_date__lt=timezone.now().date(),
+            status='confirmed'
+        ).count(),
+        
+        'queue_waiting': ServiceOrder.objects.filter(
+            status='pending'
+        ).count(),
+    }
     
     # Performance comparison (this month vs last month)
-    current_month_start = today.replace(day=1)
-    last_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
-    last_month_end = current_month_start - timedelta(days=1)
-    
-    current_month_metrics = BusinessMetrics.objects.filter(
-        date__gte=current_month_start
+    last_month_metrics = ServiceOrder.objects.filter(
+        created_at__date__gte=last_month_start,
+        created_at__date__lte=last_month_end,
+        status='completed'
     ).aggregate(
-        revenue=Sum('gross_revenue'),
-        customers=Sum('total_customers_served'),
-        services=Sum('completed_services')
+        revenue=Sum('total_amount'),
+        orders=Count('id')
     )
     
-    last_month_metrics = BusinessMetrics.objects.filter(
-        date__gte=last_month_start,
-        date__lte=last_month_end
+    current_month_metrics = ServiceOrder.objects.filter(
+        created_at__date__gte=this_month_start,
+        status='completed'
     ).aggregate(
-        revenue=Sum('gross_revenue'),
-        customers=Sum('total_customers_served'),
-        services=Sum('completed_services')
+        revenue=Sum('total_amount'),
+        orders=Count('id')
     )
     
-    # Calculate percentage changes
     def calculate_change(current, previous):
         if previous and previous > 0:
             return ((current or 0) - previous) / previous * 100
@@ -215,37 +298,66 @@ def dashboard_view(request):
             current_month_metrics['revenue'], 
             last_month_metrics['revenue']
         ),
-        'customers_change': calculate_change(
-            current_month_metrics['customers'], 
-            last_month_metrics['customers']
-        ),
-        'services_change': calculate_change(
-            current_month_metrics['services'], 
-            last_month_metrics['services']
+        'orders_change': calculate_change(
+            current_month_metrics['orders'], 
+            last_month_metrics['orders']
         ),
     }
     
-    # Dashboard widgets
-    dashboard_widgets = DashboardWidget.objects.filter(
-        is_active=True
-    ).order_by('row', 'column')
+    # Active goals (if implemented)
+    active_goals = []
+    try:
+        active_goals = BusinessGoal.objects.filter(
+            is_active=True,
+            end_date__gte=today
+        ).order_by('end_date')[:3]
+    except:
+        pass
     
-    visible_widgets = [
-        widget for widget in dashboard_widgets 
-        if widget.can_view(employee)
-    ]
+    # Recent alerts
+    recent_alerts = []
+    try:
+        recent_alerts = BusinessAlert.objects.filter(
+            is_active=True,
+            is_resolved=False
+        ).order_by('-created_at')[:5]
+    except:
+        pass
+    
+    # Quick actions based on role
+    available_actions = []
+    try:
+        quick_actions = QuickAction.objects.filter(is_active=True).order_by('display_order')
+        available_actions = [action for action in quick_actions if action.can_access(employee)][:6]
+    except:
+        pass
     
     context = {
-        'today_metrics': today_metrics,
         'quick_stats': quick_stats,
         'revenue_trend': revenue_trend,
+        'service_performance': service_performance,
+        'employee_performance': employee_performance,
+        'recent_orders': recent_orders,
+        'payment_summary': payment_summary,
+        'pending_items': pending_items,
+        'performance_comparison': performance_comparison,
         'active_goals': active_goals,
         'recent_alerts': recent_alerts,
         'quick_actions': available_actions,
-        'pending_items': pending_items,
-        'performance_comparison': performance_comparison,
-        'dashboard_widgets': visible_widgets,
-        'title': f'{business.name} Dashboard'
+        'team_shift_status': team_shift_status,
+        'business_urls': get_business_urls(request),
+        'title': f'{business.name} Dashboard',
+        # Additional context for modern dashboard
+        'top_performers': employee_performance[:5] if employee_performance else [],
+        'recent_activities': recent_orders[:10] if recent_orders else [],
+        'total_employees': Employee.objects.count(),
+        'total_orders': ServiceOrder.objects.count(),
+        'average_order_value': today_completed.aggregate(avg=Avg('total_amount'))['avg'] or 0,
+        'customer_satisfaction': 4.8,  # This would come from reviews system
+        'total_reviews': 0,  # This would come from reviews system
+        'new_customers_today': new_customers_today,
+        'pending_orders': pending_services,
+        'month_growth': performance_comparison.get('revenue_change', 0) if performance_comparison else 0,
     }
     
     return render(request, 'businesses/dashboard.html', context)

@@ -1,0 +1,270 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block page_title %}{% if shift %}Edit Shift{% else %}Create New Shift{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .attendant-checkbox {
+        padding: 0.75rem;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    .attendant-checkbox:hover {
+        background-color: #f8f9fa;
+    }
+    .attendant-checkbox.selected {
+        background-color: #e3f2fd;
+        border-color: #2196F3;
+    }
+    .role-badge {
+        font-size: 0.8em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/shifts/">Shifts</a></li>
+                    <li class="breadcrumb-item active">{% if shift %}Edit{% else %}Create{% endif %}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0 text-gray-800">{% if shift %}Edit Shift{% else %}Create New Shift{% endif %}</h1>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form method="POST" id="shiftForm">
+        {% csrf_token %}
+        
+        <div class="row">
+            <div class="col-md-8">
+                <!-- Basic Information -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Basic Information</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.name.id_for_label }}" class="form-label">Shift Name *</label>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}
+                                        <div class="text-danger small">{{ form.name.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.date.id_for_label }}" class="form-label">Date *</label>
+                                    {{ form.date }}
+                                    {% if form.date.errors %}
+                                        <div class="text-danger small">{{ form.date.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.start_time.id_for_label }}" class="form-label">Start Time *</label>
+                                    {{ form.start_time }}
+                                    {% if form.start_time.errors %}
+                                        <div class="text-danger small">{{ form.start_time.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.end_time.id_for_label }}" class="form-label">End Time *</label>
+                                    {{ form.end_time }}
+                                    {% if form.end_time.errors %}
+                                        <div class="text-danger small">{{ form.end_time.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                <!-- Staff Assignment -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Staff Assignment</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Select the staff members who will work during this shift.</p>
+                        
+                        <div class="row">
+                            {% for attendant in available_attendants %}
+                            <div class="col-md-6 col-lg-4">
+                                <div class="attendant-checkbox">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="attendants" 
+                                               value="{{ attendant.id }}" id="attendant_{{ attendant.id }}"
+                                               {% if attendant.id in selected_attendants %}checked{% endif %}>
+                                        <label class="form-check-label w-100" for="attendant_{{ attendant.id }}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ attendant.get_full_name }}</strong>
+                                                    <br>
+                                                    <span class="badge badge-secondary role-badge">{{ attendant.role|capfirst }}</span>
+                                                </div>
+                                                <div class="text-muted">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12 text-center text-muted py-4">
+                                <i class="fas fa-users fa-2x mb-2"></i>
+                                <p>No available staff members found.</p>
+                                <small>Staff members must be active to be assigned to shifts.</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if form.attendants.errors %}
+                            <div class="text-danger small mt-2">{{ form.attendants.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-md-4">
+                <!-- Quick Actions -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Actions</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> {% if shift %}Update Shift{% else %}Create Shift{% endif %}
+                            </button>
+                            <a href="/business/{{ request.tenant.slug }}/shifts/" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Shifts
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tips -->
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-info">
+                            <i class="fas fa-lightbulb"></i> Tips
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="small text-muted mb-0">
+                            <li class="mb-2">Choose a descriptive name for easy identification</li>
+                            <li class="mb-2">Ensure start and end times don't overlap with other shifts</li>
+                            <li class="mb-2">Only active staff members can be assigned to shifts</li>
+                            <li class="mb-2">Staff can check in/out during the shift period</li>
+                            <li class="mb-0">Performance metrics are calculated automatically after the shift ends</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Handle attendant selection styling
+    $('input[name="attendants"]').change(function() {
+        const checkbox = $(this);
+        const container = checkbox.closest('.attendant-checkbox');
+        
+        if (checkbox.is(':checked')) {
+            container.addClass('selected');
+        } else {
+            container.removeClass('selected');
+        }
+    });
+
+    // Initialize selected state
+    $('input[name="attendants"]:checked').each(function() {
+        $(this).closest('.attendant-checkbox').addClass('selected');
+    });
+
+    // Form validation
+    $('#shiftForm').submit(function(e) {
+        let hasErrors = false;
+        const requiredFields = ['name', 'date', 'start_time', 'end_time'];
+        
+        // Clear previous errors
+        $('.is-invalid').removeClass('is-invalid');
+        
+        // Check required fields
+        requiredFields.forEach(function(field) {
+            const input = $(`#id_${field}`);
+            if (!input.val().trim()) {
+                input.addClass('is-invalid');
+                hasErrors = true;
+            }
+        });
+        
+        // Check if at least one attendant is selected
+        if ($('input[name="attendants"]:checked').length === 0) {
+            hasErrors = true;
+            alert('Please select at least one staff member for this shift.');
+        }
+        
+        // Check time validation
+        const startTime = $('#id_start_time').val();
+        const endTime = $('#id_end_time').val();
+        
+        if (startTime && endTime && startTime >= endTime) {
+            $('#id_end_time').addClass('is-invalid');
+            hasErrors = true;
+            alert('End time must be after start time.');
+        }
+        
+        if (hasErrors) {
+            e.preventDefault();
+        }
+    });
+
+    // Auto-generate shift name based on date and time
+    $('#id_date, #id_start_time, #id_end_time').change(function() {
+        const date = $('#id_date').val();
+        const startTime = $('#id_start_time').val();
+        const endTime = $('#id_end_time').val();
+        const nameField = $('#id_name');
+        
+        if (date && startTime && endTime && !nameField.val()) {
+            const dateObj = new Date(date);
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayName = dayNames[dateObj.getDay()];
+            const suggestedName = `${dayName} Shift (${startTime} - ${endTime})`;
+            nameField.val(suggestedName);
+        }
+    });
+});
+</script>
+{% endblock %}

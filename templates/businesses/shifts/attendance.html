@@ -1,0 +1,387 @@
+{% if user_role == 'attendant' %}
+    {% extends "dashboard_base.html" %}
+{% else %}
+    {% extends "base.html" %}
+{% endif %}
+{% load static %}
+
+{% block page_title %}{{ shift.name }} - Attendance{% endblock %}
+
+{% block extra_css %}
+<style>
+    .attendance-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid #dee2e6;
+    }
+    .attendance-card.checked-in {
+        border-left-color: #28a745;
+        background-color: #f8fff9;
+    }
+    .attendance-card.on-break {
+        border-left-color: #ffc107;
+        background-color: #fffbf0;
+    }
+    .attendance-card.checked-out {
+        border-left-color: #6c757d;
+        background-color: #f8f9fa;
+    }
+    .time-badge {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+    }
+    .action-buttons .btn {
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .status-timeline {
+        border-left: 2px solid #dee2e6;
+        padding-left: 1rem;
+        margin-left: 0.5rem;
+    }
+    .timeline-item {
+        position: relative;
+        padding-bottom: 1rem;
+    }
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -1.25rem;
+        top: 0.25rem;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background-color: #007bff;
+    }
+    .timeline-item.success::before {
+        background-color: #28a745;
+    }
+    .timeline-item.warning::before {
+        background-color: #ffc107;
+    }
+    .timeline-item.secondary::before {
+        background-color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/shifts/">Shifts</a></li>
+                    <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/shifts/{{ shift.id }}/">{{ shift.name }}</a></li>
+                    <li class="breadcrumb-item active">Attendance</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0 text-gray-800">{{ shift.name }} - Attendance</h1>
+            <p class="text-muted mb-0">{{ shift.date|date:"F d, Y" }} • {{ shift.start_time|time:"H:i" }} - {{ shift.end_time|time:"H:i" }}</p>
+        </div>
+        <div>
+            <span class="badge badge-{% if shift.status == 'active' %}success{% elif shift.status == 'ended' %}secondary{% elif shift.status == 'cancelled' %}danger{% else %}primary{% endif %} badge-lg">
+                {{ shift.get_status_display }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Attendance Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1">Checked In</div>
+                            <div class="h5 mb-0 font-weight-bold">{{ checked_in_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-sign-in-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1">On Break</div>
+                            <div class="h5 mb-0 font-weight-bold">{{ on_break_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-coffee fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1">Checked Out</div>
+                            <div class="h5 mb-0 font-weight-bold">{{ checked_out_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-sign-out-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white shadow">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1">Total Staff</div>
+                            <div class="h5 mb-0 font-weight-bold">{{ attendance_records.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff Attendance Cards -->
+    <div class="row">
+        {% for attendance in attendance_records %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card attendance-card {{ attendance.status }} shadow h-100">
+                <div class="card-body">
+                    <!-- Staff Info -->
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5 class="card-title mb-1">{{ attendance.attendant.get_full_name }}</h5>
+                            <span class="badge badge-secondary">{{ attendance.attendant.role|capfirst }}</span>
+                        </div>
+                        <span class="badge badge-{% if attendance.status == 'checked_in' %}success{% elif attendance.status == 'on_break' %}warning{% else %}secondary{% endif %} badge-lg">
+                            {{ attendance.get_status_display }}
+                        </span>
+                    </div>
+
+                    <!-- Current Status Timeline -->
+                    <div class="status-timeline">
+                        {% if attendance.check_in_time %}
+                        <div class="timeline-item success">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Check In</small>
+                                <span class="badge badge-light time-badge">{{ attendance.check_in_time|time:"H:i:s" }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if attendance.break_start_time %}
+                        <div class="timeline-item warning">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Break Start</small>
+                                <span class="badge badge-light time-badge">{{ attendance.break_start_time|time:"H:i:s" }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if attendance.break_end_time %}
+                        <div class="timeline-item success">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Break End</small>
+                                <span class="badge badge-light time-badge">{{ attendance.break_end_time|time:"H:i:s" }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if attendance.check_out_time %}
+                        <div class="timeline-item secondary">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Check Out</small>
+                                <span class="badge badge-light time-badge">{{ attendance.check_out_time|time:"H:i:s" }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Working Hours Summary -->
+                    {% if attendance.total_hours_worked %}
+                    <div class="mt-3 p-2 bg-light rounded">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <small class="text-muted">Hours Worked</small>
+                                <br>
+                                <strong>{{ attendance.total_hours_worked|floatformat:1 }}</strong>
+                            </div>
+                            {% if attendance.break_duration %}
+                            <div class="col-6">
+                                <small class="text-muted">Break Time</small>
+                                <br>
+                                <strong>{{ attendance.break_duration|floatformat:1 }}h</strong>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Performance Metrics -->
+                    {% if shift.status == 'ended' %}
+                    <div class="mt-3 p-2 bg-light rounded">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <small class="text-muted">Orders</small>
+                                <br>
+                                <strong>{{ attendance.orders_completed|default:0 }}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Commission</small>
+                                <br>
+                                <strong>KES {{ attendance.commission_earned|default:0|floatformat:2 }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Action Buttons -->
+                    {% if shift.status == 'active' %}
+                    <div class="action-buttons mt-3">
+                        {% if attendance.status == 'not_checked_in' %}
+                            <button class="btn btn-success btn-sm" onclick="checkIn('{{ attendance.id }}')">
+                                <i class="fas fa-sign-in-alt"></i> Check In
+                            </button>
+                        {% elif attendance.status == 'checked_in' %}
+                            <button class="btn btn-warning btn-sm" onclick="startBreak('{{ attendance.id }}')">
+                                <i class="fas fa-coffee"></i> Start Break
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="checkOut('{{ attendance.id }}')">
+                                <i class="fas fa-sign-out-alt"></i> Check Out
+                            </button>
+                        {% elif attendance.status == 'on_break' %}
+                            <button class="btn btn-info btn-sm" onclick="endBreak('{{ attendance.id }}')">
+                                <i class="fas fa-play"></i> End Break
+                            </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">No Staff Assigned</h4>
+                    <p class="text-muted">No staff members are assigned to this shift.</p>
+                    {% if shift.status == 'planned' %}
+                    <a href="/business/{{ request.tenant.slug }}/shifts/{{ shift.id }}/edit/" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Assign Staff
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Action Modals -->
+<div class="modal fade" id="actionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="actionModalTitle"></h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="actionModalBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmAction">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentAttendanceId = null;
+let currentAction = null;
+
+function checkIn(attendanceId) {
+    currentAttendanceId = attendanceId;
+    currentAction = 'check-in';
+    
+    $('#actionModalTitle').text('Check In Staff Member');
+    $('#actionModalBody').html('<p>Confirm check-in for this staff member?</p>');
+    $('#confirmAction').removeClass().addClass('btn btn-success').text('Check In');
+    $('#actionModal').modal('show');
+}
+
+function checkOut(attendanceId) {
+    currentAttendanceId = attendanceId;
+    currentAction = 'check-out';
+    
+    $('#actionModalTitle').text('Check Out Staff Member');
+    $('#actionModalBody').html('<p>Confirm check-out for this staff member?</p><div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> This will end their shift.</div>');
+    $('#confirmAction').removeClass().addClass('btn btn-secondary').text('Check Out');
+    $('#actionModal').modal('show');
+}
+
+function startBreak(attendanceId) {
+    currentAttendanceId = attendanceId;
+    currentAction = 'break-start';
+    
+    $('#actionModalTitle').text('Start Break');
+    $('#actionModalBody').html('<p>Start break for this staff member?</p>');
+    $('#confirmAction').removeClass().addClass('btn btn-warning').text('Start Break');
+    $('#actionModal').modal('show');
+}
+
+function endBreak(attendanceId) {
+    currentAttendanceId = attendanceId;
+    currentAction = 'break-end';
+    
+    $('#actionModalTitle').text('End Break');
+    $('#actionModalBody').html('<p>End break for this staff member?</p>');
+    $('#confirmAction').removeClass().addClass('btn btn-info').text('End Break');
+    $('#actionModal').modal('show');
+}
+
+$('#confirmAction').click(function() {
+    if (!currentAttendanceId || !currentAction) return;
+    
+    $.ajax({
+        url: `/businesses/api/shifts/${currentAction}/`,
+        type: 'POST',
+        data: {
+            'attendance_id': currentAttendanceId,
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                $('#actionModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Error: ' + response.message);
+            }
+        },
+        error: function() {
+            alert('Error processing request. Please try again.');
+        }
+    });
+});
+
+// Auto-refresh every 30 seconds if shift is active
+{% if shift.status == 'active' %}
+setInterval(function() {
+    location.reload();
+}, 30000);
+{% endif %}
+</script>
+{% endblock %}

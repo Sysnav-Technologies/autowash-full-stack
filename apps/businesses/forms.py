@@ -983,3 +983,110 @@ class DashboardWidgetForm(forms.ModelForm):
                 'placeholder': 'owner,manager,supervisor'
             })
         }
+
+
+class ShiftForm(forms.ModelForm):
+    """Form for creating and editing shifts"""
+    
+    attendants = forms.ModelMultipleChoiceField(
+        queryset=None,
+        widget=forms.CheckboxSelectMultiple,
+        required=True,
+        help_text="Select staff members for this shift"
+    )
+    
+    class Meta:
+        from .models import Shift
+        model = Shift
+        fields = ['name', 'date', 'start_time', 'end_time', 'supervisor', 'target_orders', 'target_revenue', 'notes']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g., Morning Shift, Weekend Shift'
+            }),
+            'date': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'min': timezone.now().date().isoformat()
+            }),
+            'start_time': forms.TimeInput(attrs={
+                'class': 'form-control',
+                'type': 'time'
+            }),
+            'end_time': forms.TimeInput(attrs={
+                'class': 'form-control',
+                'type': 'time'
+            }),
+            'supervisor': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'target_orders': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0'
+            }),
+            'target_revenue': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'step': '0.01'
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3
+            })
+        }
+    
+    def __init__(self, *args, **kwargs):
+        business = kwargs.pop('business', None)
+        super().__init__(*args, **kwargs)
+        
+        if business:
+            # Only show active employees from this business
+            from apps.employees.models import Employee
+            self.fields['attendants'].queryset = Employee.objects.filter(
+                role='attendant',
+                is_active=True
+            ).select_related('user')
+            
+            self.fields['supervisor'].queryset = Employee.objects.filter(
+                role__in=['owner', 'manager', 'supervisor'],
+                is_active=True
+            ).select_related('user')
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+        date = cleaned_data.get('date')
+        attendants = cleaned_data.get('attendants')
+        
+        if start_time and end_time:
+            if start_time >= end_time:
+                raise ValidationError("End time must be after start time.")
+        
+        if date and date < timezone.now().date():
+            raise ValidationError("Shift date cannot be in the past.")
+        
+        if not attendants:
+            raise ValidationError("At least one attendant must be assigned to the shift.")
+        
+        # Check for overlapping shifts for selected attendants
+        if date and start_time and end_time and attendants:
+            from .models import Shift, ShiftAttendance
+            overlapping_attendances = ShiftAttendance.objects.filter(
+                attendant__in=attendants,
+                shift__date=date,
+                shift__status__in=['planned', 'active'],
+                shift__start_time__lt=end_time,
+                shift__end_time__gt=start_time
+            )
+            
+            if self.instance and self.instance.pk:
+                overlapping_attendances = overlapping_attendances.exclude(shift=self.instance)
+            
+            if overlapping_attendances.exists():
+                overlapping_names = [att.attendant.get_full_name() for att in overlapping_attendances[:3]]
+                raise ValidationError(
+                    f"These attendants already have overlapping shifts on this date: {', '.join(overlapping_names)}"
+                )
+        
+        return cleaned_data

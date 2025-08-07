@@ -1,0 +1,264 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - Attendant Dashboard{% endblock %}
+
+{% block extra_css %}
+<!-- Attendant-specific styles -->
+<style>
+.attendant-dashboard {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.attendant-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+}
+
+.shift-status-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    padding: 10px 15px;
+    border-radius: 25px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: white;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.shift-status-active {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+}
+
+.shift-status-break {
+    background: linear-gradient(45deg, #ffc107, #fd7e14);
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+}
+
+.shift-status-inactive {
+    background: linear-gradient(45deg, #6c757d, #495057);
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.4);
+}
+
+.quick-action-attendant {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 12px;
+    padding: 15px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    min-height: 100px;
+}
+
+.quick-action-attendant:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: white;
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.service-card {
+    transition: all 0.3s ease;
+}
+
+.service-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.performance-metric {
+    text-align: center;
+    padding: 20px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    margin-bottom: 15px;
+}
+
+.performance-metric .metric-value {
+    font-size: 2rem;
+    font-weight: bold;
+    display: block;
+}
+
+.performance-metric .metric-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+    .shift-status-indicator {
+        position: relative;
+        top: auto;
+        right: auto;
+        margin-bottom: 20px;
+        width: 100%;
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="attendant-dashboard">
+    <!-- Shift Status Indicator -->
+    <div class="shift-status-indicator shift-status-inactive" id="shiftStatusIndicator">
+        <i class="fas fa-clock me-2"></i>
+        <span id="shiftStatusText">No Active Shift</span>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container-fluid py-4">
+        {% block attendant_content %}
+        <!-- Default attendant content -->
+        <div class="row">
+            <div class="col-12">
+                <div class="attendant-card p-4 mb-4">
+                    <h2 class="text-center mb-4">Attendant Dashboard</h2>
+                    <p class="text-center text-muted">Welcome to your personalized attendant interface.</p>
+                </div>
+            </div>
+        </div>
+        {% endblock %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Attendant Dashboard JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize shift status
+    updateShiftStatusIndicator();
+    
+    // Update every 30 seconds
+    setInterval(updateShiftStatusIndicator, 30000);
+});
+
+function updateShiftStatusIndicator() {
+    if (!window.tenant_slug) return;
+    
+    fetch(`/business/${window.tenant_slug}/api/shifts/current/`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        const indicator = document.getElementById('shiftStatusIndicator');
+        const statusText = document.getElementById('shiftStatusText');
+        
+        if (data.success && data.shift) {
+            const status = data.shift.attendance_status;
+            const shiftName = data.shift.name;
+            
+            indicator.className = 'shift-status-indicator';
+            
+            switch(status) {
+                case 'checked_in':
+                    indicator.classList.add('shift-status-active');
+                    statusText.innerHTML = `<i class="fas fa-play me-2"></i>On Duty - ${shiftName}`;
+                    break;
+                case 'on_break':
+                    indicator.classList.add('shift-status-break');
+                    statusText.innerHTML = `<i class="fas fa-coffee me-2"></i>On Break - ${shiftName}`;
+                    break;
+                default:
+                    indicator.classList.add('shift-status-inactive');
+                    statusText.innerHTML = `<i class="fas fa-clock me-2"></i>${shiftName} - Not Checked In`;
+                    break;
+            }
+        } else {
+            indicator.className = 'shift-status-indicator shift-status-inactive';
+            statusText.innerHTML = '<i class="fas fa-clock me-2"></i>No Active Shift';
+        }
+    })
+    .catch(error => {
+        console.error('Error updating shift status:', error);
+    });
+}
+
+// Quick shift actions
+function quickShiftAction(action) {
+    fetch(`/business/${window.tenant_slug}/api/shifts/current/`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.shift) {
+            performShiftAction(action, data.shift.id);
+        } else {
+            alert('No active shift found.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error performing shift action.');
+    });
+}
+
+function performShiftAction(action, shiftId) {
+    fetch(`/business/${window.tenant_slug}/api/shifts/${action}/`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `shift_id=${shiftId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            showNotification(data.message, 'success');
+            // Update status
+            updateShiftStatusIndicator();
+        } else {
+            showNotification('Error: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Error performing action. Please try again.', 'error');
+    });
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+    notification.style.cssText = 'position: fixed; top: 80px; right: 20px; z-index: 1050; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

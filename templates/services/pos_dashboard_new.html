@@ -1,0 +1,1488 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}POS Dashboard - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Modern POS Dashboard Styles */
+:root {
+    --pos-primary: #667eea;
+    --pos-secondary: #764ba2;
+    --pos-success: #10b981;
+    --pos-warning: #f59e0b;
+    --pos-danger: #ef4444;
+    --pos-info: #06b6d4;
+    --pos-dark: #1f2937;
+    --pos-light: #f8fafc;
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+    --radius: 12px;
+    --transition: all 0.3s ease;
+}
+
+body {
+    background: linear-gradient(135deg, var(--pos-primary) 0%, var(--pos-secondary) 100%) !important;
+    min-height: 100vh;
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
+}
+
+.pos-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
+}
+
+/* Header Styles */
+.pos-header {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 20px 30px;
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    box-shadow: var(--shadow-lg);
+}
+
+.attendant-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: white;
+}
+
+.attendant-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    background: var(--pos-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+}
+
+.attendant-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.attendant-details h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+}
+
+.shift-status {
+    background: var(--pos-success);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.header-stats {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    text-align: center;
+    color: white;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 15px;
+}
+
+.header-btn {
+    background: var(--card-bg);
+    color: var(--pos-dark);
+    border: none;
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+}
+
+.header-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    background: white;
+}
+
+/* Main Layout */
+.pos-main {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 25px;
+    align-items: start;
+}
+
+/* Left Panel */
+.services-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 25px;
+    min-height: 600px;
+    box-shadow: var(--shadow-lg);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-header h3 {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Customer Section */
+.customer-search {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.search-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-input i {
+    position: absolute;
+    left: 15px;
+    color: #6b7280;
+    z-index: 2;
+}
+
+.search-input input {
+    width: 100%;
+    padding: 12px 15px 12px 45px;
+    border: 2px solid transparent;
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+.search-input input:focus {
+    outline: none;
+    border-color: var(--pos-primary);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 10;
+    display: none;
+}
+
+.search-result-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.search-result-item:hover {
+    background: #f9fafb;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.selected-customer {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 25px;
+    display: none;
+}
+
+.selected-customer.active {
+    display: block;
+}
+
+.customer-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.customer-details h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--pos-dark);
+}
+
+.customer-details p {
+    margin: 4px 0 0;
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.vehicle-selection {
+    margin-top: 15px;
+}
+
+.vehicle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.vehicle-header label {
+    font-weight: 600;
+    color: var(--pos-dark);
+    margin: 0;
+}
+
+.form-select {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: var(--pos-primary);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Service Categories */
+.service-categories {
+    margin-bottom: 25px;
+}
+
+.category-tabs {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.category-tab {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 10px 15px;
+    border-radius: 25px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.category-tab:hover,
+.category-tab.active {
+    background: white;
+    color: var(--pos-primary);
+    border-color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Services Grid */
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.service-card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.service-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--pos-primary), var(--pos-secondary));
+    transform: scaleX(0);
+    transition: var(--transition);
+}
+
+.service-card:hover::before {
+    transform: scaleX(1);
+}
+
+.service-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--pos-primary);
+}
+
+.service-image {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 15px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--pos-primary), var(--pos-secondary));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.service-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.service-info h4 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--pos-dark);
+}
+
+.service-info p {
+    margin: 0 0 15px;
+    color: #6b7280;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.service-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.price {
+    color: var(--pos-success);
+}
+
+.duration {
+    background: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: #6b7280;
+}
+
+/* Right Panel - Cart */
+.cart-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 25px;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+}
+
+.cart-header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cart-header h3 {
+    color: white;
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.order-number {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+
+.cart-items {
+    min-height: 200px;
+    margin-bottom: 20px;
+}
+
+.cart-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.cart-empty i {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+.cart-item {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    position: relative;
+}
+
+.cart-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.cart-item h5 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--pos-dark);
+}
+
+.remove-item {
+    background: none;
+    border: none;
+    color: var(--pos-danger);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    transition: var(--transition);
+}
+
+.remove-item:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.cart-item-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.qty-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: white;
+    color: var(--pos-dark);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    transition: var(--transition);
+}
+
+.qty-btn:hover {
+    border-color: var(--pos-primary);
+    color: var(--pos-primary);
+}
+
+.quantity {
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* Cart Summary */
+.cart-summary {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.9rem;
+}
+
+.summary-row:last-child {
+    border-bottom: none;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--pos-dark);
+    padding-top: 15px;
+    margin-top: 10px;
+    border-top: 2px solid #e5e7eb;
+}
+
+/* Action Buttons */
+.pos-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pos-btn {
+    padding: 15px 20px;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.pos-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.pos-btn:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--pos-primary), var(--pos-secondary));
+    color: white;
+}
+
+.btn-success {
+    background: var(--pos-success);
+    color: white;
+}
+
+.btn-warning {
+    background: var(--pos-warning);
+    color: white;
+}
+
+.btn-outline {
+    background: transparent;
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-outline:hover {
+    background: white;
+    color: var(--pos-primary);
+}
+
+/* Quick Stats Bar */
+.quick-stats {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 15px 25px;
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+}
+
+.quick-stat {
+    color: white;
+}
+
+.quick-stat-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.quick-stat-label {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .pos-main {
+        grid-template-columns: 1fr 350px;
+        gap: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .pos-container {
+        padding: 15px;
+    }
+    
+    .pos-main {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .cart-panel {
+        position: static;
+        max-height: none;
+    }
+    
+    .services-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+    }
+    
+    .pos-header {
+        padding: 15px 20px;
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .header-stats {
+        gap: 20px;
+    }
+    
+    .category-tabs {
+        justify-content: center;
+    }
+    
+    .attendant-info {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+/* Loading States */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+    position: relative;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid transparent;
+    border-top-color: var(--pos-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cart-item {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Success/Error Messages */
+.message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: var(--radius);
+    color: white;
+    font-weight: 600;
+    z-index: 1000;
+    transform: translateX(400px);
+    transition: var(--transition);
+    box-shadow: var(--shadow-lg);
+}
+
+.message.show {
+    transform: translateX(0);
+}
+
+.message.success {
+    background: var(--pos-success);
+}
+
+.message.error {
+    background: var(--pos-danger);
+}
+
+.message.warning {
+    background: var(--pos-warning);
+}
+
+/* Hide scrollbars but keep functionality */
+.cart-panel::-webkit-scrollbar,
+.search-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+.cart-panel::-webkit-scrollbar-track,
+.search-results::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.cart-panel::-webkit-scrollbar-thumb,
+.search-results::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.cart-panel::-webkit-scrollbar-thumb:hover,
+.search-results::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pos-container">
+    <!-- POS Header -->
+    <header class="pos-header">
+        <div class="attendant-info">
+            <div class="attendant-avatar">
+                {% if user.employee.photo %}
+                    <img src="{{ user.employee.photo.url }}" alt="{{ user.get_full_name }}">
+                {% else %}
+                    {{ user.get_full_name|first|upper }}
+                {% endif %}
+            </div>
+            <div class="attendant-details">
+                <h2>{{ user.get_full_name|default:user.username }}</h2>
+                <span class="shift-status" id="shift-status">On Duty</span>
+            </div>
+        </div>
+        
+        <div class="header-stats">
+            <div class="stat-item">
+                <span class="stat-value" id="today-orders">{{ today_stats.orders_count|default:0 }}</span>
+                <span class="stat-label">Orders Today</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="today-revenue">KES {{ today_stats.revenue|floatformat:0|default:0 }}</span>
+                <span class="stat-label">Revenue</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="queue-count">{{ queue_count|default:0 }}</span>
+                <span class="stat-label">In Queue</span>
+            </div>
+        </div>
+        
+        <div class="header-actions">
+            <button class="header-btn" onclick="refreshDashboard()">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+            <button class="header-btn" onclick="window.print()">
+                <i class="fas fa-print"></i>
+                Print
+            </button>
+        </div>
+    </header>
+
+    <!-- Quick Stats Bar -->
+    <div class="quick-stats">
+        <div class="quick-stat">
+            <span class="quick-stat-value">{{ services_count|default:0 }}</span>
+            <span class="quick-stat-label">Services Available</span>
+        </div>
+        <div class="quick-stat">
+            <span class="quick-stat-value">{{ customers_count|default:0 }}</span>
+            <span class="quick-stat-label">Total Customers</span>
+        </div>
+        <div class="quick-stat">
+            <span class="quick-stat-value">{{ pending_orders|default:0 }}</span>
+            <span class="quick-stat-label">Pending Orders</span>
+        </div>
+        <div class="quick-stat">
+            <span class="quick-stat-value">{{ completed_today|default:0 }}</span>
+            <span class="quick-stat-label">Completed Today</span>
+        </div>
+    </div>
+
+    <!-- Main POS Interface -->
+    <div class="pos-main">
+        <!-- Left Panel - Services & Products -->
+        <div class="services-panel">
+            <!-- Customer Selection -->
+            <section class="customer-section">
+                <div class="section-header">
+                    <h3><i class="fas fa-user"></i> Select Customer</h3>
+                    <button class="btn btn-sm btn-outline" onclick="showNewCustomerModal()">
+                        <i class="fas fa-plus"></i> New Customer
+                    </button>
+                </div>
+                
+                <div class="customer-search">
+                    <div class="search-input">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="customerSearch" placeholder="Search by name or phone..." autocomplete="off">
+                    </div>
+                    <div class="search-results" id="customerSearchResults"></div>
+                </div>
+                
+                <div class="selected-customer" id="selectedCustomer">
+                    <div class="customer-info">
+                        <div class="customer-details">
+                            <h4 id="customerName">Walk-in Customer</h4>
+                            <p id="customerPhone">No phone provided</p>
+                        </div>
+                        <button type="button" class="remove-item" onclick="clearCustomer()" title="Clear Customer">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="vehicle-selection" id="vehicleSelection" style="display: none;">
+                        <div class="vehicle-header">
+                            <label>Select Vehicle:</label>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="showAddVehicleModal()">
+                                <i class="fas fa-plus"></i> Add Vehicle
+                            </button>
+                        </div>
+                        <select id="vehicleSelect" class="form-select">
+                            <option value="">Choose vehicle...</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Service Categories -->
+            <section class="service-categories">
+                <div class="category-tabs">
+                    <button class="category-tab active" data-category="all">
+                        <i class="fas fa-th-large"></i>
+                        All Services
+                    </button>
+                    {% for category in service_categories %}
+                    <button class="category-tab" data-category="{{ category.id }}">
+                        <i class="{{ category.icon|default:'fas fa-cog' }}"></i>
+                        {{ category.name }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Services Grid -->
+            <section class="services-grid" id="servicesGrid">
+                {% for service in services %}
+                <div class="service-card" data-service-id="{{ service.id }}" data-category="{% if service.category %}{{ service.category.id }}{% else %}all{% endif %}" onclick="addToCart({{ service.id }}, '{{ service.name|escapejs }}', {{ service.base_price }})">
+                    <div class="service-image">
+                        {% if service.image %}
+                            <img src="{{ service.image.url }}" alt="{{ service.name }}">
+                        {% else %}
+                            <i class="fas fa-car-wash"></i>
+                        {% endif %}
+                    </div>
+                    <div class="service-info">
+                        <h4>{{ service.name }}</h4>
+                        <p>{{ service.description|truncatewords:8|default:"Professional service" }}</p>
+                        <div class="service-meta">
+                            <span class="price">KES {{ service.base_price }}</span>
+                            <span class="duration">{{ service.estimated_duration|default:30 }}min</span>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-span-full text-center py-12 text-white">
+                    <i class="fas fa-car-wash text-6xl mb-4 opacity-50"></i>
+                    <h3 class="text-xl font-semibold mb-2">No Services Available</h3>
+                    <p class="opacity-70">Contact your manager to add services to the system.</p>
+                </div>
+                {% endfor %}
+            </section>
+        </div>
+
+        <!-- Right Panel - Cart/Order -->
+        <div class="cart-panel">
+            <div class="cart-header">
+                <h3><i class="fas fa-shopping-cart"></i> Current Order</h3>
+                <div class="order-number">Order #<span id="orderNumber">{{ next_order_number|default:"0001" }}</span></div>
+            </div>
+
+            <div class="cart-items" id="cartItems">
+                <div class="cart-empty">
+                    <i class="fas fa-cart-plus"></i>
+                    <p>No items in cart<br><small>Select services to add to order</small></p>
+                </div>
+            </div>
+
+            <div class="cart-summary" id="cartSummary" style="display: none;">
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span id="subtotal">KES 0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tax (16%):</span>
+                    <span id="tax">KES 0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Total:</span>
+                    <span id="total">KES 0</span>
+                </div>
+            </div>
+
+            <div class="pos-actions">
+                <button class="pos-btn btn-primary" id="processOrderBtn" onclick="processOrder()" disabled>
+                    <i class="fas fa-credit-card"></i>
+                    Process Order
+                </button>
+                
+                <button class="pos-btn btn-success" id="quickPayBtn" onclick="quickPay()" disabled>
+                    <i class="fas fa-money-bill-wave"></i>
+                    Quick Pay (Cash)
+                </button>
+                
+                <button class="pos-btn btn-warning" id="holdOrderBtn" onclick="holdOrder()" disabled>
+                    <i class="fas fa-pause"></i>
+                    Hold Order
+                </button>
+                
+                <button class="pos-btn btn-outline" onclick="clearCart()">
+                    <i class="fas fa-trash"></i>
+                    Clear Cart
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden input for CSRF token -->
+<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
+<input type="hidden" id="businessSlug" value="{{ business.slug }}">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Modern POS Dashboard JavaScript
+class POSDashboard {
+    constructor() {
+        this.cart = [];
+        this.selectedCustomer = null;
+        this.selectedVehicle = null;
+        this.orderNumber = document.getElementById('orderNumber').textContent;
+        this.csrfToken = document.getElementById('csrfToken').value;
+        this.businessSlug = document.getElementById('businessSlug').value;
+        
+        this.initializeEventListeners();
+        this.loadDefaultCustomer();
+    }
+    
+    initializeEventListeners() {
+        // Customer search
+        const customerSearch = document.getElementById('customerSearch');
+        customerSearch.addEventListener('input', (e) => this.searchCustomers(e.target.value));
+        
+        // Category tabs
+        document.querySelectorAll('.category-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => this.filterServices(e.target.dataset.category));
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+    }
+    
+    loadDefaultCustomer() {
+        this.selectedCustomer = {
+            id: null,
+            name: 'Walk-in Customer',
+            phone: 'No phone provided'
+        };
+        this.updateCustomerDisplay();
+    }
+    
+    async searchCustomers(query) {
+        if (query.length < 2) {
+            document.getElementById('customerSearchResults').style.display = 'none';
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${this.getTenantUrl()}/customers/api/search/?q=${encodeURIComponent(query)}`, {
+                headers: {
+                    'X-CSRFToken': this.csrfToken,
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const customers = await response.json();
+                this.displaySearchResults(customers);
+            }
+        } catch (error) {
+            console.error('Error searching customers:', error);
+        }
+    }
+    
+    displaySearchResults(customers) {
+        const resultsContainer = document.getElementById('customerSearchResults');
+        
+        if (customers.length === 0) {
+            resultsContainer.innerHTML = '<div class="search-result-item">No customers found</div>';
+        } else {
+            resultsContainer.innerHTML = customers.map(customer => `
+                <div class="search-result-item" onclick="pos.selectCustomer(${customer.id}, '${customer.name}', '${customer.phone}')">
+                    <strong>${customer.name}</strong><br>
+                    <small>${customer.phone} | ${customer.email || 'No email'}</small>
+                </div>
+            `).join('');
+        }
+        
+        resultsContainer.style.display = 'block';
+    }
+    
+    selectCustomer(id, name, phone) {
+        this.selectedCustomer = { id, name, phone };
+        this.updateCustomerDisplay();
+        this.loadCustomerVehicles(id);
+        
+        // Hide search results
+        document.getElementById('customerSearchResults').style.display = 'none';
+        document.getElementById('customerSearch').value = '';
+    }
+    
+    updateCustomerDisplay() {
+        const selectedDiv = document.getElementById('selectedCustomer');
+        const nameSpan = document.getElementById('customerName');
+        const phoneSpan = document.getElementById('customerPhone');
+        
+        nameSpan.textContent = this.selectedCustomer.name;
+        phoneSpan.textContent = this.selectedCustomer.phone;
+        selectedDiv.classList.add('active');
+    }
+    
+    async loadCustomerVehicles(customerId) {
+        if (!customerId) {
+            document.getElementById('vehicleSelection').style.display = 'none';
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${this.getTenantUrl()}/customers/${customerId}/vehicles/`, {
+                headers: {
+                    'X-CSRFToken': this.csrfToken,
+                }
+            });
+            
+            if (response.ok) {
+                const vehicles = await response.json();
+                this.populateVehicleSelect(vehicles);
+                document.getElementById('vehicleSelection').style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error loading vehicles:', error);
+        }
+    }
+    
+    populateVehicleSelect(vehicles) {
+        const select = document.getElementById('vehicleSelect');
+        select.innerHTML = '<option value="">Choose vehicle...</option>';
+        
+        vehicles.forEach(vehicle => {
+            const option = document.createElement('option');
+            option.value = vehicle.id;
+            option.textContent = `${vehicle.make} ${vehicle.model} (${vehicle.license_plate})`;
+            select.appendChild(option);
+        });
+    }
+    
+    clearCustomer() {
+        this.loadDefaultCustomer();
+        document.getElementById('vehicleSelection').style.display = 'none';
+        document.getElementById('vehicleSelect').innerHTML = '<option value="">Choose vehicle...</option>';
+    }
+    
+    filterServices(category) {
+        // Update active tab
+        document.querySelectorAll('.category-tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelector(`[data-category="${category}"]`).classList.add('active');
+        
+        // Filter service cards
+        document.querySelectorAll('.service-card').forEach(card => {
+            const cardCategory = card.dataset.category;
+            if (category === 'all' || cardCategory === category) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+    
+    addToCart(serviceId, serviceName, price) {
+        const existingItem = this.cart.find(item => item.id === serviceId);
+        
+        if (existingItem) {
+            existingItem.quantity += 1;
+        } else {
+            this.cart.push({
+                id: serviceId,
+                name: serviceName,
+                price: parseFloat(price),
+                quantity: 1
+            });
+        }
+        
+        this.updateCartDisplay();
+        this.showMessage('Service added to cart!', 'success');
+    }
+    
+    removeFromCart(serviceId) {
+        this.cart = this.cart.filter(item => item.id !== serviceId);
+        this.updateCartDisplay();
+    }
+    
+    updateQuantity(serviceId, newQuantity) {
+        const item = this.cart.find(item => item.id === serviceId);
+        if (item) {
+            if (newQuantity <= 0) {
+                this.removeFromCart(serviceId);
+            } else {
+                item.quantity = newQuantity;
+                this.updateCartDisplay();
+            }
+        }
+    }
+    
+    updateCartDisplay() {
+        const cartItems = document.getElementById('cartItems');
+        const cartSummary = document.getElementById('cartSummary');
+        
+        if (this.cart.length === 0) {
+            cartItems.innerHTML = `
+                <div class="cart-empty">
+                    <i class="fas fa-cart-plus"></i>
+                    <p>No items in cart<br><small>Select services to add to order</small></p>
+                </div>`;
+            cartSummary.style.display = 'none';
+            this.updateActionButtons(false);
+            return;
+        }
+        
+        cartItems.innerHTML = this.cart.map(item => `
+            <div class="cart-item">
+                <div class="cart-item-header">
+                    <h5>${item.name}</h5>
+                    <button class="remove-item" onclick="pos.removeFromCart(${item.id})" title="Remove item">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="cart-item-details">
+                    <div class="quantity-controls">
+                        <button class="qty-btn" onclick="pos.updateQuantity(${item.id}, ${item.quantity - 1})">-</button>
+                        <span class="quantity">${item.quantity}</span>
+                        <button class="qty-btn" onclick="pos.updateQuantity(${item.id}, ${item.quantity + 1})">+</button>
+                    </div>
+                    <span class="item-total">KES ${(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+            </div>
+        `).join('');
+        
+        // Update summary
+        const subtotal = this.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const tax = subtotal * 0.16;
+        const total = subtotal + tax;
+        
+        document.getElementById('subtotal').textContent = `KES ${subtotal.toFixed(2)}`;
+        document.getElementById('tax').textContent = `KES ${tax.toFixed(2)}`;
+        document.getElementById('total').textContent = `KES ${total.toFixed(2)}`;
+        
+        cartSummary.style.display = 'block';
+        this.updateActionButtons(true);
+    }
+    
+    updateActionButtons(hasItems) {
+        const buttons = ['processOrderBtn', 'quickPayBtn', 'holdOrderBtn'];
+        buttons.forEach(btnId => {
+            document.getElementById(btnId).disabled = !hasItems;
+        });
+    }
+    
+    async processOrder() {
+        if (this.cart.length === 0) return;
+        
+        const orderData = {
+            customer_id: this.selectedCustomer?.id,
+            vehicle_id: this.selectedVehicle?.id,
+            items: this.cart,
+            order_type: 'pos',
+            status: 'pending_payment'
+        };
+        
+        try {
+            document.getElementById('processOrderBtn').classList.add('loading');
+            
+            const response = await fetch(`${this.getTenantUrl()}/services/api/create-order/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': this.csrfToken,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(orderData)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                this.showMessage('Order created successfully!', 'success');
+                this.clearCart();
+                this.updateOrderNumber();
+                
+                // Show payment modal or redirect
+                this.showPaymentModal(result.order_id, result.total_amount);
+            } else {
+                throw new Error('Failed to create order');
+            }
+        } catch (error) {
+            console.error('Error processing order:', error);
+            this.showMessage('Error processing order. Please try again.', 'error');
+        } finally {
+            document.getElementById('processOrderBtn').classList.remove('loading');
+        }
+    }
+    
+    async quickPay() {
+        if (this.cart.length === 0) return;
+        
+        const total = this.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.16;
+        
+        if (confirm(`Process cash payment of KES ${total.toFixed(2)}?`)) {
+            const orderData = {
+                customer_id: this.selectedCustomer?.id,
+                vehicle_id: this.selectedVehicle?.id,
+                items: this.cart,
+                payment_method: 'cash',
+                amount_paid: total,
+                order_type: 'pos',
+                status: 'paid'
+            };
+            
+            try {
+                document.getElementById('quickPayBtn').classList.add('loading');
+                
+                const response = await fetch(`${this.getTenantUrl()}/services/api/quick-pay/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': this.csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(orderData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    this.showMessage('Payment processed successfully!', 'success');
+                    this.clearCart();
+                    this.updateOrderNumber();
+                    this.updateTodayStats();
+                } else {
+                    throw new Error('Failed to process payment');
+                }
+            } catch (error) {
+                console.error('Error processing payment:', error);
+                this.showMessage('Error processing payment. Please try again.', 'error');
+            } finally {
+                document.getElementById('quickPayBtn').classList.remove('loading');
+            }
+        }
+    }
+    
+    clearCart() {
+        this.cart = [];
+        this.updateCartDisplay();
+    }
+    
+    showMessage(message, type = 'info') {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        messageDiv.textContent = message;
+        
+        document.body.appendChild(messageDiv);
+        
+        setTimeout(() => messageDiv.classList.add('show'), 100);
+        
+        setTimeout(() => {
+            messageDiv.classList.remove('show');
+            setTimeout(() => document.body.removeChild(messageDiv), 300);
+        }, 3000);
+    }
+    
+    getTenantUrl() {
+        return `/business/${this.businessSlug}`;
+    }
+    
+    updateOrderNumber() {
+        const currentNumber = parseInt(this.orderNumber);
+        this.orderNumber = String(currentNumber + 1).padStart(4, '0');
+        document.getElementById('orderNumber').textContent = this.orderNumber;
+    }
+    
+    async updateTodayStats() {
+        try {
+            const response = await fetch(`${this.getTenantUrl()}/api/today-stats/`, {
+                headers: {
+                    'X-CSRFToken': this.csrfToken,
+                }
+            });
+            
+            if (response.ok) {
+                const stats = await response.json();
+                document.getElementById('today-orders').textContent = stats.orders_count;
+                document.getElementById('today-revenue').textContent = `KES ${stats.revenue.toFixed(0)}`;
+            }
+        } catch (error) {
+            console.error('Error updating stats:', error);
+        }
+    }
+    
+    handleKeyboard(event) {
+        // Keyboard shortcuts
+        if (event.ctrlKey) {
+            switch(event.key) {
+                case 'Enter':
+                    event.preventDefault();
+                    this.processOrder();
+                    break;
+                case 'n':
+                    event.preventDefault();
+                    showNewCustomerModal();
+                    break;
+                case 'c':
+                    event.preventDefault();
+                    this.clearCart();
+                    break;
+            }
+        }
+    }
+}
+
+// Global functions
+function addToCart(serviceId, serviceName, price) {
+    pos.addToCart(serviceId, serviceName, price);
+}
+
+function showNewCustomerModal() {
+    // Implementation for new customer modal
+    console.log('Show new customer modal');
+}
+
+function refreshDashboard() {
+    window.location.reload();
+}
+
+// Initialize POS Dashboard
+let pos;
+document.addEventListener('DOMContentLoaded', function() {
+    pos = new POSDashboard();
+});
+</script>
+{% endblock %}

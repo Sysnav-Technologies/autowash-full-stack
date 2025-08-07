@@ -16,11 +16,14 @@ def business_context(request):
         'app_name': 'Autowash',
         'company_name': 'Autowash Technologies',
         'is_tenant_context': hasattr(request, 'tenant') and request.tenant is not None,
+        'tenant_urls': {},
+        'nav_urls': {},
     }
     
     # Add tenant-specific context if we're in a tenant context
     if hasattr(request, 'tenant') and request.tenant:
         tenant = request.tenant
+        slug = tenant.slug
         
         # Check if business is verified
         is_verified = getattr(tenant, 'is_verified', False)
@@ -37,6 +40,51 @@ def business_context(request):
             'tenant_subdomain': tenant.subdomain,
             'tenant_primary_domain': tenant.primary_domain,
         })
+        
+        # Generate tenant-aware URLs
+        context['tenant_urls'] = {
+            'dashboard': f'/business/{slug}/',
+            'services': f'/business/{slug}/services/',
+            'pos_dashboard': f'/business/{slug}/services/dashboard/',
+            'customers': f'/business/{slug}/customers/',
+            'employees': f'/business/{slug}/employees/',
+            'inventory': f'/business/{slug}/inventory/',
+            'reports': f'/business/{slug}/reports/',
+            'payments': f'/business/{slug}/payments/',
+            'settings': f'/business/{slug}/businesses/settings/',
+            'settings_overview': f'/business/{slug}/businesses/settings/',
+        }
+        
+        # Navigation URLs
+        base_url = f'/business/{slug}'
+        context['nav_urls'] = {
+            'home': f'{base_url}/',
+            'services': {
+                'list': f'{base_url}/services/',
+                'create': f'{base_url}/services/create/',
+                'dashboard': f'{base_url}/services/dashboard/',
+                'pos': f'{base_url}/services/dashboard/',
+            },
+            'customers': {
+                'list': f'{base_url}/customers/',
+                'create': f'{base_url}/customers/create/',
+            },
+            'employees': {
+                'list': f'{base_url}/employees/',
+                'create': f'{base_url}/employees/create/',
+            },
+            'inventory': {
+                'list': f'{base_url}/inventory/',
+                'create': f'{base_url}/inventory/create/',
+            },
+            'reports': {
+                'dashboard': f'{base_url}/reports/',
+                'revenue': f'{base_url}/reports/revenue/',
+                'services': f'{base_url}/reports/services/',
+            },
+            'payments': f'{base_url}/payments/',
+            'settings': f'{base_url}/businesses/settings/',
+        }
         
         # Add verification status if not verified
         if not is_verified:
@@ -305,6 +353,142 @@ def subscription_flow_context(request):
                 'registration_completed': False,
                 'subscription_completed': False,
                 'verification_completed': False,
+            })
+    
+    return context
+
+
+def sidebar_context(request):
+    """Add sidebar-specific context variables"""
+    context = {}
+    
+    # Only add sidebar context for authenticated users in tenant context
+    if (hasattr(request, 'user') and request.user.is_authenticated and 
+        hasattr(request, 'tenant') and request.tenant):
+        
+        try:
+            # Get pending orders count
+            from apps.services.models import ServiceOrder
+            from apps.core.database_router import TenantDatabaseManager
+            
+            db_alias = f"tenant_{request.tenant.id}"
+            TenantDatabaseManager.add_tenant_to_settings(request.tenant)
+            
+            pending_orders_count = ServiceOrder.objects.using(db_alias).filter(
+                status='pending'
+            ).count()
+            
+            active_queue_count = 0
+            try:
+                from apps.services.models import ServiceQueue
+                active_queue_count = ServiceQueue.objects.using(db_alias).filter(
+                    status__in=['waiting', 'in_service']
+                ).count()
+            except:
+                pass
+            
+            # Get active shifts count
+            active_shifts_count = 0
+            try:
+                from apps.businesses.models import Shift
+                active_shifts_count = Shift.objects.using(db_alias).filter(
+                    status='active'
+                ).count()
+            except:
+                pass
+            
+            # Get pending payments count
+            pending_payments = 0
+            try:
+                from apps.payments.models import Payment
+                pending_payments = Payment.objects.using(db_alias).filter(
+                    status='pending'
+                ).count()
+            except:
+                pass
+            
+            # Get pending employee requests count
+            pending_employee_requests = 0
+            try:
+                from apps.employees.models import Employee
+                pending_employee_requests = Employee.objects.using(db_alias).filter(
+                    status='pending'
+                ).count()
+            except:
+                pass
+            
+            context.update({
+                'pending_orders_count': pending_orders_count,
+                'active_queue_count': active_queue_count,
+                'active_shifts_count': active_shifts_count,
+                'pending_payments': pending_payments,
+                'pending_employee_requests': pending_employee_requests,
+            })
+            
+        except Exception as e:
+            # Handle any database errors gracefully
+            context.update({
+                'pending_orders_count': 0,
+                'active_queue_count': 0,
+                'active_shifts_count': 0,
+                'pending_payments': 0,
+                'pending_employee_requests': 0,
+            })
+    
+    return context
+
+
+def user_role_context(request):
+    """
+    Add user role context to templates
+    """
+    context = {
+        'user_role': None,
+        'is_owner': False,
+        'is_manager': False,
+        'is_supervisor': False,
+        'is_attendant': False,
+        'is_cleaner': False,
+        'is_cashier': False,
+        'can_access_dashboard': False,
+        'can_manage_employees': False,
+        'can_manage_services': False,
+        'can_view_reports': False,
+    }
+    
+    if hasattr(request, 'employee') and request.employee:
+        role = request.employee.role
+        context.update({
+            'user_role': role,
+            'is_owner': role == 'owner',
+            'is_manager': role == 'manager',
+            'is_supervisor': role == 'supervisor',
+            'is_attendant': role == 'attendant',
+            'is_cleaner': role == 'cleaner',
+            'is_cashier': role == 'cashier',
+        })
+        
+        # Role-based permissions
+        if role in ['owner', 'manager']:
+            context.update({
+                'can_access_dashboard': True,
+                'can_manage_employees': True,
+                'can_manage_services': True,
+                'can_view_reports': True,
+            })
+        elif role == 'supervisor':
+            context.update({
+                'can_access_dashboard': False,
+                'can_manage_employees': False,
+                'can_manage_services': True,
+                'can_view_reports': True,
+            })
+        elif role in ['attendant', 'cleaner', 'cashier']:
+            context.update({
+                'can_access_dashboard': False,
+                'can_manage_employees': False,
+                'can_manage_services': False,
+                'can_view_reports': False,
             })
     
     return context

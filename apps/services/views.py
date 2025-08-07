@@ -904,14 +904,17 @@ def get_service_data(request, service_id):
     service = get_object_or_404(Service, id=service_id)
     
     data = {
-        'id': service.id,
+        'id': str(service.id),
         'name': service.name,
         'description': service.description,
         'base_price': float(service.base_price),
         'estimated_duration': service.estimated_duration,
-        'category': service.category.name,
+        'category': service.category.name if service.category else None,
         'is_popular': service.is_popular,
-        'compatible_vehicles': service.compatible_vehicle_types.split(',')
+        'commission_rate': float(service.commission_rate or 0),
+        'commission_type': service.commission_type or 'percentage',
+        'fixed_commission': float(service.fixed_commission or 0),
+        'compatible_vehicles': service.compatible_vehicle_types.split(',') if service.compatible_vehicle_types else []
     }
     
     return JsonResponse(data)
@@ -923,17 +926,47 @@ def queue_status_ajax(request):
     """Get current queue status for AJAX updates"""
     queue_entries = ServiceQueue.objects.filter(
         status__in=['waiting', 'in_service']
-    ).select_related('order', 'order__customer').order_by('queue_number')
+    ).select_related(
+        'order', 
+        'order__customer', 
+        'order__vehicle',
+        'order__assigned_attendant'
+    ).prefetch_related(
+        'order__orderitem_set__service',
+        'order__orderitem_set__inventory_item'
+    ).order_by('queue_number')
     
     data = {
         'queue': [
             {
+                'id': entry.id,
                 'queue_number': entry.queue_number,
-                'order_number': entry.order.order_number,
-                'customer_name': entry.order.customer.display_name,
                 'status': entry.status,
+                'status_display': entry.get_status_display(),
                 'estimated_wait_time': entry.estimated_wait_time,
-                'service_bay': entry.service_bay.name if entry.service_bay else None
+                'service_bay': entry.service_bay.name if entry.service_bay else None,
+                'order': {
+                    'id': entry.order.id,
+                    'order_number': entry.order.order_number,
+                    'assigned_attendant_id': entry.order.assigned_attendant.id if entry.order.assigned_attendant else None,
+                    'customer': {
+                        'full_name': entry.order.customer.full_name,
+                        'display_name': entry.order.customer.display_name,
+                    },
+                    'vehicle': {
+                        'registration_number': entry.order.vehicle.registration_number if entry.order.vehicle else 'N/A',
+                        'make_model': f"{entry.order.vehicle.make} {entry.order.vehicle.model}" if entry.order.vehicle else 'N/A',
+                    },
+                    'order_items': [
+                        {
+                            'service': {
+                                'name': item.service.name if item.service else item.inventory_item.name,
+                                'id': item.service.id if item.service else item.inventory_item.id,
+                            }
+                        }
+                        for item in entry.order.orderitem_set.all()
+                    ]
+                }
             }
             for entry in queue_entries
         ],
@@ -941,6 +974,58 @@ def queue_status_ajax(request):
     }
     
     return JsonResponse(data)
+
+
+@employee_required()
+@ajax_required
+def customer_details_ajax(request, customer_id):
+    """Get customer details for POS system"""
+    try:
+        from apps.customers.models import Customer
+        customer = Customer.objects.get(id=customer_id, is_active=True)
+        
+        data = {
+            'customer': {
+                'id': customer.id,
+                'full_name': customer.full_name,
+                'phone': str(customer.phone),
+                'customer_id': customer.customer_id,
+                'email': customer.email or '',
+                'is_vip': customer.is_vip,
+            }
+        }
+        
+        return JsonResponse(data)
+    except Customer.DoesNotExist:
+        return JsonResponse({'error': 'Customer not found'}, status=404)
+
+
+@employee_required()
+@ajax_required
+def customer_vehicles_ajax(request, customer_id):
+    """Get customer vehicles for POS system"""
+    try:
+        from apps.customers.models import Customer, Vehicle
+        customer = Customer.objects.get(id=customer_id, is_active=True)
+        vehicles = Vehicle.objects.filter(customer=customer, is_active=True)
+        
+        data = {
+            'vehicles': [
+                {
+                    'id': vehicle.id,
+                    'registration_number': vehicle.registration_number,
+                    'make': vehicle.make,
+                    'model': vehicle.model,
+                    'year': vehicle.year,
+                    'color': vehicle.color,
+                }
+                for vehicle in vehicles
+            ]
+        }
+        
+        return JsonResponse(data)
+    except Customer.DoesNotExist:
+        return JsonResponse({'error': 'Customer not found'}, status=404)
 
 
 # Additional views to complete the services functionality
@@ -1229,52 +1314,8 @@ def _handle_payment_completion(self):
 @login_required
 @employee_required()
 def attendant_dashboard(request):
-    """Attendant dashboard with current assignments"""
-    # Get attendant's current assignments
-    my_orders = ServiceOrder.objects.filter(
-        assigned_attendant=request.employee,
-        status__in=['confirmed', 'in_progress']
-    ).select_related('customer', 'vehicle').order_by('-created_at')
-    
-    # Get queue entries for today
-    today_queue = ServiceQueue.objects.filter(
-        created_at__date=timezone.now().date(),
-        status__in=['waiting', 'in_service']
-    ).select_related('order', 'order__customer').order_by('queue_number')
-    
-    # Get my service items in progress
-    my_service_items = ServiceOrderItem.objects.filter(
-        assigned_to=request.employee,
-        completed_at__isnull=True
-    ).select_related('order', 'service')
-    
-    # Statistics
-    stats = {
-        'orders_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            created_at__date=timezone.now().date()
-        ).count(),
-        'completed_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            status='completed',
-            actual_end_time__date=timezone.now().date()
-        ).count(),
-        'in_progress': my_orders.filter(status='in_progress').count(),
-        'total_revenue_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            status='completed',
-            actual_end_time__date=timezone.now().date()
-        ).aggregate(total=Sum('total_amount'))['total'] or 0
-    }
-    
-    context = {
-        'my_orders': my_orders,
-        'today_queue': today_queue,
-        'my_service_items': my_service_items,
-        'stats': stats,
-        'title': 'My Dashboard'
-    }
-    return render(request, 'services/attendant_dashboard.html', context)
+    """Redirect to POS dashboard for attendants"""
+    return redirect(get_business_url(request, 'services:pos_dashboard'))
 
 @login_required
 @employee_required()
@@ -1386,7 +1427,7 @@ def customer_search_ajax(request):
     query = request.GET.get('q', '')
     
     if len(query) < 2:
-        return JsonResponse({'results': []})
+        return JsonResponse({'customers': []})
     
     from apps.customers.models import Customer
     
@@ -1400,16 +1441,15 @@ def customer_search_ajax(request):
     
     results = [
         {
-            'id': str(customer.id),
-            'text': f"{customer.full_name} - {customer.phone}",
-            'name': customer.full_name,
+            'id': customer.id,
+            'full_name': customer.full_name,
             'phone': str(customer.phone),
             'customer_id': customer.customer_id
         }
         for customer in customers
     ]
     
-    return JsonResponse({'results': results})
+    return JsonResponse({'customers': results})
 
 @login_required
 @employee_required()
@@ -2292,19 +2332,37 @@ def service_performance_report(request):
     # Employee performance
     employee_performance = ServiceOrder.objects.filter(
         status='completed',
-        actual_end_time__date__range=[date_from, date_to]
+        actual_end_time__date__range=[date_from, date_to],
+        assigned_attendant__isnull=False
     ).extra(
         select={'duration_minutes': "TIMESTAMPDIFF(MINUTE, actual_start_time, actual_end_time)"}
     ).values(
         'assigned_attendant__employee_id',
-        'assigned_attendant__first_name',
-        'assigned_attendant__last_name'
+        'assigned_attendant__user_id'
     ).annotate(
         orders_completed=Count('id'),
         total_revenue=Sum('total_amount'),
         avg_rating=Avg('customer_rating'),
         avg_service_time=Avg('duration_minutes')
     ).order_by('-orders_completed')
+    
+    # Add names to employee performance (since we can't query properties directly)
+    for performance in employee_performance:
+        if performance['assigned_attendant__user_id']:
+            try:
+                from django.contrib.auth.models import User
+                user = User.objects.get(id=performance['assigned_attendant__user_id'])
+                performance['attendant_name'] = user.get_full_name() or user.username
+                performance['first_name'] = user.first_name
+                performance['last_name'] = user.last_name
+            except User.DoesNotExist:
+                performance['attendant_name'] = f"Employee {performance['assigned_attendant__employee_id']}"
+                performance['first_name'] = ""
+                performance['last_name'] = ""
+        else:
+            performance['attendant_name'] = f"Employee {performance['assigned_attendant__employee_id']}"
+            performance['first_name'] = ""
+            performance['last_name'] = ""
     
     context = {
         'employee_performance': employee_performance,
@@ -2318,49 +2376,8 @@ def service_performance_report(request):
 @login_required
 @employee_required()
 def attendant_dashboard(request):
-    """Attendant dashboard with current assignments"""
-    my_orders = ServiceOrder.objects.filter(
-        assigned_attendant=request.employee,
-        status__in=['confirmed', 'in_progress']
-    ).select_related('customer', 'vehicle').order_by('-created_at')
-    
-    today_queue = ServiceQueue.objects.filter(
-        created_at__date=timezone.now().date(),
-        status__in=['waiting', 'in_service']
-    ).select_related('order', 'order__customer').order_by('queue_number')
-    
-    my_service_items = ServiceOrderItem.objects.filter(
-        assigned_to=request.employee,
-        completed_at__isnull=True
-    ).select_related('order', 'service')
-    
-    # Statistics
-    stats = {
-        'orders_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            created_at__date=timezone.now().date()
-        ).count(),
-        'completed_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            status='completed',
-            actual_end_time__date=timezone.now().date()
-        ).count(),
-        'in_progress': my_orders.filter(status='in_progress').count(),
-        'total_revenue_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            status='completed',
-            actual_end_time__date=timezone.now().date()
-        ).aggregate(total=Sum('total_amount'))['total'] or 0
-    }
-    
-    context = {
-        'my_orders': my_orders,
-        'today_queue': today_queue,
-        'my_service_items': my_service_items,
-        'stats': stats,
-        'title': 'My Dashboard'
-    }
-    return render(request, 'services/attendant_dashboard.html', context)
+    """Redirect to POS dashboard for attendants"""
+    return redirect(get_business_url(request, 'services:pos_dashboard'))
 
 @login_required
 @employee_required()
@@ -2967,3 +2984,971 @@ def add_order_to_queue(order):
     )
 
 
+# ============================================================================
+# POS SYSTEM VIEWS
+# ============================================================================
+
+@login_required
+@employee_required()
+def pos_dashboard(request):
+    """Enhanced POS dashboard for attendants with comprehensive metrics and payment integration"""
+    from decimal import Decimal
+    from datetime import timedelta
+    from django.db.models import Q, Count, Sum, Avg
+    from apps.businesses.utils import ShiftManager
+    
+    # Get service categories and services
+    service_categories = ServiceCategory.objects.filter(is_active=True).order_by('display_order', 'name')
+    services = Service.objects.filter(is_active=True).select_related('category').order_by('category__display_order', 'display_order', 'name')
+    
+    # Get sellable inventory items
+    try:
+        from apps.inventory.models import InventoryItem
+        sellable_items = InventoryItem.objects.filter(
+            is_active=True,
+            current_stock__gt=0,
+            selling_price__gt=0,
+            item_type__in=['product', 'consumable']
+        ).select_related('unit', 'category')[:20]
+    except ImportError:
+        sellable_items = []
+    
+    # Get current queue entries
+    queue_entries = ServiceQueue.objects.filter(
+        created_at__date=timezone.now().date(),
+        status__in=['waiting', 'in_service']
+    ).select_related(
+        'order', 'order__customer', 'order__vehicle', 'order__assigned_attendant'
+    ).prefetch_related(
+        'order__order_items__service'
+    ).order_by('queue_number')
+    
+    # Date ranges for metrics
+    today = timezone.now().date()
+    this_week_start = today - timedelta(days=today.weekday())
+    this_month_start = today.replace(day=1)
+    
+    # My performance metrics
+    my_today_orders = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee,
+        created_at__date=today
+    )
+    
+    my_week_orders = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee,
+        created_at__date__gte=this_week_start
+    )
+    
+    my_month_orders = ServiceOrder.objects.filter(
+        assigned_attendant=request.employee,
+        created_at__date__gte=this_month_start
+    )
+    
+    # Calculate commission earnings
+    from apps.services.models import ServiceOrderItem
+    
+    def calculate_commission(items_queryset):
+        total_commission = Decimal('0')
+        for item in items_queryset:
+            if item.service.commission_type == 'percentage' and item.service.commission_rate:
+                commission = (item.total_price * item.service.commission_rate) / 100
+                total_commission += commission
+            elif item.service.commission_type == 'fixed' and item.service.fixed_commission:
+                commission = item.service.fixed_commission * item.quantity
+                total_commission += commission
+        return total_commission
+    
+    # Commission calculations
+    today_items = ServiceOrderItem.objects.filter(
+        order__assigned_attendant=request.employee,
+        order__status='completed',
+        order__actual_end_time__date=today
+    ).select_related('service')
+    
+    week_items = ServiceOrderItem.objects.filter(
+        order__assigned_attendant=request.employee,
+        order__status='completed',
+        order__actual_end_time__date__gte=this_week_start
+    ).select_related('service')
+    
+    month_items = ServiceOrderItem.objects.filter(
+        order__assigned_attendant=request.employee,
+        order__status='completed',
+        order__actual_end_time__date__gte=this_month_start
+    ).select_related('service')
+    
+    today_commission = calculate_commission(today_items)
+    week_commission = calculate_commission(week_items)
+    month_commission = calculate_commission(month_items)
+    
+    # Get shift information
+    shift_status = {'has_active_shift': False, 'current_shift': None}
+    shift_stats = {'today': {}, 'week': {}, 'month': {}}
+    
+    try:
+        shift_status = ShiftManager.get_shift_status(request.employee)
+        shift_stats = {
+            'today': ShiftManager.get_shift_statistics(request.employee, 'today'),
+            'week': ShiftManager.get_shift_statistics(request.employee, 'week'),
+            'month': ShiftManager.get_shift_statistics(request.employee, 'month')
+        }
+    except Exception as e:
+        # Log the error but don't break the dashboard
+        logger.warning(f"Error getting shift information: {e}")
+        pass
+    
+    # Performance metrics
+    performance_metrics = {
+        'today': {
+            'orders': my_today_orders.count(),
+            'completed': my_today_orders.filter(status='completed').count(),
+            'revenue': my_today_orders.filter(status='completed').aggregate(
+                total=Sum('total_amount')
+            )['total'] or Decimal('0'),
+            'commission': today_commission,
+            'avg_order_value': my_today_orders.filter(status='completed').aggregate(
+                avg=Avg('total_amount')
+            )['avg'] or Decimal('0'),
+        },
+        'week': {
+            'orders': my_week_orders.count(),
+            'completed': my_week_orders.filter(status='completed').count(),
+            'revenue': my_week_orders.filter(status='completed').aggregate(
+                total=Sum('total_amount')
+            )['total'] or Decimal('0'),
+            'commission': week_commission,
+        },
+        'month': {
+            'orders': my_month_orders.count(),
+            'completed': my_month_orders.filter(status='completed').count(),
+            'revenue': my_month_orders.filter(status='completed').aggregate(
+                total=Sum('total_amount')
+            )['total'] or Decimal('0'),
+            'commission': month_commission,
+        }
+    }
+    
+    # Team performance leaderboard
+    team_today_orders = ServiceOrder.objects.filter(
+        created_at__date=today,
+        assigned_attendant__isnull=False,
+        status='completed'
+    ).select_related('assigned_attendant')
+    
+    attendant_stats = {}
+    for order in team_today_orders:
+        attendant_name = order.assigned_attendant.get_full_name()
+        if attendant_name not in attendant_stats:
+            attendant_stats[attendant_name] = {
+                'name': attendant_name,
+                'orders': 0,
+                'revenue': Decimal('0'),
+                'is_me': order.assigned_attendant == request.employee
+            }
+        attendant_stats[attendant_name]['orders'] += 1
+        attendant_stats[attendant_name]['revenue'] += order.total_amount or Decimal('0')
+    
+    team_leaderboard = sorted(attendant_stats.values(), key=lambda x: x['revenue'], reverse=True)[:10]
+    
+    # Payment and order management
+    pending_orders = ServiceOrder.objects.filter(
+        Q(status='pending') | Q(status='confirmed'),
+        assigned_attendant=request.employee
+    ).select_related('customer', 'vehicle')[:10]
+    
+    # Unpaid orders (completed but not fully paid)
+    unpaid_orders = ServiceOrder.objects.filter(
+        status='completed',
+        assigned_attendant=request.employee
+    ).annotate(
+        total_paid=Sum('payments__amount')
+    ).filter(
+        Q(total_paid__lt=F('total_amount')) | Q(total_paid__isnull=True)
+    ).select_related('customer', 'vehicle')[:10]
+    
+    # Recent payments
+    recent_payments = Payment.objects.filter(
+        service_order__assigned_attendant=request.employee,
+        created_at__date=today
+    ).select_related('service_order', 'service_order__customer').order_by('-created_at')[:10]
+    
+    # Quick stats
+    counts = {
+        'pending_orders': ServiceOrder.objects.filter(status='pending').count(),
+        'waiting_queue': ServiceQueue.objects.filter(status='waiting').count(),
+        'my_active_orders': my_today_orders.filter(status__in=['confirmed', 'in_progress']).count(),
+        'my_pending_orders': pending_orders.count(),
+        'unpaid_orders': unpaid_orders.count(),
+        'today_payments': recent_payments.count(),
+    }
+    
+    # Payment methods summary
+    payment_methods_today = Payment.objects.filter(
+        service_order__assigned_attendant=request.employee,
+        created_at__date=today
+    ).values('payment_method').annotate(
+        count=Count('id'),
+        total=Sum('amount')
+    ).order_by('-total')
+    
+    context = {
+        'service_categories': service_categories,
+        'services': services,
+        'sellable_items': sellable_items,
+        'queue_entries': queue_entries,
+        'performance_metrics': performance_metrics,
+        'team_leaderboard': team_leaderboard,
+        'shift_status': shift_status,
+        'shift_stats': shift_stats,
+        'pending_orders': pending_orders,
+        'unpaid_orders': unpaid_orders,
+        'recent_payments': recent_payments,
+        'payment_methods_today': payment_methods_today,
+        'counts': counts,
+        'business_urls': get_business_urls(request),
+        'title': 'Digital Workspace - POS System'
+    }
+    
+    return render(request, 'services/pos_dashboard.html', context)
+
+def get_business_urls(request):
+    """Generate business-specific URLs for templates"""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}"
+    
+    return {
+        'dashboard': f"{base_url}/",
+        'shifts': f"{base_url}/shifts/",
+        'shift_create': f"{base_url}/shifts/create/",
+        'services': f"{base_url}/services/",
+        'orders': f"{base_url}/services/orders/",
+        'queue': f"{base_url}/services/queue/",
+        'reports': f"{base_url}/services/reports/",
+        'customers': f"{base_url}/customers/",
+        'payments': f"{base_url}/payments/",
+        'my_shifts': f"{base_url}/shifts/?attendant=current",
+    }
+    
+    return render(request, 'services/pos_dashboard.html', context)
+
+
+@login_required
+@employee_required()
+@ajax_required
+@require_http_methods(["POST"])
+def create_pos_order(request):
+    """Create order from POS system with flexible payment options"""
+    try:
+        data = json.loads(request.body)
+        
+        customer_id = data.get('customer_id')
+        vehicle_id = data.get('vehicle_id')
+        payment_method = data.get('payment_method', 'cash')
+        amount_received = Decimal(str(data.get('amount_received', 0)))
+        items = data.get('items', [])
+        process_payment_now = data.get('process_payment_now', True)
+        assigned_worker_id = data.get('assigned_worker_id')  # Allow attendant to assign work to another worker
+        
+        if not customer_id or not vehicle_id or not items:
+            return JsonResponse({
+                'success': False,
+                'message': 'Missing required data'
+            })
+        
+        from apps.customers.models import Customer, Vehicle
+        from apps.inventory.models import InventoryItem
+        from apps.payments.models import Payment, PaymentMethod
+        
+        customer = Customer.objects.get(id=customer_id)
+        vehicle = Vehicle.objects.get(id=vehicle_id)
+        
+        # Get assigned worker (can be different from the attendant creating the order)
+        assigned_worker = request.employee
+        if assigned_worker_id:
+            try:
+                from apps.employees.models import Employee
+                assigned_worker = Employee.objects.get(id=assigned_worker_id, role='attendant')
+            except Employee.DoesNotExist:
+                pass  # Fall back to current attendant
+        
+        with transaction.atomic():
+            # Create service order
+            order_status = 'confirmed' if process_payment_now else 'pending'
+            
+            order = ServiceOrder.objects.create(
+                customer=customer,
+                vehicle=vehicle,
+                assigned_attendant=assigned_worker,
+                status=order_status,
+                priority='normal',
+                payment_method=payment_method if process_payment_now else '',
+                created_by=request.user
+            )
+            
+            total_amount = Decimal('0.00')
+            total_commission = Decimal('0.00')
+            
+            # Process items
+            for item_data in items:
+                item_type = item_data.get('type')
+                item_id = item_data.get('id')
+                quantity = Decimal(str(item_data.get('quantity', 1)))
+                price = Decimal(str(item_data.get('price', 0)))
+                
+                if item_type == 'service':
+                    service = Service.objects.get(id=item_id)
+                    
+                    # Create service order item
+                    order_item = ServiceOrderItem.objects.create(
+                        order=order,
+                        service=service,
+                        quantity=quantity,
+                        unit_price=price,
+                        assigned_to=assigned_worker
+                    )
+                    
+                    # Calculate commission for the assigned worker
+                    if service.commission_type == 'percentage' and service.commission_rate > 0:
+                        commission = (price * quantity) * (service.commission_rate / 100)
+                        total_commission += commission
+                    elif service.commission_type == 'fixed' and service.fixed_commission > 0:
+                        commission = service.fixed_commission * quantity
+                        total_commission += commission
+                    
+                    total_amount += price * quantity
+                    
+                elif item_type == 'inventory':
+                    inventory_item = InventoryItem.objects.get(id=item_id)
+                    
+                    # Check stock
+                    if inventory_item.current_stock < quantity:
+                        return JsonResponse({
+                            'success': False,
+                            'message': f'Insufficient stock for {inventory_item.name}'
+                        })
+                    
+                    # Reduce stock and create movement record
+                    inventory_item.current_stock -= quantity
+                    inventory_item.save()
+                    
+                    # Create stock movement
+                    from apps.inventory.models import StockMovement
+                    StockMovement.objects.create(
+                        item=inventory_item,
+                        movement_type='out',
+                        quantity=quantity,
+                        unit_cost=inventory_item.cost_price,
+                        old_stock=inventory_item.current_stock + quantity,
+                        new_stock=inventory_item.current_stock,
+                        reference_type='sale',
+                        reference_number=order.order_number,
+                        service_order=order,
+                        reason=f'Sold via POS - Order {order.order_number}'
+                    )
+                    
+                    total_amount += price * quantity
+            
+            # Calculate tax and totals
+            tax_amount = total_amount * Decimal('0.16')  # 16% VAT
+            order.subtotal = total_amount
+            order.tax_amount = tax_amount
+            order.total_amount = total_amount + tax_amount
+            order.save()
+            
+            # Create payment record if processing payment now
+            payment_response = {}
+            if process_payment_now:
+                # Get payment method
+                try:
+                    payment_method_obj = PaymentMethod.objects.get(
+                        method_type=payment_method,
+                        is_active=True
+                    )
+                except PaymentMethod.DoesNotExist:
+                    # Create basic payment method if not found
+                    payment_method_obj = PaymentMethod.objects.create(
+                        name=payment_method.title(),
+                        method_type=payment_method,
+                        is_active=True,
+                        accepts_partial=True if payment_method != 'cash' else False
+                    )
+                
+                # Create payment
+                payment = Payment.objects.create(
+                    service_order=order,
+                    customer=customer,
+                    payment_method=payment_method_obj,
+                    amount=order.total_amount,
+                    status='completed' if payment_method == 'cash' else 'pending',
+                    processed_by=request.employee,
+                    description=f'POS Payment for {order.order_number}',
+                    metadata={
+                        'amount_received': float(amount_received),
+                        'change_amount': float(max(Decimal('0'), amount_received - order.total_amount)) if payment_method == 'cash' else 0,
+                        'payment_source': 'pos_system'
+                    }
+                )
+                
+                # Handle different payment methods
+                if payment_method == 'mpesa':
+                    # For M-Pesa without callback, mark as completed for simple businesses
+                    try:
+                        business_has_gateway = hasattr(request.tenant, 'payment_gateway_configured') and request.tenant.payment_gateway_configured
+                    except AttributeError:
+                        business_has_gateway = False
+                    
+                    if not business_has_gateway:
+                        # Simple M-Pesa - mark as completed for manual verification
+                        payment.status = 'completed'
+                        payment.completed_at = timezone.now()
+                        payment.reference_number = f'MPESA-{order.order_number}-{timezone.now().strftime("%Y%m%d%H%M%S")}'
+                        payment.save()
+                
+                # Add to queue
+                add_order_to_queue(order)
+                
+                payment_response = {
+                    'payment_id': payment.payment_id,
+                    'status': payment.status,
+                    'amount': float(payment.amount),
+                    'change': float(payment.metadata.get('change_amount', 0))
+                }
+                
+                # Update order payment status
+                order.update_payment_status()
+            
+            else:
+                # Add to queue even if payment is deferred
+                add_order_to_queue(order)
+            
+            # Record commission as expense if there's any and payment is processed
+            if total_commission > 0 and process_payment_now:
+                try:
+                    from apps.expenses.models import Expense, ExpenseCategory
+                    
+                    # Get or create commission category
+                    commission_category, created = ExpenseCategory.objects.get_or_create(
+                        name='Service Commissions',
+                        defaults={
+                            'description': 'Commissions paid to service attendants',
+                            'is_auto_category': True
+                        }
+                    )
+                    
+                    # Create commission expense
+                    Expense.objects.create(
+                        amount=total_commission,
+                        description=f'Commission for order {order.order_number} - {assigned_worker.full_name}',
+                        category=commission_category,
+                        expense_type='commission',
+                        payment_method=payment_method if process_payment_now else 'pending',
+                        reference_number=order.order_number,
+                        approved_by=request.user,
+                        status='approved' if process_payment_now else 'pending'
+                    )
+                    
+                except ImportError:
+                    # Expenses app not available
+                    pass
+            
+            # Send SMS notification if enabled and phone available
+            try:
+                if customer.phone and process_payment_now:
+                    from apps.notification.utils import NotificationManager
+                    notification_manager = NotificationManager()
+                    
+                    message = f"Hi {customer.first_name}, your car wash order {order.order_number} has been created. Total: KES {order.total_amount}. Thank you for choosing us!"
+                    
+                    # This would use the SMS utility
+                    from apps.core.utils import send_sms_notification
+                    send_sms_notification(customer.phone, message)
+                    
+            except (ImportError, Exception) as e:
+                # SMS sending failed, but don't fail the order
+                pass
+            
+            response_data = {
+                'success': True,
+                'message': 'Order created successfully',
+                'order_id': order.id,
+                'order_number': order.order_number,
+                'total_amount': float(order.total_amount),
+                'commission': float(total_commission),
+                'payment_status': order.payment_status,
+                'order_status': order.status
+            }
+            
+            if payment_response:
+                response_data['payment'] = payment_response
+            
+            return JsonResponse(response_data)
+            
+    except Exception as e:
+        logger.error(f"Error creating POS order: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error creating order. Please try again.'
+        })
+
+
+@login_required
+@employee_required()
+@ajax_required
+def create_customer_ajax(request):
+    """Create customer via AJAX from POS"""
+    if request.method == 'POST':
+        try:
+            from apps.customers.models import Customer, Vehicle
+            
+            # Get form data
+            full_name = request.POST.get('full_name')
+            phone = request.POST.get('phone')
+            email = request.POST.get('email', '')
+            
+            # Vehicle data
+            registration_number = request.POST.get('registration_number')
+            make = request.POST.get('make', '')
+            model = request.POST.get('model', '')
+            
+            if not full_name or not phone or not registration_number:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Missing required fields'
+                })
+            
+            with transaction.atomic():
+                # Create customer
+                customer = Customer.objects.create(
+                    full_name=full_name,
+                    phone=phone,
+                    email=email,
+                    created_by=request.user
+                )
+                
+                # Create vehicle
+                vehicle = Vehicle.objects.create(
+                    customer=customer,
+                    registration_number=registration_number.upper(),
+                    make=make,
+                    model=model,
+                    created_by=request.user
+                )
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Customer created successfully',
+                    'customer': {
+                        'id': customer.id,
+                        'full_name': customer.full_name,
+                        'phone': customer.phone,
+                        'email': customer.email
+                    },
+                    'vehicle': {
+                        'id': vehicle.id,
+                        'registration_number': vehicle.registration_number,
+                        'make': vehicle.make,
+                        'model': vehicle.model
+                    }
+                })
+                
+        except Exception as e:
+            logger.error(f"Error creating customer: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': 'Error creating customer. Please try again.'
+            })
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request method'})
+
+
+@login_required
+@employee_required()
+@ajax_required
+def get_customer_vehicles(request, customer_id):
+    """Get vehicles for a specific customer"""
+    try:
+        from apps.customers.models import Vehicle
+        
+        vehicles = Vehicle.objects.filter(
+            customer_id=customer_id,
+            is_active=True
+        ).values('id', 'registration_number', 'make', 'model', 'vehicle_type')
+        
+        return JsonResponse({
+            'success': True,
+            'vehicles': list(vehicles)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error loading vehicles: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error loading vehicles'
+        })
+
+
+@login_required
+@employee_required()
+@ajax_required
+def add_vehicle_ajax(request):
+    """Add vehicle to existing customer via AJAX from POS"""
+    if request.method == 'POST':
+        try:
+            from apps.customers.models import Customer, Vehicle
+            
+            # Get form data
+            customer_id = request.POST.get('customer_id')
+            registration_number = request.POST.get('registration_number')
+            make = request.POST.get('make', '')
+            model = request.POST.get('model', '')
+            year = request.POST.get('year', '')
+            color = request.POST.get('color', '')
+            
+            if not customer_id or not registration_number:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Customer ID and registration number are required'
+                })
+            
+            # Verify customer exists
+            customer = get_object_or_404(Customer, id=customer_id)
+            
+            # Check if registration number already exists
+            if Vehicle.objects.filter(registration_number=registration_number.upper()).exists():
+                return JsonResponse({
+                    'success': False,
+                    'message': 'A vehicle with this registration number already exists'
+                })
+            
+            # Create vehicle
+            vehicle = Vehicle.objects.create(
+                customer=customer,
+                registration_number=registration_number.upper(),
+                make=make,
+                model=model,
+                year=int(year) if year.isdigit() else None,
+                color=color,
+                created_by=request.user
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Vehicle added successfully',
+                'vehicle': {
+                    'id': str(vehicle.id),
+                    'registration_number': vehicle.registration_number,
+                    'make': vehicle.make,
+                    'model': vehicle.model,
+                    'year': vehicle.year,
+                    'color': vehicle.color
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Error adding vehicle: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': 'Error adding vehicle. Please try again.'
+            })
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request method'})
+
+
+@login_required
+@employee_required()
+@ajax_required
+def get_inventory_item_ajax(request, item_id):
+    """Get inventory item details"""
+    try:
+        from apps.inventory.models import InventoryItem
+        
+        item = InventoryItem.objects.select_related('unit').get(id=item_id, is_active=True)
+        
+        return JsonResponse({
+            'success': True,
+            'item': {
+                'id': item.id,
+                'name': item.name,
+                'description': item.description,
+                'selling_price': float(item.selling_price),
+                'current_stock': float(item.current_stock),
+                'unit': {
+                    'name': item.unit.name,
+                    'abbreviation': item.unit.abbreviation
+                }
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error loading inventory item: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error loading item details'
+        })
+
+
+@login_required
+@employee_required()
+@ajax_required
+def get_available_workers_ajax(request):
+    """Get available workers for assignment (AJAX)"""
+    try:
+        from apps.businesses.models import ShiftAttendance
+        
+        # Get attendants who are currently checked in to active shifts
+        on_duty_attendants = ShiftAttendance.objects.filter(
+            shift__status='active',
+            status__in=['checked_in', 'on_break']
+        ).select_related('attendant')
+        
+        workers = []
+        for attendance in on_duty_attendants:
+            workers.append({
+                'id': attendance.attendant.id,
+                'name': attendance.attendant.full_name,
+                'shift': attendance.shift.name,
+                'status': attendance.get_status_display()
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'workers': workers
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        })
+
+
+@login_required
+@employee_required()
+@ajax_required
+def process_pos_payment(request):
+    """Process payment for POS order via AJAX"""
+    if request.method == 'POST':
+        try:
+            order_id = request.POST.get('order_id')
+            payment_method = request.POST.get('payment_method')
+            amount_received = Decimal(request.POST.get('amount_received', '0'))
+            
+            if not order_id or not payment_method or amount_received <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Missing required payment information'
+                })
+            
+            order = get_object_or_404(ServiceOrder, id=order_id)
+            
+            # Check if order is already paid
+            if order.payment_status == 'paid':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Order has already been paid'
+                })
+            
+            # Calculate change
+            change_amount = amount_received - order.total_amount if amount_received > order.total_amount else 0
+            
+            with transaction.atomic():
+                # Get or create payment method object
+                from apps.payments.models import Payment, PaymentMethod
+                
+                try:
+                    payment_method_obj = PaymentMethod.objects.get(method_type=payment_method, is_active=True)
+                except PaymentMethod.DoesNotExist:
+                    # Create default payment method if it doesn't exist
+                    payment_method_obj = PaymentMethod.objects.create(
+                        name=payment_method.title(),
+                        method_type=payment_method,
+                        is_active=True
+                    )
+                
+                # Create or update payment record
+                payment, created = Payment.objects.get_or_create(
+                    service_order=order,
+                    defaults={
+                        'amount': order.total_amount,
+                        'payment_method': payment_method_obj,
+                        'customer': order.customer,
+                        'status': 'completed' if amount_received >= order.total_amount else 'pending',
+                        'processed_by': request.employee,
+                        'completed_at': timezone.now() if amount_received >= order.total_amount else None,
+                        'description': f'POS Payment for order {order.order_number}',
+                        'metadata': {
+                            'amount_received': float(amount_received),
+                            'change_amount': float(change_amount),
+                            'payment_source': 'pos_system'
+                        }
+                    }
+                )
+                
+                if not created:
+                    # Update existing payment
+                    payment.amount = order.total_amount
+                    payment.processed_by = request.employee
+                    payment.metadata.update({
+                        'amount_received': float(amount_received),
+                        'change_amount': float(change_amount),
+                        'payment_source': 'pos_system'
+                    })
+                    
+                    if amount_received >= order.total_amount:
+                        payment.status = 'completed'
+                        payment.completed_at = timezone.now()
+                    else:
+                        payment.status = 'pending'
+                    
+                    payment.save()
+                
+                # Update order payment status
+                if amount_received >= order.total_amount:
+                    order.payment_status = 'paid'
+                    order.payment_method = payment_method
+                else:
+                    order.payment_status = 'partial'
+                
+                order.save()
+                
+                # Generate payment reference
+                if payment.status == 'completed':
+                    payment.reference_number = f'{payment_method.upper()}-{order.order_number}-{timezone.now().strftime("%Y%m%d%H%M%S")}'
+                    payment.save()
+                
+                # Record commission expense if fully paid
+                if payment.status == 'completed' and order.assigned_attendant:
+                    try:
+                        from apps.expenses.models import Expense, ExpenseCategory
+                        
+                        # Calculate commission
+                        total_commission = 0
+                        for item in order.service_items.all():
+                            if hasattr(item.service, 'commission_rate') and item.service.commission_rate and item.service.commission_rate > 0:
+                                commission = (item.price * item.service.commission_rate) / 100
+                                total_commission += commission
+                        
+                        if total_commission > 0:
+                            # Get or create commission category
+                            commission_category, created = ExpenseCategory.objects.get_or_create(
+                                name='Service Commissions',
+                                defaults={
+                                    'description': 'Commissions paid to service attendants',
+                                    'is_auto_category': True
+                                }
+                            )
+                            
+                            # Create commission expense
+                            Expense.objects.create(
+                                amount=total_commission,
+                                description=f'Commission for order {order.order_number} - {order.assigned_attendant.full_name}',
+                                category=commission_category,
+                                expense_type='commission',
+                                payment_method=payment_method,
+                                reference_number=order.order_number,
+                                approved_by=request.user,
+                                status='approved'
+                            )
+                            
+                    except ImportError:
+                        # Expenses app not available
+                        pass
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Payment processed successfully',
+                'payment_status': order.payment_status,
+                'change_amount': float(change_amount),
+                'payment_reference': payment.reference_number if payment.reference_number else None,
+                'total_paid': float(amount_received),
+                'balance': float(order.total_amount - amount_received) if amount_received < order.total_amount else 0
+            })
+            
+        except Exception as e:
+            logger.error(f"Error processing payment: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': 'Error processing payment. Please try again.'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method'
+    })
+
+
+@login_required
+@employee_required()
+@ajax_required
+def complete_pos_order(request):
+    """Complete POS order and move to active queue"""
+    if request.method == 'POST':
+        try:
+            order_id = request.POST.get('order_id')
+            
+            if not order_id:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Order ID is required'
+                })
+            
+            order = get_object_or_404(ServiceOrder, id=order_id)
+            
+            # Verify order can be completed
+            if order.status == 'completed':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Order is already completed'
+                })
+            
+            if order.payment_status not in ['paid', 'deferred']:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Order must be paid or marked as deferred before completion'
+                })
+            
+            with transaction.atomic():
+                # Update order status
+                order.status = 'in_progress'
+                order.started_at = timezone.now()
+                order.save()
+                
+                # Add to service queue
+                from apps.businesses.utils import ServiceQueueManager
+                queue_manager = ServiceQueueManager(request.tenant)
+                queue_manager.add_to_queue(order)
+                
+                # Update service items status
+                order.service_items.filter(status='pending').update(
+                    status='in_progress',
+                    started_at=timezone.now()
+                )
+                
+                # Send notification if applicable
+                try:
+                    if order.customer.phone:
+                        from apps.core.utils import send_sms_notification
+                        message = f"Hi {order.customer.first_name}, your car wash service has started. Order: {order.order_number}. Thank you!"
+                        send_sms_notification(order.customer.phone, message)
+                except Exception:
+                    # Don't fail order completion if SMS fails
+                    pass
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Order completed and added to service queue',
+                'order_status': order.status,
+                'queue_position': queue_manager.get_position_in_queue(order) if 'queue_manager' in locals() else None
+            })
+            
+        except Exception as e:
+            logger.error(f"Error completing order: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': 'Error completing order. Please try again.'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Invalid request method'
+    })

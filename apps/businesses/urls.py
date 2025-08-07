@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_shifts
 from apps.accounts.views import profile_view
 
 app_name = 'businesses'
@@ -42,4 +42,21 @@ urlpatterns = [
     path('settings/api/backup/create/', views.create_backup_ajax, name='create_backup'),
     path('settings/api/backup/download/<str:backup_id>/', views.download_backup, name='download_backup'),
     path('settings/api/integrations/test/<str:integration>/', views.test_integration_ajax, name='test_integration'),
+    
+    # Shift Management (Business Owners/Managers only)
+    path('shifts/', views_shifts.shift_list_view, name='shifts'),
+    path('shifts/create/', views_shifts.shift_create_view, name='shift_create'),
+    path('shifts/<uuid:shift_id>/', views_shifts.shift_detail_view, name='shift_detail'),
+    path('shifts/<uuid:shift_id>/edit/', views_shifts.shift_edit_view, name='shift_edit'),
+    path('shifts/<uuid:shift_id>/end/', views_shifts.end_shift_ajax, name='end_shift'),
+    path('shifts/<uuid:shift_id>/attendance/', views_shifts.shift_attendance_view, name='shift_attendance'),
+    path('shifts/my-stats/', views_shifts.attendant_shift_statistics, name='attendant_shift_stats'),
+    
+    # Shift Management API
+    path('api/shifts/check-in/', views_shifts.check_in_ajax, name='shift_check_in'),
+    path('api/shifts/check-out/', views_shifts.check_out_ajax, name='shift_check_out'),
+    path('api/shifts/break-start/', views_shifts.break_start_ajax, name='shift_break_start'),
+    path('api/shifts/break-end/', views_shifts.break_end_ajax, name='shift_break_end'),
+    path('api/shifts/current/', views_shifts.current_shift_ajax, name='current_shift'),
+    path('api/shifts/active/', views_shifts.active_shifts_ajax, name='active_shifts'),
 ]

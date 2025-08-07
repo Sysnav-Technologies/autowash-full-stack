@@ -259,8 +259,8 @@ def dashboard_redirect(request):
                         # Supervisors get service management focus
                         business_url = f'/business/{employee_business.slug}/services/'
                     elif employee.role == 'attendant':
-                        # Attendants get their specific dashboard
-                        business_url = f'/business/{employee_business.slug}/services/dashboard/'
+                        # Attendants get their digital workspace
+                        business_url = f'/business/{employee_business.slug}/services/pos/'
                     elif employee.role == 'cleaner':
                         # Cleaners get employee dashboard
                         business_url = f'/business/{employee_business.slug}/employees/dashboard/'

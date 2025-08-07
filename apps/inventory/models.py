@@ -158,6 +158,16 @@ class InventoryItem(TenantSoftDeleteModel):
             return 'normal'
     
     @property
+    def is_sellable(self):
+        """Check if item can be sold (has stock and selling price)"""
+        return (
+            self.is_active and 
+            self.current_stock > 0 and 
+            self.selling_price > 0 and
+            self.item_type in ['product', 'consumable']
+        )
+    
+    @property
     def total_consumed(self):
         """Get total quantity consumed"""
         return self.consumption_records.aggregate(

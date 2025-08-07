@@ -1,0 +1,385 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}My Shift Statistics - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-dashboard {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px 0;
+    }
+    
+    .stat-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        color: white;
+        transition: transform 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .shift-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+    
+    .shift-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .shift-status {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    .status-active { background: #28a745; color: white; }
+    .status-completed { background: #6c757d; color: white; }
+    .status-planned { background: #007bff; color: white; }
+    .status-cancelled { background: #dc3545; color: white; }
+    
+    .btn-filter {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 25px;
+        padding: 8px 20px;
+        margin: 0 5px 10px 0;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-filter.active,
+    .btn-filter:hover {
+        background: white;
+        color: #667eea;
+        border-color: white;
+    }
+    
+    .performance-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stats-dashboard">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="stat-card">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h1 class="text-white mb-0">
+                                <i class="fas fa-chart-line me-3"></i>My Shift Statistics
+                            </h1>
+                            <p class="text-white-50 mb-0">Performance tracking and insights</p>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            {% if shift_status.has_active_shift %}
+                                <div class="d-inline-block">
+                                    <span class="badge bg-success fs-6 me-3">
+                                        <i class="fas fa-clock me-1"></i>On Shift
+                                    </span>
+                                    <small class="text-white-50">
+                                        Active since: {{ shift_status.attendance_record.check_in_time|time:"H:i" }}
+                                    </small>
+                                </div>
+                            {% else %}
+                                <a href="/business/{{ request.tenant.slug }}/shifts/create/" class="btn btn-warning">
+                                    <i class="fas fa-play me-1"></i>Start Shift
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Time Range Filter -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <a href="?range=today" class="btn btn-filter {% if date_range == 'today' %}active{% endif %}">Today</a>
+                <a href="?range=week" class="btn btn-filter {% if date_range == 'week' %}active{% endif %}">This Week</a>
+                <a href="?range=month" class="btn btn-filter {% if date_range == 'month' %}active{% endif %}">This Month</a>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="performance-grid">
+            <!-- Hours Worked -->
+            <div class="stat-card text-center">
+                <div class="stat-value">{{ shift_stats.total_hours|floatformat:1 }}h</div>
+                <div class="stat-label">Hours Worked</div>
+                {% if shift_stats.average_hours %}
+                    <small class="text-white-50">Avg: {{ shift_stats.average_hours|floatformat:1 }}h per shift</small>
+                {% endif %}
+            </div>
+
+            <!-- Total Shifts -->
+            <div class="stat-card text-center">
+                <div class="stat-value">{{ shift_stats.total_shifts }}</div>
+                <div class="stat-label">Total Shifts</div>
+                {% if shift_stats.completed_shifts %}
+                    <small class="text-white-50">{{ shift_stats.completed_shifts }} completed</small>
+                {% endif %}
+            </div>
+
+            <!-- Earnings -->
+            <div class="stat-card text-center">
+                <div class="stat-value">KES {{ shift_stats.total_earnings|floatformat:0 }}</div>
+                <div class="stat-label">Total Earnings</div>
+                {% if shift_stats.total_hours > 0 %}
+                    <small class="text-white-50">KES {{ shift_stats.total_earnings|div:shift_stats.total_hours|floatformat:0 }}/hour</small>
+                {% endif %}
+            </div>
+
+            <!-- Orders Handled -->
+            <div class="stat-card text-center">
+                <div class="stat-value">{{ performance_data.orders }}</div>
+                <div class="stat-label">Orders Handled</div>
+                <small class="text-white-50">{{ performance_data.completion_rate|floatformat:0 }}% completion rate</small>
+            </div>
+
+            <!-- Revenue Generated -->
+            <div class="stat-card text-center">
+                <div class="stat-value">KES {{ performance_data.revenue|floatformat:0 }}</div>
+                <div class="stat-label">Revenue Generated</div>
+                {% if performance_data.orders > 0 %}
+                    <small class="text-white-50">KES {{ performance_data.avg_order_value|floatformat:0 }} avg order</small>
+                {% endif %}
+            </div>
+
+            <!-- Commission Earned -->
+            <div class="stat-card text-center">
+                <div class="stat-value">KES {{ performance_data.commission|floatformat:0 }}</div>
+                <div class="stat-label">Commission Earned</div>
+                {% if performance_data.revenue > 0 %}
+                    <small class="text-white-50">{{ performance_data.commission|div:performance_data.revenue|mul:100|floatformat:1 }}% of revenue</small>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="stat-card">
+                    <h5 class="text-white mb-3">Quick Actions</h5>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <a href="{{ business_urls.pos_dashboard }}" class="btn btn-light">
+                            <i class="fas fa-cash-register me-2"></i>POS Dashboard
+                        </a>
+                        <a href="{{ business_urls.shifts }}" class="btn btn-light">
+                            <i class="fas fa-clock me-2"></i>All Shifts
+                        </a>
+                        {% if shift_status.has_active_shift %}
+                            <button class="btn btn-warning" onclick="checkOutShift()">
+                                <i class="fas fa-sign-out-alt me-2"></i>Check Out
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Shifts -->
+        <div class="row">
+            <div class="col-12">
+                <div class="stat-card">
+                    <h5 class="text-white mb-4">
+                        <i class="fas fa-history me-2"></i>Recent Shifts
+                    </h5>
+                    
+                    {% if my_shifts %}
+                        {% for shift in my_shifts %}
+                            <div class="shift-card">
+                                <div class="row align-items-center">
+                                    <div class="col-md-3">
+                                        <h6 class="mb-1">{{ shift.name }}</h6>
+                                        <small class="text-muted">{{ shift.date }}</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>
+                                            {{ shift.start_time }} - {{ shift.end_time }}
+                                        </div>
+                                        {% with attendance=shift.attendance_records.first %}
+                                            {% if attendance.check_in_time and attendance.check_out_time %}
+                                                <small class="text-success">
+                                                    <i class="fas fa-check me-1"></i>
+                                                    {{ attendance.check_in_time|time:"H:i" }} - {{ attendance.check_out_time|time:"H:i" }}
+                                                </small>
+                                            {% elif attendance.check_in_time %}
+                                                <small class="text-warning">
+                                                    <i class="fas fa-play me-1"></i>
+                                                    Checked in: {{ attendance.check_in_time|time:"H:i" }}
+                                                </small>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                    <div class="col-md-2">
+                                        <span class="shift-status status-{{ shift.status }}">
+                                            {{ shift.get_status_display }}
+                                        </span>
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        {% with attendance=shift.attendance_records.first %}
+                                            {% if attendance.total_hours %}
+                                                <div class="fw-bold">{{ attendance.total_hours|floatformat:1 }}h</div>
+                                                <small class="text-muted">worked</small>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        <a href="/business/{{ request.tenant.slug }}/shifts/{{ shift.id }}/" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        
+                        <!-- Pagination -->
+                        {% if my_shifts.has_other_pages %}
+                            <div class="d-flex justify-content-center mt-4">
+                                <nav>
+                                    <ul class="pagination">
+                                        {% if my_shifts.has_previous %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ my_shifts.previous_page_number }}&range={{ date_range }}">Previous</a>
+                                            </li>
+                                        {% endif %}
+                                        
+                                        {% for num in my_shifts.paginator.page_range %}
+                                            {% if my_shifts.number == num %}
+                                                <li class="page-item active">
+                                                    <span class="page-link">{{ num }}</span>
+                                                </li>
+                                            {% else %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page={{ num }}&range={{ date_range }}">{{ num }}</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        {% if my_shifts.has_next %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ my_shifts.next_page_number }}&range={{ date_range }}">Next</a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center text-white-50 py-5">
+                            <i class="fas fa-calendar-times fa-3x mb-3"></i>
+                            <h5>No shifts found</h5>
+                            <p>You haven't worked any shifts in the selected time period.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function checkOutShift() {
+    if (confirm('Are you sure you want to check out from your current shift?')) {
+        fetch('/business/{{ request.tenant.slug }}/api/shifts/check-out/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Successfully checked out of shift!', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showNotification('Error checking out: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Network error occurred', 'error');
+        });
+    }
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 5000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
