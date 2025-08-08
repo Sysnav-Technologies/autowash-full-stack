@@ -616,22 +616,36 @@ def quick_order_view(request):
                 return redirect(get_business_url(request, 'services:quick_order'))
     
     # GET request - show the form
-    # Get popular services for quick selection
+    # Get popular services for quick selection, fallback to all active services if no popular ones
     popular_services = Service.objects.filter(
         is_active=True,
         is_popular=True
     ).order_by('display_order')[:8]
+    
+    # If no popular services, show all active services
+    if not popular_services.exists():
+        popular_services = Service.objects.filter(
+            is_active=True
+        ).order_by('display_order', 'name')[:8]
+
+    # Get all active services for category filtering
+    all_services = Service.objects.filter(is_active=True).select_related('category')
 
     # Get service packages
     service_packages = ServicePackage.objects.filter(
         is_active=True
     ).order_by('-is_popular', 'name')[:8]
 
-    # Get service categories
-    categories = ServiceCategory.objects.filter(is_active=True).prefetch_related('services')
+    # Get service categories with their active services
+    categories = ServiceCategory.objects.filter(is_active=True).prefetch_related(
+        'services__category'
+    ).annotate(
+        active_service_count=models.Count('services', filter=models.Q(services__is_active=True))
+    ).filter(active_service_count__gt=0)
     
     context = {
         'popular_services': popular_services,
+        'all_services': all_services,
         'categories': categories,
         'service_packages': service_packages, 
         'title': 'Quick Order (Walk-in Customer)'
