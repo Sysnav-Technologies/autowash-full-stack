@@ -74,12 +74,36 @@
 
 .quick-action-btn {
     border: 2px solid transparent;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
 .quick-action-btn:hover {
     border-color: var(--bs-primary);
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.quick-action-btn i {
+    flex-shrink: 0;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.activity-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.chart-empty-icon {
+    font-size: 3rem;
+}
+
+.no-activity-icon {
+    font-size: 2rem;
 }
 
 .alert-item {
@@ -200,10 +224,10 @@
                 </div>
                 <div class="col-lg-4 text-lg-end">
                     <div class="d-flex flex-column flex-lg-row gap-2">
-                        <a href="{% url 'services:create_order' %}" class="btn btn-light btn-sm">
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/quick/" class="btn btn-light btn-sm">
                             <i class="fas fa-plus me-1"></i>New Order
                         </a>
-                        <a href="{% url 'customers:create' %}" class="btn btn-outline-light btn-sm">
+                        <a href="/business/{{ request.tenant.slug }}/customers/create/" class="btn btn-outline-light btn-sm">
                             <i class="fas fa-user-plus me-1"></i>Add Customer
                         </a>
                     </div>
@@ -228,7 +252,7 @@
                 {% if alert.action_url %}
                 <a href="{{ alert.action_url }}" class="btn btn-outline-warning btn-sm me-2">View</a>
                 {% endif %}
-                <form method="post" action="{% url 'businesses:resolve_alert' alert.id %}" class="d-inline">
+                <form method="post" action="/business/{{ request.tenant.slug }}/alerts/{{ alert.id }}/resolve/" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-outline-secondary">
                         <i class="fas fa-times"></i>
@@ -237,6 +261,51 @@
             </div>
         </div>
         {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Business Insights (Prominent Display for Owners/Managers) -->
+{% if employee.role == 'owner' or employee.role == 'manager' %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card dashboard-card">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-chart-pie me-2"></i>Business Insights</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-primary bg-opacity-10 rounded">
+                            <div class="h2 fw-bold text-primary mb-2">{{ business_insights.total_customers|default:0 }}</div>
+                            <div class="text-muted fw-semibold">Total Customers</div>
+                            <small class="text-muted">Lifetime registrations</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-success bg-opacity-10 rounded">
+                            <div class="h2 fw-bold text-success mb-2">{{ business_insights.total_orders|default:0 }}</div>
+                            <div class="text-muted fw-semibold">Total Orders</div>
+                            <small class="text-muted">All-time services</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-info bg-opacity-10 rounded">
+                            <div class="h2 fw-bold text-info mb-2">KES {{ business_insights.average_order_value|floatformat:0|default:0 }}</div>
+                            <div class="text-muted fw-semibold">Avg Order Value</div>
+                            <small class="text-muted">Per transaction</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-warning bg-opacity-10 rounded">
+                            <div class="h2 fw-bold text-warning mb-2">KES {{ business_insights.monthly_revenue|floatformat:0|default:0 }}</div>
+                            <div class="text-muted fw-semibold">Monthly Revenue</div>
+                            <small class="text-muted">Current month</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -364,7 +433,7 @@
                     {% else %}
                         <div class="d-flex align-items-center justify-content-center h-100">
                             <div class="text-center">
-                                <i class="fas fa-chart-line text-muted mb-3" style="font-size: 3rem;"></i>
+                                <i class="fas fa-chart-line text-muted mb-3 chart-empty-icon"></i>
                                 <p class="text-muted">No revenue data available</p>
                                 <small class="text-muted">Start processing orders to see trends</small>
                             </div>
@@ -382,7 +451,7 @@
         <div class="card dashboard-card mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold">Active Goals</h6>
-                <a href="{% url 'businesses:goals' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                <a href="/business/{{ request.tenant.slug }}/goals/" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
             <div class="card-body p-0">
                 {% for goal in active_goals %}
@@ -407,29 +476,59 @@
         <!-- Quick Actions -->
         <div class="card dashboard-card mb-4">
             <div class="card-header bg-white">
-                <h6 class="mb-0 fw-bold">Quick Actions</h6>
+                <h6 class="mb-0 fw-bold"><i class="fas fa-bolt me-2"></i>Quick Actions</h6>
             </div>
             <div class="card-body">
-                <div class="d-grid gap-2">
+                <div class="row g-3">
                     {% for action in quick_actions %}
-                    <a href="{{ action.url }}" class="btn btn-primary quick-action-btn">
-                        <i class="fas fa-{{ action.icon }} me-2"></i>{{ action.title }}
-                    </a>
+                    <div class="col-sm-6">
+                        <a href="{{ action.url }}" class="btn btn-primary quick-action-btn w-100 py-3 d-flex align-items-center">
+                            <i class="fas fa-{{ action.icon }} me-3 fs-5"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">{{ action.title }}</div>
+                                <small class="opacity-75">{{ action.description|default:"Quick access" }}</small>
+                            </div>
+                        </a>
+                    </div>
                     {% empty %}
                     <!-- Default Quick Actions -->
-                    <a href="{% url 'services:create_order' %}" class="btn btn-primary quick-action-btn">
-                        <i class="fas fa-plus me-2"></i>New Service Order
-                    </a>
-                    <a href="{% url 'customers:create' %}" class="btn btn-outline-primary quick-action-btn">
-                        <i class="fas fa-user-plus me-2"></i>Add Customer
-                    </a>
+                    <div class="col-sm-6">
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/quick/" class="btn btn-primary quick-action-btn w-100 py-3 d-flex align-items-center">
+                            <i class="fas fa-plus me-3 fs-5"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">New Service Order</div>
+                                <small class="opacity-75">Start a new wash service</small>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-sm-6">
+                        <a href="/business/{{ request.tenant.slug }}/customers/create/" class="btn btn-outline-primary quick-action-btn w-100 py-3 d-flex align-items-center">
+                            <i class="fas fa-user-plus me-3 fs-5"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">Add Customer</div>
+                                <small class="opacity-75">Register new customer</small>
+                            </div>
+                        </a>
+                    </div>
                     {% if employee.role == 'owner' or employee.role == 'manager' %}
-                    <a href="{% url 'employees:create' %}" class="btn btn-outline-success quick-action-btn">
-                        <i class="fas fa-user-tie me-2"></i>Add Employee
-                    </a>
-                    <a href="{% url 'businesses:analytics' %}" class="btn btn-outline-info quick-action-btn">
-                        <i class="fas fa-chart-bar me-2"></i>View Analytics
-                    </a>
+                    <div class="col-sm-6">
+                        <a href="/business/{{ request.tenant.slug }}/employees/create/" class="btn btn-outline-success quick-action-btn w-100 py-3 d-flex align-items-center">
+                            <i class="fas fa-user-tie me-3 fs-5"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">Add Employee</div>
+                                <small class="opacity-75">Hire new staff member</small>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-sm-6">
+                        <a href="/business/{{ request.tenant.slug }}/reports/" class="btn btn-outline-info quick-action-btn w-100 py-3 d-flex align-items-center">
+                            <i class="fas fa-chart-bar me-3 fs-5"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">View Reports</div>
+                                <small class="opacity-75">Business analytics</small>
+                            </div>
+                        </a>
+                    </div>
                     {% endif %}
                     {% endfor %}
                 </div>
@@ -469,7 +568,7 @@
             <div class="card-header bg-white">
                 <h6 class="mb-0 fw-bold">Recent Activity</h6>
             </div>
-            <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+            <div class="card-body p-0 activity-scroll">
                 {% if recent_activities %}
                     {% for activity in recent_activities %}
                     <div class="activity-item d-flex align-items-start px-3">
@@ -485,7 +584,7 @@
                     {% endfor %}
                 {% else %}
                     <div class="text-center py-4">
-                        <i class="fas fa-bell-slash text-muted mb-2" style="font-size: 2rem;"></i>
+                        <i class="fas fa-bell-slash text-muted mb-2 no-activity-icon"></i>
                         <p class="text-muted mb-0">No recent activity</p>
                         <small class="text-muted">Activity will appear here as you use the system</small>
                     </div>
@@ -494,47 +593,6 @@
         </div>
     </div>
 </div>
-
-<!-- Business Insights (for owners/managers) -->
-{% if employee.role == 'owner' or employee.role == 'manager' %}
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card dashboard-card">
-            <div class="card-header bg-white">
-                <h5 class="mb-0 fw-bold">Business Insights</h5>
-            </div>
-            <div class="card-body">
-                <div class="row g-4">
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <div class="h2 fw-bold text-primary">{{ total_customers|default:0 }}</div>
-                            <div class="text-muted">Total Customers</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <div class="h2 fw-bold text-success">{{ total_orders|default:0 }}</div>
-                            <div class="text-muted">Total Orders</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <div class="h2 fw-bold text-info">{{ average_order_value|floatformat:0|default:0 }}</div>
-                            <div class="text-muted">Avg Order Value</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <div class="h2 fw-bold text-warning">{{ customer_satisfaction|floatformat:1|default:0 }}/5</div>
-                            <div class="text-muted">Customer Rating</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
 
 <!-- JavaScript and Data -->
 <script>
@@ -547,7 +605,7 @@ const dashboardData = {
         customers: {{ quick_stats.today_customers|default:0 }},
         attendance: {{ quick_stats.employee_attendance|default:0 }}
     },
-    businessSlug: '{{ business.slug }}',
+    businessSlug: '{{ request.tenant.slug }}',
     csrfToken: '{{ csrf_token }}'
 };
 

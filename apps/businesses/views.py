@@ -235,6 +235,14 @@ def dashboard_view(request):
         if widget.can_view(employee)
     ]
     
+    # Business insights (for owners/managers)
+    business_insights = {}
+    if employee.role in ['owner', 'manager']:
+        business_insights = get_business_insights()
+    
+    # Get recent activities
+    recent_activities = get_recent_activities(employee, limit=10)
+    
     context = {
         'today_metrics': today_metrics,
         'quick_stats': quick_stats,
@@ -245,47 +253,363 @@ def dashboard_view(request):
         'pending_items': pending_items,
         'performance_comparison': performance_comparison,
         'dashboard_widgets': visible_widgets,
-        'title': f'{business.name} Dashboard'
+        'business_insights': business_insights,
+        'recent_activities': recent_activities,
+        'title': f'{business.name} Dashboard',
+        'business': business,
+        'employee': employee,
+        # Add counts for sidebar badges
+        'pending_orders_count': pending_items.get('pending_orders', 0),
+        'active_queue_count': pending_items.get('active_queue', 0),
+        'low_stock_items': today_metrics.low_stock_items,
+        'pending_payments': pending_items.get('pending_payments', 0),
     }
     
     return render(request, 'businesses/dashboard.html', context)
 
+
+def get_business_insights():
+    """Get comprehensive business insights"""
+    from django.apps import apps
+    from decimal import Decimal
+    
+    insights = {
+        'total_customers': 0,
+        'total_orders': 0,
+        'average_order_value': Decimal('0.00'),
+        'customer_satisfaction': Decimal('0.0'),
+        'monthly_revenue': Decimal('0.00'),
+        'top_services': [],
+        'growth_metrics': {},
+    }
+    
+    try:
+        # Customer metrics
+        Customer = apps.get_model('customers', 'Customer')
+        insights['total_customers'] = Customer.objects.count()
+        
+        # Service order metrics
+        ServiceOrder = apps.get_model('services', 'ServiceOrder')
+        total_orders = ServiceOrder.objects.count()
+        insights['total_orders'] = total_orders
+        
+        # Average order value
+        if total_orders > 0:
+            Payment = apps.get_model('payments', 'Payment')
+            total_revenue = Payment.objects.filter(
+                status='completed'
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            
+            if total_orders > 0:
+                insights['average_order_value'] = total_revenue / total_orders
+        
+        # Monthly revenue
+        current_month_start = timezone.now().replace(day=1).date()
+        monthly_payments = Payment.objects.filter(
+            created_at__date__gte=current_month_start,
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        insights['monthly_revenue'] = monthly_payments
+        
+        # Top services
+        Service = apps.get_model('services', 'Service')
+        from django.db.models import Count
+        top_services = ServiceOrder.objects.filter(
+            created_at__date__gte=current_month_start
+        ).values('service__name').annotate(
+            count=Count('id')
+        ).order_by('-count')[:5]
+        insights['top_services'] = list(top_services)
+        
+    except:
+        pass
+    
+    return insights
+
+
+def get_recent_activities(employee, limit=10):
+    """Get recent activities for the dashboard"""
+    activities = []
+    
+    try:
+        from django.apps import apps
+        
+        # Recent service orders
+        ServiceOrder = apps.get_model('services', 'ServiceOrder')
+        recent_orders = ServiceOrder.objects.filter(
+            created_at__gte=timezone.now() - timedelta(hours=24)
+        ).order_by('-created_at')[:5]
+        
+        for order in recent_orders:
+            activities.append({
+                'title': f'New service order #{order.id}',
+                'description': f'Service: {order.service.name if hasattr(order, "service") else "Unknown"}',
+                'created_at': order.created_at,
+                'type': 'success',
+                'icon': 'car-wash'
+            })
+        
+        # Recent customer registrations
+        Customer = apps.get_model('customers', 'Customer')
+        recent_customers = Customer.objects.filter(
+            created_at__gte=timezone.now() - timedelta(hours=24)
+        ).order_by('-created_at')[:3]
+        
+        for customer in recent_customers:
+            activities.append({
+                'title': 'New customer registered',
+                'description': f'{customer.full_name}',
+                'created_at': customer.created_at,
+                'type': 'info',
+                'icon': 'user-plus'
+            })
+        
+        # Recent payments
+        Payment = apps.get_model('payments', 'Payment')
+        recent_payments = Payment.objects.filter(
+            created_at__gte=timezone.now() - timedelta(hours=24),
+            status='completed'
+        ).order_by('-created_at')[:3]
+        
+        for payment in recent_payments:
+            activities.append({
+                'title': 'Payment received',
+                'description': f'KES {payment.amount} via {payment.payment_method}',
+                'created_at': payment.created_at,
+                'type': 'success',
+                'icon': 'money-bill-wave'
+            })
+        
+        # Sort by creation time
+        activities.sort(key=lambda x: x['created_at'], reverse=True)
+        
+    except:
+        pass
+    
+    return activities[:limit]
+
+
+@login_required
+@employee_required()
+def dashboard_data_api(request):
+    """API endpoint for dashboard data updates"""
+    today = timezone.now().date()
+    period = request.GET.get('period', '7')
+    
+    # Get or update today's metrics
+    today_metrics, created = BusinessMetrics.objects.get_or_create(
+        date=today,
+        defaults={
+            'new_customers': 0,
+            'returning_customers': 0,
+            'total_customers_served': 0,
+            'total_services': 0,
+            'completed_services': 0,
+            'gross_revenue': 0,
+        }
+    )
+    
+    if created:
+        today_metrics.set_created_by(request.user)
+        today_metrics.set_updated_by(request.user)
+    
+    # Always update for real-time data
+    update_daily_metrics(today_metrics, request.user)
+    
+    # Calculate period for trend data
+    try:
+        period_days = int(period)
+    except:
+        period_days = 7    # Get trend data for the specified period
+    start_date = today - timedelta(days=period_days)
+    period_metrics = BusinessMetrics.objects.filter(
+        date__gte=start_date
+    ).order_by('date')
+    
+    revenue_trend = [
+        {
+            'date': metric.date.strftime('%Y-%m-%d'),
+            'revenue': float(metric.gross_revenue),
+            'customers': metric.total_customers_served
+        }
+        for metric in period_metrics
+    ]
+    
+    # Current metrics for real-time updates
+    current_metrics = {
+        'today_revenue': float(today_metrics.gross_revenue),
+        'today_customers': today_metrics.total_customers_served,
+        'today_services': today_metrics.completed_services,
+        'employee_attendance': float(today_metrics.employee_attendance_rate),
+    }
+    
+    return JsonResponse({
+        'revenue_trend': revenue_trend,
+        'current_metrics': current_metrics,
+        **current_metrics,  # For backward compatibility
+        'status': 'success'
+    })
+
 def update_daily_metrics(metrics, user=None):
     """Update daily metrics with real-time data"""
-    from apps.customers.models import Customer
-    from apps.employees.models import Employee, Attendance
+    from django.apps import apps
+    from decimal import Decimal
     
     today = metrics.date
     
     # Customer metrics
     try:
+        Customer = apps.get_model('customers', 'Customer')
         new_customers_today = Customer.objects.filter(
             created_at__date=today
         ).count()
         metrics.new_customers = new_customers_today
+        
+        # Total customers served today (from service orders)
+        total_customers_today = 0
+        try:
+            ServiceOrder = apps.get_model('services', 'ServiceOrder')
+            served_today = ServiceOrder.objects.filter(
+                created_at__date=today,
+                status__in=['completed', 'in_progress', 'pending']
+            ).values('customer').distinct().count()
+            total_customers_today = served_today
+        except:
+            pass
+        
+        metrics.total_customers_served = max(new_customers_today, total_customers_today)
+        
     except:
         pass  # Customer app might not be ready
     
+    # Service metrics
+    try:
+        ServiceOrder = apps.get_model('services', 'ServiceOrder')
+        service_orders_today = ServiceOrder.objects.filter(
+            created_at__date=today
+        )
+        
+        metrics.total_services = service_orders_today.count()
+        metrics.completed_services = service_orders_today.filter(status='completed').count()
+        metrics.cancelled_services = service_orders_today.filter(status='cancelled').count()
+        
+        # Calculate average service time
+        completed_orders = service_orders_today.filter(
+            status='completed',
+            completed_at__isnull=False
+        )
+        if completed_orders.exists():
+            total_time = sum([
+                (order.completed_at - order.created_at).total_seconds() / 60
+                for order in completed_orders
+            ])
+            metrics.average_service_time = Decimal(str(total_time / completed_orders.count()))
+    except:
+        pass
+    
+    # Revenue metrics
+    try:
+        Payment = apps.get_model('payments', 'Payment')
+        payments_today = Payment.objects.filter(
+            created_at__date=today,
+            status='completed'
+        )
+        
+        gross_revenue = payments_today.aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        metrics.gross_revenue = gross_revenue
+        
+        # Payment method breakdown
+        cash_payments = payments_today.filter(payment_method='cash').aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        
+        card_payments = payments_today.filter(payment_method='card').aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        
+        mpesa_payments = payments_today.filter(payment_method='mpesa').aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        
+        metrics.cash_payments = cash_payments
+        metrics.card_payments = card_payments
+        metrics.mpesa_payments = mpesa_payments
+        
+    except:
+        pass
+    
     # Employee attendance
     try:
+        Employee = apps.get_model('employees', 'Employee')
+        Attendance = apps.get_model('employees', 'Attendance')
+        
         attendance_today = Attendance.objects.filter(date=today)
         present_count = attendance_today.filter(status='present').count()
         total_employees = Employee.objects.filter(is_active=True).count()
-        absent_count = total_employees - present_count
+        absent_count = max(0, total_employees - present_count)
         
         metrics.total_employees_present = present_count
         metrics.total_employees_absent = absent_count
         
         # Calculate working hours
-        total_hours = 0
+        total_hours = Decimal('0.00')
         for attendance in attendance_today.filter(check_in_time__isnull=False):
-            total_hours += attendance.hours_worked
+            if hasattr(attendance, 'hours_worked'):
+                total_hours += Decimal(str(attendance.hours_worked or 0))
         metrics.total_working_hours = total_hours
+        
+        # Calculate attendance rate
+        if total_employees > 0:
+            attendance_rate = (present_count / total_employees) * 100
+        else:
+            attendance_rate = 0
+        metrics.employee_attendance_rate = Decimal(str(attendance_rate))
+        
     except:
-        pass  # Some fields might not exist yet
+        pass
     
-    # Additional metrics would be calculated here from other apps
-    # This will be completed when services and payments apps are ready
+    # Inventory metrics
+    try:
+        InventoryItem = apps.get_model('inventory', 'InventoryItem')
+        
+        low_stock_items = InventoryItem.objects.filter(
+            current_stock__lte=F('minimum_stock_level')
+        ).count()
+        
+        out_of_stock_items = InventoryItem.objects.filter(
+            current_stock=0
+        ).count()
+        
+        metrics.low_stock_items = low_stock_items
+        metrics.out_of_stock_items = out_of_stock_items
+        
+    except:
+        pass
+    
+    # Expense metrics
+    try:
+        Expense = apps.get_model('expenses', 'Expense')
+        expenses_today = Expense.objects.filter(
+            date=today,
+            status='approved'
+        )
+        
+        total_expenses = expenses_today.aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        metrics.total_expenses = total_expenses
+        
+        # Calculate profit margin
+        if metrics.gross_revenue > 0:
+            net_revenue = metrics.gross_revenue - total_expenses
+            profit_margin = (net_revenue / metrics.gross_revenue) * 100
+            metrics.net_revenue = net_revenue
+            metrics.profit_margin = Decimal(str(profit_margin))
+        
+    except:
+        pass
     
     # Set updated_by safely when saving
     if user:
@@ -294,58 +618,158 @@ def update_daily_metrics(metrics, user=None):
 
 def get_pending_dashboard_items(employee):
     """Get pending items that need attention"""
-    pending_items = []
+    from django.apps import apps
     
-    # Pending leave requests (for managers and owners)
-    if employee.role in ['owner', 'manager']:
-        try:
-            from apps.employees.models import Leave
-            pending_leaves = Leave.objects.filter(status='pending').count()
-            if pending_leaves > 0:
-                pending_items.append({
-                    'title': f'{pending_leaves} Pending Leave Request{"s" if pending_leaves > 1 else ""}',
-                    'url': '/employees/leave/pending/',
-                    'icon': 'fas fa-calendar-alt',
-                    'type': 'warning'
-                })
-        except:
-            pass  # Leave model might not be ready
+    pending_items = {
+        'pending_orders': 0,
+        'active_queue': 0,
+        'pending_payments': 0,
+        'low_stock_alerts': 0,
+        'pending_employee_requests': 0,
+        'items': []
+    }
     
-    # Low stock items
     try:
-        from apps.inventory.models import InventoryItem
-        low_stock_count = InventoryItem.objects.filter(
-            current_stock__lte=F('minimum_stock_level')
+        # Pending service orders
+        ServiceOrder = apps.get_model('services', 'ServiceOrder')
+        pending_orders = ServiceOrder.objects.filter(
+            status='pending'
         ).count()
-        if low_stock_count > 0:
-            pending_items.append({
-                'title': f'{low_stock_count} Low Stock Alert{"s" if low_stock_count > 1 else ""}',
-                'url': '/inventory/low-stock/',
-                'icon': 'fas fa-exclamation-triangle',
-                'type': 'danger'
-            })
-    except:
-        pass  # Inventory app might not be ready
-    
-    # Overdue goals
-    try:
-        overdue_goals = BusinessGoal.objects.filter(
-            is_active=True,
-            end_date__lt=timezone.now().date(),
-            is_achieved=False
-        ).count()
+        pending_items['pending_orders'] = pending_orders
         
-        if overdue_goals > 0:
-            pending_items.append({
-                'title': f'{overdue_goals} Overdue Goal{"s" if overdue_goals > 1 else ""}',
-                'url': '/business/goals/',
-                'icon': 'fas fa-target',
-                'type': 'warning'
+        if pending_orders > 0:
+            pending_items['items'].append({
+                'title': f'{pending_orders} pending service orders',
+                'created_at': timezone.now(),
+                'type': 'warning',
+                'icon': 'clock',
+                'url': f'/business/{employee.business.slug}/services/orders/?status=pending'
             })
-    except:
-        pass  # BusinessGoal might not be ready
+        
+        # Active queue items
+        active_queue = ServiceOrder.objects.filter(
+            status='in_progress'
+        ).count()
+        pending_items['active_queue'] = active_queue
+        
+        # Pending payments
+        Payment = apps.get_model('payments', 'Payment')
+        pending_payments = Payment.objects.filter(
+            status='pending'
+        ).count()
+        pending_items['pending_payments'] = pending_payments
+        
+        if pending_payments > 0:
+            pending_items['items'].append({
+                'title': f'{pending_payments} pending payments',
+                'created_at': timezone.now(),
+                'type': 'info',
+                'icon': 'credit-card',
+                'url': f'/business/{employee.business.slug}/payments/?status=pending'
+            })
+        
+        # Low stock alerts (for managers and owners)
+        if employee.role in ['owner', 'manager']:
+            InventoryItem = apps.get_model('inventory', 'InventoryItem')
+            low_stock_count = InventoryItem.objects.filter(
+                current_stock__lte=F('minimum_stock_level')
+            ).count()
+            pending_items['low_stock_alerts'] = low_stock_count
+            
+            if low_stock_count > 0:
+                pending_items['items'].append({
+                    'title': f'{low_stock_count} items low in stock',
+                    'created_at': timezone.now(),
+                    'type': 'danger',
+                    'icon': 'exclamation-triangle',
+                    'url': f'/business/{employee.business.slug}/inventory/reports/low-stock/'
+                })
+        
+        # Pending employee requests (for owners and managers)
+        if employee.role in ['owner', 'manager']:
+            Employee = apps.get_model('employees', 'Employee')
+            pending_employee_requests = Employee.objects.filter(
+                status='pending_approval'
+            ).count()
+            pending_items['pending_employee_requests'] = pending_employee_requests
+            
+            if pending_employee_requests > 0:
+                pending_items['items'].append({
+                    'title': f'{pending_employee_requests} employee requests',
+                    'created_at': timezone.now(),
+                    'type': 'primary',
+                    'icon': 'user-check',
+                    'url': f'/business/{employee.business.slug}/employees/?status=pending'
+                })
+        
+    except Exception as e:
+        print(f"Error getting pending items: {e}")
     
     return pending_items
+
+
+@login_required
+@employee_required()
+def dashboard_data_api(request):
+    """API endpoint for dashboard data updates"""
+    today = timezone.now().date()
+    period = request.GET.get('period', '7')
+    
+    # Get or update today's metrics
+    today_metrics, created = BusinessMetrics.objects.get_or_create(
+        date=today,
+        defaults={
+            'new_customers': 0,
+            'returning_customers': 0,
+            'total_customers_served': 0,
+            'total_services': 0,
+            'completed_services': 0,
+            'gross_revenue': 0,
+        }
+    )
+    
+    if created:
+        today_metrics.set_created_by(request.user)
+        today_metrics.set_updated_by(request.user)
+    
+    # Always update for real-time data
+    update_daily_metrics(today_metrics, request.user)
+    
+    # Calculate period for trend data
+    try:
+        period_days = int(period)
+    except:
+        period_days = 7
+    
+    # Get trend data for the specified period
+    start_date = today - timedelta(days=period_days)
+    period_metrics = BusinessMetrics.objects.filter(
+        date__gte=start_date
+    ).order_by('date')
+    
+    revenue_trend = [
+        {
+            'date': metric.date.strftime('%Y-%m-%d'),
+            'revenue': float(metric.gross_revenue),
+            'customers': metric.total_customers_served
+        }
+        for metric in period_metrics
+    ]
+    
+    # Current metrics for real-time updates
+    current_metrics = {
+        'today_revenue': float(today_metrics.gross_revenue),
+        'today_customers': today_metrics.total_customers_served,
+        'today_services': today_metrics.completed_services,
+        'employee_attendance': float(today_metrics.employee_attendance_rate),
+    }
+    
+    return JsonResponse({
+        'revenue_trend': revenue_trend,
+        'current_metrics': current_metrics,
+        **current_metrics,  # For backward compatibility
+        'status': 'success'
+    })
 
 @login_required
 @employee_required()
