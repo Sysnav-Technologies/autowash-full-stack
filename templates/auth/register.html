@@ -3,6 +3,10 @@
 
 {% block title %}Get Started - Autowash{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/auth.css' %}">
+{% endblock %}
+
 {% block public_content %}
 <section class="auth-section min-vh-100 d-flex align-items-center">
     <div class="container">
@@ -115,11 +119,11 @@
                                 • Not be entirely numeric
                             </div>
 
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="terms" name="terms" required>
+                            <div class="form-check mb-3 d-flex align-items-start">
+                                <input class="form-check-input subscription-terms-checkbox" type="checkbox" id="terms" name="terms" required>
                                 <label class="form-check-label" for="terms">
-                                    I agree to the <a href="#" target="_blank" class="text-decoration-none">Terms</a> 
-                                    and <a href="#" target="_blank" class="text-decoration-none">Privacy Policy</a>
+                                    I agree to the <a href="#" target="_blank" class="text-decoration-none text-primary">Terms</a> 
+                                    and <a href="#" target="_blank" class="text-decoration-none text-primary">Privacy Policy</a>
                                 </label>
                             </div>
 
@@ -128,6 +132,12 @@
                                 <label class="form-check-label" for="marketing">
                                     Receive marketing emails about Autowash System
                                 </label>
+                            </div>
+
+                            <!-- Email Verification Notice -->
+                            <div class="alert alert-info email-verification-notice mb-3">
+                                <i class="fas fa-envelope me-2"></i>
+                                <strong>Email Verification Required:</strong> You'll receive a verification email to activate your account.
                             </div>
 
                             <button type="submit" class="btn btn-auth btn-purple mb-3">
@@ -141,9 +151,21 @@
                             <span class="auth-divider-text">or</span>
                         </div>
 
-                        <button class="btn btn-outline-secondary w-100 mb-3">
-                            <i class="fab fa-google text-danger me-2"></i>Sign up with Google
-                        </button>
+                        {% load socialaccount %}
+                        {% get_providers as socialaccount_providers %}
+                        {% if socialaccount_providers %}
+                            {% for provider in socialaccount_providers %}
+                                {% if provider.id == "google" %}
+                                    <a href="{% provider_login_url 'google' %}" class="btn btn-outline-secondary w-100 mb-3">
+                                        <i class="fab fa-google text-danger me-2"></i>Sign up with Google
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-info text-center">
+                                <small><i class="fas fa-info-circle me-1"></i>Social signup will be available after setup</small>
+                            </div>
+                        {% endif %}
 
                         <!-- Sign In Link -->
                         <div class="text-center">
@@ -160,7 +182,7 @@
                 <!-- Trial Info -->
                 <div class="text-center mt-3">
                     <div class="d-flex justify-content-center gap-3 text-muted">
-                        <span><i class="fas fa-check me-1"></i> 14-day trial</span>
+                        <span><i class="fas fa-check me-1"></i> 7-day trial</span>
                         <span><i class="fas fa-check me-1"></i> No credit card</span>
                         <span><i class="fas fa-check me-1"></i> Cancel anytime</span>
                     </div>

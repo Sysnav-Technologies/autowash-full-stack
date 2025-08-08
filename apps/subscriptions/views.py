@@ -194,7 +194,7 @@ def subscribe_view(request, plan_slug):
                 business=business,  # Use the business object (which is a Tenant)
                 start_date=timezone.now(),
                 end_date=end_date,
-                trial_end_date=timezone.now() + timedelta(days=14),  # 14-day trial
+                trial_end_date=timezone.now() + timedelta(days=7),  # 7-day trial
                 status='trial',  # Start with trial
                 amount=final_amount
             )
@@ -208,8 +208,15 @@ def subscribe_view(request, plan_slug):
             # Create usage tracking
             SubscriptionUsage.objects.create(subscription=subscription)
             
+            # Send business registration email after subscription selection
+            try:
+                from apps.accounts.views import send_business_registration_email
+                send_business_registration_email(request, business)
+            except Exception as e:
+                print(f"Failed to send business registration email: {e}")
+            
             # Skip payment for now - directly proceed to verification
-            messages.success(request, f"Welcome to {plan.name}! Your 14-day trial has started. Please complete verification to activate your account.")
+            messages.success(request, f"Welcome to {plan.name}! Your 7-day trial has started. Please complete verification to activate your account.")
             return redirect('/auth/verification-pending/')
         else:
             # Form has errors - display them

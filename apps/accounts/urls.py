@@ -9,8 +9,17 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
 
+    # Email verification
+    path('verify-email/<str:uidb64>/<str:token>/', views.verify_email, name='verify_email'),
+    path('resend-verification/', views.resend_verification_email, name='resend_verification'),
+    path('email-verification-sent/', views.email_verification_sent, name='email_verification_sent'),
+    path('email-verification-success/', views.email_verification_success_view, name='email_verification_success'),
+
     # Password Reset
     path('password-reset/', views.password_reset_view, name='password_reset'),
+    path('password-reset-done/', views.password_reset_done_view, name='password_reset_done'),
+    path('password-reset-confirm/<str:uidb64>/<str:token>/', views.password_reset_confirm_view, name='password_reset_confirm'),
+    path('password-reset-complete/', views.password_reset_complete_view, name='password_reset_complete'),
     
     # Dashboard redirect
     path('dashboard/', views.dashboard_redirect, name='dashboard_redirect'),

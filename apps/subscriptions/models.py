@@ -49,7 +49,7 @@ class SubscriptionPlan(TimeStampedModel):
     onsite_support = models.BooleanField(default=False)
     
     # Trial
-    trial_days = models.IntegerField(default=14)
+    trial_days = models.IntegerField(default=7)
     
     # Display order
     sort_order = models.IntegerField(default=0)

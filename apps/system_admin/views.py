@@ -21,6 +21,9 @@ from decimal import Decimal
 import traceback
 import json
 
+# Import email functions
+from apps.accounts.views import send_business_approval_email
+
 
 def get_user_business_relationships(user):
     """
@@ -166,7 +169,7 @@ def approve_business(request, business_id):
                             plan=plan,
                             status='trial',  # Start with trial
                             start_date=timezone.now().date(),
-                            end_date=(timezone.now() + timezone.timedelta(days=getattr(plan, 'trial_days', 14))).date(),
+                            end_date=(timezone.now() + timezone.timedelta(days=getattr(plan, 'trial_days', 7))).date(),  # 7-day trial
                             amount=plan.price
                         )
                         business.subscription = subscription
@@ -198,20 +201,27 @@ def approve_business(request, business_id):
                     setup_success = setup_tenant_after_approval(business, request.user)
                     
                     if setup_success:
+                        # 5. Send approval notification email
+                        try:
+                            send_business_approval_email(request, business)
+                            print("Business approval email sent successfully")
+                        except Exception as e:
+                            print(f"Failed to send approval email: {e}")
+                            # Don't fail the approval process for email issues
+                        
                         # Log the activity
                         AdminActivity.objects.create(
                             admin_user=request.user,
                             action='approve_business',
-                            description=f"Approved business '{business.name}' with automatic tenant setup"
+                            description=f"Approved business '{business.name}' with automatic tenant setup and 7-day trial"
                         )
                         
                         messages.success(
                             request, 
                             f'Business "{business.name}" has been approved successfully! '
-                            f'Tenant database created and owner employee record established.'
+                            f'Tenant database created, owner employee record established, and approval email sent. '
+                            f'The business will have a 7-day trial period starting now.'
                         )
-                        
-                        # TODO: Send approval notification email/SMS
                         
                         return redirect('system_admin:dashboard')
                     else:
@@ -661,6 +671,14 @@ def bulk_approve_businesses(request):
                         setup_success = setup_tenant_after_approval(business, request.user)
                         if not setup_success:
                             failed_setups.append(business.name)
+                        
+                        # Send approval notification email
+                        try:
+                            send_business_approval_email(request, business)
+                            print(f"Approval email sent for business: {business.name}")
+                        except Exception as e:
+                            print(f"Failed to send approval email for {business.name}: {e}")
+                            # Don't fail the approval process for email issues
                         
                         approved_count += 1
                         
