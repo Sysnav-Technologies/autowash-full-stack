@@ -22,8 +22,10 @@ def business_context(request):
     if hasattr(request, 'tenant') and request.tenant:
         tenant = request.tenant
         
-        # Check if business is verified
+        # Check business status
         is_verified = getattr(tenant, 'is_verified', False)
+        is_approved = getattr(tenant, 'is_approved', False)
+        is_active = getattr(tenant, 'is_active', False)
         
         context.update({
             'business_name': tenant.name,
@@ -32,30 +34,90 @@ def business_context(request):
             'business_email': tenant.email,
             'business_timezone': getattr(tenant, 'timezone', 'Africa/Nairobi'),
             'business_verified': is_verified,
+            'business_approved': is_approved,
+            'business_active': is_active,
             'business_slug': tenant.slug,
             'business_url_prefix': f'/business/{tenant.slug}',
             'tenant_subdomain': tenant.subdomain,
             'tenant_primary_domain': tenant.primary_domain,
         })
         
+        # Add subscription context (access from main database)
+        subscription = None
+        has_subscription = False
+        subscription_active = False
+        subscription_plan = None
+        subscription_trial = False
+        
+        try:
+            # Switch to main database to access subscription
+            from django.db import connection
+            from django_tenants.utils import schema_context
+            
+            with schema_context('public'):
+                # Use the correct related name 'subscriptions'
+                subscription_qs = tenant.subscriptions.filter(status__in=['active', 'trial'])
+                if subscription_qs.exists():
+                    subscription = subscription_qs.first()
+                    has_subscription = True
+                    subscription_active = subscription.is_active if hasattr(subscription, 'is_active') else True
+                    subscription_plan = subscription.plan.name if subscription and subscription.plan else None
+                    subscription_trial = subscription.status == 'trial' if subscription else False
+        except Exception:
+            # If subscription access fails, use default values
+            pass
+        
+        context.update({
+            'has_subscription': has_subscription,
+            'subscription_active': subscription_active,
+            'subscription_plan': subscription_plan,
+            'subscription_trial': subscription_trial,
+        })
+        
+        # Add trial information for approved businesses
+        if is_approved and tenant.approved_at:
+            from datetime import timedelta
+            from django.utils import timezone as tz
+            trial_end = tenant.approved_at + timedelta(days=7)
+            trial_active = tz.now() <= trial_end
+            
+            context.update({
+                'trial_end_date': trial_end,
+                'trial_active': trial_active,
+                'trial_days_remaining': max(0, (trial_end - tz.now()).days) if trial_active else 0,
+            })
+        
         # Add verification status if not verified
-        if not is_verified:
+        if not is_verified or not is_approved:
             try:
                 verification = tenant.verification
                 context.update({
                     'verification_status': verification.status,
                     'verification_submitted': verification.submitted_at,
+                    'verification_notes': getattr(verification, 'notes', ''),
                 })
             except:
                 context.update({
                     'verification_status': 'pending',
                     'verification_submitted': None,
+                    'verification_notes': '',
                 })
+                
+        # Add workflow status for templates
+        if is_approved and is_verified and is_active:
+            context['business_status'] = 'active'
+        elif is_approved and not is_verified:
+            context['business_status'] = 'finalizing'
+        elif not is_approved:
+            context['business_status'] = 'pending_approval'
+        else:
+            context['business_status'] = 'inactive'
     else:
         # Public context
         context.update({
             'business_url_prefix': '',
             'is_public_context': True,
+            'business_status': 'public',
         })
     
     return context

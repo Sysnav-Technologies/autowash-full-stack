@@ -51,7 +51,6 @@ SHARED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.sites',
     'crispy_forms',
     'crispy_bootstrap5',
     'phonenumber_field',
@@ -65,6 +64,7 @@ SHARED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     'django_celery_beat',
     'django_celery_results',
     'channels',
@@ -84,6 +84,7 @@ TENANT_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     'rest_framework.authtoken',
     'django_celery_beat',
     'django_celery_results',
@@ -387,7 +388,9 @@ if not RENDER and not CPANEL:
     EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-    DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@localhost')
+    DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Autowash <noreply@localhost>')
+    SERVER_EMAIL = DEFAULT_FROM_EMAIL
+    EMAIL_SUBJECT_PREFIX = '[Autowash] '
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = config('EMAIL_HOST', default='mail.autowash.co.ke')
@@ -396,6 +399,12 @@ else:
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='noreply@autowash.co.ke')
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
     DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Autowash <noreply@autowash.co.ke>')
+    SERVER_EMAIL = DEFAULT_FROM_EMAIL
+    EMAIL_SUBJECT_PREFIX = '[Autowash] '
+
+# Email verification settings
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 7
+ACCOUNT_EMAIL_CONFIRMATION_HMAC = True
 
 SMS_API_KEY = config('SMS_API_KEY', default='')
 SMS_USERNAME = config('SMS_USERNAME', default='sandbox')
@@ -449,6 +458,35 @@ ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_REDIRECT_URL = '/public/'
 ACCOUNT_LOGOUT_ON_GET = True
+
+# Social Account Settings
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        },
+        'OAUTH_PKCE_ENABLED': True,
+        'VERIFIED_EMAIL': True,
+    }
+}
+
+# Social Account Configuration
+SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'  # Since Google emails are pre-verified
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_QUERY_EMAIL = True
+
+# Google OAuth Credentials (to be set in environment variables)
+GOOGLE_OAUTH2_CLIENT_ID = config('GOOGLE_OAUTH2_CLIENT_ID', default='')
+GOOGLE_OAUTH2_CLIENT_SECRET = config('GOOGLE_OAUTH2_CLIENT_SECRET', default='')
+
+# Site ID for allauth
+SITE_ID = 1
 
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

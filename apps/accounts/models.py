@@ -28,6 +28,7 @@ class UserProfile(TimeStampedModel):
     timezone = models.CharField(max_length=50, default='Africa/Nairobi')
     receive_sms = models.BooleanField(default=True)
     receive_email = models.BooleanField(default=True)
+    receive_login_notifications = models.BooleanField(default=True, help_text="Receive email notifications when you sign in")
     
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.username} Profile"

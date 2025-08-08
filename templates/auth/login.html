@@ -50,18 +50,34 @@
                                     <input class="form-check-input" type="checkbox" id="remember" name="remember">
                                     <label class="form-check-label" for="remember">Remember me</label>
                                 </div>
-                                <a href="#" class="text-decoration-none">Forgot password?</a>
+                                <a href="{% url 'accounts:password_reset' %}" class="text-decoration-none">Forgot password?</a>
                             </div>
                             <button type="submit" class="btn btn-auth btn-purple mb-3">
                                 <i class="fas fa-sign-in-alt me-2"></i>Sign In
                             </button>
                         </form>
 
-                        <!-- Divider -->
+                        <!-- Social Login -->
                         <div class="position-relative text-center mb-3">
                             <hr class="my-0">
                             <span class="auth-divider-text">or</span>
                         </div>
+
+                        {% load socialaccount %}
+                        {% get_providers as socialaccount_providers %}
+                        {% if socialaccount_providers %}
+                            {% for provider in socialaccount_providers %}
+                                {% if provider.id == "google" %}
+                                    <a href="{% provider_login_url 'google' %}" class="btn btn-outline-secondary w-100 mb-3">
+                                        <i class="fab fa-google text-danger me-2"></i>Sign in with Google
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-info text-center">
+                                <small><i class="fas fa-info-circle me-1"></i>Social login will be available after setup</small>
+                            </div>
+                        {% endif %}
 
                         <!-- Sign Up Link -->
                         <div class="text-center">

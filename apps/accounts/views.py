@@ -1,4 +1,4 @@
-# apps/accounts/views.py - Updated with fixed employee creation
+# apps/accounts/views.py - Updated with Google OAuth integration
 
 import re
 from django.shortcuts import render, redirect, get_object_or_404
@@ -13,7 +13,10 @@ from django.views.generic import TemplateView, CreateView, UpdateView
 from django.utils.decorators import method_decorator
 from django.db import transaction, connection
 from django.views.decorators.csrf import csrf_protect
-
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.contrib.sites.models import Site
 
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
@@ -62,7 +65,7 @@ class LandingView(TemplateView):
         return context
 
 def register_view(request):
-    """User registration view"""
+    """User registration view with enhanced email verification"""
     if request.user.is_authenticated:
         return redirect('accounts:dashboard_redirect')
     
@@ -71,7 +74,9 @@ def register_view(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    user = form.save()
+                    user = form.save(commit=False)
+                    user.is_active = False  # User will be activated after email verification
+                    user.save()
                     
                     # Create user profile
                     UserProfile.objects.create(
@@ -79,15 +84,14 @@ def register_view(request):
                         phone=form.cleaned_data.get('phone'),
                     )
                     
-                    # Authenticate and login
-                    username = form.cleaned_data.get('username')
-                    password = form.cleaned_data.get('password1')
-                    user = authenticate(username=username, password=password)
+                    # Send email verification
+                    send_verification_email(request, user)
                     
-                    if user:
-                        login(request, user)
-                        messages.success(request, 'Account created successfully!')
-                        return redirect('accounts:business_register')
+                    messages.success(
+                        request, 
+                        'Account created successfully! Please check your email to verify your account.'
+                    )
+                    return redirect('accounts:email_verification_sent')
                         
             except Exception as e:
                 messages.error(request, f'Registration failed: {str(e)}')
@@ -96,8 +100,323 @@ def register_view(request):
     
     return render(request, 'auth/register.html', {'form': form})
 
+def send_verification_email(request, user):
+    """Send email verification using custom templates"""
+    try:
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+        
+        # Generate verification token
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        
+        # Build verification URL
+        verification_url = request.build_absolute_uri(
+            reverse('accounts:verify_email', kwargs={'uidb64': uid, 'token': token})
+        )
+        
+        # Get current site
+        current_site = Site.objects.get_current()
+        
+        # Prepare email context
+        email_context = {
+            'user': user,
+            'activate_url': verification_url,
+            'current_site': current_site,
+            'protocol': 'https' if request.is_secure() else 'http',
+        }
+        
+        # Render email templates
+        subject = render_to_string('account/email/email_confirmation_subject.txt', email_context).strip()
+        html_message = render_to_string('account/email/email_confirmation_message.html', email_context)
+        text_message = render_to_string('account/email/email_confirmation_message.txt', email_context)
+        
+        # Send email
+        send_mail(
+            subject=subject,
+            message=text_message,
+            html_message=html_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error sending verification email: {e}")
+        return False
+
+
+def send_business_approval_email(request, business):
+    """Send business approval notification email"""
+    try:
+        from datetime import timedelta
+        
+        # Calculate trial end date (7 days from approval)
+        trial_end_date = business.approved_at + timedelta(days=7)
+        
+        # Build dashboard URL
+        dashboard_url = request.build_absolute_uri(f'/business/{business.slug}/')
+        help_center_url = request.build_absolute_uri('/help/')
+        login_url = request.build_absolute_uri('/auth/login/')
+        
+        # Get current site
+        current_site = Site.objects.get_current()
+        
+        # Get subscription info
+        subscription_info = {}
+        if hasattr(business, 'subscription') and business.subscription:
+            subscription_info = {
+                'plan_name': business.subscription.plan.name,
+                'trial_end': trial_end_date,
+                'trial_active': True,
+            }
+        
+        # Prepare email context
+        email_context = {
+            'business': business,
+            'owner': business.owner,
+            'trial_end_date': trial_end_date,
+            'dashboard_url': dashboard_url,
+            'help_center_url': help_center_url,
+            'login_url': login_url,
+            'current_site': current_site,
+            'protocol': 'https' if request.is_secure() else 'http',
+            'subscription': subscription_info,
+            'approved_by': business.approved_by.get_full_name() if business.approved_by else 'Autowash Team',
+        }
+        
+        # Render email templates
+        subject = render_to_string('account/email/business_approval_subject.txt', email_context).strip()
+        html_message = render_to_string('account/email/business_approval_message.html', email_context)
+        text_message = render_to_string('account/email/business_approval_message.txt', email_context)
+        
+        # Send email to business owner
+        send_mail(
+            subject=subject,
+            message=text_message,
+            html_message=html_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[business.owner.email],
+            fail_silently=False,
+        )
+        
+        # Also send to business email if different
+        if business.email and business.email != business.owner.email:
+            send_mail(
+                subject=subject,
+                message=text_message,
+                html_message=html_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[business.email],
+                fail_silently=False,
+            )
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error sending business approval email: {e}")
+        return False
+
+
+def send_business_registration_email(request, business):
+    """Send business registration confirmation email"""
+    try:
+        from datetime import timedelta
+        
+        # Calculate trial end date (7 days from approval, not registration)
+        # Note: Trial starts after admin approval
+        trial_end_date = business.created_at + timedelta(days=7)
+        
+        # Build dashboard URL
+        dashboard_url = request.build_absolute_uri(f'/business/{business.slug}/')
+        help_center_url = request.build_absolute_uri('/help/')
+        
+        # Get current site
+        current_site = Site.objects.get_current()
+        
+        # Prepare email context
+        email_context = {
+            'business': business,
+            'trial_end_date': trial_end_date,
+            'dashboard_url': dashboard_url,
+            'help_center_url': help_center_url,
+            'current_site': current_site,
+            'protocol': 'https' if request.is_secure() else 'http',
+        }
+        
+        # Render email templates
+        subject = render_to_string('account/email/business_registration_subject.txt', email_context).strip()
+        html_message = render_to_string('account/email/business_registration_message.html', email_context)
+        text_message = render_to_string('account/email/business_registration_message.txt', email_context)
+        
+        # Send email to business owner
+        send_mail(
+            subject=subject,
+            message=text_message,
+            html_message=html_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[business.owner.email],
+            fail_silently=False,
+        )
+        
+        # Also send to business email if different
+        if business.email and business.email != business.owner.email:
+            send_mail(
+                subject=subject,
+                message=text_message,
+                html_message=html_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[business.email],
+                fail_silently=False,
+            )
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error sending business registration email: {e}")
+        return False
+
+
+def send_login_notification_email(request, user):
+    """Send login notification email similar to Google's security alerts"""
+    try:
+        # Check if user wants to receive login notifications
+        try:
+            if hasattr(user, 'profile') and not user.profile.receive_login_notifications:
+                return True  # User opted out
+        except Exception:
+            pass  # Continue if profile doesn't exist
+        
+        # Get client information
+        ip_address = get_client_ip(request)
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        
+        # Parse user agent for device and browser info
+        device_info, browser_info = parse_user_agent(user_agent)
+        
+        # Get location from IP (you can integrate with a GeoIP service)
+        location = get_location_from_ip(ip_address)
+        
+        # Build dashboard URL for the user's business
+        dashboard_url = request.build_absolute_uri('/auth/dashboard/')
+        business = user.owned_tenants.first()
+        if business:
+            dashboard_url = request.build_absolute_uri(f'/business/{business.slug}/')
+        
+        # Get current site
+        current_site = Site.objects.get_current()
+        
+        # Prepare email context
+        email_context = {
+            'user': user,
+            'login_time': timezone.now(),
+            'ip_address': ip_address,
+            'device_info': device_info,
+            'browser_info': browser_info,
+            'location': location,
+            'dashboard_url': dashboard_url,
+            'current_site': current_site,
+            'current_year': timezone.now().year,
+            'protocol': 'https' if request.is_secure() else 'http',
+        }
+        
+        # Render email templates
+        subject = render_to_string('account/email/login_notification_subject.txt', email_context).strip()
+        html_message = render_to_string('account/email/login_notification_message.html', email_context)
+        text_message = render_to_string('account/email/login_notification_message.txt', email_context)
+        
+        # Send email
+        send_mail(
+            subject=subject,
+            message=text_message,
+            html_message=html_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error sending login notification email: {e}")
+        return False
+
+
+def get_client_ip(request):
+    """Get the client's IP address"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
+def parse_user_agent(user_agent):
+    """Parse user agent string to extract device and browser information"""
+    device_info = "Unknown Device"
+    browser_info = "Unknown Browser"
+    
+    try:
+        # Simple user agent parsing (you can use a library like user-agents for better parsing)
+        user_agent_lower = user_agent.lower()
+        
+        # Device detection
+        if 'mobile' in user_agent_lower or 'android' in user_agent_lower or 'iphone' in user_agent_lower:
+            if 'android' in user_agent_lower:
+                device_info = "Android Device"
+            elif 'iphone' in user_agent_lower:
+                device_info = "iPhone"
+            elif 'ipad' in user_agent_lower:
+                device_info = "iPad"
+            else:
+                device_info = "Mobile Device"
+        elif 'macintosh' in user_agent_lower or 'mac os' in user_agent_lower:
+            device_info = "Mac"
+        elif 'windows' in user_agent_lower:
+            device_info = "Windows PC"
+        elif 'linux' in user_agent_lower:
+            device_info = "Linux PC"
+        
+        # Browser detection
+        if 'chrome' in user_agent_lower and 'edg' not in user_agent_lower:
+            browser_info = "Google Chrome"
+        elif 'firefox' in user_agent_lower:
+            browser_info = "Mozilla Firefox"
+        elif 'safari' in user_agent_lower and 'chrome' not in user_agent_lower:
+            browser_info = "Safari"
+        elif 'edg' in user_agent_lower:
+            browser_info = "Microsoft Edge"
+        elif 'opera' in user_agent_lower:
+            browser_info = "Opera"
+        
+    except Exception:
+        pass
+    
+    return device_info, browser_info
+
+
+def get_location_from_ip(ip_address):
+    """Get approximate location from IP address"""
+    # For now, return a simple placeholder
+    # You can integrate with services like:
+    # - GeoIP2 (MaxMind)
+    # - ipapi.co
+    # - ip-api.com
+    try:
+        if ip_address and ip_address != '127.0.0.1' and not ip_address.startswith('192.168.'):
+            # This is a public IP, you could do a real lookup here
+            return "Approximate location available"
+        else:
+            return "Local/Private network"
+    except Exception:
+        return "Unknown"
+
 def login_view(request):
-    """User login view"""
+    """User login view with enhanced error handling"""
     if request.user.is_authenticated:
         return redirect('accounts:dashboard_redirect')
     
@@ -105,22 +424,72 @@ def login_view(request):
         username = request.POST.get('username')
         password = request.POST.get('password')
         
+        # Try to find user by email or username
+        try:
+            if '@' in username:
+                # Login with email
+                user_obj = User.objects.get(email=username)
+                username = user_obj.username
+        except User.DoesNotExist:
+            pass  # Username will be used as-is
+        
         user = authenticate(request, username=username, password=password)
         if user:
-            login(request, user)
-            messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
-            
-            # Redirect to next URL or dashboard
-            next_url = request.GET.get('next', 'accounts:dashboard_redirect')
-            return redirect(next_url)
+            if user.is_active:
+                login(request, user)
+                messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
+                
+                # Send login notification email (async to not slow down login)
+                try:
+                    from threading import Thread
+                    email_thread = Thread(
+                        target=send_login_notification_email,
+                        args=(request, user)
+                    )
+                    email_thread.daemon = True
+                    email_thread.start()
+                except Exception as e:
+                    print(f"Failed to start login notification email thread: {e}")
+                
+                # Redirect to next URL or dashboard
+                next_url = request.GET.get('next', 'accounts:dashboard_redirect')
+                return redirect(next_url)
+            else:
+                messages.error(request, 'Your account is not activated. Please check your email for verification instructions.')
         else:
             messages.error(request, 'Invalid credentials. Please try again.')
     
     return render(request, 'auth/login.html')
 
-# Password Reset view
+def verify_email(request, uidb64, token):
+    """Email verification view"""
+    from django.contrib.auth.tokens import default_token_generator
+    from django.utils.http import urlsafe_base64_decode
+    from django.utils.encoding import force_str
+    
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+    
+    if user is not None and default_token_generator.check_token(user, token):
+        if not user.is_active:
+            user.is_active = True
+            user.save()
+            
+            messages.success(request, 'Your email has been verified successfully! Welcome to Autowash.')
+            return redirect('accounts:email_verification_success')
+        else:
+            messages.info(request, 'Your email is already verified.')
+            return redirect('accounts:login')
+    else:
+        messages.error(request, 'The verification link is invalid or has expired.')
+        return redirect('accounts:login')
+
+# Password Reset view with enhanced templates
 def password_reset_view(request):
-    """Password reset view"""
+    """Password reset view with HTML email templates"""
     if request.user.is_authenticated:
         return redirect('accounts:dashboard_redirect')
     
@@ -129,36 +498,128 @@ def password_reset_view(request):
         if email:
             try:
                 user = User.objects.get(email=email)
-                # Trigger password reset email (using Django's built-in functionality)
+                
+                # Generate reset token
                 from django.contrib.auth.tokens import default_token_generator
-                from django.core.mail import send_mail
-                from django.urls import reverse
+                from django.utils.http import urlsafe_base64_encode
+                from django.utils.encoding import force_bytes
                 
                 token = default_token_generator.make_token(user)
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                
+                # Build reset URL
                 reset_url = request.build_absolute_uri(
-                    reverse('accounts:password_reset_confirm', kwargs={'uidb64': user.pk, 'token': token})
+                    reverse('accounts:password_reset_confirm', kwargs={'uidb64': uid, 'token': token})
                 )
                 
+                # Get current site
+                current_site = Site.objects.get_current()
+                
+                # Prepare email context
+                email_context = {
+                    'user': user,
+                    'password_reset_url': reset_url,
+                    'current_site': current_site,
+                    'protocol': 'https' if request.is_secure() else 'http',
+                }
+                
+                # Render email templates
+                subject = render_to_string('account/email/password_reset_key_subject.txt', email_context).strip()
+                text_message = render_to_string('account/email/password_reset_key_message.txt', email_context)
+                
+                # Send email
                 send_mail(
-                    'Password Reset Request',
-                    f'Click the link to reset your password: {reset_url}',
-                    settings.DEFAULT_FROM_EMAIL,
-                    [email],
+                    subject=subject,
+                    message=text_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
                     fail_silently=False,
                 )
                 
                 messages.success(request, 'Password reset email sent! Please check your inbox.')
+                return redirect('accounts:password_reset_done')
             except User.DoesNotExist:
-                messages.error(request, 'No user found with that email address.')
+                # Don't reveal if email exists for security
+                messages.success(request, 'If an account with that email exists, a password reset email has been sent.')
+                return redirect('accounts:password_reset_done')
         else:
             messages.error(request, 'Email is required.')
     
     return render(request, 'auth/password_reset.html')
 
+def password_reset_confirm_view(request, uidb64, token):
+    """Password reset confirmation view"""
+    from django.contrib.auth.tokens import default_token_generator
+    from django.utils.http import urlsafe_base64_decode
+    from django.utils.encoding import force_str
+    
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+    
+    if user is not None and default_token_generator.check_token(user, token):
+        if request.method == 'POST':
+            password1 = request.POST.get('password1')
+            password2 = request.POST.get('password2')
+            
+            if password1 and password2:
+                if password1 == password2:
+                    user.set_password(password1)
+                    user.save()
+                    messages.success(request, 'Your password has been reset successfully!')
+                    return redirect('accounts:password_reset_complete')
+                else:
+                    messages.error(request, 'Passwords do not match.')
+            else:
+                messages.error(request, 'Both password fields are required.')
+        
+        context = {
+            'validlink': True,
+            'form_action': reverse('accounts:password_reset_confirm', kwargs={'uidb64': uidb64, 'token': token})
+        }
+        return render(request, 'auth/password_reset_confirm.html', context)
+    else:
+        messages.error(request, 'The password reset link is invalid or has expired.')
+        return redirect('accounts:password_reset')
+
+
+def password_reset_done_view(request):
+    """Password reset email sent confirmation"""
+    return render(request, 'auth/password_reset_done.html')
+
+
+def password_reset_complete_view(request):
+    """Password reset complete confirmation"""
+    return render(request, 'auth/password_reset_complete.html')
+
+
+def email_verification_sent(request):
+    """Email verification sent confirmation"""
+    return render(request, 'auth/email_verification_sent.html')
+
+
+def resend_verification_email(request):
+    """Resend email verification"""
+    if request.method == 'POST':
+        if request.user.is_authenticated and not request.user.is_active:
+            send_verification_email(request, request.user)
+            messages.success(request, 'Verification email has been resent. Please check your inbox.')
+        else:
+            messages.error(request, 'Unable to resend verification email.')
+    
+    return redirect('accounts:email_verification_sent')
+
+
+def email_verification_success_view(request):
+    """Email verification success page"""
+    return render(request, 'auth/email_verification_success.html')
+
 
 @login_required
 def dashboard_redirect(request):
-    """Smart dashboard redirect based on user context and verification status"""
+    """Smart dashboard redirect based on user context and complete authentication flow"""
     print(f"\n" + "="*50)
     print(f"DASHBOARD REDIRECT CALLED")
     print(f"User: {request.user.username}")
@@ -166,7 +627,12 @@ def dashboard_redirect(request):
     print(f"Request META HOST: {request.META.get('HTTP_HOST')}")
     print(f"="*50)
     
-    # First check if user owns a business
+    # First check if user email is verified
+    if not request.user.is_active:
+        messages.warning(request, 'Please verify your email address first.')
+        return redirect('accounts:email_verification_sent')
+    
+    # Check if user owns a business
     business = request.user.owned_tenants.first()
     print(f"User owned business: {business}")
     
@@ -174,20 +640,71 @@ def dashboard_redirect(request):
         print(f"Business found: {business.name}")
         print(f"Business slug: {business.slug}")
         print(f"Business verified: {business.is_verified}")
+        print(f"Business approved: {business.is_approved}")
         
-        # Check subscription status first
-        if not hasattr(business, 'subscription') or not business.subscription or not business.subscription.is_active:
-            # Business doesn't have an active subscription - redirect to subscription selection
+        # Step 1: Check if business registration is complete
+        if not business.name or not business.phone or not business.email:
+            messages.info(request, 'Please complete your business registration.')
+            return redirect('/auth/business/register/')
+        
+        # Step 2: Check if subscription is selected
+        has_subscription = False
+        try:
+            # Check subscription in main database context
+            from django_tenants.utils import schema_context
+            with schema_context('public'):
+                has_subscription = business.subscriptions.filter(status__in=['active', 'trial']).exists()
+        except Exception:
+            has_subscription = False
+            
+        if not has_subscription:
             messages.info(request, 'Please select a subscription plan to continue.')
-            return redirect(f'/business/{business.slug}/subscriptions/select/')
+            return redirect('/subscriptions/select/')
         
-        # Check verification status
+        # Step 3: Check if business is approved by admin
+        if not business.is_approved:
+            # Check verification status
+            try:
+                verification = business.verification
+                if verification.status == 'pending':
+                    messages.info(request, 'Your business is awaiting admin approval. You will receive an email once approved.')
+                elif verification.status == 'in_review':
+                    messages.info(request, 'Your business documents are under review. You will receive an email once approved.')
+                elif verification.status == 'rejected':
+                    messages.warning(request, f'Your business registration was rejected: {business.rejection_reason or "Please contact support for details."}')
+                else:
+                    messages.info(request, 'Your business is pending approval. You will receive an email once approved.')
+            except:
+                messages.info(request, 'Your business is pending approval. You will receive an email once approved.')
+            
+            return redirect('/auth/verification-pending/')
+        
+        # Step 4: Check if subscription is active (trial or paid)
+        if not business.subscription.is_active:
+            # Check if trial period has started (trial starts after approval)
+            from datetime import timedelta
+            from django.utils import timezone
+            
+            if business.approved_at:
+                trial_end = business.approved_at + timedelta(days=7)
+                if timezone.now() <= trial_end:
+                    # Still in trial period
+                    messages.success(request, f'Your 7-day trial is active until {trial_end.strftime("%B %d, %Y")}.')
+                else:
+                    # Trial expired
+                    messages.warning(request, 'Your trial period has expired. Please upgrade your subscription.')
+                    return redirect('/subscriptions/upgrade/')
+            else:
+                # No approval date set - shouldn't happen but handle gracefully
+                messages.warning(request, 'Please contact support to activate your subscription.')
+                return redirect('/auth/verification-pending/')
+        
+        # Step 5: Check if business is verified (final step)
         if not business.is_verified:
-            # Business is not verified yet
-            messages.info(request, 'Your business is pending verification. Please check your verification status.')
-            return redirect(f'/business/{business.slug}/verification-pending/')
+            messages.info(request, 'Your business setup is being finalized. Please wait a moment...')
+            return redirect('/auth/verification-pending/')
         
-        # Business is verified - redirect to business dashboard using path-based URL
+        # All checks passed - redirect to business dashboard
         business_url = f'/business/{business.slug}/'
         print(f"Redirecting to business dashboard: {business_url}")
         return redirect(business_url)
@@ -195,11 +712,15 @@ def dashboard_redirect(request):
     # User doesn't own a business - check if they're an employee
     print("No owned business found, checking for employee records...")
     
-    # Search across all verified tenants for this user's employee record
+    # Search across all verified and approved tenants for this user's employee record
     try:
         from apps.core.tenant_models import Tenant
         
-        verified_tenants = Tenant.objects.filter(is_verified=True, is_active=True)
+        verified_tenants = Tenant.objects.filter(
+            is_verified=True, 
+            is_active=True, 
+            is_approved=True
+        )
         
         employee_business = None
         
@@ -305,11 +826,16 @@ def dashboard_redirect(request):
             all_businesses.append({
                 'business': biz,
                 'access_type': 'owner',
-                'verified': biz.is_verified
+                'verified': biz.is_verified,
+                'approved': biz.is_approved
             })
         
-        # Add employee businesses
-        verified_tenants = Tenant.objects.filter(is_verified=True, is_active=True)
+        # Add employee businesses (only verified and approved)
+        verified_tenants = Tenant.objects.filter(
+            is_verified=True, 
+            is_active=True, 
+            is_approved=True
+        )
         for tenant in verified_tenants:
             try:
                 from apps.employees.models import Employee
@@ -323,6 +849,7 @@ def dashboard_redirect(request):
                         'business': tenant,
                         'access_type': 'employee',
                         'verified': True,
+                        'approved': True,
                         'employee': employee
                     })
             except:
@@ -334,16 +861,24 @@ def dashboard_redirect(request):
             return redirect('/auth/switch-business/')
         
         elif len(all_businesses) == 1:
-            # User has access to one business
+            # User has access to one business - check its status
             business_access = all_businesses[0]
             biz = business_access['business']
             
-            if not business_access['verified']:
-                # Unverified business (must be owned)
-                messages.info(request, 'Your business is pending verification.')
-                return redirect('/auth/verification-pending/')
+            if business_access['access_type'] == 'owner':
+                # For owned businesses, check the full flow
+                if not business_access['approved']:
+                    messages.info(request, 'Your business is pending approval.')
+                    return redirect('/auth/verification-pending/')
+                elif not business_access['verified']:
+                    messages.info(request, 'Your business is being finalized.')
+                    return redirect('/auth/verification-pending/')
+                else:
+                    # Business is fully approved and verified
+                    business_url = f'/business/{biz.slug}/'
+                    return redirect(business_url)
             else:
-                # Verified business access
+                # Employee access - business should already be verified and approved
                 business_url = f'/business/{biz.slug}/'
                 return redirect(business_url)
     
@@ -465,6 +1000,14 @@ def business_register_view(request):
                     # IMPORTANT: NO database creation here!
                     # That will be done by admin during approval process
                     print("Business registration complete - waiting for admin approval")
+                    
+                    # Send business registration confirmation email
+                    print("Sending business registration email...")
+                    email_sent = send_business_registration_email(request, business)
+                    if email_sent:
+                        print("Business registration email sent successfully")
+                    else:
+                        print("Failed to send business registration email")
                     
                     # Environment-specific success message
                     success_message = f"Business '{business.name}' registered successfully! Please select a subscription plan to continue."
