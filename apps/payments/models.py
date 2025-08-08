@@ -280,7 +280,11 @@ class Payment(TenantTimeStampedModel):
     @property
     def can_be_refunded(self):
         """Check if payment can be refunded"""
-        return self.status in ['completed', 'verified'] and not self.refunds.exists()
+        if self.status not in ['completed', 'verified']:
+            return False
+        
+        # Can be refunded if there's still refundable amount
+        return self.refundable_amount > 0
     
     @property
     def total_refunded(self):
@@ -288,6 +292,11 @@ class Payment(TenantTimeStampedModel):
         return self.refunds.aggregate(
             total=models.Sum('amount')
         )['total'] or Decimal('0')
+    
+    @property
+    def refundable_amount(self):
+        """Get amount available for refund"""
+        return self.amount - self.total_refunded
     
     @property
     def payment_type_display(self):
