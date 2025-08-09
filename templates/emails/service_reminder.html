@@ -1,0 +1,103 @@
+{% extends "emails/base.html" %}
+
+{% block email_title %}Service Reminder{% endblock %}
+
+{% block content %}
+<div class="content-container">
+    <!-- Reminder Alert -->
+    <div style="background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%); padding: 20px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
+        <div style="color: #fff; font-size: 18px; font-weight: 600; margin-bottom: 8px;">
+            ⏰ Service Reminder
+        </div>
+        <div style="color: #fff; opacity: 0.9;">
+            Your service appointment is coming up!
+        </div>
+    </div>
+
+    <!-- Order Information -->
+    <div class="card">
+        <h3 style="color: #1a202c; margin: 0 0 16px 0; font-size: 18px;">Order Details</h3>
+        
+        <div class="info-row">
+            <span class="label">Order Number:</span>
+            <span class="value">{{ order.order_number }}</span>
+        </div>
+        
+        <div class="info-row">
+            <span class="label">Vehicle:</span>
+            <span class="value">{{ vehicle.make }} {{ vehicle.model }} ({{ vehicle.registration_number }})</span>
+        </div>
+        
+        {% if order.scheduled_date %}
+        <div class="info-row">
+            <span class="label">Scheduled Date:</span>
+            <span class="value">{{ order.scheduled_date|date:"F d, Y" }}</span>
+        </div>
+        {% endif %}
+        
+        {% if order.scheduled_time %}
+        <div class="info-row">
+            <span class="label">Scheduled Time:</span>
+            <span class="value">{{ order.scheduled_time|time:"g:i A" }}</span>
+        </div>
+        {% endif %}
+        
+        <div class="info-row">
+            <span class="label">Total Amount:</span>
+            <span class="value" style="color: #0066cc; font-weight: 600;">KES {{ order.total_amount|floatformat:0 }}</span>
+        </div>
+    </div>
+
+    <!-- Services List -->
+    <div class="card">
+        <h3 style="color: #1a202c; margin: 0 0 16px 0; font-size: 18px;">Selected Services</h3>
+        
+        {% for item in order_items %}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+            <div>
+                <div style="font-weight: 600; color: #1a202c;">{{ item.service.name }}</div>
+                {% if item.service.description %}
+                <div style="color: #64748b; font-size: 14px; margin-top: 4px;">{{ item.service.description|truncatewords:15 }}</div>
+                {% endif %}
+            </div>
+            <div style="text-align: right;">
+                <div style="font-weight: 600; color: #0066cc;">KES {{ item.total_price|floatformat:0 }}</div>
+                {% if item.quantity > 1 %}
+                <div style="color: #64748b; font-size: 14px;">{{ item.quantity }}x @ KES {{ item.unit_price|floatformat:0 }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Preparation Instructions -->
+    <div class="card">
+        <h3 style="color: #1a202c; margin: 0 0 16px 0; font-size: 18px;">📋 Please Prepare</h3>
+        
+        <ul style="color: #64748b; margin: 0; padding-left: 20px;">
+            <li style="margin-bottom: 8px;">Ensure your vehicle is accessible and unlocked</li>
+            <li style="margin-bottom: 8px;">Remove any valuable items from the vehicle</li>
+            <li style="margin-bottom: 8px;">Have your vehicle keys ready</li>
+            <li style="margin-bottom: 8px;">Inform us of any special requirements or concerns</li>
+        </ul>
+    </div>
+
+    <!-- Contact Actions -->
+    <div style="text-align: center; margin: 32px 0;">
+        <div style="margin-bottom: 16px;">
+            <a href="tel:{{ business_phone }}" class="btn btn-primary" style="margin: 0 8px;">
+                📞 Call Us
+            </a>
+            {% if business_email %}
+            <a href="mailto:{{ business_email }}" class="btn btn-secondary" style="margin: 0 8px;">
+                ✉️ Email Us
+            </a>
+            {% endif %}
+        </div>
+        
+        <p style="color: #64748b; margin: 0; font-size: 14px;">
+            Need to reschedule? Contact us at least 2 hours before your appointment.
+        </p>
+    </div>
+</div>
+{% endblock %}

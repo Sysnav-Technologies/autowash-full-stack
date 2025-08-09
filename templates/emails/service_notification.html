@@ -1,0 +1,168 @@
+{% extends 'emails/base.html' %}
+
+{% block content %}
+<div class="greeting">
+    Hello {% if customer.first_name %}{{ customer.first_name }}{% else %}Valued Customer{% endif %}!
+</div>
+
+{% if notification_type == "started" %}
+<div class="message">
+    Great news! Your car wash service has been started at {{ business_name }}. Our team is now working on your vehicle.
+</div>
+
+<div class="alert alert-info">
+    <strong>Service In Progress</strong><br>
+    Your vehicle is currently being serviced by our professional team.
+</div>
+
+{% elif notification_type == "completed" %}
+<div class="message">
+    Excellent! Your car wash service has been completed successfully at {{ business_name }}. Your vehicle is ready for pickup.
+</div>
+
+<div class="alert alert-success">
+    <strong>Service Completed!</strong><br>
+    Your vehicle has been professionally cleaned and is ready for collection.
+</div>
+
+{% elif notification_type == "reminder" %}
+<div class="message">
+    This is a friendly reminder about your upcoming car wash appointment at {{ business_name }}.
+</div>
+
+<div class="alert alert-warning">
+    <strong>Upcoming Appointment</strong><br>
+    Don't forget about your scheduled car wash service.
+</div>
+
+{% elif notification_type == "created" %}
+<div class="message">
+    Thank you for choosing {{ business_name }}! Your service order has been confirmed and we're preparing to serve you.
+</div>
+
+<div class="alert alert-success">
+    <strong>Order Confirmed!</strong><br>
+    Your service request has been received and will be processed shortly.
+</div>
+
+{% else %}
+<div class="message">
+    We have an update regarding your car wash service at {{ business_name }}.
+</div>
+{% endif %}
+
+<div class="info-card">
+    <div class="info-card-header">
+        🚗 Service Information
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Order Number</span>
+        <span class="info-value">{{ order.order_number }}</span>
+    </div>
+    
+    {% if order_items %}
+    <div class="info-row">
+        <span class="info-label">Services</span>
+        <span class="info-value">
+            {% for item in order_items %}
+                {{ item.service.name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </span>
+    </div>
+    {% endif %}
+    
+    {% if vehicle %}
+    <div class="info-row">
+        <span class="info-label">Vehicle</span>
+        <span class="info-value">{{ vehicle.make }} {{ vehicle.model }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Registration Number</span>
+        <span class="info-value">{{ vehicle.registration_number }}</span>
+    </div>
+    {% endif %}
+    
+    <div class="info-row">
+        <span class="info-label">Service Date</span>
+        <span class="info-value">{{ order.created_at|date:"F d, Y" }}</span>
+    </div>
+    
+    {% if order.actual_start_time %}
+    <div class="info-row">
+        <span class="info-label">Started At</span>
+        <span class="info-value">{{ order.actual_start_time|time:"g:i A" }}</span>
+    </div>
+    {% endif %}
+    
+    {% if order.actual_end_time %}
+    <div class="info-row">
+        <span class="info-label">Completed At</span>
+        <span class="info-value">{{ order.actual_end_time|time:"g:i A" }}</span>
+    </div>
+    {% endif %}
+    
+    <div class="info-row">
+        <span class="info-label">Total Amount</span>
+        <span class="info-value">KES {{ total_amount|floatformat:0 }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Status</span>
+        <span class="info-value">
+            {% if order.status == "completed" %}
+                <span class="status-badge status-success">{{ order.get_status_display }}</span>
+            {% elif order.status == "in_progress" %}
+                <span class="status-badge status-info">{{ order.get_status_display }}</span>
+            {% else %}
+                <span class="status-badge status-warning">{{ order.get_status_display }}</span>
+            {% endif %}
+        </span>
+    </div>
+</div>
+
+{% if order.assigned_attendant or attendant_name %}
+<div class="info-card">
+    <div class="info-card-header">
+        👤 Service Team
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Assigned To</span>
+        <span class="info-value">{{ attendant_name|default:"Our Professional Team" }}</span>
+    </div>
+    
+    {% if order.assigned_attendant.phone %}
+    <div class="info-row">
+        <span class="info-label">Contact</span>
+        <span class="info-value">{{ order.assigned_attendant.phone }}</span>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if notification_type == "completed" and order.total_amount %}
+<div class="alert alert-info">
+    <strong>Service Complete!</strong><br>
+    Your total service amount is KES {{ order.total_amount|floatformat:0 }}. Thank you for your business!
+</div>
+{% endif %}
+
+<div class="message">
+    {% if notification_type == "completed" %}
+    Thank you for choosing {{ business_name }}! We hope you're satisfied with the quality of our work.
+    {% else %}
+    Thank you for choosing {{ business_name }} for your car wash services. We're committed to providing you with the best experience.
+    {% endif %}
+</div>
+
+<div class="text-center">
+    {% if business_phone %}
+    <a href="tel:{{ business_phone }}" class="btn btn-secondary">📞 Call {{ business_name }}</a>
+    {% endif %}
+    {% if business_email %}
+    <a href="mailto:{{ business_email }}" class="btn btn-secondary">✉️ Email {{ business_name }}</a>
+    {% endif %}
+</div>
+{% endblock %}

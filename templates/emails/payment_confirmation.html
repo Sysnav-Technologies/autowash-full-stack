@@ -1,0 +1,119 @@
+{% extends 'emails/base.html' %}
+
+{% block content %}
+<div class="greeting">
+    Hello {% if customer_name %}{{ customer_name }}{% else %}Valued Customer{% endif %}!
+</div>
+
+<div class="message">
+    Your payment has been successfully processed. Here are the details of your transaction:
+</div>
+
+<div class="alert alert-success">
+    <strong>Payment Confirmed!</strong><br>
+    Thank you for your payment. Your transaction has been completed successfully.
+</div>
+
+<div class="info-card">
+    <div class="info-card-header">
+        💳 Payment Details
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Payment ID</span>
+        <span class="info-value">{{ payment.payment_id }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Amount Paid</span>
+        <span class="info-value">KES {{ payment.amount|floatformat:2 }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Payment Method</span>
+        <span class="info-value">{{ payment.payment_method.name }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Date & Time</span>
+        <span class="info-value">{{ payment.completed_at|date:"F d, Y at g:i A" }}</span>
+    </div>
+    
+    {% if payment.transaction_id %}
+    <div class="info-row">
+        <span class="info-label">Transaction ID</span>
+        <span class="info-value">{{ payment.transaction_id }}</span>
+    </div>
+    {% endif %}
+    
+    <div class="info-row">
+        <span class="info-label">Status</span>
+        <span class="info-value">
+            <span class="status-badge status-success">{{ payment.get_status_display }}</span>
+        </span>
+    </div>
+</div>
+
+{% if payment.service_order %}
+<div class="info-card">
+    <div class="info-card-header">
+        🚗 Service Details
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Order Number</span>
+        <span class="info-value">{{ payment.service_order.order_number }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Service Type</span>
+        <span class="info-value">{{ payment.service_order.service_type.name }}</span>
+    </div>
+    
+    {% if payment.service_order.vehicle %}
+    <div class="info-row">
+        <span class="info-label">Vehicle</span>
+        <span class="info-value">{{ payment.service_order.vehicle.make }} {{ payment.service_order.vehicle.model }} ({{ payment.service_order.vehicle.license_plate }})</span>
+    </div>
+    {% endif %}
+    
+    <div class="info-row">
+        <span class="info-label">Service Date</span>
+        <span class="info-value">{{ payment.service_order.scheduled_date|date:"F d, Y" }}</span>
+    </div>
+    
+    {% if payment.is_partial_payment %}
+    <div class="info-row">
+        <span class="info-label">Remaining Balance</span>
+        <span class="info-value">KES {{ payment.get_remaining_balance|floatformat:2 }}</span>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if payment.is_partial_payment %}
+<div class="alert alert-info">
+    <strong>Partial Payment</strong><br>
+    This is a partial payment. A balance of KES {{ payment.get_remaining_balance|floatformat:2 }} remains for this service.
+</div>
+{% endif %}
+
+{% if receipt_url %}
+<div class="text-center">
+    <a href="{{ receipt_url }}" class="btn btn-success">📄 Download Receipt</a>
+</div>
+{% endif %}
+
+<div class="message">
+    If you have any questions about this payment or need assistance, please don't hesitate to contact {{ tenant_info.name|default:"us" }}.
+</div>
+
+<div class="text-center">
+    {% if tenant_info.phone %}
+    <a href="tel:{{ tenant_info.phone }}" class="btn btn-secondary">📞 Call {{ tenant_info.name }}</a>
+    {% endif %}
+    {% if tenant_info.email %}
+    <a href="mailto:{{ tenant_info.email }}" class="btn btn-secondary">✉️ Email {{ tenant_info.name }}</a>
+    {% endif %}
+</div>
+{% endblock %}

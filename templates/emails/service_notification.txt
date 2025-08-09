@@ -1,0 +1,40 @@
+Service {{ notification_type|title }} - {{ business_name|default:"Autowash Service" }}
+
+Dear {{ customer.first_name }},
+
+{% if notification_type == 'created' %}
+Your service order has been confirmed!
+{% elif notification_type == 'started' %}
+Great news! Your service has started.
+{% elif notification_type == 'completed' %}
+Excellent! Your service has been completed.
+{% elif notification_type == 'reminder' %}
+This is a friendly reminder about your upcoming service appointment.
+{% endif %}
+
+Order Details:
+- Order Number: {{ order.order_number }}
+- Vehicle: {{ vehicle.make }} {{ vehicle.model }} ({{ vehicle.registration_number }})
+- Total Amount: KES {{ order.total_amount|floatformat:0 }}
+{% if attendant_name %}
+- Attendant: {{ attendant_name }}
+{% endif %}
+
+Services:
+{% for item in order_items %}
+- {{ item.service.name }} ({{ item.quantity }}x) - KES {{ item.total_price|floatformat:0 }}
+{% endfor %}
+
+{% if notification_type == 'completed' %}
+Thank you for choosing {{ business_name|default:"Autowash Service" }}! We hope you're satisfied with our service.
+{% endif %}
+
+{% if business_phone %}
+Contact us: {{ business_phone }}
+{% endif %}
+{% if business_email %}
+Email: {{ business_email }}
+{% endif %}
+
+Best regards,
+{{ business_name|default:"Autowash Service" }} Team
