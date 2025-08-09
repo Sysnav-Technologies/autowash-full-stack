@@ -13,7 +13,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.conf import settings
 from apps.core.decorators import employee_required, ajax_required
-from apps.core.utils import send_sms_notification, send_email_notification
+from apps.core.utils import send_sms_notification, send_email_notification, generate_unique_code
 from .models import (
     Payment, PaymentMethod, PaymentRefund, MPesaTransaction,
     CardTransaction, CashTransaction, PaymentGateway
@@ -316,6 +316,7 @@ def process_payment_view(request, order_id=None):
             with transaction.atomic():
                 # Create payment record - removed is_partial_payment field
                 payment_data = {
+                    'payment_id': generate_unique_code('PAY', 8),
                     'service_order': service_order,
                     'customer': service_order.customer if service_order else None,
                     'payment_method': payment_method,
@@ -324,10 +325,12 @@ def process_payment_view(request, order_id=None):
                     'customer_phone': request.POST.get('customer_phone', ''),
                     'customer_email': request.POST.get('customer_email', ''),
                     'processed_by': request.employee,
-                    'created_by': request.user
                 }
                 
                 payment = Payment.objects.create(**payment_data)
+                # Set the audit fields properly
+                payment.set_created_by(request.user)
+                payment.save()
                 
                 # Add metadata for partial payments using the metadata field
                 if service_order and payment_type == 'partial':
@@ -453,6 +456,7 @@ def create_partial_payment_view(request, payment_id):
             with transaction.atomic():
                 # Create new partial payment
                 payment = Payment.objects.create(
+                    payment_id=generate_unique_code('PAY', 8),
                     service_order=service_order,
                     customer=service_order.customer,
                     payment_method_id=payment_method_id,
@@ -461,10 +465,13 @@ def create_partial_payment_view(request, payment_id):
                     customer_phone=request.POST.get('customer_phone', ''),
                     customer_email=request.POST.get('customer_email', ''),
                     processed_by=request.employee,
-                    created_by=request.user,
                     is_partial_payment=True,
                     parent_payment=original_payment
                 )
+                
+                # Set the audit fields properly
+                payment.set_created_by(request.user)
+                payment.save()
                 
                 # Redirect to appropriate payment processing
                 tenant_slug = request.tenant.slug

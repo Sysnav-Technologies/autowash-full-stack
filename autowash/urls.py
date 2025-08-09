@@ -6,7 +6,7 @@ from django.views.generic import TemplateView
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect, HttpResponse
 
-from apps.core.views import health_check
+from apps.core.views import health_check, serve_legal_document
 
 admin.site.site_header = "Autowash System Administration"
 admin.site.site_title = "System Admin"
@@ -168,6 +168,9 @@ urlpatterns = [
     path('reports/', include('apps.reports.urls')),
     path('expenses/', include('apps.expenses.urls')),
     path('notifications/', include('apps.notification.urls')),
+    
+    # Legal documents
+    path('legal/<str:document_name>/', serve_legal_document, name='serve_legal_document'),
     
     path('', root_redirect, name='root_redirect'),
 ]

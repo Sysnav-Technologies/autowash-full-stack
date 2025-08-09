@@ -21,6 +21,11 @@ urlpatterns = [
     path('password-reset-confirm/<str:uidb64>/<str:token>/', views.password_reset_confirm_view, name='password_reset_confirm'),
     path('password-reset-complete/', views.password_reset_complete_view, name='password_reset_complete'),
     
+    # Password Change
+    path('password/change/', views.password_change_view, name='password_change'),
+    path('password/change/done/', views.password_change_done_view, name='password_change_done'),
+    
+
     # Dashboard redirect
     path('dashboard/', views.dashboard_redirect, name='dashboard_redirect'),
     
@@ -32,6 +37,7 @@ urlpatterns = [
     
     # User profile
     path('profile/', views.profile_view, name='profile'),
+    path('profile/photo/', views.profile_photo_upload, name='profile_photo_upload'),
     
     # Business switching and management
     path('switch-business/', views.switch_business, name='switch_business'),

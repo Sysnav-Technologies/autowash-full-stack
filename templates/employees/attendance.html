@@ -1,0 +1,380 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Attendance Management - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/employees.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/employees/">Employees</a></li>
+<li class="breadcrumb-item active">Attendance</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-clock text-primary"></i>
+            Attendance Management
+        </h1>
+        <p class="page-description">Track and manage employee attendance</p>
+    </div>
+    
+    <div class="page-actions">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#attendanceModal">
+            <i class="fas fa-plus me-2"></i>Manual Entry
+        </button>
+    </div>
+</div>
+
+{% if messages %}
+<div class="alert-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+        <i class="fas fa-{{ message.tags|default:'info'|yesno:'check-circle,exclamation-triangle,info-circle' }}"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Live Attendance Dashboard -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ present_count|default:0 }}</h3>
+                <p class="stat-label">Present Today</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon">
+                <i class="fas fa-user-clock"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ late_count|default:0 }}</h3>
+                <p class="stat-label">Late Arrivals</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card stat-card-danger">
+            <div class="stat-icon">
+                <i class="fas fa-user-times"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ absent_count|default:0 }}</h3>
+                <p class="stat-label">Absent</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card stat-card-info">
+            <div class="stat-icon">
+                <i class="fas fa-coffee"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ on_break_count|default:0 }}</h3>
+                <p class="stat-label">On Break</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Clock In/Out Section -->
+<div class="content-card mb-4">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-stopwatch"></i>
+            Quick Actions
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="quick-action-card">
+                    <h6>Clock In</h6>
+                    <p class="text-muted">Record employee arrival</p>
+                    <button class="btn btn-success" onclick="showClockInModal()">
+                        <i class="fas fa-clock me-2"></i>Clock In
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="quick-action-card">
+                    <h6>Clock Out</h6>
+                    <p class="text-muted">Record employee departure</p>
+                    <button class="btn btn-danger" onclick="showClockOutModal()">
+                        <i class="fas fa-clock me-2"></i>Clock Out
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Today's Attendance -->
+<div class="content-card">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-calendar-day"></i>
+            Today's Attendance
+        </h5>
+        <div class="card-actions">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-primary btn-sm active" data-filter="all">All</button>
+                <button type="button" class="btn btn-outline-success btn-sm" data-filter="present">Present</button>
+                <button type="button" class="btn btn-outline-warning btn-sm" data-filter="late">Late</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-filter="absent">Absent</button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover attendance-table" id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Clock In</th>
+                        <th>Clock Out</th>
+                        <th>Break Time</th>
+                        <th>Total Hours</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attendance in attendance_records %}
+                    <tr data-status="{{ attendance.status }}">
+                        <td>
+                            <div class="employee-info">
+                                {% if attendance.employee.photo %}
+                                    <img src="{{ attendance.employee.photo.url }}" alt="{{ attendance.employee.full_name }}" class="employee-avatar">
+                                {% else %}
+                                    <div class="employee-avatar">{{ attendance.employee.full_name|first|upper }}</div>
+                                {% endif %}
+                                <div class="employee-details">
+                                    <div class="employee-name">{{ attendance.employee.full_name }}</div>
+                                    <div class="employee-id">ID: {{ attendance.employee.employee_id }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ attendance.employee.department|default:"Not Assigned" }}</td>
+                        <td>
+                            <span class="status-badge status-{{ attendance.status }}">
+                                {% if attendance.status == 'present' %}
+                                    <i class="fas fa-check-circle"></i> Present
+                                {% elif attendance.status == 'late' %}
+                                    <i class="fas fa-clock"></i> Late
+                                {% elif attendance.status == 'absent' %}
+                                    <i class="fas fa-times-circle"></i> Absent
+                                {% elif attendance.status == 'on_break' %}
+                                    <i class="fas fa-coffee"></i> On Break
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>{{ attendance.clock_in|time:"H:i"|default:"-" }}</td>
+                        <td>{{ attendance.clock_out|time:"H:i"|default:"-" }}</td>
+                        <td>{{ attendance.total_break_time|default:"0h 0m" }}</td>
+                        <td>{{ attendance.total_hours|default:"-" }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                {% if not attendance.clock_in %}
+                                <button class="btn btn-sm btn-success" onclick="clockIn('{{ attendance.employee.id }}')" title="Clock In">
+                                    <i class="fas fa-sign-in-alt"></i>
+                                </button>
+                                {% elif not attendance.clock_out %}
+                                <button class="btn btn-sm btn-danger" onclick="clockOut('{{ attendance.employee.id }}')" title="Clock Out">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-outline-primary" onclick="editAttendance('{{ attendance.id }}')" title="Edit Attendance">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="fas fa-calendar-times fa-2x mb-2"></i>
+                            <p>No attendance records for today</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Attendance Entry Modal -->
+<div class="modal fade" id="attendanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manual Attendance Entry</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="employee" class="form-label">Employee</label>
+                        <select class="form-select" id="employee" name="employee" required>
+                            <option value="">Select Employee</option>
+                            {% for employee in employees %}
+                            <option value="{{ employee.id }}">{{ employee.full_name }} ({{ employee.employee_id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="date" class="form-label">Date</label>
+                        <input type="date" class="form-control" id="date" name="date" value="{{ today|date:'Y-m-d' }}" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clock_in" class="form-label">Clock In Time</label>
+                                <input type="time" class="form-control" id="clock_in" name="clock_in">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clock_out" class="form-label">Clock Out Time</label>
+                                <input type="time" class="form-control" id="clock_out" name="clock_out">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Optional notes about this attendance record"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Save Record
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Attendance management JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Filter functionality
+    const filterButtons = document.querySelectorAll('[data-filter]');
+    const tableRows = document.querySelectorAll('#attendanceTable tbody tr');
+    
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const filter = this.dataset.filter;
+            
+            // Update active button
+            filterButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Filter table rows
+            tableRows.forEach(row => {
+                if (filter === 'all' || row.dataset.status === filter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    });
+    
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        location.reload();
+    }, 30000);
+});
+
+function clockIn(employeeId) {
+    if (confirm('Clock in this employee?')) {
+        fetch(`/business/{{ request.tenant.slug }}/employees/attendance/checkin/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                employee_id: employeeId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+}
+
+function clockOut(employeeId) {
+    if (confirm('Clock out this employee?')) {
+        fetch(`/business/{{ request.tenant.slug }}/employees/attendance/checkout/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                employee_id: employeeId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+}
+
+function editAttendance(attendanceId) {
+    // Open edit modal - to be implemented
+    alert('Edit functionality will be implemented');
+}
+
+function showClockInModal() {
+    document.getElementById('attendanceModal').querySelector('.modal-title').textContent = 'Clock In Employee';
+    document.getElementById('clock_out').removeAttribute('required');
+    document.getElementById('clock_in').setAttribute('required', 'required');
+    new bootstrap.Modal(document.getElementById('attendanceModal')).show();
+}
+
+function showClockOutModal() {
+    document.getElementById('attendanceModal').querySelector('.modal-title').textContent = 'Clock Out Employee';
+    document.getElementById('clock_in').removeAttribute('required');
+    document.getElementById('clock_out').setAttribute('required', 'required');
+    new bootstrap.Modal(document.getElementById('attendanceModal')).show();
+}
+</script>
+{% endblock %}

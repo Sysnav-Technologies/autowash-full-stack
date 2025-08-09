@@ -1,0 +1,498 @@
+<!-- templates/customers/customer_feedback.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ customer.display_name }} - Feedback - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="/business/{{ request.tenant.slug }}/">
+                        <i class="fas fa-home"></i>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/business/{{ request.tenant.slug }}/customers/">Customers</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/">{{ customer.display_name }}</a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">Feedback</li>
+            </ol>
+        </nav>
+        
+        <h1 class="page-title">
+            <i class="fas fa-comments text-primary"></i>
+            Customer Feedback - {{ customer.display_name }}
+        </h1>
+        <p class="page-description">View and manage customer feedback and reviews</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-arrow-left"></i>
+            Back to Customer
+        </a>
+    </div>
+</div>
+
+<!-- Feedback Summary -->
+<div class="stats-grid mb-4">
+    <div class="stat-card">
+        <div class="stat-icon bg-success">
+            <i class="fas fa-star"></i>
+        </div>
+        <div class="stat-content">
+            <h3 class="stat-number">{{ feedback_stats.avg_rating|floatformat:1|default:"0.0" }}</h3>
+            <p class="stat-label">Average Rating</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon bg-info">
+            <i class="fas fa-comments"></i>
+        </div>
+        <div class="stat-content">
+            <h3 class="stat-number">{{ feedback_stats.total_feedback|default:0 }}</h3>
+            <p class="stat-label">Total Feedback</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon bg-warning">
+            <i class="fas fa-thumbs-up"></i>
+        </div>
+        <div class="stat-content">
+            <h3 class="stat-number">{{ feedback_stats.positive_feedback|default:0 }}</h3>
+            <p class="stat-label">Positive Reviews</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon bg-danger">
+            <i class="fas fa-thumbs-down"></i>
+        </div>
+        <div class="stat-content">
+            <h3 class="stat-number">{{ feedback_stats.negative_feedback|default:0 }}</h3>
+            <p class="stat-label">Issues Reported</p>
+        </div>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="card-body">
+        {% if feedback_list %}
+        <div class="feedback-list">
+            {% for feedback in feedback_list %}
+            <div class="feedback-item">
+                <div class="feedback-header">
+                    <div class="feedback-rating">
+                        {% for i in "12345" %}
+                        <i class="fas fa-star {% if forloop.counter <= feedback.rating %}text-warning{% else %}text-muted{% endif %}"></i>
+                        {% endfor %}
+                        <span class="rating-value">{{ feedback.rating }}/5</span>
+                    </div>
+                    <div class="feedback-date">
+                        <i class="fas fa-calendar text-muted"></i>
+                        {{ feedback.created_at|date:"M d, Y" }}
+                    </div>
+                </div>
+                
+                {% if feedback.service_order %}
+                <div class="feedback-service">
+                    <small class="text-muted">
+                        <i class="fas fa-car text-muted"></i>
+                        Service Order: 
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ feedback.service_order.pk }}/">
+                            {{ feedback.service_order.order_number }}
+                        </a>
+                        {% if feedback.service_order.vehicle %}
+                        ({{ feedback.service_order.vehicle.registration_number }})
+                        {% endif %}
+                    </small>
+                </div>
+                {% endif %}
+                
+                {% if feedback.comment %}
+                <div class="feedback-content">
+                    <p>{{ feedback.comment|linebreaks }}</p>
+                </div>
+                {% endif %}
+                
+                {% if feedback.response %}
+                <div class="feedback-response">
+                    <div class="response-header">
+                        <strong>Business Response:</strong>
+                        <small class="text-muted">{{ feedback.response_date|date:"M d, Y" }}</small>
+                    </div>
+                    <p>{{ feedback.response|linebreaks }}</p>
+                    <small class="text-muted">
+                        Responded by: {{ feedback.responded_by.get_full_name|default:feedback.responded_by.username }}
+                    </small>
+                </div>
+                {% elif user_role in 'owner,manager' %}
+                <div class="feedback-actions">
+                    <button class="btn btn-sm btn-outline-primary" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#responseModal"
+                            data-feedback-id="{{ feedback.pk }}"
+                            data-feedback-comment="{{ feedback.comment|truncatewords:10 }}">
+                        <i class="fas fa-reply"></i>
+                        Respond to Feedback
+                    </button>
+                </div>
+                {% endif %}
+                
+                <div class="feedback-footer">
+                    <div class="feedback-type">
+                        <span class="badge badge-{% if feedback.rating >= 4 %}success{% elif feedback.rating >= 3 %}warning{% else %}danger{% endif %}">
+                            {% if feedback.rating >= 4 %}
+                            Positive
+                            {% elif feedback.rating >= 3 %}
+                            Neutral
+                            {% else %}
+                            Negative
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    {% if feedback.is_verified %}
+                    <div class="feedback-verified">
+                        <span class="badge badge-info">
+                            <i class="fas fa-check-circle"></i>
+                            Verified
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <nav aria-label="Feedback pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="fas fa-comments"></i>
+            </div>
+            <h3 class="empty-state-title">No Feedback Yet</h3>
+            <p class="empty-state-description">
+                This customer hasn't provided any feedback yet. Encourage them to share their experience!
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Response Modal -->
+<div class="modal fade" id="responseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-reply"></i>
+                    Respond to Feedback
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/feedback/respond/">
+                {% csrf_token %}
+                <input type="hidden" name="feedback_id" id="feedback_id">
+                <div class="modal-body">
+                    <div class="feedback-preview">
+                        <h6>Customer Feedback:</h6>
+                        <p id="feedback_preview" class="text-muted"></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="response" class="form-label required">
+                            <i class="fas fa-comment"></i>
+                            Your Response
+                        </label>
+                        <textarea name="response" 
+                                  id="response" 
+                                  class="form-control"
+                                  rows="4"
+                                  placeholder="Write a professional response to this feedback..."
+                                  required></textarea>
+                        <small class="form-text text-muted">
+                            This response will be visible to the customer and help improve their experience.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i>
+                        Send Response
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.feedback-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.feedback-item {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    background: var(--gray-50);
+}
+
+.feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.feedback-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.rating-value {
+    margin-left: 0.5rem;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.feedback-date {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.feedback-service {
+    margin-bottom: 1rem;
+}
+
+.feedback-service a {
+    color: var(--primary-600);
+    text-decoration: none;
+}
+
+.feedback-service a:hover {
+    text-decoration: underline;
+}
+
+.feedback-content {
+    margin-bottom: 1rem;
+}
+
+.feedback-content p {
+    margin: 0;
+    color: var(--gray-700);
+    line-height: 1.6;
+}
+
+.feedback-response {
+    background: var(--blue-50);
+    border: 1px solid var(--blue-200);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.response-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.feedback-actions {
+    margin-bottom: 1rem;
+}
+
+.feedback-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.feedback-type,
+.feedback-verified {
+    display: flex;
+    align-items: center;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+}
+
+.stat-content h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.stat-content p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    color: var(--gray-400);
+    margin-bottom: 1rem;
+}
+
+.empty-state-title {
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-description {
+    color: var(--gray-600);
+    margin-bottom: 2rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.feedback-preview {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.feedback-preview h6 {
+    margin-bottom: 0.5rem;
+    color: var(--gray-700);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-label.required::after {
+    content: '*';
+    color: var(--danger-500);
+    margin-left: 0.25rem;
+}
+
+@media (max-width: 768px) {
+    .feedback-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .feedback-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Handle response modal
+document.addEventListener('DOMContentLoaded', function() {
+    const responseModal = document.getElementById('responseModal');
+    if (responseModal) {
+        responseModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const feedbackId = button.getAttribute('data-feedback-id');
+            const feedbackComment = button.getAttribute('data-feedback-comment');
+            
+            document.getElementById('feedback_id').value = feedbackId;
+            document.getElementById('feedback_preview').textContent = feedbackComment;
+        });
+    }
+});
+</script>
+{% endblock %}

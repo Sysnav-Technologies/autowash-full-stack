@@ -29,6 +29,8 @@
                         <span class="nav-text">Dashboard</span>
                     </a>
                 </li>
+                
+           
             </ul>
         </div>
         {% endif %}
@@ -45,6 +47,8 @@
                         <span class="nav-text">Dashboard</span>
                     </a>
                 </li>
+                
+             
             </ul>
         </div>
         {% endif %}
@@ -290,6 +294,10 @@
                             </a>
                         </li>
                         
+                        <li class="nav-divider">
+                            <span class="nav-divider-text">Items & Categories</span>
+                        </li>
+                        
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'inventory' in request.resolver_match.namespace %}active{% endif %}" 
                                href="/business/{{ request.tenant.slug }}/inventory/items/">
@@ -307,10 +315,38 @@
                         </li>
                         
                         <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'category_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/categories/">
+                                <i class="nav-icon fas fa-tags"></i>
+                                <span class="nav-text">Categories</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'unit_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/units/">
+                                <i class="nav-icon fas fa-ruler"></i>
+                                <span class="nav-text">Units</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-divider">
+                            <span class="nav-divider-text">Stock Management</span>
+                        </li>
+                        
+                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'stock_adjustment' %}active{% endif %}" 
                                href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/">
                                 <i class="nav-icon fas fa-exchange-alt"></i>
                                 <span class="nav-text">Stock Adjustments</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'stock_movements' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/stock/movements/">
+                                <i class="nav-icon fas fa-history"></i>
+                                <span class="nav-text">Stock Movements</span>
                             </a>
                         </li>
                         
@@ -322,11 +358,37 @@
                             </a>
                         </li>
                         
+                        <li class="nav-divider">
+                            <span class="nav-divider-text">Alerts & Reports</span>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'alerts' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/alerts/">
+                                <i class="nav-icon fas fa-bell"></i>
+                                <span class="nav-text">Alerts</span>
+                                {% if active_alerts_count > 0 %}
+                                <span class="nav-badge nav-badge-danger">{{ active_alerts_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'low_stock_report' %}active{% endif %}" 
                                href="/business/{{ request.tenant.slug }}/inventory/reports/low-stock/">
                                 <i class="nav-icon fas fa-exclamation-triangle"></i>
                                 <span class="nav-text">Low Stock Report</span>
+                                {% if low_stock_items > 0 %}
+                                <span class="nav-badge nav-badge-warning">{{ low_stock_items }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'valuation_report' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/inventory/reports/valuation/">
+                                <i class="nav-icon fas fa-calculator"></i>
+                                <span class="nav-text">Valuation Report</span>
                             </a>
                         </li>
                     </ul>
@@ -420,14 +482,6 @@
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'process' %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/payments/process/">
-                                <i class="nav-icon fas fa-credit-card"></i>
-                                <span class="nav-text">Process Payment</span>
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'methods' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
                                href="/business/{{ request.tenant.slug }}/payments/methods/">
                                 <i class="nav-icon fas fa-credit-card"></i>
@@ -435,11 +489,45 @@
                             </a>
                         </li>
                         
+                        <li class="nav-divider">
+                            <span class="nav-divider-text">Management</span>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reconciliation' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/payments/reconciliation/">
+                                <i class="nav-icon fas fa-balance-scale"></i>
+                                <span class="nav-text">Reconciliation</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'settings' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/payments/settings/">
+                                <i class="nav-icon fas fa-cog"></i>
+                                <span class="nav-text">Payment Settings</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-divider">
+                            <span class="nav-divider-text">Reports & Export</span>
+                        </li>
+                        
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
                                href="/business/{{ request.tenant.slug }}/payments/reports/">
                                 <i class="nav-icon fas fa-chart-bar"></i>
                                 <span class="nav-text">Reports</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" 
+                               href="/business/{{ request.tenant.slug }}/payments/export/" 
+                               target="_blank">
+                                <i class="nav-icon fas fa-download"></i>
+                                <span class="nav-text">Export Data</span>
+                                <i class="nav-badge nav-badge-info">CSV</i>
                             </a>
                         </li>
                     </ul>

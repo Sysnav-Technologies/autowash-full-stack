@@ -399,23 +399,40 @@ def user_management_view(request):
         
         employees = Employee.objects.filter(is_active=True).select_related(
             'department'
-        ).order_by('role', 'first_name')
+        ).order_by('role', 'employee_id')
         
         # Group by role
         employees_by_role = {}
+        role_counts = {}
+        
         for employee in employees:
             role = employee.get_role_display()
+            role_key = employee.role  # Use the actual role key (owner, manager, etc.)
+            
             if role not in employees_by_role:
                 employees_by_role[role] = []
             employees_by_role[role].append(employee)
             
+            # Count by role key for easier template access
+            if role_key not in role_counts:
+                role_counts[role_key] = 0
+            role_counts[role_key] += 1
+            
     except ImportError:
         employees = []
         employees_by_role = {}
+        role_counts = {}
     
     context = {
         'employees': employees,
         'employees_by_role': employees_by_role,
+        'owner_count': role_counts.get('owner', 0),
+        'manager_count': role_counts.get('manager', 0),
+        'supervisor_count': role_counts.get('supervisor', 0),
+        'attendant_count': role_counts.get('attendant', 0),
+        'cashier_count': role_counts.get('cashier', 0),
+        'cleaner_count': role_counts.get('cleaner', 0),
+        'security_count': role_counts.get('security', 0),
         'title': 'User Management'
     }
     

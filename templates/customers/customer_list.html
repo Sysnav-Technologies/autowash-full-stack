@@ -16,7 +16,7 @@
     
     <div class="page-actions">
         {% if user_role in 'owner,manager,supervisor,attendant' %}
-        <a href="/business/{{ request.business.slug }}/customers/add/" class="btn btn-primary">
+        <a href="/business/{{ request.tenant.slug }}/customers/create/" class="btn btn-primary">
             <i class="fas fa-plus"></i>
             Add Customer
         </a>
@@ -28,13 +28,13 @@
                 More Actions
             </button>
             <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/export/">
+                <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/export/">
                     <i class="fas fa-download"></i> Export Customers
                 </a></li>
-                <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/loyalty/">
+                <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/loyalty/">
                     <i class="fas fa-star"></i> Loyalty Program
                 </a></li>
-                <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/import/">
+                <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/import/">
                     <i class="fas fa-upload"></i> Import Customers
                 </a></li>
             </ul>
@@ -154,7 +154,7 @@
                     <i class="fas fa-search"></i>
                     Search
                 </button>
-                <a href="/business/{{ request.business.slug }}/customers/" class="btn btn-outline-secondary">
+                <a href="/business/{{ request.tenant.slug }}/customers/" class="btn btn-outline-secondary">
                     <i class="fas fa-times"></i>
                     Clear
                 </a>
@@ -195,7 +195,7 @@
                         <td>
                             <div class="customer-info">
                                 <div class="customer-name">
-                                    <a href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/" class="customer-link">
+                                    <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="customer-link">
                                         <strong>{{ customer.display_name }}</strong>
                                     </a>
                                     {% if customer.is_vip %}
@@ -277,21 +277,21 @@
                                         Actions
                                     </button>
                                     <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/">
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/">
                                             <i class="fas fa-eye"></i> View Details
                                         </a></li>
                                         
                                         {% if user_role in 'owner,manager,supervisor' %}
-                                        <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/edit/">
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/edit/">
                                             <i class="fas fa-edit"></i> Edit Customer
                                         </a></li>
                                         {% endif %}
                                         
-                                        <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/customers/{{ customer.pk }}/vehicles/add/">
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/vehicles/add/">
                                             <i class="fas fa-plus"></i> Add Vehicle
                                         </a></li>
                                         
-                                        <li><a class="dropdown-item" href="/business/{{ request.business.slug }}/services/orders/quick/?customer={{ customer.pk }}">
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/orders/quick/?customer={{ customer.pk }}">
                                             <i class="fas fa-plus-circle"></i> Create Order
                                         </a></li>
                                         
@@ -364,7 +364,7 @@
             <h5>No Customers Found</h5>
             <p>{% if search_form.search.value %}No customers match your search criteria.{% else %}You haven't added any customers yet.{% endif %}</p>
             {% if user_role in 'owner,manager,supervisor,attendant' %}
-            <a href="/business/{{ request.business.slug }}/customers/add/" class="btn btn-primary">
+            <a href="/business/{{ request.tenant.slug }}/customers/add/" class="btn btn-primary">
                 <i class="fas fa-plus"></i>
                 Add Your First Customer
             </a>
@@ -521,7 +521,7 @@ function toggleFilters() {
 
 function toggleVIPStatus(customerId, newStatus) {
     if (confirm(`Are you sure you want to ${newStatus ? 'make this customer VIP' : 'remove VIP status'}?`)) {
-        fetch(`/business/{{ request.business.slug }}/customers/${customerId}/toggle-vip/`, {
+        fetch(`/business/{{ request.tenant.slug }}/customers/${customerId}/toggle-vip/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -545,7 +545,7 @@ function toggleVIPStatus(customerId, newStatus) {
 
 function deactivateCustomer(customerId) {
     if (confirm('Are you sure you want to deactivate this customer? They will no longer be able to make bookings.')) {
-        fetch(`/business/{{ request.business.slug }}/customers/${customerId}/deactivate/`, {
+        fetch(`/business/{{ request.tenant.slug }}/customers/${customerId}/deactivate/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),

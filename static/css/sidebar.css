@@ -16,6 +16,7 @@
     flex-direction: column;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     overflow: hidden;
+    max-height: 100vh; /* Ensure it doesn't exceed viewport height */
 }
 
 .sidebar.collapsed {
@@ -64,8 +65,11 @@
 }
 
 .brand-text {
-    transition: opacity 0.3s ease;
+    transition: opacity 0.3s ease, width 0.3s ease;
     min-width: 0;
+    flex: 1;
+    opacity: 1; /* Make sure it's visible by default */
+    width: auto; /* Make sure it has width by default */
 }
 
 .sidebar.collapsed .brand-text {
@@ -83,6 +87,8 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 180px; /* Ensure it doesn't overflow */
+    display: block; /* Ensure it displays */
 }
 
 .brand-type {
@@ -92,6 +98,9 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 180px; /* Ensure it doesn't overflow */
+    display: block; /* Ensure it displays */
+    margin-top: 2px; /* Add small spacing */
 }
 
 /* Search Section */
@@ -152,10 +161,13 @@
 /* Sidebar Navigation */
 .sidebar-nav {
     flex: 1;
-    padding: 1rem 0;
+    padding: 1rem 0 2rem 0; /* Extra bottom padding to ensure all items are visible */
     overflow-y: auto;
+    overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: #374151 transparent;
+    min-height: 0; /* Allow flex item to shrink */
+    max-height: calc(100vh - 200px); /* Reserve space for header and footer */
 }
 
 .sidebar-nav::-webkit-scrollbar {
@@ -176,7 +188,8 @@
 }
 
 .nav-section:last-child {
-    margin-bottom: 1rem;
+    margin-bottom: 2rem; /* Extra margin for last section to ensure visibility */
+    padding-bottom: 1rem; /* Additional padding at bottom */
 }
 
 .nav-section-title {
@@ -220,6 +233,8 @@
     position: relative;
     font-size: 0.9rem;
     font-family: 'Inter', sans-serif;
+    min-height: 44px; /* Minimum height for touch targets */
+    flex-wrap: nowrap; /* Keep icon and text on same line */
 }
 
 .nav-link:hover {
@@ -256,9 +271,12 @@
 .nav-text {
     flex: 1;
     transition: opacity 0.3s ease;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal; /* Allow text wrapping */
+    overflow: visible; /* Don't hide overflow */
+    text-overflow: initial; /* Remove ellipsis */
+    line-height: 1.3; /* Better line spacing for wrapped text */
+    word-wrap: break-word; /* Break long words if needed */
+    min-width: 0; /* Allow flex shrinking */
 }
 
 .sidebar.collapsed .nav-text {
@@ -298,9 +316,27 @@
 }
 
 .nav-dropdown.open .nav-submenu {
-    max-height: 300px;
+    max-height: calc(100vh - 300px); /* Dynamic height based on viewport */
     opacity: 1;
     padding-top: 0.25rem;
+    overflow-y: auto; /* Enable scrolling for long submenus */
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #374151 transparent;
+}
+
+/* Submenu scrollbar styling */
+.nav-submenu::-webkit-scrollbar {
+    width: 4px;
+}
+
+.nav-submenu::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.nav-submenu::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 2px;
 }
 
 .sidebar.collapsed .nav-submenu {
@@ -311,6 +347,9 @@
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
     color: #9ca3af;
+    min-height: 40px; /* Minimum height for submenu items */
+    white-space: normal; /* Allow text wrapping in submenus */
+    line-height: 1.3;
 }
 
 .nav-submenu .nav-link:hover {
@@ -329,6 +368,8 @@
     padding: 1rem;
     border-top: 1px solid #2a2d3a;
     background: #1a1b23;
+    flex-shrink: 0; /* Prevent footer from shrinking */
+    min-height: 70px; /* Set minimum height for footer */
 }
 
 .sidebar-user {
@@ -406,10 +447,59 @@
         transform: translateX(-100%);
         z-index: 1050;
         transition: transform 0.3s ease;
+        width: 280px; /* Ensure full width on mobile */
+        min-width: 280px; /* Prevent shrinking */
+        height: 100vh;
+        max-height: 100vh;
     }
     
     .sidebar.mobile-open {
         transform: translateX(0);
+        width: 280px !important; /* Force full width when open */
+    }
+    
+    /* Ensure nav scrolling works on mobile */
+    .sidebar-nav {
+        max-height: calc(100vh - 160px); /* Account for header and footer on mobile */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    }
+    
+    /* Force all text elements to be visible when mobile sidebar is open */
+    .sidebar.mobile-open .nav-text {
+        opacity: 1 !important;
+        width: auto !important;
+        overflow: visible !important;
+        white-space: normal !important; /* Allow wrapping on mobile */
+        text-overflow: initial !important;
+        line-height: 1.3 !important;
+    }
+    
+    .sidebar.mobile-open .brand-text {
+        opacity: 1 !important;
+        width: auto !important;
+        overflow: visible !important;
+    }
+    
+    .sidebar.mobile-open .user-info {
+        opacity: 1 !important;
+        width: auto !important;
+        overflow: visible !important;
+    }
+    
+    .sidebar.mobile-open .nav-section-title {
+        opacity: 1 !important;
+        height: auto !important;
+        padding: 0 1.5rem 0.5rem !important;
+        margin: 0 !important;
+    }
+    
+    /* Ensure submenus are fully accessible on mobile */
+    .sidebar.mobile-open .nav-submenu {
+        max-height: calc(100vh - 350px) !important;
+        overflow-y: auto !important;
+        display: block !important;
+        opacity: 1 !important;
     }
     
     .sidebar.collapsed {
@@ -421,6 +511,7 @@
         transform: translateX(0);
     }
     
+    /* Make sure collapsed elements are visible on mobile */
     .sidebar.collapsed .nav-text {
         opacity: 1;
         width: auto;
@@ -435,11 +526,14 @@
     
     .sidebar.collapsed .nav-submenu {
         display: block;
+        max-height: calc(100vh - 400px) !important; /* More space for mobile submenus */
+        overflow-y: auto !important;
     }
     
     .sidebar.collapsed .brand-text {
         opacity: 1;
         width: auto;
+        overflow: visible;
     }
     
     .sidebar.collapsed .user-info {
@@ -455,6 +549,20 @@
     .sidebar.collapsed .sidebar-search {
         display: block;
     }
+    
+    /* Ensure brand name and type are visible on mobile */
+    .brand-name,
+    .brand-type {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+    
+    /* Fix sidebar header on mobile */
+    .sidebar-header {
+        min-height: 80px;
+        padding: 1.5rem;
+    }
 }
 
 /* Sidebar Overlay for Mobile */
@@ -467,5 +575,25 @@
     background: rgba(0, 0, 0, 0.5);
     z-index: 999;
     display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
     backdrop-filter: blur(4px);
+}
+
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+/* Prevent body scroll when mobile sidebar is open */
+body.sidebar-open {
+    overflow: hidden;
+}
+
+@media (max-width: 768px) {
+    body.sidebar-open {
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+    }
 }

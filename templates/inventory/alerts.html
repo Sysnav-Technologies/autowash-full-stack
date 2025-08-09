@@ -1,0 +1,269 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Inventory Alerts - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <div class="page-breadcrumb">
+            <a href="/business/{{ request.tenant.slug }}/inventory/" class="breadcrumb-link">Inventory</a>
+            <i class="fas fa-chevron-right"></i>
+            <span class="breadcrumb-current">Alerts</span>
+        </div>
+        <h1 class="page-title">
+            <i class="fas fa-bell"></i>
+            Inventory Alerts
+        </h1>
+        <div class="page-actions">
+            <a href="/business/{{ request.tenant.slug }}/inventory/" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i>
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Statistics -->
+<div class="stats-grid mb-4">
+    <div class="stat-card">
+        <div class="stat-icon warning">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div class="stat-value">{{ stats.critical_alerts }}</div>
+        <div class="stat-label">Critical Alerts</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon primary">
+            <i class="fas fa-info-circle"></i>
+        </div>
+        <div class="stat-value">{{ stats.warning_alerts }}</div>
+        <div class="stat-label">Warning Alerts</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon success">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="stat-value">{{ stats.resolved_today }}</div>
+        <div class="stat-label">Resolved Today</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon info">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div class="stat-value">{{ stats.total_alerts }}</div>
+        <div class="stat-label">Total Alerts</div>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="filter-form">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <input type="text" 
+                           name="search" 
+                           class="form-control" 
+                           placeholder="Search alerts..." 
+                           value="{{ request.GET.search }}">
+                </div>
+                <div class="col-md-2">
+                    <select name="alert_type" class="form-select">
+                        <option value="">All Types</option>
+                        <option value="low_stock" {% if request.GET.alert_type == 'low_stock' %}selected{% endif %}>Low Stock</option>
+                        <option value="out_of_stock" {% if request.GET.alert_type == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
+                        <option value="expiring" {% if request.GET.alert_type == 'expiring' %}selected{% endif %}>Expiring Soon</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="status" class="form-select">
+                        <option value="">All Status</option>
+                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="resolved" {% if request.GET.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="priority" class="form-select">
+                        <option value="">All Priority</option>
+                        <option value="critical" {% if request.GET.priority == 'critical' %}selected{% endif %}>Critical</option>
+                        <option value="high" {% if request.GET.priority == 'high' %}selected{% endif %}>High</option>
+                        <option value="medium" {% if request.GET.priority == 'medium' %}selected{% endif %}>Medium</option>
+                        <option value="low" {% if request.GET.priority == 'low' %}selected{% endif %}>Low</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <div class="btn-group w-100">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Filter
+                        </button>
+                        <a href="/business/{{ request.tenant.slug }}/inventory/alerts/" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Alerts List -->
+{% if alerts %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Alert</th>
+                            <th>Item</th>
+                            <th>Type</th>
+                            <th>Priority</th>
+                            <th>Created</th>
+                            <th>Status</th>
+                            <th width="120">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in alerts %}
+                        <tr class="{% if not alert.is_active %}table-secondary{% endif %}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="alert-icon me-2">
+                                        {% if alert.alert_type == 'low_stock' %}
+                                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                                        {% elif alert.alert_type == 'out_of_stock' %}
+                                            <i class="fas fa-times-circle text-danger"></i>
+                                        {% elif alert.alert_type == 'expiring' %}
+                                            <i class="fas fa-clock text-info"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold">{{ alert.title }}</div>
+                                        <small class="text-muted">{{ alert.message }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ alert.item.id }}/" class="text-decoration-none">
+                                    {{ alert.item.name }}
+                                </a>
+                                <br><small class="text-muted">{{ alert.item.sku }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ alert.alert_type|yesno:'warning,danger,info' }}">
+                                    {{ alert.get_alert_type_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ alert.priority|yesno:'danger,warning,primary,secondary' }}">
+                                    {{ alert.get_priority_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {{ alert.created_at|date:"M d, Y" }}
+                                <br><small class="text-muted">{{ alert.created_at|time:"H:i" }}</small>
+                            </td>
+                            <td>
+                                {% if alert.is_active %}
+                                    <span class="badge bg-warning">Active</span>
+                                {% else %}
+                                    <span class="badge bg-success">Resolved</span>
+                                    <br><small class="text-muted">{{ alert.resolved_at|date:"M d, H:i" }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ alert.item.id }}/" 
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if alert.is_active %}
+                                    <form method="post" action="/business/{{ request.tenant.slug }}/inventory/alerts/{{ alert.id }}/resolve/" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline-success btn-sm" 
+                                                onclick="return confirm('Mark this alert as resolved?')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if alerts.has_other_pages %}
+        <nav aria-label="Alerts pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if alerts.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ alerts.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                <li class="page-item active">
+                    <span class="page-link">{{ alerts.number }} of {{ alerts.paginator.num_pages }}</span>
+                </li>
+                
+                {% if alerts.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ alerts.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ alerts.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Last</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+
+{% else %}
+    <!-- Empty State -->
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-bell fa-4x text-muted mb-4"></i>
+            <h3 class="text-muted">No Alerts Found</h3>
+            {% if request.GET.search or request.GET.alert_type or request.GET.status or request.GET.priority %}
+                <p class="text-muted mb-4">No alerts match your search criteria. Try adjusting your filters.</p>
+                <a href="/business/{{ request.tenant.slug }}/inventory/alerts/" class="btn btn-outline-primary">
+                    <i class="fas fa-times"></i>
+                    Clear Filters
+                </a>
+            {% else %}
+                <p class="text-muted mb-4">No inventory alerts at the moment. Great job keeping everything in stock!</p>
+                <a href="/business/{{ request.tenant.slug }}/inventory/" class="btn btn-primary">
+                    <i class="fas fa-boxes"></i>
+                    Go to Inventory
+                </a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh alerts every 30 seconds
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

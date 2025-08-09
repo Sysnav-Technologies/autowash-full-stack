@@ -779,3 +779,285 @@ class ItemExpiry(TenantTimeStampedModel):
         verbose_name = "Item Expiry Record"
         verbose_name_plural = "Item Expiry Records"
         ordering = ['expiry_date']
+
+
+class DailyOperations(TenantTimeStampedModel):
+    """Daily operations tracking for inventory management"""
+    operation_date = models.DateField(unique=True)
+    
+    # Shift information
+    SHIFT_CHOICES = [
+        ('morning', 'Morning Shift'),
+        ('afternoon', 'Afternoon Shift'),
+        ('evening', 'Evening Shift'),
+        ('night', 'Night Shift'),
+    ]
+    current_shift = models.CharField(max_length=20, choices=SHIFT_CHOICES, default='morning')
+    
+    # Staff assignments
+    shift_supervisor = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supervised_operations'
+    )
+    
+    # Operation status
+    STATUS_CHOICES = [
+        ('planning', 'Planning'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('reconciled', 'Reconciled'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planning')
+    
+    # Daily targets
+    target_services = models.IntegerField(default=0)
+    actual_services = models.IntegerField(default=0)
+    
+    # Reconciliation
+    reconciled_at = models.DateTimeField(null=True, blank=True)
+    reconciled_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reconciled_operations'
+    )
+    
+    notes = models.TextField(blank=True)
+    
+    def __str__(self):
+        return f"Operations - {self.operation_date}"
+    
+    @property
+    def service_completion_rate(self):
+        """Calculate service completion rate"""
+        if self.target_services == 0:
+            return 0
+        return (self.actual_services / self.target_services) * 100
+    
+    @property
+    def total_consumption_value(self):
+        """Get total value of items consumed today"""
+        from django.db.models import Sum, F
+        return self.bay_consumptions.aggregate(
+            total=Sum(F('quantity') * F('unit_cost'))
+        )['total'] or 0
+    
+    class Meta:
+        verbose_name = "Daily Operations"
+        verbose_name_plural = "Daily Operations"
+        ordering = ['-operation_date']
+
+
+class BayConsumption(TenantTimeStampedModel):
+    """Track inventory consumption by wash bays"""
+    daily_operations = models.ForeignKey(
+        DailyOperations,
+        on_delete=models.CASCADE,
+        related_name='bay_consumptions'
+    )
+    
+    # Bay information
+    bay = models.ForeignKey(
+        'services.ServiceBay',
+        on_delete=models.CASCADE,
+        related_name='consumptions'
+    )
+    
+    # Item consumption
+    item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.CASCADE,
+        related_name='bay_consumptions'
+    )
+    
+    # Consumption details
+    quantity_allocated = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Quantity transferred to bay"
+    )
+    quantity_used = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        help_text="Actual quantity consumed"
+    )
+    quantity_remaining = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        help_text="Quantity remaining at bay"
+    )
+    
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # Transfer details
+    transferred_at = models.DateTimeField(auto_now_add=True)
+    transferred_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='bay_transfers'
+    )
+    
+    # Usage tracking
+    last_updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='bay_updates'
+    )
+    
+    # Status
+    STATUS_CHOICES = [
+        ('transferred', 'Transferred to Bay'),
+        ('in_use', 'In Use'),
+        ('completed', 'Completed'),
+        ('returned', 'Returned to Stock'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='transferred')
+    
+    notes = models.TextField(blank=True)
+    
+    def __str__(self):
+        return f"{self.item.name} - Bay {self.bay.bay_number} ({self.daily_operations.operation_date})"
+    
+    @property
+    def total_allocated_value(self):
+        """Calculate total allocated value"""
+        return self.quantity_allocated * self.unit_cost
+    
+    @property
+    def total_used_value(self):
+        """Calculate total used value"""
+        return self.quantity_used * self.unit_cost
+    
+    @property
+    def wastage(self):
+        """Calculate wastage"""
+        return self.quantity_allocated - self.quantity_used - self.quantity_remaining
+    
+    @property
+    def wastage_value(self):
+        """Calculate wastage value"""
+        return self.wastage * self.unit_cost
+    
+    def save(self, *args, **kwargs):
+        # Auto-calculate remaining quantity
+        self.quantity_remaining = self.quantity_allocated - self.quantity_used
+        super().save(*args, **kwargs)
+    
+    class Meta:
+        verbose_name = "Bay Consumption"
+        verbose_name_plural = "Bay Consumptions"
+        unique_together = ['daily_operations', 'bay', 'item']
+        ordering = ['-daily_operations__operation_date', 'bay__bay_number']
+
+
+class InventoryReconciliation(TenantTimeStampedModel):
+    """Daily inventory reconciliation records"""
+    daily_operations = models.OneToOneField(
+        DailyOperations,
+        on_delete=models.CASCADE,
+        related_name='reconciliation'
+    )
+    
+    # Reconciliation summary
+    total_items_checked = models.IntegerField(default=0)
+    total_discrepancies = models.IntegerField(default=0)
+    total_variance_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    # Reconciliation status
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    
+    # Approval
+    is_approved = models.BooleanField(default=False)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_reconciliations'
+    )
+    
+    notes = models.TextField(blank=True)
+    
+    def __str__(self):
+        return f"Reconciliation - {self.daily_operations.operation_date}"
+    
+    @property
+    def accuracy_rate(self):
+        """Calculate reconciliation accuracy rate"""
+        if self.total_items_checked == 0:
+            return 100
+        return ((self.total_items_checked - self.total_discrepancies) / self.total_items_checked) * 100
+    
+    class Meta:
+        verbose_name = "Inventory Reconciliation"
+        verbose_name_plural = "Inventory Reconciliations"
+        ordering = ['-daily_operations__operation_date']
+
+
+class ReconciliationItem(TenantTimeStampedModel):
+    """Individual item reconciliation records"""
+    reconciliation = models.ForeignKey(
+        InventoryReconciliation,
+        on_delete=models.CASCADE,
+        related_name='item_records'
+    )
+    
+    item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.CASCADE,
+        related_name='reconciliation_records'
+    )
+    
+    # Stock levels
+    system_stock = models.DecimalField(max_digits=10, decimal_places=2)
+    physical_stock = models.DecimalField(max_digits=10, decimal_places=2)
+    variance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    variance_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    # Reconciliation details
+    has_discrepancy = models.BooleanField(default=False)
+    reason = models.TextField(blank=True)
+    action_taken = models.TextField(blank=True)
+    
+    # Bay usage breakdown
+    bay_usage = models.JSONField(default=dict, blank=True)  # {'bay_1': 5.5, 'bay_2': 3.2}
+    
+    verified_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    
+    def save(self, *args, **kwargs):
+        # Calculate variance
+        self.variance = self.physical_stock - self.system_stock
+        self.variance_value = self.variance * self.item.unit_cost
+        self.has_discrepancy = abs(self.variance) > 0.01  # Allow for small rounding differences
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.item.name} - {self.reconciliation.daily_operations.operation_date}"
+    
+    class Meta:
+        verbose_name = "Reconciliation Item"
+        verbose_name_plural = "Reconciliation Items"
+        unique_together = ['reconciliation', 'item']
+        ordering = ['item__name']

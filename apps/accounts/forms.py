@@ -193,7 +193,9 @@ class BusinessRegistrationForm(forms.ModelForm):
             'is_verified', 'is_approved', 'approved_by', 'approved_at', 'rejection_reason', 
             'subscription', 'max_employees', 'max_customers', 'logo', 'created_at', 'updated_at',
             'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
-            'id', 'created_by_id', 'updated_by_id'
+            'id', 'created_by_id', 'updated_by_id',
+            # Additional fields from migration 0003 - these should use model defaults
+            'api_key', 'auto_backup_enabled', 'auto_payment_confirmation', 'default_tax_rate', 'last_backup_date'
         ]
         widgets = {
             'name': forms.TextInput(attrs={

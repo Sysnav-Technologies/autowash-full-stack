@@ -112,6 +112,13 @@ class Tenant(TimeStampedModel, Address, ContactInfo):
     # Logo
     logo = models.ImageField(upload_to='tenant_logos/', blank=True, null=True)
     
+    # Additional settings 
+    api_key = models.CharField(max_length=255, blank=True, help_text='API key for third-party integrations')
+    auto_backup_enabled = models.BooleanField(default=True, help_text='Enable automatic backups')
+    auto_payment_confirmation = models.BooleanField(default=False, help_text='Automatically confirm payments')
+    default_tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=16.0, help_text='Default tax rate percentage')
+    last_backup_date = models.DateTimeField(null=True, blank=True, help_text='Last backup timestamp')
+    
     objects = TenantManager()
     
     class Meta:

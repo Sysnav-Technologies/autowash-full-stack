@@ -14,7 +14,8 @@ from apps.core.utils import generate_unique_code
 from .models import (
     InventoryItem, InventoryCategory, Unit, StockMovement, 
     StockAdjustment, ItemConsumption, StockTake, StockTakeCount,
-    InventoryAlert, ItemLocation
+    InventoryAlert, ItemLocation, DailyOperations, BayConsumption,
+    InventoryReconciliation, ReconciliationItem
 )
 from .forms import (
     InventoryItemForm, InventoryCategoryForm, UnitForm, 
@@ -1291,3 +1292,684 @@ def ajax_location_create(request):
             return JsonResponse({'success': False, 'message': str(e)}, status=400)
     
     return JsonResponse({'success': False, 'message': 'Invalid request'}, status=400)
+
+
+# === DAILY OPERATIONS VIEWS ===
+
+@employee_required()
+def daily_operations_dashboard(request):
+    """Comprehensive daily operations dashboard integrating all app functionalities"""
+    from .models import DailyOperations, BayConsumption, InventoryReconciliation
+    from apps.services.models import ServiceBay, ServiceOrder
+    from apps.customers.models import Customer
+    from apps.employees.models import Employee, Attendance
+    from apps.payments.models import Payment
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    today = timezone.now().date()
+    
+    # Get or create today's operations
+    operations, created = DailyOperations.objects.get_or_create(
+        operation_date=today,
+        defaults={
+            'shift_supervisor': request.user.employee if hasattr(request.user, 'employee') else None,
+            'target_services': 50,  # Default target
+        }
+    )
+    
+    # Get all wash bays
+    bays = ServiceBay.objects.filter(is_active=True).order_by('bay_number')
+    
+    # Get bay consumptions for today
+    bay_consumptions = BayConsumption.objects.filter(
+        daily_operations=operations
+    ).select_related('item', 'bay').order_by('bay__bay_number', 'item__name')
+    
+    # Organize consumptions by bay
+    bay_consumption_data = {}
+    for bay in bays:
+        bay_consumptions_for_bay = bay_consumptions.filter(bay=bay)
+        total_allocated = bay_consumptions_for_bay.aggregate(
+            total=Sum(F('quantity_allocated') * F('unit_cost'))
+        )['total'] or 0
+        total_used = bay_consumptions_for_bay.aggregate(
+            total=Sum(F('quantity_used') * F('unit_cost'))
+        )['total'] or 0
+        total_remaining = bay_consumptions_for_bay.aggregate(
+            total=Sum(F('quantity_remaining') * F('unit_cost'))
+        )['total'] or 0
+        
+        bay_consumption_data[bay.id] = {
+            'bay': bay,
+            'consumptions': bay_consumptions_for_bay,
+            'total_allocated_value': total_allocated,
+            'total_used_value': total_used,
+            'total_remaining_value': total_remaining,
+        }
+    
+    # Get inventory items available for allocation
+    available_items = InventoryItem.objects.filter(
+        current_stock__gt=0,
+        is_active=True
+    ).order_by('category__name', 'name')
+    
+    # Get reconciliation status
+    try:
+        reconciliation = InventoryReconciliation.objects.get(daily_operations=operations)
+    except InventoryReconciliation.DoesNotExist:
+        reconciliation = None
+    
+    # Calculate summary statistics
+    total_allocated = bay_consumptions.aggregate(
+        total=Sum(F('quantity_allocated') * F('unit_cost'))
+    )['total'] or 0
+    
+    total_used = bay_consumptions.aggregate(
+        total=Sum(F('quantity_used') * F('unit_cost'))
+    )['total'] or 0
+    
+    total_remaining = bay_consumptions.aggregate(
+        total=Sum(F('quantity_remaining') * F('unit_cost'))
+    )['total'] or 0
+    
+    # Get recent activities from various apps
+    recent_orders = ServiceOrder.objects.filter(
+        created_at__date=today
+    ).select_related('customer', 'queue_entry__service_bay').order_by('-created_at')
+    
+    # Calculate metrics before slicing
+    active_customers_today = recent_orders.values('customer').distinct().count()
+    
+    # Now slice for display
+    recent_orders = recent_orders[:10]
+    
+    recent_stock_movements = StockMovement.objects.filter(
+        created_at__date=today
+    ).select_related('item').order_by('-created_at')[:10]
+    
+    # Get recent payments (if Payment model exists)
+    recent_payments = []
+    try:
+        from apps.payments.models import Payment
+        recent_payments = Payment.objects.filter(
+            created_at__date=today
+        ).select_related('customer').order_by('-created_at')[:10]
+    except:
+        pass
+    
+    # Get recent customers
+    recent_customers_queryset = Customer.objects.filter(
+        created_at__date=today
+    ).order_by('-created_at')
+    
+    # Calculate count before slicing
+    new_customers_today = recent_customers_queryset.count()
+    
+    # Now slice for display
+    recent_customers = recent_customers_queryset[:10]
+    
+    # Get employees on duty
+    on_duty_employees = []
+    try:
+        from apps.employees.models import Attendance
+        today_attendances = Attendance.objects.filter(
+            date=today,
+            check_out_time__isnull=True,
+            status='present'
+        ).select_related('employee')
+        on_duty_employees = [att.employee for att in today_attendances]
+    except:
+        pass
+    
+    # Calculate additional metrics
+    daily_revenue = 0
+    try:
+        daily_revenue = recent_payments and sum(p.amount for p in recent_payments) or 0
+    except:
+        pass
+    
+    low_stock_alerts = InventoryAlert.objects.filter(
+        is_resolved=False,
+        alert_type__in=['low_stock', 'out_of_stock']
+    ).count()
+    
+    context = {
+        'operations': operations,
+        'bays': bays,
+        'bay_consumption_data': bay_consumption_data,
+        'available_items': available_items,
+        'reconciliation': reconciliation,
+        'summary': {
+            'total_allocated': total_allocated,
+            'total_used': total_used,
+            'total_remaining': total_remaining,
+            'total_bays': bays.count(),
+            'active_bays': bays.filter(is_active=True).count(),
+            'occupied_bays': bays.filter(is_occupied=True).count(),
+        },
+        'recent_orders': recent_orders,
+        'recent_stock_movements': recent_stock_movements,
+        'recent_payments': recent_payments,
+        'recent_customers': recent_customers,
+        'on_duty_employees': on_duty_employees,
+        'daily_revenue': daily_revenue,
+        'active_customers_today': active_customers_today,
+        'new_customers_today': new_customers_today,
+        'low_stock_alerts': low_stock_alerts,
+        'page_title': f'Daily Operations Command Center - {today}',
+        **get_inventory_urls(request)
+    }
+    
+    return render(request, 'inventory/daily_operations.html', context)
+
+
+@employee_required()
+@require_POST
+def allocate_to_bay(request):
+    """Allocate inventory items to wash bays"""
+    from .models import DailyOperations, BayConsumption
+    from apps.services.models import ServiceBay
+    
+    try:
+        with transaction.atomic():
+            today = timezone.now().date()
+            operations = DailyOperations.objects.get(operation_date=today)
+            
+            bay_id = request.POST.get('bay_id')
+            item_id = request.POST.get('item_id')
+            quantity = float(request.POST.get('quantity', 0))
+            
+            bay = ServiceBay.objects.get(id=bay_id)
+            item = InventoryItem.objects.get(id=item_id)
+            
+            # Check stock availability
+            if item.current_stock < quantity:
+                messages.error(request, f'Insufficient stock for {item.name}. Available: {item.current_stock}')
+                return redirect('inventory:daily_operations')
+            
+            # Check if allocation already exists
+            allocation, created = BayConsumption.objects.get_or_create(
+                daily_operations=operations,
+                bay=bay,
+                item=item,
+                defaults={
+                    'quantity_allocated': quantity,
+                    'unit_cost': item.unit_cost,
+                    'transferred_by': request.user.employee if hasattr(request.user, 'employee') else None,
+                }
+            )
+            
+            if not created:
+                # Update existing allocation
+                allocation.quantity_allocated += quantity
+                allocation.save()
+            
+            # Create stock movement
+            StockMovement.objects.create(
+                item=item,
+                movement_type='out',
+                quantity=quantity,
+                unit_cost=item.unit_cost,
+                reference_type='bay_allocation',
+                reference_id=f"Bay-{bay.bay_number}-{today}",
+                notes=f"Allocated to Bay {bay.bay_number} for daily operations",
+                created_by=request.user
+            )
+            
+            # Update item stock
+            item.current_stock -= quantity
+            item.save()
+            
+            messages.success(request, f'Successfully allocated {quantity} {item.unit.symbol} of {item.name} to Bay {bay.bay_number}')
+            
+    except Exception as e:
+        messages.error(request, f'Error allocating items: {str(e)}')
+    
+    return redirect('inventory:daily_operations')
+
+
+@employee_required()
+@require_POST
+def record_bay_consumption(request):
+    """Record actual consumption by a bay"""
+    from .models import DailyOperations, BayConsumption
+    
+    try:
+        today = timezone.now().date()
+        operations = DailyOperations.objects.get(operation_date=today)
+        
+        consumption_id = request.POST.get('consumption_id')
+        quantity_used = float(request.POST.get('quantity_used', 0))
+        notes = request.POST.get('notes', '')
+        
+        consumption = BayConsumption.objects.get(
+            id=consumption_id,
+            daily_operations=operations
+        )
+        
+        # Validate quantity
+        if quantity_used > consumption.quantity_allocated:
+            messages.error(request, 'Quantity used cannot exceed allocated quantity')
+            return redirect('inventory:daily_operations')
+        
+        consumption.quantity_used = quantity_used
+        consumption.quantity_remaining = consumption.quantity_allocated - quantity_used
+        consumption.notes = notes
+        consumption.status = 'completed' if quantity_used == consumption.quantity_allocated else 'in_use'
+        consumption.updated_by = request.user.employee if hasattr(request.user, 'employee') else None
+        consumption.save()
+        
+        messages.success(request, f'Consumption recorded for Bay {consumption.bay.bay_number}')
+        
+    except Exception as e:
+        messages.error(request, f'Error recording consumption: {str(e)}')
+    
+    return redirect('inventory:daily_operations')
+
+
+@employee_required()
+@require_POST
+def transfer_between_bays(request):
+    """Transfer inventory between wash bays"""
+    from .models import DailyOperations, BayConsumption
+    
+    try:
+        with transaction.atomic():
+            today = timezone.now().date()
+            operations = DailyOperations.objects.get(operation_date=today)
+            
+            from_bay_id = request.POST.get('from_bay_id')
+            to_bay_id = request.POST.get('to_bay_id')
+            item_id = request.POST.get('item_id')
+            quantity = float(request.POST.get('quantity', 0))
+            
+            # Get source consumption
+            from_consumption = BayConsumption.objects.get(
+                daily_operations=operations,
+                bay_id=from_bay_id,
+                item_id=item_id
+            )
+            
+            # Check available quantity
+            if from_consumption.quantity_remaining < quantity:
+                messages.error(request, 'Insufficient quantity available for transfer')
+                return redirect('inventory:daily_operations')
+            
+            # Update source bay
+            from_consumption.quantity_remaining -= quantity
+            from_consumption.save()
+            
+            # Get or create target bay allocation
+            to_consumption, created = BayConsumption.objects.get_or_create(
+                daily_operations=operations,
+                bay_id=to_bay_id,
+                item_id=item_id,
+                defaults={
+                    'quantity_allocated': quantity,
+                    'unit_cost': from_consumption.unit_cost,
+                    'transferred_by': request.user.employee if hasattr(request.user, 'employee') else None,
+                }
+            )
+            
+            if not created:
+                to_consumption.quantity_allocated += quantity
+                to_consumption.quantity_remaining += quantity
+                to_consumption.save()
+            
+            messages.success(request, f'Successfully transferred {quantity} units between bays')
+            
+    except Exception as e:
+        messages.error(request, f'Error transferring items: {str(e)}')
+    
+    return redirect('inventory:daily_operations')
+
+
+@employee_required()
+@require_POST
+def return_to_stock(request):
+    """Return unused items from bay back to stock"""
+    from .models import DailyOperations, BayConsumption
+    
+    try:
+        with transaction.atomic():
+            today = timezone.now().date()
+            operations = DailyOperations.objects.get(operation_date=today)
+            
+            consumption_id = request.POST.get('consumption_id')
+            quantity_returned = float(request.POST.get('quantity_returned', 0))
+            
+            consumption = BayConsumption.objects.get(
+                id=consumption_id,
+                daily_operations=operations
+            )
+            
+            # Validate quantity
+            if quantity_returned > consumption.quantity_remaining:
+                messages.error(request, 'Return quantity cannot exceed remaining quantity')
+                return redirect('inventory:daily_operations')
+            
+            # Update consumption
+            consumption.quantity_remaining -= quantity_returned
+            consumption.status = 'returned' if consumption.quantity_remaining == 0 else consumption.status
+            consumption.save()
+            
+            # Return to stock
+            item = consumption.item
+            item.current_stock += quantity_returned
+            item.save()
+            
+            # Create stock movement
+            StockMovement.objects.create(
+                item=item,
+                movement_type='in',
+                quantity=quantity_returned,
+                unit_cost=consumption.unit_cost,
+                reference_type='bay_return',
+                reference_id=f"Bay-{consumption.bay.bay_number}-Return-{today}",
+                notes=f"Returned from Bay {consumption.bay.bay_number}",
+                created_by=request.user
+            )
+            
+            messages.success(request, f'Successfully returned {quantity_returned} units to stock')
+            
+    except Exception as e:
+        messages.error(request, f'Error returning items: {str(e)}')
+    
+    return redirect('inventory:daily_operations')
+
+
+@employee_required()
+def start_reconciliation(request):
+    """Start daily inventory reconciliation"""
+    from .models import DailyOperations, InventoryReconciliation, ReconciliationItem
+    
+    try:
+        with transaction.atomic():
+            today = timezone.now().date()
+            operations = DailyOperations.objects.get(operation_date=today)
+            
+            # Create reconciliation record
+            reconciliation, created = InventoryReconciliation.objects.get_or_create(
+                daily_operations=operations,
+                defaults={
+                    'completed_by': request.user.employee if hasattr(request.user, 'employee') else None,
+                }
+            )
+            
+            if created:
+                # Create reconciliation items for all active inventory
+                active_items = InventoryItem.objects.filter(is_active=True)
+                
+                for item in active_items:
+                    ReconciliationItem.objects.create(
+                        reconciliation=reconciliation,
+                        item=item,
+                        system_stock=item.current_stock,
+                        physical_stock=item.current_stock,  # To be updated during count
+                    )
+                
+                reconciliation.total_items_checked = active_items.count()
+                reconciliation.save()
+                
+                messages.success(request, f'Reconciliation started with {active_items.count()} items')
+            else:
+                messages.info(request, 'Reconciliation already in progress')
+            
+    except Exception as e:
+        messages.error(request, f'Error starting reconciliation: {str(e)}')
+    
+    return redirect('inventory:daily_operations')
+
+
+@employee_required()
+@ajax_required
+def ajax_update_reconciliation_item(request):
+    """AJAX endpoint to update reconciliation item physical count"""
+    from .models import ReconciliationItem
+    
+    if request.method == 'POST':
+        try:
+            item_id = request.POST.get('item_id')
+            physical_stock = float(request.POST.get('physical_stock', 0))
+            reason = request.POST.get('reason', '')
+            
+            recon_item = ReconciliationItem.objects.get(id=item_id)
+            recon_item.physical_stock = physical_stock
+            recon_item.reason = reason
+            recon_item.verified_by = request.user.employee if hasattr(request.user, 'employee') else None
+            recon_item.save()
+            
+            # Update reconciliation summary
+            reconciliation = recon_item.reconciliation
+            reconciliation.total_discrepancies = reconciliation.item_records.filter(has_discrepancy=True).count()
+            reconciliation.total_variance_value = reconciliation.item_records.aggregate(
+                total=Sum('variance_value')
+            )['total'] or 0
+            reconciliation.save()
+            
+            return JsonResponse({
+                'success': True,
+                'variance': float(recon_item.variance),
+                'variance_value': float(recon_item.variance_value),
+                'has_discrepancy': recon_item.has_discrepancy
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)}, status=400)
+    
+    return JsonResponse({'success': False, 'message': 'Invalid request'}, status=400)
+
+
+@employee_required()
+@require_POST
+def complete_reconciliation(request):
+    """Complete daily reconciliation and update stock levels"""
+    from .models import DailyOperations, InventoryReconciliation
+    
+    try:
+        with transaction.atomic():
+            today = timezone.now().date()
+            operations = DailyOperations.objects.get(operation_date=today)
+            reconciliation = InventoryReconciliation.objects.get(daily_operations=operations)
+            
+            # Update stock levels based on physical counts
+            for item_record in reconciliation.item_records.all():
+                if item_record.has_discrepancy:
+                    # Update item stock to match physical count
+                    item = item_record.item
+                    old_stock = item.current_stock
+                    item.current_stock = item_record.physical_stock
+                    item.save()
+                    
+                    # Create stock movement for adjustment
+                    movement_type = 'in' if item_record.variance > 0 else 'out'
+                    StockMovement.objects.create(
+                        item=item,
+                        movement_type=movement_type,
+                        quantity=abs(item_record.variance),
+                        unit_cost=item.unit_cost,
+                        reference_type='reconciliation',
+                        reference_id=f"Recon-{today}",
+                        notes=f"Reconciliation adjustment. Reason: {item_record.reason}",
+                        created_by=request.user
+                    )
+            
+            # Mark reconciliation as completed
+            reconciliation.is_completed = True
+            reconciliation.completed_at = timezone.now()
+            reconciliation.save()
+            
+            # Update operations status
+            operations.status = 'reconciled'
+            operations.reconciled_at = timezone.now()
+            operations.reconciled_by = request.user.employee if hasattr(request.user, 'employee') else None
+            operations.save()
+            
+            messages.success(request, 'Reconciliation completed successfully')
+            
+    except Exception as e:
+        messages.error(request, f'Error completing reconciliation: {str(e)}')
+    
+    return redirect('inventory:daily_operations')
+
+
+@employee_required()
+def get_bay_status(request):
+    """Get current status of all wash bays for AJAX updates"""
+    from apps.services.models import ServiceBay, ServiceOrder
+    
+    try:
+        bays = ServiceBay.objects.filter(is_active=True).order_by('bay_number')
+        bay_data = []
+        
+        for bay in bays:
+            # Get current order if any
+            current_order = None
+            try:
+                current_order = ServiceOrder.objects.filter(
+                    bay=bay,
+                    status__in=['in_progress', 'started']
+                ).first()
+            except:
+                pass
+            
+            bay_info = {
+                'id': bay.id,
+                'bay_number': bay.bay_number,
+                'name': bay.name,
+                'is_occupied': getattr(bay, 'is_occupied', False),
+                'is_active': bay.is_active,
+                'current_order': None
+            }
+            
+            if current_order:
+                bay_info['current_order'] = {
+                    'id': current_order.id,
+                    'customer_name': str(current_order.customer),
+                    'service_name': current_order.service.name if hasattr(current_order, 'service') else 'Service',
+                    'started_at': current_order.created_at.strftime('%H:%M')
+                }
+            
+            bay_data.append(bay_info)
+        
+        return JsonResponse({
+            'success': True,
+            'bays': bay_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@employee_required()
+def get_activity_feed(request):
+    """Get recent activities across all modules for the activity feed"""
+    try:
+        activities = []
+        today = timezone.now().date()
+        
+        # Recent stock movements
+        recent_movements = StockMovement.objects.filter(
+            created_at__date=today
+        ).select_related('item').order_by('-created_at')[:5]
+        
+        for movement in recent_movements:
+            activities.append({
+                'type': 'stock_movement',
+                'icon': 'fas fa-boxes',
+                'color': 'info',
+                'title': f'Stock {movement.movement_type.title()}',
+                'description': f'{movement.quantity} {movement.item.name}',
+                'time': movement.created_at.strftime('%H:%M'),
+                'user': str(movement.created_by) if movement.created_by else 'System'
+            })
+        
+        # Recent service orders
+        try:
+            from apps.services.models import ServiceOrder
+            recent_orders = ServiceOrder.objects.filter(
+                created_at__date=today
+            ).select_related('customer', 'queue_entry__service_bay').order_by('-created_at')[:5]
+            
+            for order in recent_orders:
+                bay_info = "TBD"
+                if hasattr(order, 'queue_entry') and order.queue_entry and order.queue_entry.service_bay:
+                    bay_info = f"Bay {order.queue_entry.service_bay.bay_number}"
+                
+                activities.append({
+                    'type': 'service_order',
+                    'icon': 'fas fa-car',
+                    'color': 'primary',
+                    'title': 'New Service Order',
+                    'description': f'{order.customer} - {bay_info}',
+                    'time': order.created_at.strftime('%H:%M'),
+                    'user': str(order.created_by) if hasattr(order, 'created_by') else 'System'
+                })
+        except:
+            pass
+        
+        # Recent payments
+        try:
+            from apps.payments.models import Payment
+            recent_payments = Payment.objects.filter(
+                created_at__date=today
+            ).select_related('customer').order_by('-created_at')[:3]
+            
+            for payment in recent_payments:
+                activities.append({
+                    'type': 'payment',
+                    'icon': 'fas fa-money-bill-wave',
+                    'color': 'success',
+                    'title': 'Payment Received',
+                    'description': f'${payment.amount} from {payment.customer}',
+                    'time': payment.created_at.strftime('%H:%M'),
+                    'user': str(payment.created_by) if hasattr(payment, 'created_by') else 'System'
+                })
+        except:
+            pass
+        
+        # Sort all activities by time (newest first)
+        activities.sort(key=lambda x: x['time'], reverse=True)
+        
+        return JsonResponse({
+            'success': True,
+            'activities': activities[:15]  # Limit to 15 most recent
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@employee_required()
+@require_POST
+def update_operations_target(request):
+    """Update daily operations target"""
+    try:
+        target = int(request.POST.get('target', 0))
+        today = timezone.now().date()
+        
+        operations, _ = DailyOperations.objects.get_or_create(
+            operation_date=today,
+            defaults={'shift_supervisor': request.user.employee if hasattr(request.user, 'employee') else None}
+        )
+        
+        operations.target_services = target
+        operations.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Target updated to {target} services'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })

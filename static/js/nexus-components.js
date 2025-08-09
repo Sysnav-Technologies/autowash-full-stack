@@ -20,11 +20,52 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(overlay);
     }
 
+    // Get the actual overlay element (created or existing)
+    const actualOverlay = document.querySelector('.sidebar-overlay') || document.getElementById('sidebarOverlay');
+
     // Mobile toggle functionality
     if (mobileToggle) {
         mobileToggle.addEventListener('click', function() {
+            console.log('Mobile toggle clicked'); // Debug log
             sidebar.classList.toggle('mobile-open');
-            document.querySelector('.sidebar-overlay').classList.toggle('show');
+            
+            // When opening mobile sidebar, ensure it's not collapsed
+            if (sidebar.classList.contains('mobile-open')) {
+                sidebar.classList.remove('collapsed');
+                if (topbar) topbar.classList.remove('sidebar-collapsed');
+                if (mainContent) mainContent.classList.remove('sidebar-collapsed');
+                
+                // Force visibility of text elements on mobile
+                setTimeout(() => {
+                    const navTexts = document.querySelectorAll('.nav-text');
+                    const brandText = document.querySelector('.brand-text');
+                    const userInfo = document.querySelector('.user-info');
+                    
+                    navTexts.forEach(text => {
+                        text.style.opacity = '1';
+                        text.style.width = 'auto';
+                        text.style.whiteSpace = 'normal'; // Allow text wrapping
+                        text.style.overflow = 'visible';
+                        text.style.textOverflow = 'initial';
+                    });
+                    
+                    if (brandText) {
+                        brandText.style.opacity = '1';
+                        brandText.style.width = 'auto';
+                    }
+                    
+                    if (userInfo) {
+                        userInfo.style.opacity = '1';
+                        userInfo.style.width = 'auto';
+                    }
+                    
+                    console.log('Mobile sidebar opened - forced text visibility and wrapping');
+                }, 50);
+            }
+            
+            if (actualOverlay) {
+                actualOverlay.classList.toggle('show');
+            }
             body.classList.toggle('sidebar-open');
         });
     }
@@ -43,15 +84,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Sidebar overlay click
-    const overlayElement = document.querySelector('.sidebar-overlay');
-    if (overlayElement) {
-        overlayElement.addEventListener('click', function() {
+    if (actualOverlay) {
+        actualOverlay.addEventListener('click', function() {
+            console.log('Overlay clicked'); // Debug log
             sidebar.classList.remove('mobile-open');
-            overlayElement.classList.remove('show');
+            actualOverlay.classList.remove('show');
             body.classList.remove('sidebar-open');
         });
     }
 
+    // Clear sidebar collapsed state for debugging (remove after testing)
+    localStorage.removeItem('sidebarCollapsed');
+    
     // Restore sidebar state on page load (desktop only)
     if (window.innerWidth > 992) {
         const savedState = localStorage.getItem('sidebarCollapsed');
@@ -62,18 +106,155 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Force brand text visibility check
+    function ensureBrandTextVisibility() {
+        const brandText = document.querySelector('.brand-text');
+        const brandName = document.querySelector('.brand-name');
+        const brandType = document.querySelector('.brand-type');
+        
+        if (brandText && brandName && brandType) {
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            console.log('Sidebar collapsed state:', isCollapsed);
+            console.log('Brand text computed style:', window.getComputedStyle(brandText));
+            
+            if (!isCollapsed) {
+                // Force visibility when not collapsed
+                brandText.style.opacity = '1';
+                brandText.style.width = 'auto';
+                brandName.style.display = 'block';
+                brandType.style.display = 'block';
+                console.log('Forced brand text visibility');
+            }
+        } else {
+            console.log('Brand elements not found:', { brandText, brandName, brandType });
+        }
+    }
+
+    // Run visibility check after DOM is ready
+    setTimeout(ensureBrandTextVisibility, 100);
+
+    // Ensure sidebar scrolling works properly
+    function ensureSidebarScrolling() {
+        const sidebarNav = document.querySelector('.sidebar-nav');
+        if (sidebarNav) {
+            const navHeight = sidebarNav.scrollHeight;
+            const containerHeight = sidebarNav.clientHeight;
+            const isScrollable = navHeight > containerHeight;
+            
+            console.log('Sidebar navigation stats:', {
+                scrollHeight: navHeight,
+                clientHeight: containerHeight,
+                isScrollable: isScrollable,
+                overflow: window.getComputedStyle(sidebarNav).overflowY
+            });
+            
+            // Force scroll properties if needed
+            if (isScrollable) {
+                sidebarNav.style.overflowY = 'auto';
+                sidebarNav.style.overflowX = 'hidden';
+                console.log('Sidebar scrolling enabled');
+            }
+        }
+    }
+
+    // Run scrolling check after DOM is ready
+    setTimeout(ensureSidebarScrolling, 200);
+
+    // Add scroll event listener for debugging
+    const sidebarNav = document.querySelector('.sidebar-nav');
+    if (sidebarNav) {
+        sidebarNav.addEventListener('scroll', function() {
+            console.log('Sidebar scrolled:', {
+                scrollTop: this.scrollTop,
+                scrollHeight: this.scrollHeight,
+                clientHeight: this.clientHeight
+            });
+        });
+    }
+
+    // Enhanced submenu management
+    function enhanceSubmenuScrolling() {
+        const dropdowns = document.querySelectorAll('.nav-dropdown');
+        dropdowns.forEach(dropdown => {
+            const toggle = dropdown.querySelector('.nav-dropdown-toggle, .dropdown-toggle');
+            const submenu = dropdown.querySelector('.nav-submenu');
+            
+            if (toggle && submenu) {
+                toggle.addEventListener('click', function() {
+                    setTimeout(() => {
+                        if (dropdown.classList.contains('open')) {
+                            const submenuHeight = submenu.scrollHeight;
+                            const availableHeight = window.innerHeight - 300;
+                            
+                            console.log('Submenu opened:', {
+                                submenuHeight: submenuHeight,
+                                availableHeight: availableHeight,
+                                needsScrolling: submenuHeight > availableHeight
+                            });
+                            
+                            // Ensure submenu scrolling is enabled if needed
+                            if (submenuHeight > availableHeight) {
+                                submenu.style.overflowY = 'auto';
+                                submenu.style.maxHeight = availableHeight + 'px';
+                                console.log('Enabled submenu scrolling');
+                            }
+                        }
+                    }, 300); // Wait for animation to complete
+                });
+            }
+        });
+    }
+
+    // Initialize submenu enhancements
+    setTimeout(enhanceSubmenuScrolling, 300);
+
     // Handle window resize
     window.addEventListener('resize', function() {
-        if (window.innerWidth > 992) {
+        if (window.innerWidth > 768) {
             // Close mobile sidebar on desktop
             sidebar.classList.remove('mobile-open');
-            document.querySelector('.sidebar-overlay')?.classList.remove('show');
+            if (actualOverlay) {
+                actualOverlay.classList.remove('show');
+            }
             body.classList.remove('sidebar-open');
         } else {
-            // Remove collapsed state on mobile
+            // Remove collapsed state on mobile and force text visibility
             sidebar.classList.remove('collapsed');
             if (topbar) topbar.classList.remove('sidebar-collapsed');
             if (mainContent) mainContent.classList.remove('sidebar-collapsed');
+            
+            // Force visibility of all text elements on mobile
+            setTimeout(() => {
+                const navTexts = document.querySelectorAll('.nav-text');
+                const brandText = document.querySelector('.brand-text');
+                const userInfo = document.querySelector('.user-info');
+                const sectionTitles = document.querySelectorAll('.nav-section-title');
+                
+                navTexts.forEach(text => {
+                    text.style.opacity = '1';
+                    text.style.width = 'auto';
+                    text.style.whiteSpace = 'normal'; // Allow text wrapping
+                    text.style.overflow = 'visible';
+                    text.style.textOverflow = 'initial';
+                });
+                
+                sectionTitles.forEach(title => {
+                    title.style.opacity = '1';
+                    title.style.height = 'auto';
+                });
+                
+                if (brandText) {
+                    brandText.style.opacity = '1';
+                    brandText.style.width = 'auto';
+                }
+                
+                if (userInfo) {
+                    userInfo.style.opacity = '1';
+                    userInfo.style.width = 'auto';
+                }
+                
+                console.log('Mobile view - forced all text visibility and wrapping');
+            }, 100);
         }
     });
 

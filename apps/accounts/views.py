@@ -595,6 +595,49 @@ def password_reset_complete_view(request):
     return render(request, 'auth/password_reset_complete.html')
 
 
+@login_required
+def password_change_view(request):
+    """Password change view for authenticated users"""
+    if request.method == 'POST':
+        old_password = request.POST.get('old_password')
+        new_password1 = request.POST.get('new_password1')
+        new_password2 = request.POST.get('new_password2')
+        
+        # Validate old password
+        if not request.user.check_password(old_password):
+            messages.error(request, 'Your old password was entered incorrectly. Please enter it again.')
+            return render(request, 'auth/password_change.html')
+        
+        # Validate new passwords match
+        if new_password1 != new_password2:
+            messages.error(request, 'The two password fields didn\'t match.')
+            return render(request, 'auth/password_change.html')
+        
+        # Validate password strength (basic validation)
+        if len(new_password1) < 8:
+            messages.error(request, 'Your password must contain at least 8 characters.')
+            return render(request, 'auth/password_change.html')
+        
+        # Change password
+        request.user.set_password(new_password1)
+        request.user.save()
+        
+        # Update session to prevent logout
+        from django.contrib.auth import update_session_auth_hash
+        update_session_auth_hash(request, request.user)
+        
+        messages.success(request, 'Your password has been changed successfully!')
+        return redirect('accounts:password_change_done')
+    
+    return render(request, 'auth/password_change.html')
+
+
+@login_required
+def password_change_done_view(request):
+    """Password change success confirmation"""
+    return render(request, 'auth/password_change_done.html')
+
+
 def email_verification_sent(request):
     """Email verification sent confirmation"""
     return render(request, 'auth/email_verification_sent.html')
@@ -1182,6 +1225,11 @@ def profile_view(request):
     """User profile view"""
     profile, created = UserProfile.objects.get_or_create(user=request.user)
     
+    # Get employee context if exists
+    employee = None
+    if hasattr(request, 'employee') and request.employee:
+        employee = request.employee
+    
     if request.method == 'POST':
         form = UserProfileForm(request.POST, request.FILES, instance=profile)
         if form.is_valid():
@@ -1194,9 +1242,38 @@ def profile_view(request):
     context = {
         'form': form,
         'profile': profile,
+        'employee': employee,
         'title': 'My Profile'
     }
     return render(request, 'auth/profile.html', context)
+
+@login_required
+def profile_photo_upload(request):
+    """Handle profile photo upload"""
+    if request.method == 'POST':
+        try:
+            profile, created = UserProfile.objects.get_or_create(user=request.user)
+            
+            if 'photo' in request.FILES:
+                # Delete old photo if exists
+                if profile.photo:
+                    try:
+                        profile.photo.delete(save=False)
+                    except:
+                        pass
+                
+                # Save new photo
+                profile.photo = request.FILES['photo']
+                profile.save()
+                
+                messages.success(request, 'Profile photo updated successfully!')
+            else:
+                messages.error(request, 'No photo file provided.')
+                
+        except Exception as e:
+            messages.error(request, f'Error uploading photo: {str(e)}')
+    
+    return redirect('/auth/profile/')
 
 @login_required
 def business_settings_view(request):
