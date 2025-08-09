@@ -1,1363 +1,396 @@
-<!-- templates/services/attendant_dashboard.html -->
 {% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}My Dashboard - {{ block.super }}{% endblock %}
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item active">My Dashboard</li>
+{% endblock %}
+
+{% block content %}
+<!-- Welcome Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm bg-gradient-primary text-white">
+            <div class="card-body p-4">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <h2 class="fw-bold mb-2">
+                            Good {% now "H" as current_hour %}{% if current_hour < 12 %}Morning{% elif current_hour < 17 %}Afternoon{% else %}Evening{% endif %}, {{ request.employee.user.first_name|default:request.employee.user.username }}!
+                        </h2>
+                        <p class="mb-3 text-white-75">
+                            Here's your service dashboard for {{ "now"|date:"l, F j" }}
+                        </p>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-briefcase me-2"></i>
+                                <span>Role: {{ request.employee.get_role_display }}</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-building me-2"></i>
+                                <span>{{ request.tenant.name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 text-lg-end">
+                        <div class="d-flex flex-column flex-lg-row gap-2 justify-content-lg-end">
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/create/" class="btn btn-light fw-semibold">
+                                <i class="fas fa-plus me-2"></i>New Service
+                            </a>
+                            <button type="button" class="btn btn-outline-light fw-semibold" onclick="location.reload()" title="Refresh Dashboard">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1 fw-semibold">Orders Today</p>
+                        <h3 class="fw-bold text-primary mb-0">{{ stats.orders_today }}</h3>
+                        <small class="text-muted">
+                            <i class="fas fa-calendar-day text-info me-1"></i>New assignments
+                        </small>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-clipboard-list text-primary" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1 fw-semibold">Completed</p>
+                        <h3 class="fw-bold text-success mb-0">{{ stats.completed_today }}</h3>
+                        <small class="text-success">
+                            <i class="fas fa-check-circle me-1"></i>Finished today
+                        </small>
+                    </div>
+                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-check-circle text-success" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1 fw-semibold">In Progress</p>
+                        <h3 class="fw-bold text-warning mb-0">{{ stats.in_progress }}</h3>
+                        <small class="text-warning">
+                            <i class="fas fa-spinner me-1"></i>Active services
+                        </small>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-spinner text-warning" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1 fw-semibold">Revenue Today</p>
+                        <h3 class="fw-bold text-info mb-0">${{ stats.total_revenue_today|floatformat:0 }}</h3>
+                        <small class="text-info">
+                            <i class="fas fa-dollar-sign me-1"></i>Total earnings
+                        </small>
+                    </div>
+                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-dollar-sign text-info" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="row">
+    <!-- My Active Orders -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clipboard-list text-primary me-2"></i>My Active Orders
+                    </h5>
+                    <span class="badge bg-primary">{{ my_orders.count }} orders</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if my_orders %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Order</th>
+                                    <th>Customer</th>
+                                    <th>Vehicle</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in my_orders %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" class="fw-semibold text-decoration-none">
+                                                {{ order.order_number }}
+                                            </a>
+                                            <div class="text-muted small">
+                                                <i class="fas fa-clock me-1"></i>{{ order.created_at|date:"M j, g:i A" }}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <div class="fw-semibold">{{ order.customer.full_name }}</div>
+                                            <div class="text-muted small">{{ order.customer.phone_number }}</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">{{ order.vehicle.make }} {{ order.vehicle.model }}</div>
+                                        <div class="text-muted small">{{ order.vehicle.license_plate }}</div>
+                                    </td>
+                                    <td>
+                                        {% if order.status == 'confirmed' %}
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-clock me-1"></i>Confirmed
+                                            </span>
+                                        {% elif order.status == 'in_progress' %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-spinner me-1"></i>In Progress
+                                            </span>
+                                        {% elif order.status == 'completed' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check-circle me-1"></i>Completed
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                {{ order.get_status_display }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-1">
+                                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" 
+                                               class="btn btn-sm btn-outline-primary" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if order.status == 'confirmed' %}
+                                                <form method="post" action="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/start/" style="display:inline;">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-success" title="Start Service">
+                                                        <i class="fas fa-play"></i>
+                                                    </button>
+                                                </form>
+                                            {% elif order.status == 'in_progress' %}
+                                                <form method="post" action="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/complete/" style="display:inline;">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-warning" title="Complete Service">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No Active Orders</h5>
+                        <p class="text-muted">You don't have any assigned orders at the moment.</p>
+                        <a href="/business/{{ request.tenant.slug }}/services/queue/" class="btn btn-outline-primary">
+                            <i class="fas fa-search me-2"></i>Check Service Queue
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Items & Queue -->
+    <div class="col-lg-4">
+        <!-- My Service Items -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-tasks text-warning me-2"></i>My Service Items
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if my_service_items %}
+                    {% for item in my_service_items|slice:":5" %}
+                    <div class="d-flex align-items-center justify-content-between py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div>
+                            <div class="fw-semibold">{{ item.service.name }}</div>
+                            <small class="text-muted">Order: {{ item.order.order_number }}</small>
+                        </div>
+                        <span class="badge bg-light text-dark">${{ item.unit_price }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if my_service_items.count > 5 %}
+                    <div class="text-center mt-3">
+                        <small class="text-muted">and {{ my_service_items.count|add:"-5" }} more...</small>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-tasks fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">No pending service items</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Today's Queue -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-list-ol text-info me-2"></i>Today's Queue
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if today_queue %}
+                    {% for queue_entry in today_queue|slice:":5" %}
+                    <div class="d-flex align-items-center justify-content-between py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div>
+                            <div class="fw-semibold">#{{ queue_entry.queue_number }}</div>
+                            <small class="text-muted">{{ queue_entry.order.customer.full_name }}</small>
+                        </div>
+                        {% if queue_entry.status == 'waiting' %}
+                            <span class="badge bg-secondary">Waiting</span>
+                        {% elif queue_entry.status == 'in_service' %}
+                            <span class="badge bg-primary">In Service</span>
+                        {% else %}
+                            <span class="badge bg-success">{{ queue_entry.get_status_display }}</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if today_queue.count > 5 %}
+                    <div class="text-center mt-3">
+                        <a href="/business/{{ request.tenant.slug }}/services/queue/" class="btn btn-sm btn-outline-primary">
+                            View All ({{ today_queue.count }})
+                        </a>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-list-ol fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">No queue entries today</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Action Modal -->
+<div class="modal fade" id="actionModal" tabindex="-1" aria-labelledby="actionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="actionModalLabel">Service Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="actionModalContent">
+                <!-- Dynamic content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
 {% block extra_css %}
 <style>
-:root {
-    --primary-500: #3b82f6;
-    --primary-50: #eff6ff;
-    --primary-600: #2563eb;
-    --primary-700: #1d4ed8;
-    --success-500: #10b981;
-    --success-50: #ecfdf5;
-    --success-600: #059669;
-    --warning-500: #f59e0b;
-    --warning-50: #fffbeb;
-    --info-500: #06b6d4;
-    --info-50: #f0f9ff;
-    --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
-    --gray-500: #6b7280;
-    --gray-600: #4b5563;
-    --gray-700: #374151;
-    --gray-800: #1f2937;
-    --gray-900: #111827;
-    --radius-sm: 0.375rem;
-    --radius-md: 0.5rem;
-    --radius-lg: 0.75rem;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --transition-fast: 0.15s ease-in-out;
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background: linear-gradient(135deg, var(--primary-50), var(--info-50));
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--primary-200);
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: transform 0.2s ease-in-out;
 }
 
-.page-header-content h1 {
-    margin: 0;
-    font-size: 1.875rem;
-    font-weight: 700;
-    color: var(--gray-900);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.page-description {
-    margin: 0.5rem 0 0;
-    color: var(--gray-600);
-    font-size: 1rem;
-}
-
-.page-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border-radius: var(--radius-md);
-    font-weight: 500;
-    text-decoration: none;
-    border: 1px solid transparent;
-    transition: all var(--transition-fast);
-    cursor: pointer;
-    font-size: 0.875rem;
-}
-
-.btn-success {
-    background: var(--success-500);
-    color: white;
-    border-color: var(--success-500);
-}
-
-.btn-success:hover {
-    background: var(--success-600);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-    text-decoration: none;
-    color: white;
-}
-
-.btn-outline-primary {
-    background: transparent;
-    color: var(--primary-600);
-    border-color: var(--primary-300);
-}
-
-.btn-outline-primary:hover {
-    background: var(--primary-50);
-    border-color: var(--primary-500);
-    text-decoration: none;
-    color: var(--primary-700);
-}
-
-.btn-sm {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    box-shadow: var(--shadow-sm);
-    position: relative;
-    overflow: hidden;
-    transition: all var(--transition-fast);
-}
-
-.stat-card:hover {
+.card:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
 }
 
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
+.text-white-75 {
+    color: rgba(255, 255, 255, 0.75);
 }
 
-.stat-card-primary::before { background: var(--primary-500); }
-.stat-card-success::before { background: var(--success-500); }
-.stat-card-info::before { background: var(--info-500); }
-.stat-card-warning::before { background: var(--warning-500); }
-
-.stat-icon {
-    width: 3rem;
-    height: 3rem;
-    border-radius: var(--radius-lg);
-    background: var(--gray-100);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--primary-600);
-    font-size: 1.25rem;
-    flex-shrink: 0;
-}
-
-.stat-content h3 {
-    margin: 0;
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--gray-900);
-}
-
-.stat-content p {
-    margin: 0;
-    font-size: 0.875rem;
-    color: var(--gray-600);
-    font-weight: 500;
-}
-
-.stat-change {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-top: 0.25rem;
-}
-
-.content-card {
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
-}
-
-.card-header {
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--gray-200);
-    background: var(--gray-50);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.card-title {
-    margin: 0;
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--gray-900);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.card-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.card-body {
-    padding: 1.5rem;
-}
-
-.assignments-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.assignment-card {
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1.25rem;
-    background: white;
-    transition: all var(--transition-fast);
-}
-
-.assignment-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
-    border-color: var(--primary-300);
-}
-
-.assignment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-}
-
-.assignment-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.assignment-number {
-    margin: 0;
-    font-weight: 600;
-    color: var(--primary-600);
-    font-size: 1rem;
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
 }
 
 .badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.75rem;
-    border-radius: 50px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-}
-
-.badge-pending { background: var(--warning-50); color: var(--warning-700); }
-.badge-confirmed { background: var(--info-50); color: var(--info-700); }
-.badge-in_progress { background: var(--primary-50); color: var(--primary-700); }
-.badge-completed { background: var(--success-50); color: var(--success-700); }
-.badge-cancelled { background: var(--gray-100); color: var(--gray-700); }
-
-.priority-badge {
-    font-size: 0.625rem;
-    padding: 0.125rem 0.5rem;
-}
-
-.priority-high { background: #fef2f2; color: #dc2626; }
-.priority-urgent { background: #fef2f2; color: #dc2626; font-weight: 700; }
-
-.assignment-time {
-    font-size: 0.875rem;
-    color: var(--gray-600);
-}
-
-.time-elapsed {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: var(--success-600);
-    font-weight: 500;
-}
-
-.assignment-details {
-    margin-bottom: 1rem;
-}
-
-.customer-vehicle {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--gray-100);
-}
-
-.customer-info,
-.vehicle-info {
-    font-size: 0.875rem;
-}
-
-.customer-info strong,
-.vehicle-info strong {
-    color: var(--gray-900);
-}
-
-.customer-info small,
-.vehicle-info small {
-    color: var(--gray-600);
-}
-
-.services-list {
-    margin-bottom: 1rem;
-}
-
-.service-tag {
-    display: inline-block;
-    background: var(--primary-100);
-    color: var(--primary-700);
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    margin: 0.125rem;
-    font-weight: 500;
-}
-
-.order-summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
-}
-
-.order-total {
-    font-weight: 600;
-    color: var(--gray-900);
-    font-size: 1rem;
-}
-
-.order-duration {
-    color: var(--gray-600);
-}
-
-.assignment-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-}
-
-.btn-warning {
-    background: var(--warning-500);
-    color: white;
-    border-color: var(--warning-500);
-}
-
-.btn-warning:hover {
-    background: #d97706;
-    transform: translateY(-1px);
-    text-decoration: none;
-    color: white;
-}
-
-.btn-primary {
-    background: var(--primary-500);
-    color: white;
-    border-color: var(--primary-500);
-}
-
-.btn-primary:hover {
-    background: var(--primary-600);
-    transform: translateY(-1px);
-    text-decoration: none;
-    color: white;
-}
-
-.assignment-notes {
-    background: var(--info-50);
-    border: 1px solid var(--info-200);
-    border-radius: var(--radius-md);
-    padding: 0.75rem;
-    font-size: 0.875rem;
-    color: var(--info-800);
-}
-
-.assignment-notes i {
-    color: var(--info-600);
-    margin-right: 0.5rem;
-}
-
-.empty-assignments {
-    text-align: center;
-    padding: 3rem 1rem;
-}
-
-.empty-assignments-icon {
-    font-size: 3rem;
-    color: var(--gray-300);
-    margin-bottom: 1rem;
-}
-
-.empty-assignments h6 {
-    margin: 0 0 0.5rem;
-    font-size: 1.125rem;
-    color: var(--gray-700);
-}
-
-.empty-assignments p {
-    margin: 0 0 1.5rem;
-    color: var(--gray-500);
-}
-
-.queue-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.queue-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    background: white;
-    transition: all var(--transition-fast);
-}
-
-.queue-item:hover {
-    background: var(--gray-50);
-    border-color: var(--primary-300);
-}
-
-.queue-item-mine {
-    background: var(--primary-50);
-    border-color: var(--primary-200);
-}
-
-.queue-badge {
-    background: var(--primary-600);
-    color: white;
-    border-radius: 50%;
-    width: 1.5rem;
-    height: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 600;
-    flex-shrink: 0;
-}
-
-.queue-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.queue-order {
-    font-weight: 600;
-    color: var(--gray-900);
-    font-size: 0.875rem;
-}
-
-.queue-customer {
-    color: var(--gray-600);
-    font-size: 0.75rem;
-    margin: 0.125rem 0;
-}
-
-.queue-status {
-    margin-top: 0.25rem;
-}
-
-.queue-time {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-}
-
-.empty-queue {
-    text-align: center;
-    padding: 2rem 1rem;
-    color: var(--gray-500);
-}
-
-.empty-queue i {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-    opacity: 0.5;
-}
-
-.quick-actions-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-}
-
-.quick-action-btn {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    padding: 1rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    text-decoration: none;
-    color: inherit;
-}
-
-.quick-action-btn:hover {
-    background: var(--primary-50);
-    border-color: var(--primary-200);
-    transform: translateY(-1px);
-    text-decoration: none;
-    color: inherit;
-}
-
-.quick-action-btn i {
-    font-size: 1.25rem;
-    color: var(--primary-600);
-}
-
-.quick-action-btn span {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--gray-700);
-}
-
-.performance-metrics {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.metric {
-    text-align: center;
-    padding: 1rem;
-    background: var(--gray-50);
-    border-radius: var(--radius-md);
-}
-
-.metric-label {
-    font-size: 0.75rem;
-    color: var(--gray-600);
-    margin-bottom: 0.25rem;
-}
-
-.metric-value {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--gray-900);
-    margin-bottom: 0.25rem;
-}
-
-.metric-target {
-    font-size: 0.625rem;
-    color: var(--gray-500);
-}
-
-.attendance-status {
-    text-align: center;
-}
-
-.attendance-info {
-    margin-bottom: 1rem;
-    font-size: 0.875rem;
-}
-
-.attendance-info > div {
-    margin-bottom: 0.5rem;
-}
-
-.attendance-actions {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.btn-danger {
-    background: #ef4444;
-    color: white;
-    border-color: #ef4444;
-}
-
-.btn-danger:hover {
-    background: #dc2626;
-    transform: translateY(-1px);
-    text-decoration: none;
-    color: white;
-}
-
-.row {
-    display: flex;
-    gap: 2rem;
-    margin: 0 -1rem;
-}
-
-.col-lg-8 {
-    flex: 0 0 66.666667%;
-    padding: 0 1rem;
-}
-
-.col-lg-4 {
-    flex: 0 0 33.333333%;
-    padding: 0 1rem;
-}
-
-.mt-4 {
-    margin-top: 1.5rem;
-}
-
-.text-primary { color: var(--primary-600); }
-.text-success { color: var(--success-600); }
-.text-warning { color: var(--warning-600); }
-.text-muted { color: var(--gray-500); }
-
-.toast-notification {
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 1rem;
-    box-shadow: var(--shadow-lg);
-    z-index: 9999;
-    min-width: 300px;
-    animation: slideInRight 0.3s ease-out;
-}
-
-.toast-notification.toast-success { border-left: 4px solid var(--success-500); }
-.toast-notification.toast-error { border-left: 4px solid #ef4444; }
-.toast-notification.toast-info { border-left: 4px solid var(--info-500); }
-
-.toast-content {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.toast-close {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: none;
-    border: none;
-    color: var(--gray-400);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
-}
-
-@keyframes slideInRight {
-    from { opacity: 0; transform: translateX(100%); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-@media (max-width: 1024px) {
-    .row {
-        flex-direction: column;
-    }
-    
-    .col-lg-8,
-    .col-lg-4 {
-        flex: 1;
-    }
+    font-size: 0.75em;
 }
 
 @media (max-width: 768px) {
-    .page-header {
+    .d-flex.gap-1 {
         flex-direction: column;
-        gap: 1rem;
-        align-items: stretch;
+        gap: 0.25rem !important;
     }
     
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .customer-vehicle {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
-    }
-    
-    .assignment-actions {
-        justify-content: center;
-    }
-    
-    .quick-actions-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .attendance-actions {
-        flex-direction: column;
+    .btn-sm {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
     }
 }
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1 class="page-title">
-            <i class="fas fa-user-cog text-primary"></i>
-            My Dashboard
-        </h1>
-        <p class="page-description">Welcome back, {{ request.user.get_full_name|default:request.user.username }}! Here's your service overview.</p>
-    </div>
-    
-    <div class="page-actions">
-        <a href="/business/{{ request.tenant.slug }}/services/orders/quick/" class="btn btn-success">
-            <i class="fas fa-bolt"></i>
-            Quick Order
-        </a>
-        <a href="/business/{{ request.tenant.slug }}/services/my-services/" class="btn btn-outline-primary">
-            <i class="fas fa-list"></i>
-            All My Services
-        </a>
-    </div>
-</div>
-
-<!-- Performance Stats -->
-<div class="stats-grid">
-    <div class="stat-card stat-card-primary">
-        <div class="stat-icon">
-            <i class="fas fa-clipboard-check"></i>
-        </div>
-        <div class="stat-content">
-            <h3>{{ stats.orders_today|default:0 }}</h3>
-            <p>Orders Today</p>
-            <small class="stat-change">
-                {% if stats.completed_today > 0 %}
-                <i class="fas fa-check text-success"></i>
-                {{ stats.completed_today }} completed
-                {% else %}
-                No completed orders yet
-                {% endif %}
-            </small>
-        </div>
-    </div>
-    
-    <div class="stat-card stat-card-success">
-        <div class="stat-icon">
-            <i class="fas fa-check-circle"></i>
-        </div>
-        <div class="stat-content">
-            <h3>{{ stats.completed_today|default:0 }}</h3>
-            <p>Completed Today</p>
-            <small class="stat-change">
-                {% if stats.in_progress > 0 %}
-                <i class="fas fa-cog fa-spin text-primary"></i>
-                {{ stats.in_progress }} in progress
-                {% else %}
-                No services in progress
-                {% endif %}
-            </small>
-        </div>
-    </div>
-    
-    <div class="stat-card stat-card-info">
-        <div class="stat-icon">
-            <i class="fas fa-dollar-sign"></i>
-        </div>
-        <div class="stat-content">
-            <h3>KES {{ stats.total_revenue_today|floatformat:0|default:0 }}</h3>
-            <p>Revenue Today</p>
-            <small class="stat-change">From completed services</small>
-        </div>
-    </div>
-    
-    <div class="stat-card stat-card-warning">
-        <div class="stat-icon">
-            <i class="fas fa-clock"></i>
-        </div>
-        <div class="stat-content">
-            <h3 id="current-time">--:--</h3>
-            <p>Current Time</p>
-            <small class="stat-change" id="shift-status">Shift status</small>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- Current Assignments -->
-    <div class="col-lg-8">
-        <div class="content-card">
-            <div class="card-header">
-                <h5 class="card-title">
-                    <i class="fas fa-tasks"></i>
-                    My Current Assignments
-                </h5>
-                <div class="card-actions">
-                    <button class="btn btn-sm btn-success" onclick="startNextService()">
-                        <i class="fas fa-play"></i>
-                        Start Next Service
-                    </button>
-                </div>
-            </div>
-            
-            <div class="card-body">
-                {% if my_orders %}
-                <div class="assignments-list">
-                    {% for order in my_orders %}
-                    <div class="assignment-card" data-order-id="{{ order.id }}">
-                        <div class="assignment-header">
-                            <div class="assignment-info">
-                                <h6 class="assignment-number">{{ order.order_number }}</h6>
-                                <span class="badge badge-{{ order.status }}">{{ order.get_status_display }}</span>
-                                {% if order.priority != 'normal' %}
-                                <span class="priority-badge priority-{{ order.priority }}">
-                                    {{ order.get_priority_display }}
-                                </span>
-                                {% endif %}
-                            </div>
-                            <div class="assignment-time">
-                                {% if order.status == 'in_progress' and order.actual_start_time %}
-                                <span class="time-elapsed" data-start-time="{{ order.actual_start_time.isoformat }}">
-                                    <i class="fas fa-clock"></i>
-                                    <span class="elapsed-time">--:--</span>
-                                </span>
-                                {% else %}
-                                <span class="time-created">
-                                    <i class="fas fa-calendar"></i>
-                                    {{ order.created_at|date:"H:i" }}
-                                </span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="assignment-details">
-                            <div class="customer-vehicle">
-                                <div class="customer-info">
-                                    <strong>{{ order.customer.full_name }}</strong>
-                                    <br><small>{{ order.customer.phone }}</small>
-                                </div>
-                                <div class="vehicle-info">
-                                    <strong>{{ order.vehicle.registration_number }}</strong>
-                                    <br><small>{{ order.vehicle.make }} {{ order.vehicle.model }}</small>
-                                </div>
-                            </div>
-                            
-                            <div class="services-list">
-                                {% for item in order.order_items.all %}
-                                <span class="service-tag">
-                                    {{ item.service.name }}{% if item.quantity > 1 %} x{{ item.quantity }}{% endif %}
-                                </span>
-                                {% endfor %}
-                            </div>
-                            
-                            <div class="order-summary">
-                                <span class="order-total">KES {{ order.total_amount }}</span>
-                                <span class="order-duration">{{ order.estimated_duration }} min</span>
-                            </div>
-                        </div>
-                        
-                        <div class="assignment-actions">
-                            {% if order.status == 'confirmed' %}
-                            <button class="btn btn-sm btn-success" onclick="startService('{{ order.id }}')">
-                                <i class="fas fa-play"></i>
-                                Start Service
-                            </button>
-                            {% elif order.status == 'in_progress' %}
-                            <button class="btn btn-sm btn-warning" onclick="pauseService('{{ order.id }}')">
-                                <i class="fas fa-pause"></i>
-                                Pause
-                            </button>
-                            <button class="btn btn-sm btn-success" onclick="completeService('{{ order.id }}')">
-                                <i class="fas fa-check"></i>
-                                Complete
-                            </button>
-                            {% endif %}
-                            
-                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-eye"></i>
-                                View Details
-                            </a>
-                        </div>
-                        
-                        {% if order.special_instructions %}
-                        <div class="assignment-notes">
-                            <i class="fas fa-sticky-note"></i>
-                            <strong>Instructions:</strong> {{ order.special_instructions }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="empty-assignments">
-                    <div class="empty-assignments-icon">
-                        <i class="fas fa-clipboard-check"></i>
-                    </div>
-                    <h6>No Current Assignments</h6>
-                    <p>You don't have any active service assignments right now.</p>
-                    <a href="/business/{{ request.tenant.slug }}/services/orders/quick/" class="btn btn-success">
-                        <i class="fas fa-bolt"></i>
-                        Create Quick Order
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <!-- Today's Queue & Quick Actions -->
-    <div class="col-lg-4">
-        <!-- Today's Queue -->
-        <div class="content-card">
-            <div class="card-header">
-                <h6 class="card-title">
-                    <i class="fas fa-list-ol"></i>
-                    Today's Queue
-                </h6>
-                <div class="card-actions">
-                    <a href="/business/{{ request.tenant.slug }}/services/queue/" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-external-link-alt"></i>
-                        View All
-                    </a>
-                </div>
-            </div>
-            
-            <div class="card-body">
-                {% if today_queue %}
-                <div class="queue-list">
-                    {% for entry in today_queue %}
-                    <div class="queue-item {% if entry.order.assigned_attendant_id == request.user.id %}queue-item-mine{% endif %}">
-                        <div class="queue-number">
-                            <span class="queue-badge">{{ entry.queue_number }}</span>
-                        </div>
-                        <div class="queue-info">
-                            <div class="queue-order">{{ entry.order.order_number }}</div>
-                            <div class="queue-customer">{{ entry.order.customer.full_name }}</div>
-                            <div class="queue-status">
-                                <span class="badge badge-{{ entry.status }}">{{ entry.get_status_display }}</span>
-                            </div>
-                        </div>
-                        <div class="queue-time">
-                            {% if entry.status == 'waiting' %}
-                            <small class="text-muted">Est. {{ entry.estimated_wait_time|default:0 }} min</small>
-                            {% elif entry.status == 'in_service' %}
-                            <small class="text-success">Active</small>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="empty-queue">
-                    <i class="fas fa-list-ol"></i>
-                    <p>No orders in queue today</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        
-        <!-- Quick Actions -->
-        <div class="content-card mt-4">
-            <div class="card-header">
-                <h6 class="card-title">
-                    <i class="fas fa-bolt"></i>
-                    Quick Actions
-                </h6>
-            </div>
-            
-            <div class="card-body">
-                <div class="quick-actions-grid">
-                    <a href="/business/{{ request.tenant.slug }}/services/quick/customer-register/" class="quick-action-btn">
-                        <i class="fas fa-user-plus"></i>
-                        <span>Register Customer</span>
-                    </a>
-                    
-                    <a href="/business/{{ request.tenant.slug }}/services/quick/service-assign/" class="quick-action-btn">
-                        <i class="fas fa-hand-point-right"></i>
-                        <span>Assign Service</span>
-                    </a>
-                    
-                    <a href="/business/{{ request.tenant.slug }}/payments/create/" class="quick-action-btn">
-                        <i class="fas fa-credit-card"></i>
-                        <span>Process Payment</span>
-                    </a>
-                    
-                    <a href="#" onclick="printReceipt()" class="quick-action-btn">
-                        <i class="fas fa-print"></i>
-                        <span>Print Receipt</span>
-                    </a>
-                    
-                    <a href="#" onclick="openCustomerSearch()" class="quick-action-btn">
-                        <i class="fas fa-search"></i>
-                        <span>Find Customer</span>
-                    </a>
-                    
-                    <a href="#" onclick="viewMyPerformance()" class="quick-action-btn">
-                        <i class="fas fa-chart-line"></i>
-                        <span>My Performance</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Today's Performance -->
-        <div class="content-card mt-4">
-            <div class="card-header">
-                <h6 class="card-title">
-                    <i class="fas fa-trophy"></i>
-                    Today's Performance
-                </h6>
-            </div>
-            
-            <div class="card-body">
-                <div class="performance-metrics">
-                    <div class="metric">
-                        <div class="metric-label">Services Completed</div>
-                        <div class="metric-value">{{ stats.completed_today|default:0 }}</div>
-                        <div class="metric-target">Target: 8</div>
-                    </div>
-                    
-                    <div class="metric">
-                        <div class="metric-label">Revenue Generated</div>
-                        <div class="metric-value">KES {{ stats.total_revenue_today|floatformat:0|default:0 }}</div>
-                        <div class="metric-target">Target: KES 5,000</div>
-                    </div>
-                    
-                    <div class="metric">
-                        <div class="metric-label">Average Service Time</div>
-                        <div class="metric-value">{{ stats.avg_service_time|default:"--" }} min</div>
-                        <div class="metric-target">Target: 45 min</div>
-                    </div>
-                    
-                    <div class="metric">
-                        <div class="metric-label">Customer Satisfaction</div>
-                        <div class="metric-value">{{ stats.avg_rating|default:"--" }}★</div>
-                        <div class="metric-target">Target: 4.5★</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Attendance -->
-        <div class="content-card mt-4">
-            <div class="card-header">
-                <h6 class="card-title">
-                    <i class="fas fa-clock"></i>
-                    Attendance
-                </h6>
-            </div>
-            
-            <div class="card-body">
-                <div class="attendance-status">
-                    <div class="attendance-info">
-                        <div class="check-in-time">
-                            <strong>Check-in:</strong> <span id="check-in-time">--:--</span>
-                        </div>
-                        <div class="hours-worked">
-                            <strong>Hours Worked:</strong> <span id="hours-worked">0:00</span>
-                        </div>
-                    </div>
-                    
-                    <div class="attendance-actions">
-                        <button class="btn btn-sm btn-success" onclick="checkIn()">
-                            <i class="fas fa-sign-in-alt"></i>
-                            Check In
-                        </button>
-                        <button class="btn btn-sm btn-warning" onclick="takeBreak()">
-                            <i class="fas fa-coffee"></i>
-                            Break
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="checkOut()">
-                            <i class="fas fa-sign-out-alt"></i>
-                            Check Out
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
 {% block extra_js %}
 <script>
-// Initialize dashboard
-document.addEventListener('DOMContentLoaded', function() {
-    updateCurrentTime();
-    updateElapsedTimes();
-    loadAttendanceStatus();
-    
-    // Update time every minute
-    setInterval(updateCurrentTime, 60000);
-    setInterval(updateElapsedTimes, 60000);
-});
+// Auto-refresh every 5 minutes
+setInterval(function() {
+    // Partial refresh for real-time updates
+    location.reload();
+}, 300000);
 
-function updateCurrentTime() {
+// Real-time clock
+function updateClock() {
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
-    document.getElementById('current-time').textContent = timeString;
-    
-    // Update shift status
-    const hour = now.getHours();
-    const shiftStatus = document.getElementById('shift-status');
-    if (hour >= 8 && hour < 17) {
-        shiftStatus.textContent = 'Day Shift';
-        shiftStatus.className = 'stat-change text-success';
-    } else if (hour >= 17 && hour < 22) {
-        shiftStatus.textContent = 'Evening Shift';
-        shiftStatus.className = 'stat-change text-warning';
-    } else {
-        shiftStatus.textContent = 'Off Hours';
-        shiftStatus.className = 'stat-change text-muted';
-    }
+    const timeString = now.toLocaleTimeString();
+    const clockElements = document.querySelectorAll('.current-time');
+    clockElements.forEach(el => el.textContent = timeString);
 }
 
-function updateElapsedTimes() {
-    document.querySelectorAll('.time-elapsed').forEach(element => {
-        const startTime = new Date(element.dataset.startTime);
-        const now = new Date();
-        const elapsed = Math.floor((now - startTime) / 1000 / 60); // minutes
-        
-        const hours = Math.floor(elapsed / 60);
-        const minutes = elapsed % 60;
-        const timeString = `${hours}:${minutes.toString().padStart(2, '0')}`;
-        
-        element.querySelector('.elapsed-time').textContent = timeString;
-    });
-}
+setInterval(updateClock, 1000);
+updateClock();
 
-function loadAttendanceStatus() {
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/attendance-status/`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.check_in_time) {
-                document.getElementById('check-in-time').textContent = data.check_in_time;
-            }
-            if (data.hours_worked) {
-                document.getElementById('hours-worked').textContent = data.hours_worked;
-            }
-        })
-        .catch(error => {
-            console.error('Error loading attendance status:', error);
-        });
-}
-
-// Service management functions
-function startNextService() {
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/start-next/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccessToast('Service started successfully');
-            if (data.redirect_url) {
-                setTimeout(() => {
-                    window.location.href = data.redirect_url;
-                }, 1500);
-            } else {
-                setTimeout(() => location.reload(), 1500);
-            }
-        } else {
-            showErrorToast(data.message || 'No services in queue');
-        }
-    })
-    .catch(error => {
-        showErrorToast('Error starting service');
-    });
-}
-
-function startService(orderId) {
-    fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/start/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccessToast('Service started successfully');
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showErrorToast(data.message || 'Error starting service');
-        }
-    })
-    .catch(error => {
-        showErrorToast('Error starting service');
-    });
-}
-
-function pauseService(orderId) {
-    fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/pause/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccessToast('Service paused');
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showErrorToast(data.message || 'Error pausing service');
-        }
-    })
-    .catch(error => {
-        showErrorToast('Error pausing service');
-    });
-}
-
-function completeService(orderId) {
-    if (confirm('Are you sure you want to complete this service?')) {
-        fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/complete/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccessToast('Service completed successfully');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showErrorToast(data.message || 'Error completing service');
-            }
-        })
-        .catch(error => {
-            showErrorToast('Error completing service');
-        });
-    }
-}
-
-// Quick action functions
-function openCustomerSearch() {
-    // Open customer search in new window or modal
-    window.location.href = `/business/{{ request.tenant.slug }}/customers/search/`;
-}
-
-function printReceipt() {
-    // Open receipt printing interface
-    window.location.href = `/business/{{ request.tenant.slug }}/payments/receipts/`;
-}
-
-function viewMyPerformance() {
-    // Show performance details
-    window.location.href = `/business/{{ request.tenant.slug }}/services/my-performance/`;
-}
-
-// Attendance functions
-function checkIn() {
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/check-in/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccessToast('Checked in successfully');
-            loadAttendanceStatus();
-        } else {
-            showErrorToast(data.message || 'Error checking in');
-        }
-    })
-    .catch(error => {
-        showErrorToast('Error checking in');
-    });
-}
-
-function takeBreak() {
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/break-start/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccessToast('Break started');
-            loadAttendanceStatus();
-        } else {
-            showErrorToast(data.message || 'Error starting break');
-        }
-    })
-    .catch(error => {
-        showErrorToast('Error starting break');
-    });
-}
-
-function checkOut() {
-    if (confirm('Are you sure you want to check out?')) {
-        fetch(`/business/{{ request.tenant.slug }}/services/ajax/check-out/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccessToast('Checked out successfully');
-                loadAttendanceStatus();
-            } else {
-                showErrorToast(data.message || 'Error checking out');
-            }
-        })
-        .catch(error => {
-            showErrorToast('Error checking out');
-        });
-    }
-}
-
-// Utility functions
+// CSRF token helper
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -1373,41 +406,10 @@ function getCookie(name) {
     return cookieValue;
 }
 
-function showSuccessToast(message) {
-    showToast(message, 'success');
-}
-
-function showErrorToast(message) {
-    showToast(message, 'error');
-}
-
-function showInfoToast(message) {
-    showToast(message, 'info');
-}
-
-function showToast(message, type) {
-    // Remove existing toasts
-    document.querySelectorAll('.toast-notification').forEach(toast => toast.remove());
-    
-    const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    toast.innerHTML = `
-        <div class="toast-content">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
-            <span>${message}</span>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-        }
-    }, 4000);
+// Toast notifications
+function showToast(message, type = 'info') {
+    // You can integrate with Bootstrap Toast or another notification system
+    console.log(`${type.toUpperCase()}: ${message}`);
 }
 </script>
 {% endblock %}
