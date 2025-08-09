@@ -1,0 +1,477 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}User Management - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/business.css' %}" rel="stylesheet">
+<style>
+.user-card {
+    border: 1px solid #e0e6ed;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.user-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.role-section {
+    margin-bottom: 2rem;
+}
+
+.role-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.user-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #007bff;
+    color: white;
+    font-weight: 600;
+    margin-right: 1rem;
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.user-info {
+    flex-grow: 1;
+}
+
+.user-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.25rem;
+}
+
+.user-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.user-detail {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.user-detail i {
+    margin-right: 0.5rem;
+    width: 16px;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-suspended {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.user-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-users-cog text-primary"></i>
+            User Management
+        </h1>
+        <p class="page-description">Manage employees and their system access</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/employees/create/" class="btn btn-primary">
+            <i class="fas fa-user-plus me-2"></i>Add Employee
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+<div class="alert-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+        <i class="fas fa-{{ message.tags|default:'info'|yesno:'check-circle,exclamation-triangle,info-circle' }}"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- User Statistics -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ employees.count }}</h3>
+                <p class="stat-label">Total Employees</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-info">
+            <div class="stat-icon">
+                <i class="fas fa-crown"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ owner_count|default:0 }}</h3>
+                <p class="stat-label">Owners</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ manager_count|default:0 }}</h3>
+                <p class="stat-label">Managers</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ supervisor_count|default:0 }}</h3>
+                <p class="stat-label">Supervisors</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon">
+                <i class="fas fa-hands-wash"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ attendant_count|default:0 }}</h3>
+                <p class="stat-label">Attendants</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-secondary">
+            <div class="stat-icon">
+                <i class="fas fa-ellipsis-h"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ cashier_count|add:cleaner_count|add:security_count|default:0 }}</h3>
+                <p class="stat-label">Others</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users by Role -->
+<div class="content-card">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-user-friends"></i>
+            Employees by Role
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if employees_by_role %}
+            {% for role, role_employees in employees_by_role.items %}
+            <div class="role-section">
+                <div class="role-header">
+                    <h6 class="mb-0">
+                        {% if role == "Business Owner" %}
+                            <i class="fas fa-crown me-2"></i>
+                        {% elif role == "Manager" %}
+                            <i class="fas fa-user-tie me-2"></i>
+                        {% elif role == "Supervisor" %}
+                            <i class="fas fa-user-check me-2"></i>
+                        {% elif role == "Service Attendant" %}
+                            <i class="fas fa-hands-wash me-2"></i>
+                        {% elif role == "Cashier" %}
+                            <i class="fas fa-cash-register me-2"></i>
+                        {% else %}
+                            <i class="fas fa-user me-2"></i>
+                        {% endif %}
+                        {{ role }} ({{ role_employees|length }})
+                    </h6>
+                </div>
+                
+                <div class="row">
+                    {% for employee in role_employees %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="user-card">
+                            <div class="d-flex align-items-start">
+                                {% if employee.photo %}
+                                    <img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="user-avatar">
+                                {% else %}
+                                    <div class="user-avatar">
+                                        {{ employee.full_name|first|upper }}
+                                    </div>
+                                {% endif %}
+                                
+                                <div class="user-info">
+                                    <div class="user-name">{{ employee.full_name }}</div>
+                                    <div class="user-id">ID: {{ employee.employee_id }}</div>
+                                    
+                                    <div class="user-details">
+                                        {% if employee.department %}
+                                        <div class="user-detail">
+                                            <i class="fas fa-building"></i>
+                                            {{ employee.department.name }}
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if employee.phone %}
+                                        <div class="user-detail">
+                                            <i class="fas fa-phone"></i>
+                                            {{ employee.phone }}
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="user-detail">
+                                            <i class="fas fa-calendar"></i>
+                                            Joined {{ employee.hire_date|date:"M Y"|default:"N/A" }}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-2">
+                                        <span class="status-badge status-{{ employee.status }}">
+                                            {% if employee.status == 'active' %}
+                                                <i class="fas fa-check-circle"></i> Active
+                                            {% elif employee.status == 'inactive' %}
+                                                <i class="fas fa-times-circle"></i> Inactive
+                                            {% elif employee.status == 'suspended' %}
+                                                <i class="fas fa-pause-circle"></i> Suspended
+                                            {% endif %}
+                                        </span>
+                                        
+                                        {% if employee.can_login %}
+                                        <span class="badge bg-success ms-2">
+                                            <i class="fas fa-sign-in-alt"></i> System Access
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary ms-2">
+                                            <i class="fas fa-ban"></i> No System Access
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="user-actions mt-3">
+                                <a href="/business/{{ request.tenant.slug }}/employees/{{ employee.id }}/" 
+                                   class="btn btn-sm btn-outline-primary" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="/business/{{ request.tenant.slug }}/employees/{{ employee.id }}/edit/" 
+                                   class="btn btn-sm btn-outline-secondary" title="Edit Employee">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% if employee.can_login %}
+                                <button class="btn btn-sm btn-outline-warning" 
+                                        onclick="toggleAccess('{{ employee.id }}', false)" title="Revoke Access">
+                                    <i class="fas fa-user-lock"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-success" 
+                                        onclick="toggleAccess('{{ employee.id }}', true)" title="Grant Access">
+                                    <i class="fas fa-user-check"></i>
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-outline-info" 
+                                        onclick="resetPassword('{{ employee.id }}')" title="Reset Password">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                <h5>No Employees Found</h5>
+                <p class="text-muted">Start by adding your first employee to the system.</p>
+                <a href="/business/{{ request.tenant.slug }}/employees/create/" class="btn btn-primary">
+                    <i class="fas fa-user-plus me-2"></i>Add First Employee
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="content-card mt-4">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-bolt"></i>
+            Quick Actions
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="quick-action-card text-center">
+                    <i class="fas fa-user-plus fa-2x text-primary mb-2"></i>
+                    <h6>Add Employee</h6>
+                    <p class="text-muted">Add a new employee to the system</p>
+                    <a href="/business/{{ request.tenant.slug }}/employees/create/" class="btn btn-primary btn-sm">
+                        Add Employee
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="quick-action-card text-center">
+                    <i class="fas fa-building fa-2x text-success mb-2"></i>
+                    <h6>Manage Departments</h6>
+                    <p class="text-muted">Organize employees by departments</p>
+                    <a href="/business/{{ request.tenant.slug }}/employees/departments/" class="btn btn-success btn-sm">
+                        Departments
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="quick-action-card text-center">
+                    <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                    <h6>Attendance</h6>
+                    <p class="text-muted">View employee attendance records</p>
+                    <a href="/business/{{ request.tenant.slug }}/employees/attendance/" class="btn btn-warning btn-sm">
+                        Attendance
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="quick-action-card text-center">
+                    <i class="fas fa-download fa-2x text-info mb-2"></i>
+                    <h6>Export Data</h6>
+                    <p class="text-muted">Export employee information</p>
+                    <button class="btn btn-info btn-sm" onclick="exportEmployees()">
+                        Export
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAccess(employeeId, grantAccess) {
+    const action = grantAccess ? 'grant' : 'revoke';
+    const message = grantAccess ? 'grant system access to' : 'revoke system access from';
+    
+    if (confirm(`Are you sure you want to ${message} this employee?`)) {
+        fetch(`/business/{{ request.tenant.slug }}/employees/${employeeId}/toggle-access/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                action: action
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'Failed to update access'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update employee access');
+        });
+    }
+}
+
+function resetPassword(employeeId) {
+    if (confirm('Are you sure you want to reset this employee\'s password? They will receive an email with instructions.')) {
+        fetch(`/business/{{ request.tenant.slug }}/employees/${employeeId}/reset-password/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Password reset email sent successfully');
+            } else {
+                alert('Error: ' + (data.message || 'Failed to reset password'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to reset password');
+        });
+    }
+}
+
+function exportEmployees() {
+    const format = prompt('Export format (csv, xlsx, pdf):', 'csv');
+    if (format && ['csv', 'xlsx', 'pdf'].includes(format.toLowerCase())) {
+        window.location.href = `/business/{{ request.tenant.slug }}/employees/export/?format=${format}`;
+    }
+}
+</script>
+{% endblock %}
