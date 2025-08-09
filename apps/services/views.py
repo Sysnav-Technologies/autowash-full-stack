@@ -24,6 +24,7 @@ from .forms import (
     ServiceForm, ServiceCategoryForm, ServicePackageForm, 
     ServiceOrderForm, QuickOrderForm, ServiceOrderItemForm, ServiceRatingForm
 )
+from .notifications import send_service_notification_email
 from datetime import datetime, timedelta
 import json
 import logging
@@ -347,6 +348,20 @@ def order_create_view(request):
                         add_order_to_queue(order)
                     
                     # Send notifications
+                    # Ensure tenant context is set from request
+                    from apps.core.database_router import set_current_tenant
+                    if hasattr(request, 'tenant') and request.tenant:
+                        set_current_tenant(request.tenant)
+                    
+                    # Send HTML email notification if customer has email
+                    if order.customer.email:
+                        send_service_notification_email(
+                            order=order,
+                            notification_type='created',  # Order created notification
+                            attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None
+                        )
+                    
+                    # Send SMS notification if enabled
                     if order.customer.phone and order.customer.receive_service_reminders:
                         send_sms_notification(
                             phone_number=str(order.customer.phone),
@@ -773,6 +788,20 @@ def start_service(request, order_id):
             pass
     
     # Send service start notification
+    # Ensure tenant context is set from request
+    from apps.core.database_router import set_current_tenant
+    if hasattr(request, 'tenant') and request.tenant:
+        set_current_tenant(request.tenant)
+    
+    # Send HTML email notification
+    if order.customer.email:
+        send_service_notification_email(
+            order=order,
+            notification_type='started',
+            attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None
+        )
+    
+    # Send SMS notification if enabled
     if (hasattr(order.customer, 'phone') and order.customer.phone and 
         hasattr(order.customer, 'receive_service_reminders') and 
         order.customer.receive_service_reminders):
@@ -824,6 +853,20 @@ def complete_service(request, order_id):
         bay.complete_service()
     
     # Send completion notification
+    # Ensure tenant context is set from request
+    from apps.core.database_router import set_current_tenant
+    if hasattr(request, 'tenant') and request.tenant:
+        set_current_tenant(request.tenant)
+    
+    # Send HTML email notification
+    if order.customer.email:
+        send_service_notification_email(
+            order=order,
+            notification_type='completed',
+            attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None
+        )
+    
+    # Send SMS notification if enabled
     if (hasattr(order.customer, 'phone') and order.customer.phone and 
         hasattr(order.customer, 'receive_service_reminders') and 
         order.customer.receive_service_reminders):

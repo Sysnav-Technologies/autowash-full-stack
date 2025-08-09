@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ email_title|default:"Autowash App" }}</title>
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Container */
+        .email-wrapper {
+            width: 100%;
+            background-color: #f8f9fa;
+            padding: 20px 0;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        /* Header */
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 32px 24px;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .tagline {
+            font-size: 14px;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        
+        /* Tenant Header */
+        .tenant-header {
+            background: #ffffff;
+            border-bottom: 2px solid #f1f5f9;
+            padding: 20px 24px;
+            text-align: center;
+        }
+        
+        .tenant-logo {
+            max-width: 120px;
+            max-height: 60px;
+            margin-bottom: 8px;
+        }
+        
+        .tenant-name {
+            font-size: 22px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+        
+        .tenant-tagline {
+            font-size: 14px;
+            color: #64748b;
+        }
+        
+        /* Content */
+        .email-content {
+            padding: 32px 24px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 16px;
+        }
+        
+        .message {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 24px;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        /* Info cards */
+        .info-card {
+            background: #f8f9ff;
+            border: 1px solid #e3e8ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .info-card-header {
+            font-size: 16px;
+            font-weight: 600;
+            color: #4338ca;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e3e8ff;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            color: #6b7280;
+        }
+        
+        .info-value {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            margin: 8px 4px;
+        }
+        
+        .btn:hover {
+            background: #5a67d8;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        
+        .btn-success {
+            background: #10b981;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        /* Alert boxes */
+        .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            border: 1px solid #a7f3d0;
+            color: #065f46;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            border: 1px solid #93c5fd;
+            color: #1e40af;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            color: #92400e;
+        }
+        
+        /* Lists */
+        .email-list {
+            margin: 16px 0;
+            padding-left: 20px;
+        }
+        
+        .email-list li {
+            margin: 8px 0;
+            color: #374151;
+        }
+        
+        /* Footer */
+        .email-footer {
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            padding: 24px;
+            text-align: center;
+        }
+        
+        .footer-content {
+            font-size: 14px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+        
+        .footer-links {
+            margin: 16px 0;
+        }
+        
+        .footer-links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 12px;
+            font-size: 14px;
+        }
+        
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .business-info {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        
+        /* Tenant info box */
+        .tenant-info {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+        }
+        
+        .tenant-contact {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 4px 0;
+        }
+        
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            
+            .email-header,
+            .tenant-header,
+            .email-content,
+            .email-footer {
+                padding: 24px 16px;
+            }
+            
+            .info-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            
+            .btn {
+                display: block;
+                text-align: center;
+                margin: 12px 0;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            .email-wrapper {
+                background: white;
+                padding: 0;
+            }
+            
+            .email-container {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <!-- Header -->
+            <div class="email-header">
+                <div class="logo">AUTOWASH APP</div>
+                <div class="tagline">Your Car Wash Business Platform</div>
+            </div>
+            
+            <!-- Tenant Header (for multi-tenant emails) -->
+            {% if tenant_info %}
+            <div class="tenant-header">
+                {% if tenant_info.logo %}
+                <img src="{{ tenant_info.logo }}" alt="{{ tenant_info.name }}" class="tenant-logo">
+                {% endif %}
+                <div class="tenant-name">{{ tenant_info.name }}</div>
+                {% if tenant_info.tagline %}
+                <div class="tenant-tagline">{{ tenant_info.tagline }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            <!-- Content -->
+            <div class="email-content">
+                {% block content %}
+                <!-- Email content will be inserted here -->
+                {% endblock %}
+            </div>
+            
+            <!-- Footer -->
+            <div class="email-footer">
+                <div class="footer-content">
+                    {% if tenant_info %}
+                    <div class="tenant-info">
+                        <div class="tenant-name">{{ tenant_info.name }}</div>
+                        {% if tenant_info.phone %}<div class="tenant-contact">📞 {{ tenant_info.phone }}</div>{% endif %}
+                        {% if tenant_info.email %}<div class="tenant-contact">✉️ {{ tenant_info.email }}</div>{% endif %}
+                        {% if tenant_info.address %}<div class="tenant-contact">📍 {{ tenant_info.address }}</div>{% endif %}
+                        {% if tenant_info.website %}<div class="tenant-contact">🌐 {{ tenant_info.website }}</div>{% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="footer-links">
+                        <a href="https://autowash.co.ke/support">Help Center</a>
+                        <a href="https://autowash.co.ke/legal/terms-of-service">Terms</a>
+                        <a href="https://autowash.co.ke/legal/privacy-policy">Privacy</a>
+                    </div>
+                    
+                    <div class="business-info">
+                        <strong>Autowash App</strong><br>
+                        Nairobi, Kenya<br>
+                        support@autowash.co.ke
+                    </div>
+                    
+                    <p style="margin-top: 16px; font-size: 12px; color: #9ca3af;">
+                        This email was sent from the Autowash App system. If you have any questions, please contact support.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

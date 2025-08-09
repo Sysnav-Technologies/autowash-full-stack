@@ -1,0 +1,39 @@
+Service Reminder - {{ business_name|default:"Autowash Service" }}
+
+Dear {{ customer.first_name }},
+
+This is a friendly reminder about your upcoming service appointment.
+
+Order Details:
+- Order Number: {{ order.order_number }}
+- Vehicle: {{ vehicle.make }} {{ vehicle.model }} ({{ vehicle.registration_number }})
+{% if order.scheduled_date %}
+- Scheduled Date: {{ order.scheduled_date|date:"F d, Y" }}
+{% endif %}
+{% if order.scheduled_time %}
+- Scheduled Time: {{ order.scheduled_time|time:"g:i A" }}
+{% endif %}
+- Total Amount: KES {{ order.total_amount|floatformat:0 }}
+
+Selected Services:
+{% for item in order_items %}
+- {{ item.service.name }} ({{ item.quantity }}x) - KES {{ item.total_price|floatformat:0 }}
+{% endfor %}
+
+Please prepare:
+- Ensure your vehicle is accessible and unlocked
+- Remove any valuable items from the vehicle
+- Have your vehicle keys ready
+- Inform us of any special requirements or concerns
+
+{% if business_phone %}
+Contact us: {{ business_phone }}
+{% endif %}
+{% if business_email %}
+Email: {{ business_email }}
+{% endif %}
+
+Need to reschedule? Contact us at least 2 hours before your appointment.
+
+Best regards,
+{{ business_name|default:"Autowash Service" }} Team
