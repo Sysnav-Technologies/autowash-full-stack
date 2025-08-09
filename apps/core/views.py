@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse, Http404
 from django.conf import settings
 from django.db import connection
 from django.core.cache import cache
@@ -384,3 +384,36 @@ Request Time: {current_time}</pre>
     """
     
     return HttpResponse(html_content)
+
+def serve_legal_document(request, document_name):
+    """Serve legal documents (Terms of Service, Privacy Policy) as PDF files"""
+    
+    # Define allowed documents for security
+    allowed_documents = {
+        'terms-of-service': 'AutoWash_Terms_of_Service.pdf',
+        'privacy-policy': 'AutoWash_Privacy_Policy.pdf'
+    }
+    
+    if document_name not in allowed_documents:
+        raise Http404("Document not found")
+    
+    # Get the actual filename
+    filename = allowed_documents[document_name]
+    file_path = os.path.join(settings.STATIC_ROOT or 'static', filename)
+    
+    # If STATIC_ROOT is not set (development), try the static directory
+    if not os.path.exists(file_path):
+        file_path = os.path.join('static', filename)
+    
+    if not os.path.exists(file_path):
+        raise Http404("Document file not found")
+    
+    try:
+        response = FileResponse(
+            open(file_path, 'rb'),
+            content_type='application/pdf',
+            filename=filename
+        )
+        return response
+    except IOError:
+        raise Http404("Document could not be read")
