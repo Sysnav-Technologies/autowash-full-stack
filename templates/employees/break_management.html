@@ -1,0 +1,402 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Break Management - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/employees.css' %}" rel="stylesheet">
+<style>
+.break-clock {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: #007bff;
+    font-family: 'Courier New', monospace;
+}
+
+.break-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 2rem;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.break-status {
+    padding: 1rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+}
+
+.break-status.on-break {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+    color: #2d3436;
+}
+
+.break-status.working {
+    background: linear-gradient(135deg, #55efc4 0%, #81ecec 100%);
+    color: #2d3436;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-coffee text-primary"></i>
+            Break Management
+        </h1>
+        <p class="page-description">Manage your work breaks and track time</p>
+    </div>
+</div>
+
+{% if messages %}
+<div class="alert-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+        <i class="fas fa-{{ message.tags|default:'info'|yesno:'check-circle,exclamation-triangle,info-circle' }}"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Current Break Status -->
+<div class="break-card">
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <h3><i class="fas fa-user-clock"></i> {{ employee.full_name }}</h3>
+            <p class="mb-0">Employee ID: {{ employee.employee_id }}</p>
+        </div>
+        <div class="col-md-6">
+            <div class="break-status {% if current_break %}on-break{% else %}working{% endif %}">
+                {% if current_break %}
+                    <h4><i class="fas fa-pause-circle"></i> Currently on Break</h4>
+                    <p class="mb-0">Started: {{ current_break.start_time|time:"H:i" }}</p>
+                    <div class="break-clock" id="breakTimer">00:00:00</div>
+                {% else %}
+                    <h4><i class="fas fa-play-circle"></i> Currently Working</h4>
+                    <p class="mb-0">Ready to take a break when needed</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Break Controls -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="content-card h-100">
+            <div class="card-header text-center">
+                <h5 class="card-title">
+                    <i class="fas fa-play"></i>
+                    Start Break
+                </h5>
+            </div>
+            <div class="card-body text-center">
+                {% if not current_break %}
+                <div class="mb-3">
+                    <label for="breakType" class="form-label">Break Type</label>
+                    <select class="form-select" id="breakType" title="Select break type">
+                        <option value="short">Short Break (15 min)</option>
+                        <option value="lunch">Lunch Break (30-60 min)</option>
+                        <option value="personal">Personal Break</option>
+                        <option value="meeting">Meeting/Training</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <button class="btn btn-warning btn-lg" onclick="startBreak()">
+                    <i class="fas fa-coffee me-2"></i>Start Break
+                </button>
+                {% else %}
+                <p class="text-muted">Break already in progress</p>
+                <button class="btn btn-secondary btn-lg" disabled>
+                    <i class="fas fa-coffee me-2"></i>Break Active
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="content-card h-100">
+            <div class="card-header text-center">
+                <h5 class="card-title">
+                    <i class="fas fa-stop"></i>
+                    End Break
+                </h5>
+            </div>
+            <div class="card-body text-center">
+                {% if current_break %}
+                <div class="mb-3">
+                    <p><strong>Break Type:</strong> {{ current_break.get_break_type_display }}</p>
+                    <p><strong>Duration:</strong> <span id="currentDuration">{{ current_break.duration|default:"00:00:00" }}</span></p>
+                </div>
+                <button class="btn btn-success btn-lg" onclick="endBreak()">
+                    <i class="fas fa-play me-2"></i>Return to Work
+                </button>
+                {% else %}
+                <p class="text-muted">No active break to end</p>
+                <button class="btn btn-secondary btn-lg" disabled>
+                    <i class="fas fa-play me-2"></i>No Active Break
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Today's Break Summary -->
+<div class="content-card mb-4">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-calendar-day"></i>
+            Today's Break Summary
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card stat-card-info">
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ total_break_time|default:"0:00" }}</h3>
+                        <p class="stat-label">Total Break Time</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="stat-card stat-card-primary">
+                    <div class="stat-icon">
+                        <i class="fas fa-list"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ break_count|default:0 }}</h3>
+                        <p class="stat-label">Number of Breaks</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="stat-card stat-card-success">
+                    <div class="stat-icon">
+                        <i class="fas fa-utensils"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ lunch_break_time|default:"0:00" }}</h3>
+                        <p class="stat-label">Lunch Break</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="stat-card stat-card-warning">
+                    <div class="stat-icon">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ remaining_break_time|default:"0:00" }}</h3>
+                        <p class="stat-label">Remaining Allowed</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Break History -->
+<div class="content-card">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-history"></i>
+            Today's Break History
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Break Type</th>
+                        <th>Start Time</th>
+                        <th>End Time</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for break_record in break_history %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-info">
+                                {% if break_record.break_type == 'short' %}
+                                    <i class="fas fa-clock"></i> Short Break
+                                {% elif break_record.break_type == 'lunch' %}
+                                    <i class="fas fa-utensils"></i> Lunch Break
+                                {% elif break_record.break_type == 'personal' %}
+                                    <i class="fas fa-user"></i> Personal
+                                {% elif break_record.break_type == 'meeting' %}
+                                    <i class="fas fa-users"></i> Meeting
+                                {% else %}
+                                    <i class="fas fa-ellipsis-h"></i> Other
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>{{ break_record.start_time|time:"H:i" }}</td>
+                        <td>
+                            {% if break_record.end_time %}
+                                {{ break_record.end_time|time:"H:i" }}
+                            {% else %}
+                                <span class="text-warning"><i class="fas fa-clock"></i> In Progress</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if break_record.duration %}
+                                {{ break_record.duration }}
+                            {% else %}
+                                <span id="duration-{{ break_record.id }}">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not break_record.end_time %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-pause"></i> Active
+                                </span>
+                            {% else %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check"></i> Completed
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            <i class="fas fa-coffee fa-2x mb-2"></i>
+                            <p>No breaks taken today</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let breakStartTime = {% if current_break %}"{{ current_break.start_time|time:'H:i:s' }}"{% else %}null{% endif %};
+let timerInterval;
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (breakStartTime) {
+        startTimer();
+    }
+});
+
+function startTimer() {
+    timerInterval = setInterval(updateTimer, 1000);
+    updateTimer(); // Initial update
+}
+
+function updateTimer() {
+    if (!breakStartTime) return;
+    
+    const now = new Date();
+    const start = new Date();
+    const timeParts = breakStartTime.split(':');
+    start.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2]));
+    
+    const diff = now - start;
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    
+    const timerElement = document.getElementById('breakTimer');
+    if (timerElement) {
+        timerElement.textContent = timeString;
+    }
+    
+    const durationElement = document.getElementById('currentDuration');
+    if (durationElement) {
+        durationElement.textContent = timeString;
+    }
+}
+
+function startBreak() {
+    const breakType = document.getElementById('breakType').value;
+    
+    if (confirm(`Start ${breakType} break now?`)) {
+        fetch(`/business/{{ request.tenant.slug }}/employees/attendance/take-break/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                break_type: breakType
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to start break');
+        });
+    }
+}
+
+function endBreak() {
+    if (confirm('End your break and return to work?')) {
+        fetch(`/business/{{ request.tenant.slug }}/employees/attendance/end-break/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                clearInterval(timerInterval);
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to end break');
+        });
+    }
+}
+
+// Check break status periodically
+setInterval(function() {
+    fetch(`/business/{{ request.tenant.slug }}/employees/attendance/break-status/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.on_break && !breakStartTime) {
+                location.reload();
+            } else if (!data.on_break && breakStartTime) {
+                location.reload();
+            }
+        })
+        .catch(error => console.error('Error checking break status:', error));
+}, 30000); // Check every 30 seconds
+</script>
+{% endblock %}

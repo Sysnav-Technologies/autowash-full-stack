@@ -1,0 +1,440 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Leave Request - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/employees.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-calendar-minus text-primary"></i>
+            Leave Request
+        </h1>
+        <p class="page-description">Submit and manage leave requests</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/employees/leave/list/" class="btn btn-outline-primary">
+            <i class="fas fa-list me-2"></i>My Leave History
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+<div class="alert-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+        <i class="fas fa-{{ message.tags|default:'info'|yesno:'check-circle,exclamation-triangle,info-circle' }}"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Leave Balance Summary -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ annual_leave_balance|default:0 }}</h3>
+                <p class="stat-label">Annual Leave</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon">
+                <i class="fas fa-user-md"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ sick_leave_balance|default:0 }}</h3>
+                <p class="stat-label">Sick Leave</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ personal_leave_balance|default:0 }}</h3>
+                <p class="stat-label">Personal Leave</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card stat-card-info">
+            <div class="stat-icon">
+                <i class="fas fa-hourglass-half"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ pending_requests|default:0 }}</h3>
+                <p class="stat-label">Pending Requests</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leave Request Form -->
+<div class="content-card">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-plus-circle"></i>
+            Submit Leave Request
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data" id="leaveRequestForm">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="leave_type" class="form-label">Leave Type *</label>
+                        <select class="form-select" id="leave_type" name="leave_type" required>
+                            <option value="">Select Leave Type</option>
+                            <option value="annual">Annual Leave</option>
+                            <option value="sick">Sick Leave</option>
+                            <option value="personal">Personal Leave</option>
+                            <option value="maternity">Maternity Leave</option>
+                            <option value="paternity">Paternity Leave</option>
+                            <option value="emergency">Emergency Leave</option>
+                            <option value="bereavement">Bereavement Leave</option>
+                            <option value="unpaid">Unpaid Leave</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="duration_type" class="form-label">Duration Type *</label>
+                        <select class="form-select" id="duration_type" name="duration_type" required>
+                            <option value="">Select Duration</option>
+                            <option value="full_day">Full Day</option>
+                            <option value="half_day">Half Day</option>
+                            <option value="hours">Specific Hours</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">Start Date *</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" required min="{{ today|date:'Y-m-d' }}">
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">End Date *</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" required min="{{ today|date:'Y-m-d' }}">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Half Day Options -->
+            <div class="row" id="half_day_options" style="display: none;">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="half_day_period" class="form-label">Half Day Period</label>
+                        <select class="form-select" id="half_day_period" name="half_day_period">
+                            <option value="">Select Period</option>
+                            <option value="morning">Morning (First Half)</option>
+                            <option value="afternoon">Afternoon (Second Half)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Specific Hours Options -->
+            <div class="row" id="hours_options" style="display: none;">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="start_time" class="form-label">Start Time</label>
+                        <input type="time" class="form-control" id="start_time" name="start_time">
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="end_time" class="form-label">End Time</label>
+                        <input type="time" class="form-control" id="end_time" name="end_time">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="reason" class="form-label">Reason for Leave *</label>
+                <textarea class="form-control" id="reason" name="reason" rows="4" required 
+                    placeholder="Please provide detailed reason for your leave request"></textarea>
+            </div>
+            
+            <div class="mb-3">
+                <label for="supporting_document" class="form-label">Supporting Document</label>
+                <input type="file" class="form-control" id="supporting_document" name="supporting_document" 
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                <div class="form-text">
+                    <i class="fas fa-info-circle"></i>
+                    Upload medical certificate, invitation letter, or other supporting documents (Optional)
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="handover_notes" class="form-label">Work Handover Notes</label>
+                <textarea class="form-control" id="handover_notes" name="handover_notes" rows="3" 
+                    placeholder="Describe any work handover arrangements or important tasks to be covered"></textarea>
+            </div>
+            
+            <div class="mb-3">
+                <label for="emergency_contact" class="form-label">Emergency Contact During Leave</label>
+                <input type="text" class="form-control" id="emergency_contact" name="emergency_contact" 
+                    placeholder="Phone number or contact details">
+            </div>
+            
+            <!-- Leave Summary -->
+            <div class="alert alert-info" id="leave_summary" style="display: none;">
+                <h6><i class="fas fa-info-circle"></i> Leave Summary</h6>
+                <p id="summary_text"></p>
+                <p><strong>Total Days:</strong> <span id="total_days">0</span></p>
+                <p><strong>Remaining Balance:</strong> <span id="remaining_balance">-</span></p>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane me-2"></i>Submit Request
+                </button>
+                <button type="reset" class="btn btn-secondary">
+                    <i class="fas fa-undo me-2"></i>Reset Form
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Recent Leave Requests -->
+<div class="content-card mt-4">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-history"></i>
+            Recent Leave Requests
+        </h5>
+        <div class="card-actions">
+            <a href="/business/{{ request.tenant.slug }}/employees/leave/list/" class="btn btn-sm btn-outline-primary">
+                View All
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Period</th>
+                        <th>Days</th>
+                        <th>Status</th>
+                        <th>Applied Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for leave in recent_leaves %}
+                    <tr>
+                        <td>
+                            <span class="leave-type-badge leave-{{ leave.leave_type }}">
+                                {{ leave.get_leave_type_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {{ leave.start_date|date:"M d" }} - {{ leave.end_date|date:"M d, Y" }}
+                        </td>
+                        <td>{{ leave.total_days }}</td>
+                        <td>
+                            <span class="status-badge status-{{ leave.status }}">
+                                {% if leave.status == 'pending' %}
+                                    <i class="fas fa-clock"></i> Pending
+                                {% elif leave.status == 'approved' %}
+                                    <i class="fas fa-check-circle"></i> Approved
+                                {% elif leave.status == 'rejected' %}
+                                    <i class="fas fa-times-circle"></i> Rejected
+                                {% elif leave.status == 'cancelled' %}
+                                    <i class="fas fa-ban"></i> Cancelled
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>{{ leave.created_at|date:"M d, Y" }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewLeave('{{ leave.id }}')" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% if leave.status == 'pending' %}
+                                <button class="btn btn-sm btn-outline-danger" onclick="cancelLeave('{{ leave.id }}')" title="Cancel Request">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            <i class="fas fa-calendar-times fa-2x mb-2"></i>
+                            <p>No leave requests found</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const durationSelect = document.getElementById('duration_type');
+    const halfDayOptions = document.getElementById('half_day_options');
+    const hoursOptions = document.getElementById('hours_options');
+    const startDateInput = document.getElementById('start_date');
+    const endDateInput = document.getElementById('end_date');
+    const leaveTypeSelect = document.getElementById('leave_type');
+    const leaveSummary = document.getElementById('leave_summary');
+    
+    // Show/hide duration options
+    durationSelect.addEventListener('change', function() {
+        const value = this.value;
+        
+        halfDayOptions.style.display = value === 'half_day' ? 'block' : 'none';
+        hoursOptions.style.display = value === 'hours' ? 'block' : 'none';
+        
+        // Set end date same as start date for half day and hours
+        if (value === 'half_day' || value === 'hours') {
+            endDateInput.value = startDateInput.value;
+            endDateInput.readOnly = true;
+        } else {
+            endDateInput.readOnly = false;
+        }
+        
+        updateLeaveSummary();
+    });
+    
+    // Update end date minimum when start date changes
+    startDateInput.addEventListener('change', function() {
+        endDateInput.min = this.value;
+        if (endDateInput.value < this.value) {
+            endDateInput.value = this.value;
+        }
+        
+        const durationType = durationSelect.value;
+        if (durationType === 'half_day' || durationType === 'hours') {
+            endDateInput.value = this.value;
+        }
+        
+        updateLeaveSummary();
+    });
+    
+    endDateInput.addEventListener('change', updateLeaveSummary);
+    leaveTypeSelect.addEventListener('change', updateLeaveSummary);
+    
+    function updateLeaveSummary() {
+        const leaveType = leaveTypeSelect.value;
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+        const durationType = durationSelect.value;
+        
+        if (!leaveType || !startDate || !endDate) {
+            leaveSummary.style.display = 'none';
+            return;
+        }
+        
+        // Calculate days
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const timeDiff = end.getTime() - start.getTime();
+        let totalDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+        
+        if (durationType === 'half_day') {
+            totalDays = 0.5;
+        } else if (durationType === 'hours') {
+            totalDays = 'Custom hours';
+        }
+        
+        // Update summary
+        document.getElementById('total_days').textContent = totalDays;
+        document.getElementById('summary_text').textContent = 
+            `${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} leave from ${startDate} to ${endDate}`;
+        
+        // Show leave balance (would need to be calculated server-side)
+        const balances = {
+            'annual': parseInt('{{ annual_leave_balance|default:0 }}'),
+            'sick': parseInt('{{ sick_leave_balance|default:0 }}'),
+            'personal': parseInt('{{ personal_leave_balance|default:0 }}')
+        };
+        
+        const currentBalance = balances[leaveType] || 'N/A';
+        let remainingBalance = 'N/A';
+        if (typeof currentBalance === 'number' && typeof totalDays === 'number') {
+            remainingBalance = currentBalance - totalDays;
+        }
+        
+        document.getElementById('remaining_balance').textContent = remainingBalance;
+        leaveSummary.style.display = 'block';
+    }
+});
+
+function viewLeave(leaveId) {
+    // Redirect to leave detail view
+    window.location.href = `/business/{{ request.tenant.slug }}/employees/leave/${leaveId}/`;
+}
+
+function cancelLeave(leaveId) {
+    if (confirm('Are you sure you want to cancel this leave request?')) {
+        fetch(`/business/{{ request.tenant.slug }}/employees/leave/${leaveId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+}
+
+// Form validation
+document.getElementById('leaveRequestForm').addEventListener('submit', function(e) {
+    const startDate = new Date(document.getElementById('start_date').value);
+    const endDate = new Date(document.getElementById('end_date').value);
+    
+    if (endDate < startDate) {
+        e.preventDefault();
+        alert('End date cannot be before start date');
+        return false;
+    }
+    
+    // Additional validation can be added here
+});
+</script>
+{% endblock %}

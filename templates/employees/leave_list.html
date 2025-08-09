@@ -1,0 +1,443 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Leave History - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/employees.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-history text-primary"></i>
+            Leave History
+        </h1>
+        <p class="page-description">View and manage your leave requests</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/employees/leave/request/" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>New Request
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+<div class="alert-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+        <i class="fas fa-{{ message.tags|default:'info'|yesno:'check-circle,exclamation-triangle,info-circle' }}"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Leave Summary Stats -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ total_requests|default:0 }}</h3>
+                <p class="stat-label">Total Requests</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ approved_requests|default:0 }}</h3>
+                <p class="stat-label">Approved</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ pending_requests|default:0 }}</h3>
+                <p class="stat-label">Pending</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-danger">
+            <div class="stat-icon">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ rejected_requests|default:0 }}</h3>
+                <p class="stat-label">Rejected</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-info">
+            <div class="stat-icon">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ total_days_taken|default:0 }}</h3>
+                <p class="stat-label">Days Taken</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card stat-card-success">
+            <div class="stat-icon">
+                <i class="fas fa-calendar-plus"></i>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">{{ remaining_balance|default:0 }}</h3>
+                <p class="stat-label">Remaining</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters and Search -->
+<div class="content-card mb-4">
+    <div class="card-body">
+        <form method="get" class="filter-form">
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">All Status</option>
+                        <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="approved" {% if request.GET.status == 'approved' %}selected{% endif %}>Approved</option>
+                        <option value="rejected" {% if request.GET.status == 'rejected' %}selected{% endif %}>Rejected</option>
+                        <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="leave_type" class="form-label">Leave Type</label>
+                    <select class="form-select" id="leave_type" name="leave_type">
+                        <option value="">All Types</option>
+                        <option value="annual" {% if request.GET.leave_type == 'annual' %}selected{% endif %}>Annual Leave</option>
+                        <option value="sick" {% if request.GET.leave_type == 'sick' %}selected{% endif %}>Sick Leave</option>
+                        <option value="personal" {% if request.GET.leave_type == 'personal' %}selected{% endif %}>Personal Leave</option>
+                        <option value="maternity" {% if request.GET.leave_type == 'maternity' %}selected{% endif %}>Maternity Leave</option>
+                        <option value="paternity" {% if request.GET.leave_type == 'paternity' %}selected{% endif %}>Paternity Leave</option>
+                        <option value="emergency" {% if request.GET.leave_type == 'emergency' %}selected{% endif %}>Emergency Leave</option>
+                        <option value="bereavement" {% if request.GET.leave_type == 'bereavement' %}selected{% endif %}>Bereavement Leave</option>
+                        <option value="unpaid" {% if request.GET.leave_type == 'unpaid' %}selected{% endif %}>Unpaid Leave</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="year" class="form-label">Year</label>
+                    <select class="form-select" id="year" name="year">
+                        <option value="">All Years</option>
+                        {% for year in available_years %}
+                        <option value="{{ year }}" {% if request.GET.year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="month" class="form-label">Month</label>
+                    <select class="form-select" id="month" name="month">
+                        <option value="">All Months</option>
+                        <option value="1" {% if request.GET.month == '1' %}selected{% endif %}>January</option>
+                        <option value="2" {% if request.GET.month == '2' %}selected{% endif %}>February</option>
+                        <option value="3" {% if request.GET.month == '3' %}selected{% endif %}>March</option>
+                        <option value="4" {% if request.GET.month == '4' %}selected{% endif %}>April</option>
+                        <option value="5" {% if request.GET.month == '5' %}selected{% endif %}>May</option>
+                        <option value="6" {% if request.GET.month == '6' %}selected{% endif %}>June</option>
+                        <option value="7" {% if request.GET.month == '7' %}selected{% endif %}>July</option>
+                        <option value="8" {% if request.GET.month == '8' %}selected{% endif %}>August</option>
+                        <option value="9" {% if request.GET.month == '9' %}selected{% endif %}>September</option>
+                        <option value="10" {% if request.GET.month == '10' %}selected{% endif %}>October</option>
+                        <option value="11" {% if request.GET.month == '11' %}selected{% endif %}>November</option>
+                        <option value="12" {% if request.GET.month == '12' %}selected{% endif %}>December</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <a href="/business/{{ request.tenant.slug }}/employees/leave/list/" class="btn btn-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Leave Requests Table -->
+<div class="content-card">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="fas fa-list"></i>
+            Leave Requests
+            {% if leave_requests.count > 0 %}
+                <span class="badge bg-primary">{{ leave_requests.count }}</span>
+            {% endif %}
+        </h5>
+        <div class="card-actions">
+            <button class="btn btn-sm btn-outline-primary" onclick="exportLeaveHistory()">
+                <i class="fas fa-download me-1"></i>Export
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover leave-table">
+                <thead>
+                    <tr>
+                        <th>Request Date</th>
+                        <th>Leave Type</th>
+                        <th>Period</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Approved By</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for leave in leave_requests %}
+                    <tr>
+                        <td>
+                            <div class="leave-date">
+                                <div class="date-main">{{ leave.created_at|date:"M d, Y" }}</div>
+                                <div class="date-time">{{ leave.created_at|time:"H:i" }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="leave-type-badge leave-{{ leave.leave_type }}">
+                                {{ leave.get_leave_type_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="leave-period">
+                                <div class="period-dates">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    {{ leave.start_date|date:"M d" }} - {{ leave.end_date|date:"M d, Y" }}
+                                </div>
+                                {% if leave.duration_type == 'half_day' %}
+                                <div class="period-detail">
+                                    <i class="fas fa-clock"></i>
+                                    {{ leave.get_half_day_period_display|default:"Half Day" }}
+                                </div>
+                                {% elif leave.duration_type == 'hours' %}
+                                <div class="period-detail">
+                                    <i class="fas fa-hourglass-half"></i>
+                                    {{ leave.start_time }} - {{ leave.end_time }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="duration-badge">
+                                {% if leave.total_days == 0.5 %}
+                                    Half Day
+                                {% elif leave.duration_type == 'hours' %}
+                                    Custom Hours
+                                {% else %}
+                                    {{ leave.total_days }} day{{ leave.total_days|pluralize }}
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-badge status-{{ leave.status }}">
+                                {% if leave.status == 'pending' %}
+                                    <i class="fas fa-clock"></i> Pending
+                                {% elif leave.status == 'approved' %}
+                                    <i class="fas fa-check-circle"></i> Approved
+                                {% elif leave.status == 'rejected' %}
+                                    <i class="fas fa-times-circle"></i> Rejected
+                                {% elif leave.status == 'cancelled' %}
+                                    <i class="fas fa-ban"></i> Cancelled
+                                {% endif %}
+                            </span>
+                            {% if leave.status == 'approved' and leave.approved_at %}
+                            <div class="status-date">{{ leave.approved_at|date:"M d, Y" }}</div>
+                            {% elif leave.status == 'rejected' and leave.rejected_at %}
+                            <div class="status-date">{{ leave.rejected_at|date:"M d, Y" }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if leave.approved_by %}
+                                <div class="approver-info">
+                                    <div class="approver-name">{{ leave.approved_by.get_full_name }}</div>
+                                    <div class="approver-role">{{ leave.approved_by.role|default:"Manager" }}</div>
+                                </div>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewLeaveDetails('{{ leave.id }}')" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                
+                                {% if leave.status == 'pending' %}
+                                <button class="btn btn-sm btn-outline-warning" onclick="editLeave('{{ leave.id }}')" title="Edit Request">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="cancelLeave('{{ leave.id }}')" title="Cancel Request">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                {% endif %}
+                                
+                                {% if leave.supporting_document %}
+                                <a href="{{ leave.supporting_document.url }}" class="btn btn-sm btn-outline-info" target="_blank" title="View Document">
+                                    <i class="fas fa-file-alt"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">
+                            <i class="fas fa-calendar-times fa-3x mb-3"></i>
+                            <h5>No Leave Requests Found</h5>
+                            <p>You haven't submitted any leave requests yet.</p>
+                            <a href="/business/{{ request.tenant.slug }}/employees/leave/request/" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Submit Your First Request
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <nav aria-label="Leave requests pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if request.GET.status %}status={{ request.GET.status }}&{% endif %}{% if request.GET.leave_type %}leave_type={{ request.GET.leave_type }}&{% endif %}{% if request.GET.year %}year={{ request.GET.year }}&{% endif %}{% if request.GET.month %}month={{ request.GET.month }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if request.GET.status %}status={{ request.GET.status }}&{% endif %}{% if request.GET.leave_type %}leave_type={{ request.GET.leave_type }}&{% endif %}{% if request.GET.year %}year={{ request.GET.year }}&{% endif %}{% if request.GET.month %}month={{ request.GET.month }}&{% endif %}page={{ num }}">{{ num }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if request.GET.status %}status={{ request.GET.status }}&{% endif %}{% if request.GET.leave_type %}leave_type={{ request.GET.leave_type }}&{% endif %}{% if request.GET.year %}year={{ request.GET.year }}&{% endif %}{% if request.GET.month %}month={{ request.GET.month }}&{% endif %}page={{ page_obj.next_page_number }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Leave Detail Modal -->
+<div class="modal fade" id="leaveDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Leave Request Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="leaveDetailContent">
+                <!-- Content will be loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function viewLeaveDetails(leaveId) {
+    fetch(`/business/{{ request.tenant.slug }}/employees/leave/${leaveId}/details/`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('leaveDetailContent').innerHTML = data.html;
+            new bootstrap.Modal(document.getElementById('leaveDetailModal')).show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to load leave details');
+        });
+}
+
+function editLeave(leaveId) {
+    window.location.href = `/business/{{ request.tenant.slug }}/employees/leave/${leaveId}/edit/`;
+}
+
+function cancelLeave(leaveId) {
+    if (confirm('Are you sure you want to cancel this leave request? This action cannot be undone.')) {
+        fetch(`/business/{{ request.tenant.slug }}/employees/leave/${leaveId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to cancel leave request');
+        });
+    }
+}
+
+function exportLeaveHistory() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'csv');
+    window.location.href = '?' + params.toString();
+}
+
+// Auto-submit filter form on change
+document.addEventListener('DOMContentLoaded', function() {
+    const filterSelects = document.querySelectorAll('.filter-form select');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+});
+</script>
+{% endblock %}
