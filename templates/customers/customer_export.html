@@ -1,0 +1,451 @@
+<!-- templates/customers/customer_export.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Export Customers - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="/business/{{ request.tenant.slug }}/">
+                        <i class="fas fa-home"></i>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/business/{{ request.tenant.slug }}/customers/">Customers</a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">Export</li>
+            </ol>
+        </nav>
+        
+        <h1 class="page-title">
+            <i class="fas fa-download text-primary"></i>
+            Export Customer Data
+        </h1>
+        <p class="page-description">Export your customer database in various formats</p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/customers/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Customers
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-cog"></i>
+                    Export Configuration
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/business/{{ request.tenant.slug }}/customers/export/process/">
+                    {% csrf_token %}
+                    
+                    <!-- Export Format -->
+                    <div class="form-group">
+                        <label class="form-label required">
+                            <i class="fas fa-file"></i>
+                            Export Format
+                        </label>
+                        <div class="format-options">
+                            <div class="format-option">
+                                <input type="radio" name="format" value="csv" id="format_csv" checked>
+                                <label for="format_csv" class="format-label">
+                                    <i class="fas fa-file-csv text-success"></i>
+                                    <div>
+                                        <strong>CSV (Comma Separated Values)</strong>
+                                        <p>Compatible with Excel, Google Sheets, and most applications</p>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <div class="format-option">
+                                <input type="radio" name="format" value="excel" id="format_excel">
+                                <label for="format_excel" class="format-label">
+                                    <i class="fas fa-file-excel text-success"></i>
+                                    <div>
+                                        <strong>Excel (.xlsx)</strong>
+                                        <p>Microsoft Excel format with advanced formatting</p>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <div class="format-option">
+                                <input type="radio" name="format" value="pdf" id="format_pdf">
+                                <label for="format_pdf" class="format-label">
+                                    <i class="fas fa-file-pdf text-danger"></i>
+                                    <div>
+                                        <strong>PDF Document</strong>
+                                        <p>Formatted document suitable for printing</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fields to Include -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-list"></i>
+                            Fields to Include
+                        </label>
+                        <div class="field-options">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="customer_id" id="field_customer_id" checked>
+                                        <label for="field_customer_id" class="form-check-label">Customer ID</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="full_name" id="field_full_name" checked>
+                                        <label for="field_full_name" class="form-check-label">Full Name</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="email" id="field_email" checked>
+                                        <label for="field_email" class="form-check-label">Email Address</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="phone" id="field_phone" checked>
+                                        <label for="field_phone" class="form-check-label">Phone Number</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="address" id="field_address">
+                                        <label for="field_address" class="form-check-label">Address</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="customer_type" id="field_customer_type">
+                                        <label for="field_customer_type" class="form-check-label">Customer Type</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="date_of_birth" id="field_date_of_birth">
+                                        <label for="field_date_of_birth" class="form-check-label">Date of Birth</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="loyalty_points" id="field_loyalty_points">
+                                        <label for="field_loyalty_points" class="form-check-label">Loyalty Points</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="total_orders" id="field_total_orders">
+                                        <label for="field_total_orders" class="form-check-label">Total Orders</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="fields" value="created_at" id="field_created_at">
+                                        <label for="field_created_at" class="form-check-label">Registration Date</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field-actions">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllFields()">
+                                Select All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllFields()">
+                                Deselect All
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Filters -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-filter"></i>
+                            Filters (Optional)
+                        </label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="customer_type_filter">Customer Type</label>
+                                    <select name="customer_type_filter" id="customer_type_filter" class="form-control">
+                                        <option value="">All Types</option>
+                                        <option value="individual">Individual</option>
+                                        <option value="business">Business</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="status_filter">Status</label>
+                                    <select name="status_filter" id="status_filter" class="form-control">
+                                        <option value="">All Statuses</option>
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="date_from">Registration Date From</label>
+                                    <input type="date" name="date_from" id="date_from" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="date_to">Registration Date To</label>
+                                    <input type="date" name="date_to" id="date_to" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-download"></i>
+                            Generate Export
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Export Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="info-item">
+                    <label>Total Customers:</label>
+                    <span class="badge badge-primary">{{ total_customers }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Active Customers:</label>
+                    <span class="badge badge-success">{{ active_customers }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Inactive Customers:</label>
+                    <span class="badge badge-warning">{{ inactive_customers }}</span>
+                </div>
+                
+                <hr>
+                
+                <h6>Export Tips:</h6>
+                <ul class="tips-list">
+                    <li>CSV format is recommended for large datasets</li>
+                    <li>Excel format includes formatting and formulas</li>
+                    <li>PDF format is best for printed reports</li>
+                    <li>Use filters to export specific customer segments</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-history"></i>
+                    Recent Exports
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_exports %}
+                <div class="export-list">
+                    {% for export in recent_exports %}
+                    <div class="export-item">
+                        <div class="export-info">
+                            <strong>{{ export.filename }}</strong>
+                            <div class="export-meta">
+                                <small class="text-muted">
+                                    {{ export.created_at|date:"M d, Y g:i A" }} • 
+                                    {{ export.record_count }} records
+                                </small>
+                            </div>
+                        </div>
+                        {% if export.is_ready %}
+                        <a href="{{ export.file_url }}" class="btn btn-sm btn-outline-primary" download title="Download {{ export.filename }}">
+                            <i class="fas fa-download"></i>
+                        </a>
+                        {% else %}
+                        <span class="badge badge-warning">Processing</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state-sm">
+                    <i class="fas fa-history text-muted"></i>
+                    <p>No recent exports</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.format-options {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.format-option {
+    position: relative;
+}
+
+.format-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.format-label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.format-label:hover {
+    border-color: var(--primary-300);
+    background: var(--primary-50);
+}
+
+.format-option input[type="radio"]:checked + .format-label {
+    border-color: var(--primary-500);
+    background: var(--primary-50);
+}
+
+.format-label i {
+    font-size: 1.5rem;
+}
+
+.format-label strong {
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.format-label p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.field-options {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-check {
+    margin-bottom: 0.75rem;
+}
+
+.field-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.info-item label {
+    font-weight: 500;
+    color: var(--gray-600);
+}
+
+.tips-list {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.tips-list li {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin-bottom: 0.5rem;
+}
+
+.export-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.export-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-sm);
+}
+
+.export-info strong {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.export-meta {
+    font-size: 0.75rem;
+}
+
+.empty-state-sm {
+    text-align: center;
+    padding: 2rem 1rem;
+}
+
+.empty-state-sm i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-sm p {
+    color: var(--gray-500);
+    margin: 0;
+}
+
+.form-actions {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--gray-200);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function selectAllFields() {
+    const checkboxes = document.querySelectorAll('input[name="fields"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
+
+function deselectAllFields() {
+    const checkboxes = document.querySelectorAll('input[name="fields"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+// Auto-set today's date for "to" field
+document.getElementById('date_to').valueAsDate = new Date();
+</script>
+{% endblock %}

@@ -1,0 +1,350 @@
+<!-- templates/customers/note_form.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}
+{% if note.pk %}Edit Note{% else %}Add Note{% endif %} - {{ customer.display_name }} - {{ block.super }}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="/business/{{ request.tenant.slug }}/">
+                        <i class="fas fa-home"></i>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/business/{{ request.tenant.slug }}/customers/">Customers</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/">{{ customer.display_name }}</a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">
+                    {% if note.pk %}Edit Note{% else %}Add Note{% endif %}
+                </li>
+            </ol>
+        </nav>
+        
+        <h1 class="page-title">
+            <i class="fas fa-sticky-note text-primary"></i>
+            {% if note.pk %}Edit Note{% else %}Add Note{% endif %} - {{ customer.display_name }}
+        </h1>
+        <p class="page-description">
+            {% if note.pk %}
+            Update the note details below
+            {% else %}
+            Add a new note for this customer
+            {% endif %}
+        </p>
+    </div>
+    
+    <div class="page-actions">
+        <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-arrow-left"></i>
+            Back to Customer
+        </a>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="card-body">
+        <form method="post" class="form-modern">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="form-group">
+                        <label for="id_title" class="form-label required">
+                            <i class="fas fa-heading"></i>
+                            Note Title
+                        </label>
+                        <input type="text" 
+                               name="title" 
+                               id="id_title" 
+                               class="form-control"
+                               value="{{ form.title.value|default:'' }}"
+                               placeholder="Enter a descriptive title for this note"
+                               required>
+                        {% if form.title.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.title.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_content" class="form-label required">
+                            <i class="fas fa-align-left"></i>
+                            Note Content
+                        </label>
+                        <textarea name="content" 
+                                  id="id_content" 
+                                  class="form-control"
+                                  rows="8"
+                                  placeholder="Enter the note content..."
+                                  required>{{ form.content.value|default:'' }}</textarea>
+                        {% if form.content.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.content.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-cog"></i>
+                            Note Settings
+                        </label>
+                        <div class="form-check">
+                            <input type="checkbox" 
+                                   name="is_important" 
+                                   id="id_is_important" 
+                                   class="form-check-input"
+                                   {% if form.is_important.value %}checked{% endif %}>
+                            <label for="id_is_important" class="form-check-label">
+                                <i class="fas fa-exclamation-triangle text-warning"></i>
+                                Mark as Important
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Important notes will be highlighted and shown first
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_category" class="form-label">
+                            <i class="fas fa-tag"></i>
+                            Category
+                        </label>
+                        <select name="category" id="id_category" class="form-control">
+                            <option value="">Select a category</option>
+                            <option value="general" {% if form.category.value == 'general' %}selected{% endif %}>General</option>
+                            <option value="preference" {% if form.category.value == 'preference' %}selected{% endif %}>Preference</option>
+                            <option value="complaint" {% if form.category.value == 'complaint' %}selected{% endif %}>Complaint</option>
+                            <option value="compliment" {% if form.category.value == 'compliment' %}selected{% endif %}>Compliment</option>
+                            <option value="special_instruction" {% if form.category.value == 'special_instruction' %}selected{% endif %}>Special Instruction</option>
+                            <option value="payment_issue" {% if form.category.value == 'payment_issue' %}selected{% endif %}>Payment Issue</option>
+                            <option value="other" {% if form.category.value == 'other' %}selected{% endif %}>Other</option>
+                        </select>
+                        {% if form.category.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.category.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if note.pk %}
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-info-circle"></i>
+                            Note Information
+                        </label>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <label>Created:</label>
+                                <span>{{ note.created_at|date:"M d, Y g:i A" }}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Created by:</label>
+                                <span>{{ note.created_by.get_full_name|default:note.created_by.username }}</span>
+                            </div>
+                            {% if note.updated_at %}
+                            <div class="info-item">
+                                <label>Last updated:</label>
+                                <span>{{ note.updated_at|date:"M d, Y g:i A" }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <div class="form-actions-left">
+                    <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </a>
+                </div>
+                <div class="form-actions-right">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        {% if note.pk %}Update Note{% else %}Save Note{% endif %}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-modern .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-label.required::after {
+    content: '*';
+    color: var(--danger-500);
+    margin-left: 0.25rem;
+}
+
+.form-control {
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-check {
+    padding: 1rem;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.5rem;
+}
+
+.form-check-input {
+    margin-right: 0.5rem;
+}
+
+.form-check-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.info-list {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.info-item:last-child {
+    margin-bottom: 0;
+}
+
+.info-item label {
+    font-weight: 500;
+    color: var(--gray-600);
+    font-size: 0.875rem;
+}
+
+.info-item span {
+    color: var(--gray-900);
+    font-size: 0.875rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.form-actions-left,
+.form-actions-right {
+    display: flex;
+    gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+    .form-actions {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .form-actions-left,
+    .form-actions-right {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-save draft functionality (optional)
+let autoSaveTimeout;
+
+function autoSave() {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(() => {
+        const title = document.getElementById('id_title').value;
+        const content = document.getElementById('id_content').value;
+        
+        if (title || content) {
+            localStorage.setItem('customer_note_draft', JSON.stringify({
+                customer_id: '{{ customer.pk }}',
+                title: title,
+                content: content,
+                timestamp: new Date().getTime()
+            }));
+        }
+    }, 1000);
+}
+
+// Load draft on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const draft = localStorage.getItem('customer_note_draft');
+    if (draft && !{{ note.pk|default:'false' }}) {
+        const data = JSON.parse(draft);
+        if (data.customer_id === '{{ customer.pk }}') {
+            // Check if draft is less than 24 hours old
+            const age = new Date().getTime() - data.timestamp;
+            if (age < 24 * 60 * 60 * 1000) {
+                if (confirm('A draft note was found. Would you like to restore it?')) {
+                    document.getElementById('id_title').value = data.title;
+                    document.getElementById('id_content').value = data.content;
+                }
+            }
+        }
+    }
+    
+    // Set up auto-save
+    document.getElementById('id_title').addEventListener('input', autoSave);
+    document.getElementById('id_content').addEventListener('input', autoSave);
+});
+
+// Clear draft on successful save
+window.addEventListener('beforeunload', function() {
+    // Clear draft if form is being submitted
+    if (document.querySelector('form').checkValidity()) {
+        localStorage.removeItem('customer_note_draft');
+    }
+});
+</script>
+{% endblock %}
