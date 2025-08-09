@@ -1,0 +1,371 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ unit.name }} - Unit Detail - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <div class="page-breadcrumb">
+            <a href="/business/{{ request.tenant.slug }}/inventory/" class="breadcrumb-link">Inventory</a>
+            <i class="fas fa-chevron-right"></i>
+            <a href="/business/{{ request.tenant.slug }}/inventory/units/" class="breadcrumb-link">Units</a>
+            <i class="fas fa-chevron-right"></i>
+            <span class="breadcrumb-current">{{ unit.name }}</span>
+        </div>
+        <h1 class="page-title">
+            <i class="fas fa-ruler"></i>
+            {{ unit.name }}
+            {% if not unit.is_active %}
+                <span class="badge bg-secondary ms-2">Inactive</span>
+            {% endif %}
+        </h1>
+        <div class="page-actions">
+            <a href="/business/{{ request.tenant.slug }}/inventory/units/{{ unit.id }}/edit/" class="btn btn-primary">
+                <i class="fas fa-edit"></i>
+                Edit Unit
+            </a>
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-label="More actions">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <form method="post" action="/business/{{ request.tenant.slug }}/inventory/units/{{ unit.id }}/toggle/" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item">
+                                {% if unit.is_active %}
+                                    <i class="fas fa-pause text-warning"></i> Deactivate
+                                {% else %}
+                                    <i class="fas fa-play text-success"></i> Activate
+                                {% endif %}
+                            </button>
+                        </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item text-danger" href="/business/{{ request.tenant.slug }}/inventory/units/{{ unit.id }}/delete/">
+                            <i class="fas fa-trash"></i> Delete Unit
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Unit Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    Unit Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td class="fw-semibold">Name:</td>
+                                <td>{{ unit.name }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold">Symbol:</td>
+                                <td><code class="bg-light px-2 py-1 rounded">{{ unit.symbol }}</code></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold">Type:</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ unit.get_unit_type_display }}</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold">Status:</td>
+                                <td>
+                                    {% if unit.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td class="fw-semibold">Created:</td>
+                                <td>{{ unit.created_at|date:"M d, Y H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold">Updated:</td>
+                                <td>{{ unit.updated_at|date:"M d, Y H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold">Items Using:</td>
+                                <td>
+                                    <a href="/business/{{ request.tenant.slug }}/inventory/items/?unit={{ unit.id }}" class="text-decoration-none">
+                                        {{ items_count }} items
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                {% if unit.description %}
+                    <div class="mt-3">
+                        <strong>Description:</strong>
+                        <p class="text-muted mb-0">{{ unit.description }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Items Using This Unit -->
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-boxes"></i>
+                        Items Using This Unit
+                        <span class="badge bg-primary ms-2">{{ items_count }}</span>
+                    </h5>
+                    {% if items_count > 0 %}
+                        <a href="/business/{{ request.tenant.slug }}/inventory/items/?unit={{ unit.id }}" class="btn btn-outline-primary btn-sm">
+                            View All Items
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                {% if items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item Name</th>
+                                    <th>SKU</th>
+                                    <th>Category</th>
+                                    <th>Current Stock</th>
+                                    <th>Status</th>
+                                    <th width="100">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td>
+                                        <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/" class="text-decoration-none fw-semibold">
+                                            {{ item.name }}
+                                        </a>
+                                    </td>
+                                    <td><code class="bg-light px-2 py-1 rounded">{{ item.sku }}</code></td>
+                                    <td>
+                                        {% if item.category %}
+                                            <span class="badge bg-secondary">{{ item.category.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="{% if item.current_stock <= item.minimum_stock %}text-danger{% elif item.current_stock <= item.reorder_level %}text-warning{% else %}text-success{% endif %}">
+                                            {{ item.current_stock }} {{ unit.symbol }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if item.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/" 
+                                           class="btn btn-outline-primary btn-sm"
+                                           title="View Item">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if items_count > items|length %}
+                        <div class="text-center mt-3">
+                            <a href="/business/{{ request.tenant.slug }}/inventory/items/?unit={{ unit.id }}" class="btn btn-outline-primary">
+                                View All {{ items_count }} Items
+                            </a>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No Items Using This Unit</h5>
+                        <p class="text-muted mb-3">No inventory items are currently using this unit of measurement.</p>
+                        <a href="/business/{{ request.tenant.slug }}/inventory/items/create/" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            Add Item
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Quick Stats -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-bar"></i>
+                    Quick Statistics
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="stat-row">
+                    <span class="stat-label">Total Items:</span>
+                    <span class="stat-value">{{ items_count }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Active Items:</span>
+                    <span class="stat-value">{{ active_items_count }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Total Stock Value:</span>
+                    <span class="stat-value">KES {{ total_stock_value|floatformat:2 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Low Stock Items:</span>
+                    <span class="stat-value text-warning">{{ low_stock_count }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unit Type Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    Unit Type: {{ unit.get_unit_type_display }}
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if unit.unit_type == 'weight' %}
+                    <p class="text-muted small mb-2">
+                        <i class="fas fa-weight-hanging"></i>
+                        Weight units are used for measuring the mass of items like chemicals, parts, or materials.
+                    </p>
+                    <p class="text-muted small">
+                        <strong>Common examples:</strong> kg, g, lb, oz
+                    </p>
+                {% elif unit.unit_type == 'volume' %}
+                    <p class="text-muted small mb-2">
+                        <i class="fas fa-flask"></i>
+                        Volume units are used for measuring liquids, gases, or bulk materials.
+                    </p>
+                    <p class="text-muted small">
+                        <strong>Common examples:</strong> L, ml, gal, qt
+                    </p>
+                {% elif unit.unit_type == 'length' %}
+                    <p class="text-muted small mb-2">
+                        <i class="fas fa-ruler"></i>
+                        Length units are used for measuring distances, dimensions, or linear quantities.
+                    </p>
+                    <p class="text-muted small">
+                        <strong>Common examples:</strong> m, cm, ft, in
+                    </p>
+                {% elif unit.unit_type == 'area' %}
+                    <p class="text-muted small mb-2">
+                        <i class="fas fa-square"></i>
+                        Area units are used for measuring surface areas or coverage.
+                    </p>
+                    <p class="text-muted small">
+                        <strong>Common examples:</strong> m², ft², acre
+                    </p>
+                {% elif unit.unit_type == 'piece' %}
+                    <p class="text-muted small mb-2">
+                        <i class="fas fa-cubes"></i>
+                        Piece units are used for counting discrete items or units.
+                    </p>
+                    <p class="text-muted small">
+                        <strong>Common examples:</strong> pcs, each, dozen, pair
+                    </p>
+                {% elif unit.unit_type == 'time' %}
+                    <p class="text-muted small mb-2">
+                        <i class="fas fa-clock"></i>
+                        Time units are used for measuring duration or time-based services.
+                    </p>
+                    <p class="text-muted small">
+                        <strong>Common examples:</strong> hr, min, day, month
+                    </p>
+                {% else %}
+                    <p class="text-muted small">
+                        <i class="fas fa-question-circle"></i>
+                        Custom unit type for specialized measurements.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Related Units -->
+        {% if related_units %}
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-link"></i>
+                    Related Units
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for related_unit in related_units %}
+                    <a href="/business/{{ request.tenant.slug }}/inventory/units/{{ related_unit.id }}/" 
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ related_unit.name }}</strong>
+                            <br><small class="text-muted">{{ related_unit.symbol }}</small>
+                        </div>
+                        <span class="badge bg-primary">{{ related_unit.get_unit_type_display }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-weight: 500;
+}
+
+.stat-value {
+    color: #6c757d;
+}
+
+code {
+    font-size: 0.875em;
+}
+</style>
+{% endblock %}

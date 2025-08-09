@@ -40,6 +40,15 @@ urlpatterns = [
     path('alerts/', views.alerts_view, name='alerts'),
     path('alerts/<int:alert_id>/resolve/', views.resolve_alert, name='resolve_alert'),
 
+    # Daily Operations
+    path('daily-operations/', views.daily_operations_dashboard, name='daily_operations'),
+    path('daily-operations/allocate/', views.allocate_to_bay, name='allocate_to_bay'),
+    path('daily-operations/consumption/', views.record_bay_consumption, name='record_bay_consumption'),
+    path('daily-operations/transfer/', views.transfer_between_bays, name='transfer_between_bays'),
+    path('daily-operations/return/', views.return_to_stock, name='return_to_stock'),
+    path('daily-operations/reconciliation/start/', views.start_reconciliation, name='start_reconciliation'),
+    path('daily-operations/reconciliation/complete/', views.complete_reconciliation, name='complete_reconciliation'),
+
     # Units
     path('units/', views.unit_list_view, name='unit_list'),
     path('units/create/', views.unit_create_view, name='unit_create'),
@@ -53,6 +62,10 @@ urlpatterns = [
     # AJAX endpoints
     path('ajax/items/search/', views.item_search_ajax, name='item_search'),
     path('ajax/consumption/', views.item_consumption_ajax, name='item_consumption'),
+    path('ajax/reconciliation/update/', views.ajax_update_reconciliation_item, name='ajax_update_reconciliation_item'),
+    path('ajax/bay-status/', views.get_bay_status, name='get_bay_status'),
+    path('ajax/activity-feed/', views.get_activity_feed, name='get_activity_feed'),
+    path('ajax/update-target/', views.update_operations_target, name='update_operations_target'),
     # path('ajax/stock-check/', views.stock_check_ajax, name='stock_check'),
     
     # # Mobile/Quick Actions

@@ -1,0 +1,380 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Create Stock Take - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <div class="page-breadcrumb">
+            <a href="/business/{{ request.tenant.slug }}/inventory/" class="breadcrumb-link">Inventory</a>
+            <i class="fas fa-chevron-right"></i>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/" class="breadcrumb-link">Stock Takes</a>
+            <i class="fas fa-chevron-right"></i>
+            <span class="breadcrumb-current">Create</span>
+        </div>
+        <h1 class="page-title">
+            <i class="fas fa-clipboard-check"></i>
+            Create Stock Take
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Stock Take Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="id_reference" class="form-label">Reference *</label>
+                                {{ form.reference }}
+                                {% if form.reference.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ form.reference.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="id_scheduled_date" class="form-label">Scheduled Date</label>
+                                {{ form.scheduled_date }}
+                                {% if form.scheduled_date.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ form.scheduled_date.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_description" class="form-label">Description *</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.description.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_notes" class="form-label">Notes</label>
+                        {{ form.notes }}
+                        {% if form.notes.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.notes.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Include Categories -->
+                    <div class="mb-4">
+                        <label class="form-label">Include Categories</label>
+                        <div class="category-selection">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="select_all_categories">
+                                <label class="form-check-label fw-semibold" for="select_all_categories">
+                                    Select All Categories
+                                </label>
+                            </div>
+                            <hr>
+                            {% for category in categories %}
+                                <div class="form-check">
+                                    <input class="form-check-input category-checkbox" 
+                                           type="checkbox" 
+                                           name="categories" 
+                                           value="{{ category.id }}" 
+                                           id="category_{{ category.id }}">
+                                    <label class="form-check-label" for="category_{{ category.id }}">
+                                        {{ category.name }}
+                                        <small class="text-muted">({{ category.item_count }} items)</small>
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        {% if form.categories.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.categories.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Include Items -->
+                    <div class="mb-4">
+                        <label class="form-label">Or Select Specific Items</label>
+                        <div class="item-selection">
+                            <div class="input-group mb-3">
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="item_search" 
+                                       placeholder="Search items by name or SKU...">
+                                <button class="btn btn-outline-secondary" type="button" id="search_items">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            
+                            <div id="selected_items" class="selected-items">
+                                <!-- Selected items will appear here -->
+                            </div>
+                            
+                            <div id="item_search_results" class="item-search-results">
+                                <!-- Search results will appear here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary">
+                            <i class="fas fa-save"></i>
+                            Save as Draft
+                        </button>
+                        <button type="submit" name="action" value="start_immediately" class="btn btn-primary">
+                            <i class="fas fa-play"></i>
+                            Create and Start
+                        </button>
+                        <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Help Card -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-question-circle"></i>
+                    Stock Take Guide
+                </h6>
+            </div>
+            <div class="card-body">
+                <h6>What is a Stock Take?</h6>
+                <p class="small text-muted mb-3">
+                    A stock take is a physical count of all your inventory items to verify actual quantities match your system records.
+                </p>
+
+                <h6>How it works:</h6>
+                <ol class="small text-muted">
+                    <li>Create a stock take by selecting categories or specific items</li>
+                    <li>Start the stock take to begin counting</li>
+                    <li>Count each item physically and update quantities</li>
+                    <li>Complete the stock take to apply adjustments</li>
+                </ol>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb"></i>
+                    <strong>Tip:</strong> Schedule stock takes during low activity periods for better accuracy.
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Card -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-bar"></i>
+                    Quick Stats
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="stat-row">
+                    <span class="stat-label">Total Items:</span>
+                    <span class="stat-value">{{ total_items }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Categories:</span>
+                    <span class="stat-value">{{ total_categories }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Last Stock Take:</span>
+                    <span class="stat-value">
+                        {% if last_stock_take %}
+                            {{ last_stock_take.completed_at|date:"M d, Y"|default:"In Progress" }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Select all categories functionality
+    const selectAllCheckbox = document.getElementById('select_all_categories');
+    const categoryCheckboxes = document.querySelectorAll('.category-checkbox');
+    
+    selectAllCheckbox.addEventListener('change', function() {
+        categoryCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+    
+    // Update select all state when individual checkboxes change
+    categoryCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const allChecked = Array.from(categoryCheckboxes).every(cb => cb.checked);
+            const noneChecked = Array.from(categoryCheckboxes).every(cb => !cb.checked);
+            
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = !allChecked && !noneChecked;
+        });
+    });
+    
+    // Item search functionality
+    const itemSearch = document.getElementById('item_search');
+    const searchButton = document.getElementById('search_items');
+    const searchResults = document.getElementById('item_search_results');
+    const selectedItems = document.getElementById('selected_items');
+    let selectedItemIds = new Set();
+    
+    function searchItems() {
+        const query = itemSearch.value.trim();
+        if (query.length < 2) {
+            searchResults.innerHTML = '';
+            return;
+        }
+        
+        fetch(`/business/{{ request.tenant.slug }}/inventory/ajax/items/search/?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                displaySearchResults(data.items);
+            })
+            .catch(error => {
+                console.error('Error searching items:', error);
+            });
+    }
+    
+    function displaySearchResults(items) {
+        searchResults.innerHTML = '';
+        if (items.length === 0) {
+            searchResults.innerHTML = '<p class="text-muted small">No items found.</p>';
+            return;
+        }
+        
+        items.forEach(item => {
+            if (selectedItemIds.has(item.id)) return; // Skip already selected items
+            
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'search-result-item';
+            itemDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                    <div>
+                        <strong>${item.name}</strong>
+                        <br><small class="text-muted">${item.sku} - Current Stock: ${item.current_stock}</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItem(${item.id}, '${item.name}', '${item.sku}')">
+                        Add
+                    </button>
+                </div>
+            `;
+            searchResults.appendChild(itemDiv);
+        });
+    }
+    
+    window.addItem = function(id, name, sku) {
+        if (selectedItemIds.has(id)) return;
+        
+        selectedItemIds.add(id);
+        
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'selected-item d-flex justify-content-between align-items-center p-2 border-bottom bg-light';
+        itemDiv.innerHTML = `
+            <div>
+                <strong>${name}</strong>
+                <br><small class="text-muted">${sku}</small>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeItem(${id}, this)">
+                Remove
+            </button>
+            <input type="hidden" name="items" value="${id}">
+        `;
+        selectedItems.appendChild(itemDiv);
+        
+        // Remove from search results
+        searchItems();
+    };
+    
+    window.removeItem = function(id, button) {
+        selectedItemIds.delete(id);
+        button.closest('.selected-item').remove();
+    };
+    
+    // Search events
+    searchButton.addEventListener('click', searchItems);
+    itemSearch.addEventListener('input', debounce(searchItems, 300));
+    
+    // Debounce function
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+});
+</script>
+
+<style>
+.category-selection {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
+.item-selection {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
+.search-result-item:hover {
+    background-color: #f8f9fa;
+}
+
+.selected-item {
+    margin-bottom: 0.5rem;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-weight: 500;
+}
+
+.stat-value {
+    color: #6c757d;
+}
+</style>
+{% endblock %}

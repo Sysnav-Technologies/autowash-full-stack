@@ -1,0 +1,297 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Stock Movements - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <div class="page-breadcrumb">
+            <a href="/business/{{ request.tenant.slug }}/inventory/" class="breadcrumb-link">Inventory</a>
+            <i class="fas fa-chevron-right"></i>
+            <span class="breadcrumb-current">Stock Movements</span>
+        </div>
+        <h1 class="page-title">
+            <i class="fas fa-exchange-alt"></i>
+            Stock Movements
+        </h1>
+        <div class="page-actions">
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                New Adjustment
+            </a>
+            <div class="dropdown">
+                <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-download"></i>
+                    Export
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/inventory/reports/export/csv/">
+                        <i class="fas fa-file-csv"></i> Export CSV
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Movement Statistics -->
+<div class="stats-grid mb-4">
+    <div class="stat-card">
+        <div class="stat-icon success">
+            <i class="fas fa-arrow-up"></i>
+        </div>
+        <div class="stat-value">{{ stats.total_in }}</div>
+        <div class="stat-label">Stock In</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon warning">
+            <i class="fas fa-arrow-down"></i>
+        </div>
+        <div class="stat-value">{{ stats.total_out }}</div>
+        <div class="stat-label">Stock Out</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon primary">
+            <i class="fas fa-exchange-alt"></i>
+        </div>
+        <div class="stat-value">{{ stats.total_adjustments }}</div>
+        <div class="stat-label">Adjustments</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon info">
+            <i class="fas fa-calendar-day"></i>
+        </div>
+        <div class="stat-value">{{ stats.today_movements }}</div>
+        <div class="stat-label">Today</div>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="filter-form">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="search" class="form-label">Search</label>
+                    <input type="text" 
+                           id="search"
+                           name="search" 
+                           class="form-control" 
+                           placeholder="Search items or reasons..." 
+                           value="{{ request.GET.search }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="movement_type" class="form-label">Movement Type</label>
+                    <select id="movement_type" name="movement_type" class="form-select">
+                        <option value="">All Types</option>
+                        <option value="in" {% if request.GET.movement_type == 'in' %}selected{% endif %}>Stock In</option>
+                        <option value="out" {% if request.GET.movement_type == 'out' %}selected{% endif %}>Stock Out</option>
+                        <option value="adjustment" {% if request.GET.movement_type == 'adjustment' %}selected{% endif %}>Adjustment</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="date_from" class="form-label">From Date</label>
+                    <input type="date" 
+                           id="date_from"
+                           name="date_from" 
+                           class="form-control" 
+                           value="{{ request.GET.date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="date_to" class="form-label">To Date</label>
+                    <input type="date" 
+                           id="date_to"
+                           name="date_to" 
+                           class="form-control" 
+                           value="{{ request.GET.date_to }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="btn-group w-100">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Filter
+                        </button>
+                        <a href="/business/{{ request.tenant.slug }}/inventory/stock/movements/" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Movements List -->
+{% if movements %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>
+                                <a href="?sort=created_at{% if request.GET.sort == 'created_at' and request.GET.order != 'desc' %}&order=desc{% endif %}{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                                   class="text-decoration-none">
+                                    Date/Time
+                                    {% if request.GET.sort == 'created_at' %}
+                                        <i class="fas fa-sort-{% if request.GET.order == 'desc' %}down{% else %}up{% endif %}"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>Item</th>
+                            <th>Type</th>
+                            <th>Quantity</th>
+                            <th>Previous Stock</th>
+                            <th>New Stock</th>
+                            <th>Reason</th>
+                            <th>Created By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movement in movements %}
+                        <tr>
+                            <td>
+                                {{ movement.created_at|date:"M d, Y" }}
+                                <br><small class="text-muted">{{ movement.created_at|time:"H:i" }}</small>
+                            </td>
+                            <td>
+                                <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ movement.item.id }}/" class="text-decoration-none">
+                                    {{ movement.item.name }}
+                                </a>
+                                <br><small class="text-muted">{{ movement.item.sku }}</small>
+                            </td>
+                            <td>
+                                <span class="movement-type-badge {{ movement.movement_type }}">
+                                    {% if movement.movement_type == 'in' %}
+                                        <i class="fas fa-arrow-up"></i> Stock In
+                                    {% elif movement.movement_type == 'out' %}
+                                        <i class="fas fa-arrow-down"></i> Stock Out
+                                    {% else %}
+                                        <i class="fas fa-exchange-alt"></i> Adjustment
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="movement-{{ movement.movement_type }}">
+                                    {% if movement.movement_type == 'in' %}+{% elif movement.movement_type == 'out' %}-{% endif %}{{ movement.quantity }}
+                                </span>
+                                {{ movement.item.unit.symbol }}
+                            </td>
+                            <td>{{ movement.old_stock }} {{ movement.item.unit.symbol }}</td>
+                            <td>{{ movement.new_stock }} {{ movement.item.unit.symbol }}</td>
+                            <td>{{ movement.reason|default:"-" }}</td>
+                            <td>
+                                {{ movement.created_by.get_full_name|default:movement.created_by.username }}
+                                <br><small class="text-muted">{{ movement.created_by.email }}</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if movements.has_other_pages %}
+        <nav aria-label="Movements pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if movements.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ movements.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                <li class="page-item active">
+                    <span class="page-link">{{ movements.number }} of {{ movements.paginator.num_pages }}</span>
+                </li>
+                
+                {% if movements.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ movements.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ movements.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Last</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+
+{% else %}
+    <!-- Empty State -->
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-exchange-alt fa-4x text-muted mb-4"></i>
+            <h3 class="text-muted">No Stock Movements Found</h3>
+            {% if request.GET.search or request.GET.movement_type or request.GET.date_from or request.GET.date_to %}
+                <p class="text-muted mb-4">No movements match your search criteria. Try adjusting your filters.</p>
+                <a href="/business/{{ request.tenant.slug }}/inventory/stock/movements/" class="btn btn-outline-primary">
+                    <i class="fas fa-times"></i>
+                    Clear Filters
+                </a>
+            {% else %}
+                <p class="text-muted mb-4">No stock movements recorded yet. Start by making your first adjustment.</p>
+                <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    Make Adjustment
+                </a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.movement-type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.movement-type-badge.in {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.movement-type-badge.out {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.movement-type-badge.adjustment {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.movement-in {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.movement-out {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.movement-adjustment {
+    color: #17a2b8;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
