@@ -112,7 +112,7 @@ def send_order_created_notification(order, tenant=None):
         'order': order,
         'customer': order.customer,
         'vehicle': order.vehicle,
-        'services': order.serviceorderitem_set.all(),
+        'services': order.order_items.all(),
         'notification_type': 'created'
     }
     
@@ -144,7 +144,7 @@ def send_order_started_notification(order, attendant_name=None, tenant=None):
         'order': order,
         'customer': order.customer,
         'vehicle': order.vehicle,
-        'services': order.serviceorderitem_set.all(),
+        'services': order.order_items.all(),
         'attendant_name': attendant_name,
         'notification_type': 'started'
     }
@@ -177,7 +177,7 @@ def send_order_completed_notification(order, attendant_name=None, tenant=None):
         'order': order,
         'customer': order.customer,
         'vehicle': order.vehicle,
-        'services': order.serviceorderitem_set.all(),
+        'services': order.order_items.all(),
         'attendant_name': attendant_name,
         'notification_type': 'completed'
     }
