@@ -1,0 +1,759 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Service Queue - {{ block.super }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/services/">Services</a>
+</li>
+<li class="breadcrumb-item active">Queue Management</li>
+{% endblock %}
+
+{% block content %}
+<!-- Queue Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm bg-gradient-primary text-white">
+            <div class="card-body p-4">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <h2 class="fw-bold mb-2">
+                            <i class="fas fa-tasks me-2"></i>
+                            Service Queue Management
+                        </h2>
+                        <p class="mb-3 text-white-75">
+                            Monitor and manage your service queue in real-time for {{ "now"|date:"l, F j" }}
+                        </p>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-clock me-2"></i>
+                                <span id="current-time">Loading...</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-building me-2"></i>
+                                <span>{{ request.tenant.name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 text-lg-end">
+                        <div class="d-flex flex-column flex-lg-row gap-2 justify-content-lg-end">
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/create/" class="btn btn-light fw-semibold">
+                                <i class="fas fa-plus me-2"></i>New Order
+                            </a>
+                            <button type="button" class="btn btn-outline-light fw-semibold" onclick="refreshQueue()" title="Refresh Queue">
+                                <i class="fas fa-sync-alt me-2" id="refresh-icon"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Queue Statistics -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1 fw-semibold">Waiting in Queue</p>
+                        <h3 class="fw-bold text-warning mb-0" id="waiting-count">{{ stats.waiting_count|default:0 }}</h3>
+                        <small class="text-muted">
+                            <i class="fas fa-clock text-warning me-1"></i>Pending services
+                        </small>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-clock text-warning" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1 fw-semibold">In Service</p>
+                        <h3 class="fw-bold text-info mb-0" id="in-service-count">{{ stats.in_service_count|default:0 }}</h3>
+                        <small class="text-info">
+                            <i class="fas fa-cog fa-spin me-1"></i>Currently active
+                        </small>
+                    </div>
+                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-cog text-info" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1 fw-semibold">Completed Today</p>
+                        <h3 class="fw-bold text-success mb-0" id="total-processed">{{ stats.total_processed|default:0 }}</h3>
+                        <small class="text-success">
+                            <i class="fas fa-check-circle me-1"></i>Finished services
+                        </small>
+                    </div>
+                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-check-circle text-success" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1 fw-semibold">Avg Wait Time</p>
+                        <h3 class="fw-bold text-primary mb-0" id="avg-wait-time">{{ stats.avg_wait_time|default:0 }} min</h3>
+                        <small class="text-muted">
+                            <i class="fas fa-stopwatch text-primary me-1"></i>Average today
+                        </small>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-stopwatch text-primary" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Queue Controls -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="auto-refresh" checked>
+                            <label class="form-check-label fw-semibold" for="auto-refresh">
+                                <i class="fas fa-sync-alt me-1"></i>Auto Refresh (30s)
+                            </label>
+                        </div>
+                        <div class="vr d-none d-md-block"></div>
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Last updated: <span id="last-updated">{{ "now"|date:"H:i:s" }}</span>
+                        </small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="printQueue()">
+                            <i class="fas fa-print me-1"></i>Print Queue
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="exportQueue()">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Queue List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list-ol text-primary me-2"></i>
+                        Service Queue
+                    </h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-dark">
+                            <i class="fas fa-users me-1"></i>
+                            {{ queue_entries|length }} in queue
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="queue-container">
+                    {% if queue_entries %}
+                        {% for entry in queue_entries %}
+                        <div class="queue-entry border-bottom" data-queue-id="{{ entry.id }}" data-order-id="{{ entry.order.id }}">
+                            <div class="row g-0 align-items-center p-4">
+                                <!-- Queue Position -->
+                                <div class="col-md-1 text-center">
+                                    <div class="queue-position {% if entry.status == 'waiting' %}waiting{% else %}in-service{% endif %}">
+                                        {{ entry.queue_number }}
+                                    </div>
+                                </div>
+                                
+                                <!-- Order Details -->
+                                <div class="col-md-4">
+                                    <div class="order-details">
+                                        <h6 class="mb-1 fw-bold">
+                                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ entry.order.pk }}/" class="text-decoration-none">
+                                                {{ entry.order.order_number }}
+                                            </a>
+                                        </h6>
+                                        <p class="mb-1 text-muted">
+                                            <i class="fas fa-user me-2"></i>
+                                            {{ entry.order.customer.full_name }}
+                                        </p>
+                                        {% if entry.order.vehicle %}
+                                        <p class="mb-0 text-muted small">
+                                            <i class="fas fa-car me-2"></i>
+                                            {{ entry.order.vehicle.make }} {{ entry.order.vehicle.model }}
+                                            <span class="badge bg-light text-dark ms-1">{{ entry.order.vehicle.license_plate }}</span>
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Services -->
+                                <div class="col-md-3">
+                                    <div class="services-list">
+                                        <small class="text-muted fw-semibold d-block mb-2">Services:</small>
+                                        {% for item in entry.order.order_items.all %}
+                                            <span class="badge bg-secondary me-1 mb-1">{{ item.service.name }}</span>
+                                        {% endfor %}
+                                        <div class="mt-2">
+                                            <span class="fw-bold text-success">
+                                                <i class="fas fa-money-bill-wave me-1"></i>
+                                                KES {{ entry.order.total_amount|floatformat:0 }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Status & Timing -->
+                                <div class="col-md-2">
+                                    <div class="status-info">
+                                        {% if entry.status == 'waiting' %}
+                                            <span class="status-badge waiting">
+                                                <i class="fas fa-clock me-1"></i>Waiting
+                                            </span>
+                                        {% elif entry.status == 'in_service' %}
+                                            <span class="status-badge in-service">
+                                                <i class="fas fa-cog fa-spin me-1"></i>In Service
+                                            </span>
+                                        {% endif %}
+                                        
+                                        {% if entry.estimated_wait_time %}
+                                        <div class="text-muted small mt-1">
+                                            <i class="fas fa-hourglass-half me-1"></i>
+                                            Est: {{ entry.estimated_wait_time }} min
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if entry.order.assigned_attendant %}
+                                        <div class="text-muted small mt-1">
+                                            <i class="fas fa-user-tie me-1"></i>
+                                            {{ entry.order.assigned_attendant.user.first_name }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div class="col-md-2">
+                                    <div class="action-buttons d-flex flex-column gap-2">
+                                        {% if entry.status == 'waiting' %}
+                                            <button type="button" class="btn btn-success btn-sm" onclick="startService('{{ entry.order.id }}')">
+                                                <i class="fas fa-play me-1"></i>Start Service
+                                            </button>
+                                        {% elif entry.status == 'in_service' %}
+                                            <button type="button" class="btn btn-primary btn-sm" onclick="completeService('{{ entry.order.id }}')">
+                                                <i class="fas fa-check me-1"></i>Complete
+                                            </button>
+                                            <button type="button" class="btn btn-warning btn-sm" onclick="pauseService('{{ entry.order.id }}')">
+                                                <i class="fas fa-pause me-1"></i>Pause
+                                            </button>
+                                        {% endif %}
+                                        
+                                        <!-- Dropdown for more actions -->
+                                        <div class="dropdown">
+                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-h"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li>
+                                                    <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/orders/{{ entry.order.pk }}/">
+                                                        <i class="fas fa-eye me-2"></i>View Details
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/orders/{{ entry.order.pk }}/edit/">
+                                                        <i class="fas fa-edit me-2"></i>Edit Order
+                                                    </a>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <button class="dropdown-item text-danger" onclick="removeFromQueue('{{ entry.id }}')">
+                                                        <i class="fas fa-trash me-2"></i>Remove from Queue
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-clipboard-list fa-4x text-muted"></i>
+                            </div>
+                            <h5 class="text-muted mb-3">No entries in queue</h5>
+                            <p class="text-muted mb-4">The service queue is currently empty. Create a new order to get started.</p>
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/create/" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Create New Order
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.queue-position {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: white;
+}
+
+.queue-position.waiting {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+}
+
+.queue-position.in-service {
+    background: linear-gradient(135deg, #17a2b8, #007bff);
+}
+
+.queue-entry {
+    transition: all 0.3s ease;
+}
+
+.queue-entry:hover {
+    background-color: #f8f9fa;
+}
+
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+}
+
+.status-badge.waiting {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-badge.in-service {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.action-buttons .btn {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.empty-state {
+    padding: 4rem 2rem;
+}
+
+.order-details h6 a {
+    color: #007bff;
+    transition: color 0.2s ease;
+}
+
+.order-details h6 a:hover {
+    color: #0056b3;
+}
+
+#refresh-icon.fa-spin {
+    animation: fa-spin 1s infinite linear;
+}
+</style>
+
+<script>
+let autoRefreshInterval;
+
+// CSRF Token handling
+function getCSRFToken() {
+    const metaToken = document.querySelector('meta[name="csrf-token"]');
+    if (metaToken) {
+        return metaToken.getAttribute('content');
+    }
+    
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, 10) === ('csrftoken' + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(10));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initializeQueue();
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 1000);
+    
+    // Auto refresh toggle
+    const autoRefreshToggle = document.getElementById('auto-refresh');
+    if (autoRefreshToggle.checked) {
+        startAutoRefresh();
+    }
+    
+    autoRefreshToggle.addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+});
+
+function initializeQueue() {
+    console.log('Queue initialized');
+    loadQueueStatistics();
+}
+
+function updateCurrentTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour12: true, 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    document.getElementById('current-time').textContent = timeString;
+}
+
+function startAutoRefresh() {
+    autoRefreshInterval = setInterval(() => {
+        refreshQueue();
+        loadQueueStatistics();
+    }, 30000); // 30 seconds
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+}
+
+// Queue refresh function
+function refreshQueue() {
+    const refreshIcon = document.getElementById('refresh-icon');
+    refreshIcon.classList.add('fa-spin');
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/status/`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateQueueDisplay(data.queue);
+        updateLastUpdated();
+        refreshIcon.classList.remove('fa-spin');
+    })
+    .catch(error => {
+        console.error('Error refreshing queue:', error);
+        showToast('Error refreshing queue. Please try again.', 'error');
+        refreshIcon.classList.remove('fa-spin');
+    });
+}
+
+// Statistics loading
+function loadQueueStatistics() {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/queue/statistics/`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateStatistics(data);
+    })
+    .catch(error => {
+        console.error('Error loading statistics:', error);
+    });
+}
+
+function updateStatistics(stats) {
+    document.getElementById('total-processed').textContent = stats.total_processed || 0;
+    document.getElementById('avg-wait-time').textContent = `${stats.avg_wait_time || 0} min`;
+    document.getElementById('waiting-count').textContent = stats.waiting_count || 0;
+    document.getElementById('in-service-count').textContent = stats.in_service_count || 0;
+}
+
+function updateLastUpdated() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    document.getElementById('last-updated').textContent = timeString;
+}
+
+function updateQueueDisplay(queueData) {
+    const container = document.getElementById('queue-container');
+    
+    if (!queueData || queueData.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-clipboard-list fa-4x text-muted"></i>
+                </div>
+                <h5 class="text-muted mb-3">No entries in queue</h5>
+                <p class="text-muted mb-4">The service queue is currently empty. Create a new order to get started.</p>
+                <a href="/business/{{ request.tenant.slug }}/services/orders/create/" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Create New Order
+                </a>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    queueData.forEach(entry => {
+        const statusClass = entry.status === 'waiting' ? 'waiting' : 'in-service';
+        const statusIcon = entry.status === 'waiting' ? 'fas fa-clock' : 'fas fa-cog fa-spin';
+        const statusText = entry.status === 'waiting' ? 'Waiting' : 'In Service';
+        
+        html += `
+            <div class="queue-entry border-bottom" data-queue-id="${entry.queue_id}" data-order-id="${entry.order_id}">
+                <div class="row g-0 align-items-center p-4">
+                    <div class="col-md-1 text-center">
+                        <div class="queue-position ${statusClass}">
+                            ${entry.queue_number}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="order-details">
+                            <h6 class="mb-1 fw-bold">
+                                <a href="/business/{{ request.tenant.slug }}/services/orders/${entry.order_id}/" class="text-decoration-none">
+                                    ${entry.order_number}
+                                </a>
+                            </h6>
+                            <p class="mb-1 text-muted">
+                                <i class="fas fa-user me-2"></i>
+                                ${entry.customer_name}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="services-list">
+                            <small class="text-muted fw-semibold d-block mb-2">Services:</small>
+                            <span class="badge bg-secondary me-1 mb-1">Service</span>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="status-info">
+                            <span class="status-badge ${statusClass}">
+                                <i class="${statusIcon} me-1"></i>${statusText}
+                            </span>
+                            ${entry.estimated_wait_time ? `<div class="text-muted small mt-1"><i class="fas fa-hourglass-half me-1"></i>Est: ${entry.estimated_wait_time} min</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="action-buttons d-flex flex-column gap-2">
+                            ${entry.status === 'waiting' ? 
+                                `<button type="button" class="btn btn-success btn-sm" onclick="startService('${entry.order_id}')">
+                                    <i class="fas fa-play me-1"></i>Start Service
+                                </button>` :
+                                `<button type="button" class="btn btn-primary btn-sm" onclick="completeService('${entry.order_id}')">
+                                    <i class="fas fa-check me-1"></i>Complete
+                                </button>
+                                <button type="button" class="btn btn-warning btn-sm" onclick="pauseService('${entry.order_id}')">
+                                    <i class="fas fa-pause me-1"></i>Pause
+                                </button>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Service management functions
+function startService(orderId) {
+    if (!confirm('Are you sure you want to start this service?')) {
+        return;
+    }
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/start/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Service started successfully!', 'success');
+            refreshQueue();
+            loadQueueStatistics();
+        } else {
+            showToast(data.message || 'Error starting service', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error starting service:', error);
+        showToast('Error starting service. Please try again.', 'error');
+    });
+}
+
+function completeService(orderId) {
+    if (!confirm('Are you sure you want to complete this service?')) {
+        return;
+    }
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/complete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Service completed successfully!', 'success');
+            refreshQueue();
+            loadQueueStatistics();
+        } else {
+            showToast(data.message || 'Error completing service', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error completing service:', error);
+        showToast('Error completing service. Please try again.', 'error');
+    });
+}
+
+function pauseService(orderId) {
+    if (!confirm('Are you sure you want to pause this service?')) {
+        return;
+    }
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/pause/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Service paused successfully!', 'success');
+            refreshQueue();
+            loadQueueStatistics();
+        } else {
+            showToast(data.message || 'Error pausing service', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error pausing service:', error);
+        showToast('Error pausing service. Please try again.', 'error');
+    });
+}
+
+function removeFromQueue(queueId) {
+    if (!confirm('Are you sure you want to remove this entry from the queue?')) {
+        return;
+    }
+    
+    // Implementation for removing from queue
+    showToast('Remove from queue functionality to be implemented', 'info');
+}
+
+function printQueue() {
+    window.print();
+}
+
+function exportQueue() {
+    // Implementation for exporting queue
+    showToast('Export functionality to be implemented', 'info');
+}
+
+// Toast notification function
+function showToast(message, type = 'info') {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '9999';
+        document.body.appendChild(toastContainer);
+    }
+    
+    // Create toast
+    const toastId = 'toast-' + Date.now();
+    const bgClass = type === 'error' ? 'bg-danger' : type === 'success' ? 'bg-success' : 'bg-info';
+    
+    const toastHtml = `
+        <div id="${toastId}" class="toast ${bgClass} text-white" role="alert">
+            <div class="toast-body">
+                ${message}
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    
+    // Show toast
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement);
+    toast.show();
+    
+    // Remove toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', function() {
+        toastElement.remove();
+    });
+}
+</script>
+{% endblock %}

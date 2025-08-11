@@ -67,6 +67,7 @@ urlpatterns = [
     # AJAX endpoints
     path('ajax/service/<uuid:service_id>/data/', views.get_service_data, name='service_data'),
     path('ajax/queue/status/', views.queue_status_ajax, name='queue_status'),
+    path('ajax/queue/statistics/', views.queue_statistics_ajax, name='queue_statistics'),
     path('ajax/calculate-price/', views.calculate_order_price, name='calculate_price'),
     path('ajax/customer/search/', views.customer_search_ajax, name='customer_search'),
     path('ajax/vehicle/search/', views.vehicle_search_ajax, name='vehicle_search'),
