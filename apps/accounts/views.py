@@ -561,8 +561,8 @@ def password_reset_confirm_view(request, uidb64, token):
     
     if user is not None and default_token_generator.check_token(user, token):
         if request.method == 'POST':
-            password1 = request.POST.get('password1')
-            password2 = request.POST.get('password2')
+            password1 = request.POST.get('new_password1')
+            password2 = request.POST.get('new_password2')
             
             if password1 and password2:
                 if password1 == password2:
@@ -640,7 +640,7 @@ def password_change_done_view(request):
 
 def email_verification_sent(request):
     """Email verification sent confirmation"""
-    return render(request, 'auth/email_verification_sent.html')
+    return render(request, 'account/email_verification_sent.html')
 
 
 def resend_verification_email(request):
@@ -657,7 +657,7 @@ def resend_verification_email(request):
 
 def email_verification_success_view(request):
     """Email verification success page"""
-    return render(request, 'auth/email_verification_success.html')
+    return render(request, 'account/email_verification_success.html')
 
 
 @login_required
@@ -693,14 +693,24 @@ def dashboard_redirect(request):
         # Step 2: Check if subscription is selected
         has_subscription = False
         try:
-            # Check subscription in main database context
-            from django_tenants.utils import schema_context
-            with schema_context('public'):
-                has_subscription = business.subscriptions.filter(status__in=['active', 'trial']).exists()
-        except Exception:
+            # Check if business has an active subscription using the direct subscription field
+            has_subscription = (
+                business.subscription is not None and 
+                business.subscription.status in ['active', 'trial'] and
+                business.subscription.is_active
+            )
+            print(f"Subscription check result: {has_subscription}")
+            if business.subscription:
+                print(f"Subscription status: {business.subscription.status}")
+                print(f"Subscription is_active: {business.subscription.is_active}")
+        except Exception as e:
+            print(f"Error checking subscription: {e}")
             has_subscription = False
             
+        print(f"Has subscription: {has_subscription}")
+        
         if not has_subscription:
+            print("No subscription found, redirecting to subscription selection")
             messages.info(request, 'Please select a subscription plan to continue.')
             return redirect('/subscriptions/select/')
         
@@ -723,7 +733,7 @@ def dashboard_redirect(request):
             return redirect('/auth/verification-pending/')
         
         # Step 4: Check if subscription is active (trial or paid)
-        if not business.subscription.is_active:
+        if business.subscription and not business.subscription.is_active:
             # Check if trial period has started (trial starts after approval)
             from datetime import timedelta
             from django.utils import timezone

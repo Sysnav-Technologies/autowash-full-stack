@@ -1,0 +1,294 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Subscription Overview - {{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h1 class="h3 mb-0 text-gray-800">Subscription Overview</h1>
+                    <p class="mb-0 text-muted">Manage your subscription and billing</p>
+                </div>
+                {% if subscription %}
+                <div class="d-flex gap-2">
+                    <a href="/business/{{ request.tenant.slug }}/subscriptions/billing/" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-file-invoice mr-1"></i>Billing History
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/subscriptions/settings/" class="btn btn-primary btn-sm">
+                        <i class="fas fa-cog mr-1"></i>Settings
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if subscription %}
+    <!-- Current Plan -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5 class="card-title text-primary mb-1">{{ subscription.plan.name }} Plan</h5>
+                            <p class="text-muted mb-3">{{ subscription.plan.description }}</p>
+                            
+                            <div class="row">
+                                <div class="col-sm-6 mb-2">
+                                    <small class="text-muted">Status</small>
+                                    <div class="fw-bold">
+                                        <span class="badge badge-success">Active</span>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <small class="text-muted">Next Billing</small>
+                                    <div class="fw-bold">{{ subscription.end_date|date:"M d, Y" }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-right">
+                            <div class="text-center">
+                                <h3 class="text-dark mb-0">KES {{ subscription.plan.price|floatformat:2 }}</h3>
+                                <small class="text-muted">per month</small>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-outline-primary btn-block btn-sm" onclick="upgradeSubscription()">Upgrade Plan</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Days Until Renewal</h6>
+                    <h2 class="text-primary mb-2">{{ days_until_renewal }}</h2>
+                    <p class="text-muted mb-3">{{ subscription.end_date|date:"M d, Y" }}</p>
+                    {% if subscription.auto_renewal %}
+                    <span class="badge badge-success">Auto-renewal enabled</span>
+                    {% else %}
+                    <span class="badge badge-warning">Auto-renewal disabled</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage Summary -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Current Usage</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="text-center">
+                                <div class="text-muted small">Orders This Month</div>
+                                <h4 class="text-primary">{{ usage_stats.orders_this_month }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="text-center">
+                                <div class="text-muted small">Total Customers</div>
+                                <h4 class="text-success">{{ usage_stats.customers_count }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="text-center">
+                                <div class="text-muted small">Storage Used</div>
+                                <h4 class="text-info">{{ usage_stats.storage_used }} MB</h4>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="text-center">
+                                <div class="text-muted small">API Calls</div>
+                                <h4 class="text-warning">{{ usage_stats.api_calls }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center mt-3">
+                        <a href="/business/{{ request.tenant.slug }}/subscriptions/usage/" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-chart-line mr-1"></i>View Detailed Analytics
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <div class="card shadow h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-file-invoice fa-2x text-primary mb-3"></i>
+                    <h6 class="card-title">Billing History</h6>
+                    <p class="card-text text-muted small">View invoices and payment history</p>
+                    <a href="/business/{{ request.tenant.slug }}/subscriptions/billing/" class="btn btn-outline-primary btn-sm">View History</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card shadow h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-credit-card fa-2x text-success mb-3"></i>
+                    <h6 class="card-title">Payment Methods</h6>
+                    <p class="card-text text-muted small">Manage your payment methods</p>
+                    <a href="/business/{{ request.tenant.slug }}/subscriptions/payment-methods/" class="btn btn-outline-success btn-sm">Manage</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card shadow h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-cog fa-2x text-secondary mb-3"></i>
+                    <h6 class="card-title">Settings</h6>
+                    <p class="card-text text-muted small">Configure subscription preferences</p>
+                    <a href="/business/{{ request.tenant.slug }}/subscriptions/settings/" class="btn btn-outline-secondary btn-sm">Configure</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- No Subscription -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-exclamation-triangle fa-3x text-warning mb-4"></i>
+                    <h4 class="text-gray-800 mb-3">No Active Subscription</h4>
+                    <p class="text-muted mb-4">You don't have an active subscription. Choose a plan to get started.</p>
+                    <button class="btn btn-primary" onclick="showPlanSelection()">Choose a Plan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Plan Selection Modal -->
+<div class="modal fade" id="planSelectionModal" tabindex="-1" role="dialog" aria-labelledby="planSelectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="planSelectionModalLabel">
+                    <i class="fas fa-star mr-2"></i>Choose Your Plan
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    {% if available_plans %}
+                        {% for plan in available_plans %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 {% if plan.is_popular %}border-primary{% endif %}">
+                                {% if plan.is_popular %}
+                                <div class="card-header bg-primary text-white text-center">
+                                    <small>Most Popular</small>
+                                </div>
+                                {% endif %}
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">{{ plan.name }}</h5>
+                                    <h3 class="text-primary">KES {{ plan.price|floatformat:2 }}</h3>
+                                    <p class="text-muted">per {{ plan.get_plan_type_display|lower }}</p>
+                                    <hr>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success mr-2"></i>{{ plan.max_customers }} customers</li>
+                                        <li><i class="fas fa-check text-success mr-2"></i>{{ plan.max_services }} services</li>
+                                        <li><i class="fas fa-check text-success mr-2"></i>{{ plan.storage_limit }} MB storage</li>
+                                        <li><i class="fas fa-check text-success mr-2"></i>{{ plan.max_employees }} employees</li>
+                                    </ul>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn btn-primary btn-block" onclick="selectPlan('{{ plan.id }}')">
+                                        Select Plan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="col-12 text-center">
+                            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                            <h5>No Plans Available</h5>
+                            <p class="text-muted">Please contact support to set up your subscription.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showPlanSelection() {
+    $('#planSelectionModal').modal('show');
+}
+
+function selectPlan(planId) {
+    // Make AJAX request to select plan
+    $.ajax({
+        url: '{% url "subscriptions:select_subscription_plan" %}',
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val(),
+            'plan_id': planId
+        },
+        success: function(response) {
+            $('#planSelectionModal').modal('hide');
+            showAlert('Plan selected successfully! Redirecting to payment...', 'success');
+            setTimeout(() => {
+                window.location.href = '/business/{{ request.tenant.slug }}/subscriptions/payment/';
+            }, 2000);
+        },
+        error: function(xhr, status, error) {
+            showAlert('Error selecting plan. Please try again.', 'danger');
+        }
+    });
+}
+
+function upgradeSubscription() {
+    showPlanSelection();
+}
+
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    `;
+    $('.container-fluid').prepend(alertHtml);
+    
+    // Auto-hide alerts after 5 seconds
+    setTimeout(() => {
+        $('.alert').alert('close');
+    }, 5000);
+}
+
+// Add CSRF token to all AJAX requests
+$.ajaxSetup({
+    beforeSend: function(xhr, settings) {
+        if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+            xhr.setRequestHeader("X-CSRFToken", $('[name=csrfmiddlewaretoken]').val());
+        }
+    }
+});
+</script>
+{% endblock %}

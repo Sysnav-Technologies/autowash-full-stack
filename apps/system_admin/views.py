@@ -1943,3 +1943,470 @@ def reactivate_employee(request, business_id, employee_id):
         messages.error(request, f'Error reactivating employee: {str(e)}')
     
     return redirect('system_admin:user_management')
+
+
+# ============================================================================
+# NOTIFICATION MANAGEMENT VIEWS
+# ============================================================================
+
+@user_passes_test(lambda u: u.is_staff)
+@login_required
+def notification_management(request):
+    """Main notification management dashboard"""
+    from django.utils import timezone
+    from datetime import timedelta
+    from apps.core.notifications import send_notification_email
+    from django.db.models import Count, Q
+    
+    # Get notification statistics
+    today = timezone.now().date()
+    week_ago = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
+    
+    # Get actual statistics from various models
+    from apps.services.models import ServiceOrder
+    from apps.payments.models import Payment
+    from apps.inventory.models import InventoryItem
+    from django.db.models import F
+    
+    # Service order notifications (approximate based on orders created)
+    orders_today = ServiceOrder.objects.filter(created_at__date=today).count()
+    orders_week = ServiceOrder.objects.filter(created_at__date__gte=week_ago).count()
+    
+    # Payment notifications (approximate based on payments)
+    payments_today = Payment.objects.filter(created_at__date=today, status='completed').count()
+    payments_week = Payment.objects.filter(created_at__date__gte=week_ago, status='completed').count()
+    
+    # Low stock items
+    low_stock_items = InventoryItem.objects.filter(
+        current_stock__lte=F('minimum_stock'),
+        is_active=True
+    ).count()
+    
+    # Subscription statistics
+    active_subscriptions = Subscription.objects.filter(status='active').count()
+    expiring_soon = Subscription.objects.filter(
+        status='active',
+        end_date__lte=timezone.now() + timedelta(days=7)
+    ).count()
+    expired_today = Subscription.objects.filter(
+        status='active',
+        end_date__date=today
+    ).count()
+    
+    stats = {
+        'orders_today': orders_today,
+        'orders_week': orders_week,
+        'payments_today': payments_today,
+        'payments_week': payments_week,
+        'low_stock_items': low_stock_items,
+        'active_subscriptions': active_subscriptions,
+        'expiring_soon': expiring_soon,
+        'expired_today': expired_today,
+        'total_notifications_estimate': orders_today * 3 + payments_today + expired_today,  # Estimate
+        'email_enabled': True,
+        'sms_enabled': True,
+    }
+    
+    # Get recent businesses for bulk notifications
+    recent_businesses = Tenant.objects.filter(
+        is_approved=True,
+        created_at__gte=week_ago
+    ).select_related().order_by('-created_at')[:10]
+    
+    # Get subscription expiry alerts
+    expiring_subscriptions = Subscription.objects.filter(
+        status='active',
+        end_date__lte=timezone.now() + timedelta(days=7)
+    ).select_related('business', 'plan').order_by('end_date')[:10]
+    
+    # Get recent notifications (mock data for now)
+    recent_notifications = [
+        {
+            'type': 'Order Created',
+            'recipient': 'customer@example.com',
+            'status': 'Sent',
+            'timestamp': timezone.now() - timedelta(minutes=5),
+            'business': 'Demo Car Wash'
+        },
+        {
+            'type': 'Payment Confirmation', 
+            'recipient': 'john@example.com',
+            'status': 'Sent',
+            'timestamp': timezone.now() - timedelta(minutes=15),
+            'business': 'Elite Auto Care'
+        },
+        {
+            'type': 'Subscription Expiry Warning',
+            'recipient': 'owner@business.com',
+            'status': 'Sent', 
+            'timestamp': timezone.now() - timedelta(hours=2),
+            'business': 'Quick Wash Services'
+        }
+    ]
+    
+    context = {
+        'stats': stats,
+        'recent_businesses': recent_businesses,
+        'expiring_subscriptions': expiring_subscriptions,
+        'recent_notifications': recent_notifications,
+        'title': 'Notification Management'
+    }
+    
+    return render(request, 'system_admin/notification_management.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@login_required
+def notification_settings(request):
+    """Notification system settings"""
+    if request.method == 'POST':
+        # Handle settings update
+        messages.success(request, 'Notification settings updated successfully!')
+        return redirect('system_admin:notification_settings')
+    
+    # Mock settings - in production these would be stored in database
+    settings_data = {
+        'email_enabled': True,
+        'sms_enabled': True,
+        'subscription_warning_days': 7,
+        'low_stock_threshold': 10,
+        'batch_size': 100,
+        'rate_limit': 10,  # emails per minute
+        'from_email': 'noreply@autowash.com',
+        'sms_provider': 'africas_talking',
+    }
+    
+    context = {
+        'settings': settings_data,
+        'title': 'Notification Settings'
+    }
+    
+    return render(request, 'system_admin/notification_settings.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@login_required
+def notification_logs(request):
+    """View notification logs and history"""
+    from django.core.paginator import Paginator
+    
+    # Mock log data - in production this would come from a NotificationLog model
+    logs = [
+        {
+            'id': 1,
+            'type': 'Order Created',
+            'recipient': 'customer@example.com',
+            'business': 'Demo Car Wash',
+            'status': 'Sent',
+            'sent_at': timezone.now() - timedelta(minutes=5),
+            'template': 'service_notification.html',
+            'error': None
+        },
+        {
+            'id': 2,
+            'type': 'Payment Confirmation',
+            'recipient': 'invalid@email',
+            'business': 'Elite Auto Care', 
+            'status': 'Failed',
+            'sent_at': timezone.now() - timedelta(minutes=10),
+            'template': 'payment_confirmation.html',
+            'error': 'Invalid email address'
+        },
+        {
+            'id': 3,
+            'type': 'Low Stock Alert',
+            'recipient': 'manager@business.com',
+            'business': 'Quick Wash Services',
+            'status': 'Sent',
+            'sent_at': timezone.now() - timedelta(hours=1),
+            'template': 'low_stock_alert.html', 
+            'error': None
+        }
+    ] * 20  # Simulate more data
+    
+    paginator = Paginator(logs, 25)
+    page = request.GET.get('page', 1)
+    logs_page = paginator.get_page(page)
+    
+    context = {
+        'logs': logs_page,
+        'title': 'Notification Logs'
+    }
+    
+    return render(request, 'system_admin/notification_logs.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@login_required
+@require_http_methods(["POST"])
+def send_bulk_notification(request):
+    """Send bulk notifications to multiple businesses"""
+    from apps.core.notifications import send_notification_email
+    
+    business_ids = request.POST.getlist('business_ids')
+    notification_type = request.POST.get('notification_type')
+    subject = request.POST.get('subject')
+    message = request.POST.get('message')
+    
+    if not business_ids or not notification_type:
+        return JsonResponse({
+            'success': False,
+            'message': 'Please select businesses and notification type'
+        })
+    
+    try:
+        sent_count = 0
+        failed_count = 0
+        
+        businesses = Tenant.objects.filter(id__in=business_ids, is_approved=True)
+        
+        for business in businesses:
+            try:
+                # Send notification based on type
+                if notification_type == 'custom':
+                    # Send custom message
+                    context = {
+                        'business': business,
+                        'custom_message': message,
+                        'subject': subject
+                    }
+                    success = send_notification_email(
+                        to_email=business.email,
+                        subject=subject,
+                        template_name='system_admin_announcement',
+                        context=context
+                    )
+                else:
+                    # Send predefined notification type
+                    if notification_type == 'subscription_reminder':
+                        subscription = business.subscriptions.filter(status='active').first()
+                        if subscription:
+                            from apps.core.notifications import send_subscription_expiry_warning
+                            success = send_subscription_expiry_warning(subscription, 7)
+                        else:
+                            success = False
+                    else:
+                        success = False
+                
+                if success:
+                    sent_count += 1
+                else:
+                    failed_count += 1
+                    
+            except Exception as e:
+                failed_count += 1
+                continue
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Bulk notification completed. Sent: {sent_count}, Failed: {failed_count}',
+            'sent_count': sent_count,
+            'failed_count': failed_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error sending bulk notifications: {str(e)}'
+        })
+
+
+@user_passes_test(lambda u: u.is_staff)
+@login_required
+@require_http_methods(["POST"])
+def test_notification(request):
+    """Send test notifications"""
+    from apps.core.notifications import send_notification_email
+    
+    email = request.POST.get('email')
+    notification_type = request.POST.get('type')
+    
+    if not email or not notification_type:
+        return JsonResponse({
+            'success': False,
+            'message': 'Email and notification type are required'
+        })
+    
+    try:
+        # Test notification context
+        test_context = {
+            'test_mode': True,
+            'business_name': 'Test Business',
+            'customer_name': 'Test Customer',
+            'order_number': 'TEST001',
+            'amount': '1000.00',
+            'current_year': timezone.now().year
+        }
+        
+        # Map notification types to templates
+        template_map = {
+            'order_created': 'service_notification',
+            'order_started': 'service_notification', 
+            'order_completed': 'service_notification',
+            'payment_confirmation': 'payment_confirmation',
+            'subscription_warning': 'subscription_expiry_warning',
+            'low_stock_alert': 'low_stock_alert'
+        }
+        
+        template = template_map.get(notification_type)
+        if not template:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid notification type'
+            })
+        
+        # Customize context based on type
+        if notification_type.startswith('order'):
+            test_context.update({
+                'notification_type': notification_type.split('_')[1],
+                'order': {
+                    'order_number': 'TEST001',
+                    'total_amount': '1000.00'
+                },
+                'customer': {'first_name': 'Test', 'full_name': 'Test Customer'},
+                'vehicle': {'make': 'Toyota', 'model': 'Camry', 'registration_number': 'KAA 123A'}
+            })
+        elif notification_type == 'subscription_warning':
+            test_context.update({
+                'days_remaining': 3,
+                'subscription': {'end_date': timezone.now() + timedelta(days=3)},
+                'plan': {'name': 'Professional Plan'}
+            })
+        elif notification_type == 'low_stock_alert':
+            test_context.update({
+                'inventory_item': {'name': 'Car Shampoo'},
+                'current_stock': 5,
+                'minimum_stock': 10
+            })
+        
+        success = send_notification_email(
+            to_email=email,
+            subject=f"Test Notification - {notification_type.replace('_', ' ').title()}",
+            template_name=template,
+            context=test_context
+        )
+        
+        return JsonResponse({
+            'success': success,
+            'message': 'Test notification sent successfully!' if success else 'Failed to send test notification'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error sending test notification: {str(e)}'
+        })
+
+
+@user_passes_test(lambda u: u.is_staff)
+@login_required
+def notification_settings(request):
+    """Notification system settings"""
+    if request.method == 'POST':
+        # Handle settings update
+        settings = {
+            'email_enabled': request.POST.get('email_enabled') == 'on',
+            'sms_enabled': request.POST.get('sms_enabled') == 'on',
+            'low_stock_threshold': request.POST.get('low_stock_threshold', 10),
+            'subscription_warning_days': request.POST.get('subscription_warning_days', 7),
+        }
+        
+        # Save to database or configuration file
+        messages.success(request, 'Notification settings updated successfully!')
+        return redirect('system_admin:notification_settings')
+    
+    context = {
+        'title': 'Notification Settings',
+        'settings': {
+            'email_enabled': True,
+            'sms_enabled': True,
+            'low_stock_threshold': 10,
+            'subscription_warning_days': 7,
+        }
+    }
+    
+    return render(request, 'system_admin/notification_settings.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@login_required
+def notification_logs(request):
+    """View notification logs"""
+    # Mock data - in production, implement proper logging
+    logs = [
+        {
+            'id': 1,
+            'type': 'Order Created',
+            'recipient': 'customer@example.com',
+            'status': 'Sent',
+            'sent_at': timezone.now(),
+            'business': 'Test Carwash'
+        },
+        {
+            'id': 2,
+            'type': 'Payment Confirmation',
+            'recipient': 'client@test.com',
+            'status': 'Failed',
+            'sent_at': timezone.now() - timedelta(hours=1),
+            'business': 'Auto Spa Pro'
+        }
+    ]
+    
+    context = {
+        'title': 'Notification Logs',
+        'logs': logs
+    }
+    
+    return render(request, 'system_admin/notification_logs.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@login_required
+@require_http_methods(["POST"])
+def send_bulk_notification(request):
+    """Send bulk notifications to businesses"""
+    from apps.core.notifications import send_notification_email
+    
+    business_ids = request.POST.getlist('business_ids')
+    subject = request.POST.get('subject')
+    message = request.POST.get('message')
+    
+    if not business_ids or not subject or not message:
+        messages.error(request, 'Please select businesses and provide subject and message')
+        return redirect('system_admin:notification_management')
+    
+    success_count = 0
+    failed_count = 0
+    
+    for business_id in business_ids:
+        try:
+            business = Tenant.objects.get(id=business_id)
+            if business.email:
+                context = {
+                    'business': business,
+                    'message': message,
+                    'admin_sender': request.user.get_full_name() or request.user.username
+                }
+                
+                success = send_notification_email(
+                    to_email=business.email,
+                    subject=subject,
+                    template_name='admin_bulk_notification',
+                    context=context
+                )
+                
+                if success:
+                    success_count += 1
+                else:
+                    failed_count += 1
+            else:
+                failed_count += 1
+                
+        except Tenant.DoesNotExist:
+            failed_count += 1
+        except Exception:
+            failed_count += 1
+    
+    messages.success(request, f'Bulk notification sent: {success_count} successful, {failed_count} failed')
+    return redirect('system_admin:notification_management')

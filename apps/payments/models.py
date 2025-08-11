@@ -366,65 +366,30 @@ class Payment(TenantTimeStampedModel):
         if not self.customer:
             return
             
-        from apps.core.utils import send_sms_notification, send_email_notification
-        from django.template.loader import render_to_string
+        from apps.core.notifications import send_payment_confirmation_notification
         from apps.core.database_router import get_current_tenant
+        import logging
+        
+        logger = logging.getLogger(__name__)
         
         try:
             # Get current tenant information
             tenant = get_current_tenant()
-            tenant_info = None
-            if tenant:
-                tenant_info = {
-                    'name': tenant.name,
-                    'phone': getattr(tenant, 'phone', ''),
-                    'email': getattr(tenant, 'email', ''),
-                    'address': getattr(tenant, 'address', ''),
-                    'website': getattr(tenant, 'website', None),
-                    'logo': getattr(tenant, 'logo', None),
-                }
             
-            # Send SMS notification
-            if self.customer.phone and getattr(self.customer, 'receive_service_reminders', True):
-                payment_type = "Partial payment" if self.is_partial_payment else "Payment"
-                remaining = self.get_remaining_balance()
-                balance_msg = f" Balance due: KES {remaining}" if remaining > 0 else ""
+            # Send comprehensive payment confirmation notification
+            success = send_payment_confirmation_notification(
+                payment=self,
+                tenant=tenant
+            )
+            
+            if success:
+                logger.info(f"Payment confirmation sent for payment {self.payment_id}")
+            else:
+                logger.warning(f"Failed to send payment confirmation for payment {self.payment_id}")
                 
-                business_name = tenant_info['name'] if tenant_info else "Autowash"
-                message = f"{payment_type} confirmed! KES {self.amount} received for order {self.service_order.order_number if self.service_order else 'N/A'}.{balance_msg} Thank you! - {business_name}"
-                send_sms_notification(str(self.customer.phone), message)
-        except Exception:
-            pass  # Don't break if SMS fails
-        
-        try:
-            # Send HTML email notification
-            if self.customer.email and getattr(self.customer, 'receive_marketing_email', True):
-                context = {
-                    'payment': self,
-                    'customer': self.customer,
-                    'customer_name': self.customer.display_name,
-                    'tenant': tenant,
-                    'business_name': tenant.name if tenant else 'Autowash App',
-                    'business_phone': getattr(tenant, 'phone', '') if tenant else '',
-                    'business_email': getattr(tenant, 'email', '') if tenant else '',
-                    'business_address': getattr(tenant, 'address', '') if tenant else '',
-                    'receipt_url': None,  # Can be added if receipt generation is implemented
-                }
-                
-                # Render HTML email
-                html_message = render_to_string('emails/payment_confirmation.html', context)
-                
-                # Subject
-                business_name = tenant.name if tenant else "Autowash App"
-                subject = f"Payment Confirmation - {business_name}"
-                
-                # Plain text fallback
-                plain_message = f"Your payment of KES {self.amount} has been confirmed for order {self.service_order.order_number if self.service_order else 'N/A'}. Thank you for choosing {business_name}!"
-                
-                send_email_notification(subject, plain_message, [self.customer.email], html_message=html_message)
         except Exception as e:
-            print(f"Failed to send payment confirmation email: {e}")
-            pass  # Don't break if email fails
+            logger.error(f"Error sending payment confirmation for payment {self.payment_id}: {str(e)}")
+            pass  # Don't break if notification fails
     
     class Meta:
         verbose_name = "Payment"

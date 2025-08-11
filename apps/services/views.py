@@ -353,20 +353,12 @@ def order_create_view(request):
                     if hasattr(request, 'tenant') and request.tenant:
                         set_current_tenant(request.tenant)
                     
-                    # Send HTML email notification if customer has email
-                    if order.customer.email:
-                        send_service_notification_email(
-                            order=order,
-                            notification_type='created',  # Order created notification
-                            attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None
-                        )
-                    
-                    # Send SMS notification if enabled
-                    if order.customer.phone and order.customer.receive_service_reminders:
-                        send_sms_notification(
-                            phone_number=str(order.customer.phone),
-                            message=f"Your service order {order.order_number} has been created. Total: KES {order.total_amount}"
-                        )
+                    # Send order created notification
+                    from apps.core.notifications import send_order_created_notification
+                    send_order_created_notification(
+                        order=order,
+                        tenant=request.tenant if hasattr(request, 'tenant') else None
+                    )
                     
                     messages.success(request, f'Order {order.order_number} created successfully!')
                     return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
@@ -590,6 +582,18 @@ def quick_order_view(request):
                 # Add to queue
                 add_order_to_queue(order)
                 
+                # Send order created notification
+                from apps.core.database_router import set_current_tenant
+                from apps.core.notifications import send_order_created_notification
+                
+                if hasattr(request, 'tenant') and request.tenant:
+                    set_current_tenant(request.tenant)
+                
+                send_order_created_notification(
+                    order=order,
+                    tenant=request.tenant if hasattr(request, 'tenant') else None
+                )
+                
                 logger.info(f"Order {order.order_number} created successfully")
                 
                 # Return appropriate response
@@ -790,28 +794,16 @@ def start_service(request, order_id):
     # Send service start notification
     # Ensure tenant context is set from request
     from apps.core.database_router import set_current_tenant
+    from apps.core.notifications import send_order_started_notification
+    
     if hasattr(request, 'tenant') and request.tenant:
         set_current_tenant(request.tenant)
     
-    # Send HTML email notification
-    if order.customer.email:
-        send_service_notification_email(
-            order=order,
-            notification_type='started',
-            attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None
-        )
-    
-    # Send SMS notification if enabled
-    if (hasattr(order.customer, 'phone') and order.customer.phone and 
-        hasattr(order.customer, 'receive_service_reminders') and 
-        order.customer.receive_service_reminders):
-        try:
-            send_sms_notification(
-                phone_number=str(order.customer.phone),
-                message=f"Your service has started! Order {order.order_number}. We'll notify you when complete."
-            )
-        except Exception as e:
-            logger.error(f"Failed to send start SMS for order {order.order_number}: {str(e)}")
+    send_order_started_notification(
+        order=order,
+        attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None,
+        tenant=request.tenant if hasattr(request, 'tenant') else None
+    )
     
     messages.success(request, f'Service started for order {order.order_number}')
     return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
@@ -853,30 +845,19 @@ def complete_service(request, order_id):
         bay.complete_service()
     
     # Send completion notification
+    # Send service completion notification
     # Ensure tenant context is set from request
     from apps.core.database_router import set_current_tenant
+    from apps.core.notifications import send_order_completed_notification
+    
     if hasattr(request, 'tenant') and request.tenant:
         set_current_tenant(request.tenant)
     
-    # Send HTML email notification
-    if order.customer.email:
-        send_service_notification_email(
-            order=order,
-            notification_type='completed',
-            attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None
-        )
-    
-    # Send SMS notification if enabled
-    if (hasattr(order.customer, 'phone') and order.customer.phone and 
-        hasattr(order.customer, 'receive_service_reminders') and 
-        order.customer.receive_service_reminders):
-        try:
-            send_sms_notification(
-                phone_number=str(order.customer.phone),
-                message=f"Your service is complete! Order {order.order_number}. Total: KES {order.total_amount}. Thank you for choosing us!"
-            )
-        except Exception as e:
-            logger.error(f"Failed to send completion SMS for order {order.order_number}: {str(e)}")
+    send_order_completed_notification(
+        order=order,
+        attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None,
+        tenant=request.tenant if hasattr(request, 'tenant') else None
+    )
     
     messages.success(request, f'Service completed for order {order.order_number}')
     return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
@@ -2107,7 +2088,8 @@ def bay_create_view(request):
                 has_drainage=request.POST.get('has_drainage') == 'on'
             )
             messages.success(request, f'Service bay "{bay.name}" created successfully!')
-            return redirect('services:bay_list')
+           
+            return redirect(get_business_url(request, 'services:bay_list'))
         except Exception as e:
             messages.error(request, f'Error creating service bay: {str(e)}')
     
@@ -2134,7 +2116,8 @@ def bay_edit_view(request, pk):
         bay.save()
         
         messages.success(request, f'Service bay "{bay.name}" updated successfully!')
-        return redirect('services:bay_list')
+        return redirect(get_business_url(request, 'services:bay_list'))
+
     
     context = {
         'bay': bay,

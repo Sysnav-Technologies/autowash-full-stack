@@ -11,8 +11,10 @@ class SubscriptionPlan(TimeStampedModel):
     
     PLAN_TYPES = [
         ('monthly', 'Monthly Plan'),
+        ('quarterly', 'Quarterly Plan'),
         ('semi_annual', 'Semi-Annual Plan'),
         ('annual', 'Annual Plan'),
+        ('one_time', 'One Off Plan'),
     ]
     
     name = models.CharField(max_length=100)

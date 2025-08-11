@@ -1,0 +1,485 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Usage Analytics - {{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h1 class="h3 mb-0 text-gray-800">Usage Analytics</h1>
+                    <p class="mb-0 text-muted">Monitor your subscription usage and limits</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/business/{{ request.tenant.slug }}/subscriptions/overview/" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left mr-1"></i>Back to Overview
+                    </a>
+                    <button class="btn btn-outline-primary btn-sm" onclick="exportUsageData()">
+                        <i class="fas fa-download mr-1"></i>Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage Metrics -->
+    <div class="row mb-4">
+        {% if usage_summary %}
+        <!-- Orders Usage -->
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Services</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ usage_summary.orders.used }} / {{ usage_summary.orders.limit }}
+                            </div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-primary" role="progressbar" 
+                                     style="width: {{ usage_summary.orders.percentage }}%" 
+                                     aria-valuenow="{{ usage_summary.orders.percentage }}" 
+                                     aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">{{ usage_summary.orders.percentage|floatformat:1 }}% used</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-car-wash fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customers Usage -->
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Customers</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ usage_summary.customers.used }} / {{ usage_summary.customers.limit }}
+                            </div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {{ usage_summary.customers.percentage }}%" 
+                                     aria-valuenow="{{ usage_summary.customers.percentage }}" 
+                                     aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">{{ usage_summary.customers.percentage|floatformat:1 }}% used</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage Usage -->
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Storage</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ usage_summary.storage.used }} / {{ usage_summary.storage.limit }} MB
+                            </div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-info" role="progressbar" 
+                                     style="width: {{ usage_summary.storage.percentage }}%" 
+                                     aria-valuenow="{{ usage_summary.storage.percentage }}" 
+                                     aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">{{ usage_summary.storage.percentage|floatformat:1 }}% used</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-database fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Employees Usage -->
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Employees</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ usage_summary.api_calls.used|default:"0" }} / {{ usage_summary.api_calls.limit }}
+                            </div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-warning" role="progressbar" 
+                                     style="width: {{ usage_summary.api_calls.percentage }}%" 
+                                     aria-valuenow="{{ usage_summary.api_calls.percentage }}" 
+                                     aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">{{ usage_summary.api_calls.percentage|floatformat:1 }}% used</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-user-tie fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Current Plan Info -->
+    {% if subscription %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">{{ subscription.plan.name }} Plan Limits</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="text-muted small">Services Available</div>
+                            <h5 class="text-primary mb-0">{{ subscription.plan.max_services|default:"Unlimited" }}</h5>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="text-muted small">Total Customers</div>
+                            <h5 class="text-success mb-0">{{ subscription.plan.max_customers|default:"Unlimited" }}</h5>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="text-muted small">Storage Limit</div>
+                            <h5 class="text-info mb-0">{{ subscription.plan.storage_limit|default:"Unlimited" }} MB</h5>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="text-muted small">Employees</div>
+                            <h5 class="text-warning mb-0">{{ subscription.plan.max_employees|default:"Unlimited" }}</h5>
+                        </div>
+                    </div>
+                    <div class="text-center mt-3">
+                        <a href="/business/{{ request.tenant.slug }}/subscriptions/overview/" class="btn btn-primary btn-sm">
+                            <i class="fas fa-arrow-up mr-1"></i>Upgrade Plan
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Usage History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 font-weight-bold text-primary">Recent Usage History</h6>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-success btn-sm" onclick="exportUsageData()">
+                                <i class="fas fa-download mr-1"></i>Export CSV
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="refreshUsageData()">
+                                <i class="fas fa-sync mr-1"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if usage_metrics %}
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped" id="usageTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Services</th>
+                                    <th>Customers</th>
+                                    <th>Storage (MB)</th>
+                                    <th>Employees</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for metric in usage_metrics %}
+                                <tr>
+                                    <td>{{ metric.created_at|date:"M d, Y" }}</td>
+                                    <td>{{ metric.orders_count|default:"-" }}</td>
+                                    <td>{{ metric.customers_count|default:"-" }}</td>
+                                    <td>{{ metric.storage_mb|default:"-" }}</td>
+                                    <td>{{ metric.api_calls|default:"-" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-chart-line fa-3x text-gray-300 mb-3"></i>
+                        <h5 class="text-gray-600 mb-3">No Usage Data Available</h5>
+                        <p class="text-gray-500 mb-4">Usage metrics will appear here as your business grows.</p>
+                        <a href="/business/{{ request.tenant.slug }}/subscriptions/overview/" class="btn btn-primary">
+                            <i class="fas fa-eye mr-1"></i>View Subscription
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage Alerts -->
+    {% if usage_summary %}
+    <div class="row mt-4">
+        {% for key, values in usage_summary.items %}
+            {% if values.percentage > 80 %}
+            <div class="col-12">
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <strong>{{ key|title }}</strong> usage is at {{ values.percentage|floatformat:0 }}%. 
+                    Consider upgrading your plan to avoid service interruption.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.24/js/dataTables.bootstrap4.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Initialize DataTable if usage metrics exist
+    if ($('#usageTable').length) {
+        $('#usageTable').DataTable({
+            order: [[0, 'desc']],
+            pageLength: 10,
+            responsive: true,
+            language: {
+                search: "Search usage data:",
+                lengthMenu: "Show _MENU_ entries per page",
+                info: "Showing _START_ to _END_ of _TOTAL_ entries"
+            }
+        });
+    }
+    
+    // Initialize tooltips for progress bars
+    $('[data-toggle="tooltip"]').tooltip();
+    
+    // Auto-refresh usage data every 5 minutes
+    setInterval(function() {
+        refreshUsageData(true); // Silent refresh
+    }, 300000);
+});
+
+function exportUsageData() {
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...';
+    button.disabled = true;
+    
+    // Create CSV data
+    const data = [
+        ['Date', 'Services', 'Customers', 'Storage (MB)', 'Employees']
+    ];
+    
+    // Add table data if it exists
+    if ($('#usageTable tbody tr').length) {
+        $('#usageTable tbody tr').each(function() {
+            const row = [];
+            $(this).find('td').each(function() {
+                row.push($(this).text().trim());
+            });
+            data.push(row);
+        });
+    }
+    
+    // Create CSV content
+    const csvContent = data.map(row => row.join(',')).join('\n');
+    
+    // Download file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'usage_analytics_' + new Date().toISOString().split('T')[0] + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    // Reset button
+    button.innerHTML = originalText;
+    button.disabled = false;
+    
+    // Show success message
+    showNotification('Usage data exported successfully!', 'success');
+}
+
+function refreshUsageData(silent = false) {
+    const button = event ? event.target.closest('button') : null;
+    let originalText = '';
+    
+    if (button && !silent) {
+        originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Refreshing...';
+        button.disabled = true;
+    }
+    
+    $.ajax({
+        url: '{% url "subscriptions:refresh_usage_data" %}',
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                if (!silent) {
+                    showNotification('Usage data refreshed successfully', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    // Update progress bars silently
+                    updateProgressBars(response.usage_summary);
+                }
+            } else {
+                if (!silent) {
+                    showNotification('Error refreshing data: ' + response.error, 'error');
+                }
+            }
+        },
+        error: function() {
+            if (!silent) {
+                showNotification('Failed to refresh usage data', 'error');
+            }
+        },
+        complete: function() {
+            if (button && !silent) {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+    });
+}
+
+function updateProgressBars(usageSummary) {
+    // Update each progress bar with new data
+    Object.keys(usageSummary).forEach(function(key) {
+        const progressBar = $(`.progress-bar[data-usage="${key}"]`);
+        if (progressBar.length) {
+            const percentage = usageSummary[key].percentage;
+            progressBar.css('width', percentage + '%');
+            progressBar.attr('aria-valuenow', percentage);
+            progressBar.siblings('.text-xs').text(percentage.toFixed(1) + '% used');
+            
+            // Update color based on usage
+            progressBar.removeClass('bg-success bg-info bg-warning bg-danger');
+            if (percentage < 50) {
+                progressBar.addClass('bg-success');
+            } else if (percentage < 75) {
+                progressBar.addClass('bg-info');
+            } else if (percentage < 90) {
+                progressBar.addClass('bg-warning');
+            } else {
+                progressBar.addClass('bg-danger');
+            }
+        }
+    });
+}
+
+function generateUsageReport() {
+    // Open modal for report generation options
+    const modal = `
+        <div class="modal fade" id="reportModal" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Generate Usage Report</h5>
+                        <button type="button" class="close" data-dismiss="modal">
+                            <span>&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="reportForm">
+                            <div class="form-group">
+                                <label>Report Type</label>
+                                <select class="form-control" name="report_type">
+                                    <option value="summary">Usage Summary</option>
+                                    <option value="detailed">Detailed Analytics</option>
+                                    <option value="trends">Usage Trends</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Date Range</label>
+                                <select class="form-control" name="date_range">
+                                    <option value="last_7_days">Last 7 Days</option>
+                                    <option value="last_30_days">Last 30 Days</option>
+                                    <option value="last_90_days">Last 90 Days</option>
+                                    <option value="current_year">Current Year</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="downloadReport()">Generate Report</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $('body').append(modal);
+    $('#reportModal').modal('show');
+    
+    // Remove modal after hiding
+    $('#reportModal').on('hidden.bs.modal', function() {
+        $(this).remove();
+    });
+}
+
+function downloadReport() {
+    const formData = new FormData(document.getElementById('reportForm'));
+    formData.append('csrfmiddlewaretoken', $('[name=csrfmiddlewaretoken]').val());
+    
+    const url = '{% url "subscriptions:generate_usage_report" %}';
+    const params = new URLSearchParams(formData).toString();
+    
+    // Open download link
+    window.open(url + '?' + params, '_blank');
+    
+    $('#reportModal').modal('hide');
+}
+
+function showNotification(message, type) {
+    const alertClass = type === 'error' ? 'alert-danger' : 'alert-success';
+    const notification = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    `;
+    
+    // Find or create notifications container
+    let notificationsContainer = $('#notifications');
+    if (notificationsContainer.length === 0) {
+        $('body').prepend('<div id="notifications" class="position-fixed" style="top: 20px; right: 20px; z-index: 9999; width: 300px;"></div>');
+        notificationsContainer = $('#notifications');
+    }
+    
+    notificationsContainer.html(notification);
+    setTimeout(() => {
+        $('.alert').fadeOut();
+    }, 5000);
+}
+</script>
+{% endblock %}
