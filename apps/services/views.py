@@ -864,7 +864,7 @@ def complete_service(request, order_id):
 
 @login_required
 # Owner or manager required for queue management
-@employee_required(['owner', 'manager'])
+@employee_required(['owner', 'manager', 'attendant'])
 def queue_view(request):
     """Service queue management"""
     # Get current queue
@@ -1284,7 +1284,7 @@ def attendant_dashboard(request):
     my_service_items = ServiceOrderItem.objects.filter(
         assigned_to=request.employee,
         completed_at__isnull=True
-    ).select_related('order', 'service')
+    ).select_related('order', 'service', 'order__customer', 'order__vehicle')
     
     # Statistics
     stats = {
@@ -2372,7 +2372,7 @@ def attendant_dashboard(request):
     my_service_items = ServiceOrderItem.objects.filter(
         assigned_to=request.employee,
         completed_at__isnull=True
-    ).select_related('order', 'service')
+    ).select_related('order', 'service', 'order__customer', 'order__vehicle')
     
     # Statistics
     stats = {

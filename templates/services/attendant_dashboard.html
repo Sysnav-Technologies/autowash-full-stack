@@ -113,13 +113,13 @@
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 fw-semibold">Revenue Today</p>
-                        <h3 class="fw-bold text-info mb-0">${{ stats.total_revenue_today|floatformat:0 }}</h3>
+                        <h3 class="fw-bold text-info mb-0">KES {{ stats.total_revenue_today|floatformat:0 }}</h3>
                         <small class="text-info">
-                            <i class="fas fa-dollar-sign me-1"></i>Total earnings
+                            <i class="fas fa-coins me-1"></i>Total earnings
                         </small>
                     </div>
                     <div class="bg-info bg-opacity-10 rounded-circle p-3">
-                        <i class="fas fa-dollar-sign text-info" style="font-size: 1.5rem;"></i>
+                        <i class="fas fa-coins text-info" style="font-size: 1.5rem;"></i>
                     </div>
                 </div>
             </div>
@@ -249,23 +249,66 @@
             <div class="card-body">
                 {% if my_service_items %}
                     {% for item in my_service_items|slice:":5" %}
-                    <div class="d-flex align-items-center justify-content-between py-2 {% if not forloop.last %}border-bottom{% endif %}">
-                        <div>
-                            <div class="fw-semibold">{{ item.service.name }}</div>
-                            <small class="text-muted">Order: {{ item.order.order_number }}</small>
+                    <div class="d-flex align-items-center justify-content-between py-3 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold text-primary">{{ item.service.name }}</div>
+                            <small class="text-muted d-block">Order: {{ item.order.order_number }}</small>
+                            <small class="text-muted d-block">
+                                <i class="fas fa-user me-1"></i>{{ item.order.customer.full_name }}
+                                {% if item.order.vehicle %}
+                                | <i class="fas fa-car me-1"></i>{{ item.order.vehicle.make }} {{ item.order.vehicle.model }}
+                                {% endif %}
+                            </small>
+                            {% if item.started_at %}
+                                <small class="text-success">
+                                    <i class="fas fa-play me-1"></i>Started: {{ item.started_at|date:"H:i" }}
+                                </small>
+                            {% else %}
+                                <small class="text-warning">
+                                    <i class="fas fa-clock me-1"></i>Not started yet
+                                </small>
+                            {% endif %}
                         </div>
-                        <span class="badge bg-light text-dark">${{ item.unit_price }}</span>
+                        <div class="text-end">
+                            <span class="badge bg-primary mb-2">KES {{ item.unit_price|floatformat:0 }}</span>
+                            <div>
+                                {% if item.started_at and not item.completed_at %}
+                                    <form method="post" action="/business/{{ request.tenant.slug }}{% url 'services:complete_service' item.order.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-success">
+                                            <i class="fas fa-check me-1"></i>Complete
+                                        </button>
+                                    </form>
+                                {% elif not item.started_at %}
+                                    <form method="post" action="/business/{{ request.tenant.slug }}{% url 'services:start_service' item.order.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-warning">
+                                            <i class="fas fa-play me-1"></i>Start
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Completed
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                     {% endfor %}
                     {% if my_service_items.count > 5 %}
                     <div class="text-center mt-3">
                         <small class="text-muted">and {{ my_service_items.count|add:"-5" }} more...</small>
+                        <br>
+                        <a href="/business/{{ request.tenant.slug }}{% url 'services:my_services' %}" class="btn btn-sm btn-outline-primary mt-2">
+                            <i class="fas fa-list me-1"></i>View All My Items
+                        </a>
                     </div>
                     {% endif %}
                 {% else %}
-                    <div class="text-center py-3">
-                        <i class="fas fa-tasks fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">No pending service items</p>
+                    <div class="text-center py-4">
+                        <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                        <h6 class="text-muted">No pending service items</h6>
+                        <p class="text-muted small mb-0">You don't have any service items assigned to you at the moment.</p>
                     </div>
                 {% endif %}
             </div>
