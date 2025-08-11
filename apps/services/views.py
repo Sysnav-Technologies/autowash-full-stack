@@ -806,6 +806,16 @@ def start_service(request, order_id):
     )
     
     messages.success(request, f'Service started for order {order.order_number}')
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'message': f'Service started for order {order.order_number}',
+            'order_id': str(order.id),
+            'status': order.status
+        })
+    
     return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 @login_required
 @employee_required()
@@ -860,6 +870,16 @@ def complete_service(request, order_id):
     )
     
     messages.success(request, f'Service completed for order {order.order_number}')
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'message': f'Service completed for order {order.order_number}',
+            'order_id': str(order.id),
+            'status': order.status
+        })
+    
     return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 @login_required
@@ -966,15 +986,79 @@ def queue_status_ajax(request):
     data = {
         'queue': [
             {
+                'queue_id': entry.id,
                 'queue_number': entry.queue_number,
+                'order_id': entry.order.id,
                 'order_number': entry.order.order_number,
-                'customer_name': entry.order.customer.display_name,
+                'customer_name': entry.order.customer.full_name,
                 'status': entry.status,
                 'estimated_wait_time': entry.estimated_wait_time,
                 'service_bay': entry.service_bay.name if entry.service_bay else None
             }
             for entry in queue_entries
         ],
+        'timestamp': timezone.now().isoformat()
+    }
+    
+    return JsonResponse(data)
+
+
+@login_required
+@employee_required()
+@ajax_required
+def queue_statistics_ajax(request):
+    """Get queue statistics for AJAX updates"""
+    today = timezone.now().date()
+    
+    # Calculate statistics
+    total_processed = ServiceOrder.objects.filter(
+        status='completed',
+        actual_end_time__date=today
+    ).count()
+    
+    # Average wait time calculation
+    completed_orders = ServiceOrder.objects.filter(
+        status='completed',
+        actual_start_time__isnull=False,
+        actual_end_time__date=today
+    )
+    
+    total_wait_time = 0
+    wait_count = 0
+    for order in completed_orders:
+        if order.created_at and order.actual_start_time:
+            wait_time = (order.actual_start_time - order.created_at).total_seconds() / 60
+            total_wait_time += wait_time
+            wait_count += 1
+    
+    avg_wait_time = round(total_wait_time / wait_count if wait_count > 0 else 0, 1)
+    
+    # Efficiency calculation (services completed vs planned)
+    planned_services = ServiceOrder.objects.filter(
+        created_at__date=today
+    ).count()
+    efficiency = round((total_processed / planned_services * 100) if planned_services > 0 else 0, 1)
+    
+    # Customer satisfaction (average rating)
+    ratings = ServiceOrder.objects.filter(
+        actual_end_time__date=today,
+        customer_rating__isnull=False
+    ).values_list('customer_rating', flat=True)
+    
+    avg_rating = round(sum(ratings) / len(ratings) if ratings else 0, 1)
+    satisfaction = f"{avg_rating}/5" if avg_rating > 0 else "N/A"
+    
+    # Current queue counts
+    waiting_count = ServiceQueue.objects.filter(status='waiting').count()
+    in_service_count = ServiceQueue.objects.filter(status='in_service').count()
+    
+    data = {
+        'total_processed': total_processed,
+        'avg_wait_time': avg_wait_time,
+        'efficiency': efficiency,
+        'satisfaction': satisfaction,
+        'waiting_count': waiting_count,
+        'in_service_count': in_service_count,
         'timestamp': timezone.now().isoformat()
     }
     
@@ -1122,11 +1206,23 @@ def pause_service(request, order_id):
     # Record pause time in internal notes
     order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
     order.save()
-    
-    messages.success(request, 'Service paused.')
-    return redirect('services:order_detail', pk=order.pk)
 
-@login_required
+    messages.success(request, 'Service paused.')
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'message': 'Service paused.',
+            'order_id': str(order.id),
+            'status': order.status
+        })
+
+    # Use tenant-aware redirect if available
+    from apps.core.utils import get_business_url
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+    
+    return redirect('services:order_detail', pk=order.pk)@login_required
 @employee_required()
 @require_POST
 def resume_service(request, order_id):
@@ -1284,7 +1380,7 @@ def attendant_dashboard(request):
     my_service_items = ServiceOrderItem.objects.filter(
         assigned_to=request.employee,
         completed_at__isnull=True
-    ).select_related('order', 'service', 'order__customer', 'order__vehicle')
+    ).select_related('order', 'service', 'order__customer', 'order__vehicle').order_by('started_at', 'order__created_at')
     
     # Statistics
     stats = {
@@ -2372,7 +2468,7 @@ def attendant_dashboard(request):
     my_service_items = ServiceOrderItem.objects.filter(
         assigned_to=request.employee,
         completed_at__isnull=True
-    ).select_related('order', 'service', 'order__customer', 'order__vehicle')
+    ).select_related('order', 'service', 'order__customer', 'order__vehicle').order_by('started_at', 'order__created_at')
     
     # Statistics
     stats = {
