@@ -1284,7 +1284,7 @@ def attendant_dashboard(request):
     my_service_items = ServiceOrderItem.objects.filter(
         assigned_to=request.employee,
         completed_at__isnull=True
-    ).select_related('order', 'service')
+    ).select_related('order', 'service', 'order__customer', 'order__vehicle')
     
     # Statistics
     stats = {
@@ -2372,7 +2372,7 @@ def attendant_dashboard(request):
     my_service_items = ServiceOrderItem.objects.filter(
         assigned_to=request.employee,
         completed_at__isnull=True
-    ).select_related('order', 'service')
+    ).select_related('order', 'service', 'order__customer', 'order__vehicle')
     
     # Statistics
     stats = {
