@@ -864,7 +864,7 @@ def complete_service(request, order_id):
 
 @login_required
 # Owner or manager required for queue management
-@employee_required(['owner', 'manager'])
+@employee_required(['owner', 'manager', 'attendant'])
 def queue_view(request):
     """Service queue management"""
     # Get current queue
