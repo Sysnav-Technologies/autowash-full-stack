@@ -1,0 +1,427 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payment Methods - {{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h1 class="h3 mb-0 text-gray-800">Payment Methods</h1>
+                    <p class="mb-0 text-muted">Manage your payment methods for subscription billing</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/business/{{ request.tenant.slug }}/subscriptions/overview/" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left mr-1"></i>Back to Overview
+                    </a>
+                    <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addPaymentMethodModal">
+                        <i class="fas fa-plus mr-1"></i>Add Payment Method
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Methods -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Your Payment Methods</h6>
+                </div>
+                <div class="card-body">
+                    {% if payment_methods %}
+                    <div class="row">
+                        {% for method in payment_methods %}
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="card border-left-primary h-100 {% if method.is_default %}border-success{% endif %}">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <h6 class="text-primary">{{ method.card_type|title }}</h6>
+                                            <p class="mb-1">**** **** **** {{ method.last_four }}</p>
+                                            <small class="text-muted">Expires {{ method.expiry_month }}/{{ method.expiry_year }}</small>
+                                        </div>
+                                        {% if method.is_default %}
+                                        <span class="badge badge-success">Default</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="d-flex gap-2">
+                                        {% if not method.is_default %}
+                                        <button class="btn btn-outline-primary btn-sm" onclick="setDefaultPaymentMethod('{{ method.id }}')">
+                                            Set Default
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-outline-danger btn-sm" onclick="removePaymentMethod('{{ method.id }}')">
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-credit-card fa-3x text-gray-300 mb-3"></i>
+                        <h5 class="text-gray-600 mb-3">No Payment Methods Added</h5>
+                        <p class="text-gray-500 mb-4">Add a payment method to manage your subscription billing automatically.</p>
+                        <button class="btn btn-primary" data-toggle="modal" data-target="#addPaymentMethodModal">
+                            <i class="fas fa-plus mr-1"></i>Add Your First Payment Method
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Information -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow border-left-success">
+                <div class="card-body">
+                    <h6 class="text-success mb-3">
+                        <i class="fas fa-shield-alt mr-2"></i>Security & Compliance
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-4 text-center mb-3">
+                            <i class="fas fa-lock fa-2x text-success mb-2"></i>
+                            <h6>256-bit SSL Encryption</h6>
+                            <p class="text-muted small">All payment data is encrypted</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <i class="fas fa-certificate fa-2x text-success mb-2"></i>
+                            <h6>PCI DSS Compliant</h6>
+                            <p class="text-muted small">Meets industry security standards</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <i class="fas fa-user-shield fa-2x text-success mb-2"></i>
+                            <h6>No Local Storage</h6>
+                            <p class="text-muted small">Card details are not stored on our servers</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Payment Method Modal -->
+<div class="modal fade" id="addPaymentMethodModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Payment Method</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addPaymentMethodForm">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="cardNumber">Card Number *</label>
+                            <input type="text" class="form-control" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="expiryDate">Expiry Date *</label>
+                            <input type="text" class="form-control" id="expiryDate" placeholder="MM/YY" maxlength="5" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="cvv">CVV *</label>
+                            <input type="text" class="form-control" id="cvv" placeholder="123" maxlength="4" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="cardholderName">Cardholder Name *</label>
+                            <input type="text" class="form-control" id="cardholderName" placeholder="John Doe" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="setDefault">
+                                <label class="form-check-label" for="setDefault">
+                                    Set as default payment method
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addPaymentMethod()">
+                    <i class="fas fa-plus mr-1"></i>Add Payment Method
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Format card number input
+    $('#cardNumber').on('input', function() {
+        let value = this.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+        let matches = value.match(/\d{4,16}/g);
+        let match = matches && matches[0] || '';
+        let parts = [];
+        for (let i = 0, len = match.length; i < len; i += 4) {
+            parts.push(match.substring(i, i + 4));
+        }
+        if (parts.length) {
+            this.value = parts.join(' ');
+        } else {
+            this.value = value;
+        }
+        
+        // Detect card type
+        detectCardType(value);
+    });
+
+    // Format expiry date input
+    $('#expiryDate').on('input', function() {
+        let value = this.value.replace(/\D/g, '');
+        if (value.length >= 2) {
+            value = value.substring(0, 2) + '/' + value.substring(2, 4);
+        }
+        this.value = value;
+        
+        // Validate expiry date
+        validateExpiryDate(value);
+    });
+
+    // CVV input validation
+    $('#cvv').on('input', function() {
+        this.value = this.value.replace(/\D/g, '');
+    });
+    
+    // Cardholder name validation
+    $('#cardholderName').on('input', function() {
+        this.value = this.value.replace(/[^a-zA-Z\s]/g, '');
+    });
+});
+
+function detectCardType(cardNumber) {
+    const cardTypes = {
+        visa: /^4/,
+        mastercard: /^5[1-5]/,
+        amex: /^3[47]/,
+        discover: /^6(?:011|5)/
+    };
+    
+    let cardType = 'unknown';
+    for (let type in cardTypes) {
+        if (cardTypes[type].test(cardNumber)) {
+            cardType = type;
+            break;
+        }
+    }
+    
+    // Update UI to show card type
+    const cardTypeIcon = $('#cardTypeIcon');
+    if (cardTypeIcon.length === 0) {
+        $('#cardNumber').after('<small id="cardTypeIcon" class="form-text text-muted"></small>');
+    }
+    
+    const iconMap = {
+        visa: 'fab fa-cc-visa text-primary',
+        mastercard: 'fab fa-cc-mastercard text-warning',
+        amex: 'fab fa-cc-amex text-success',
+        discover: 'fab fa-cc-discover text-info',
+        unknown: ''
+    };
+    
+    if (cardType !== 'unknown') {
+        $('#cardTypeIcon').html(`<i class="${iconMap[cardType]}"></i> ${cardType.toUpperCase()} detected`);
+    } else {
+        $('#cardTypeIcon').html('');
+    }
+}
+
+function validateExpiryDate(value) {
+    if (value.length === 5) {
+        const [month, year] = value.split('/');
+        const monthNum = parseInt(month);
+        const yearNum = parseInt('20' + year);
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1;
+        
+        let isValid = true;
+        let message = '';
+        
+        if (monthNum < 1 || monthNum > 12) {
+            isValid = false;
+            message = 'Invalid month';
+        } else if (yearNum < currentYear || (yearNum === currentYear && monthNum < currentMonth)) {
+            isValid = false;
+            message = 'Card has expired';
+        }
+        
+        const feedback = $('#expiryFeedback');
+        if (feedback.length === 0) {
+            $('#expiryDate').after('<small id="expiryFeedback" class="form-text"></small>');
+        }
+        
+        if (!isValid) {
+            $('#expiryFeedback').html(message).removeClass('text-success').addClass('text-danger');
+            $('#expiryDate').removeClass('is-valid').addClass('is-invalid');
+        } else {
+            $('#expiryFeedback').html('Valid expiry date').removeClass('text-danger').addClass('text-success');
+            $('#expiryDate').removeClass('is-invalid').addClass('is-valid');
+        }
+    }
+}
+
+function addPaymentMethod() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    const cardNumber = $('#cardNumber').val().replace(/\s/g, '');
+    const expiryDate = $('#expiryDate').val();
+    const cvv = $('#cvv').val();
+    const cardholderName = $('#cardholderName').val();
+    const setDefault = $('#setDefault').is(':checked');
+
+    // Validation
+    if (!cardNumber || cardNumber.length < 13) {
+        showNotification('Please enter a valid card number', 'error');
+        return;
+    }
+    
+    if (!expiryDate || expiryDate.length !== 5) {
+        showNotification('Please enter a valid expiry date (MM/YY)', 'error');
+        return;
+    }
+    
+    if (!cvv || cvv.length < 3) {
+        showNotification('Please enter a valid CVV', 'error');
+        return;
+    }
+    
+    if (!cardholderName.trim()) {
+        showNotification('Please enter the cardholder name', 'error');
+        return;
+    }
+
+    // Show loading state
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Adding...';
+    button.disabled = true;
+
+    // Simulate API call
+    $.ajax({
+        url: '{% url "subscriptions:add_payment_method" %}',
+        method: 'POST',
+        data: {
+            'card_number': cardNumber,
+            'expiry_date': expiryDate,
+            'cvv': cvv,
+            'cardholder_name': cardholderName,
+            'set_default': setDefault,
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                showNotification('Payment method added successfully', 'success');
+                $('#addPaymentMethodModal').modal('hide');
+                $('#addPaymentMethodForm')[0].reset();
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showNotification('Error: ' + response.error, 'error');
+            }
+        },
+        error: function() {
+            showNotification('Failed to add payment method. Please try again.', 'error');
+        },
+        complete: function() {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    });
+}
+
+function setDefaultPaymentMethod(methodId) {
+    if (confirm('Set this as your default payment method?')) {
+        $.ajax({
+            url: '{% url "subscriptions:set_default_payment_method" %}',
+            method: 'POST',
+            data: {
+                'payment_method_id': methodId,
+                'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    showNotification('Default payment method updated', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification('Error: ' + response.error, 'error');
+                }
+            },
+            error: function() {
+                showNotification('Failed to update default payment method', 'error');
+            }
+        });
+    }
+}
+
+function removePaymentMethod(methodId) {
+    if (confirm('Are you sure you want to remove this payment method? This action cannot be undone.')) {
+        $.ajax({
+            url: '{% url "subscriptions:remove_payment_method" %}',
+            method: 'POST',
+            data: {
+                'payment_method_id': methodId,
+                'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    showNotification('Payment method removed successfully', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification('Error: ' + response.error, 'error');
+                }
+            },
+            error: function() {
+                showNotification('Failed to remove payment method', 'error');
+            }
+        });
+    }
+}
+
+function showNotification(message, type) {
+    const alertClass = type === 'error' ? 'alert-danger' : 'alert-success';
+    const notification = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    `;
+    
+    // Find or create notifications container
+    let notificationsContainer = $('#notifications');
+    if (notificationsContainer.length === 0) {
+        $('body').prepend('<div id="notifications" class="position-fixed" style="top: 20px; right: 20px; z-index: 9999; width: 300px;"></div>');
+        notificationsContainer = $('#notifications');
+    }
+    
+    notificationsContainer.html(notification);
+    setTimeout(() => {
+        $('.alert').fadeOut();
+    }, 5000);
+}
+</script>
+{% endblock %}

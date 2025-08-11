@@ -591,9 +591,14 @@ def approve_purchase_order(request, pk):
     
     order.approve(request.user)
     
+    # Trigger notification
+    from apps.core.notifications import send_purchase_order_notification
+    send_purchase_order_notification(order, 'approved')
+    
     auto_send = request.POST.get('auto_send', 'false').lower() == 'true'
     if auto_send:
         order.send_to_supplier()
+        send_purchase_order_notification(order, 'sent')
         messages.success(request, f'Purchase Order {order.po_number} approved and sent to supplier!')
     else:
         messages.success(request, f'Purchase Order {order.po_number} approved successfully!')
@@ -612,6 +617,11 @@ def send_purchase_order(request, pk):
         return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
     
     order.send_to_supplier()
+    
+    # Trigger notification
+    from apps.core.notifications import send_purchase_order_notification
+    send_purchase_order_notification(order, 'sent')
+    
     messages.success(request, f'Purchase Order {order.po_number} sent to supplier!')
     
     return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
@@ -650,6 +660,10 @@ def cancel_purchase_order(request, pk):
     
     order.status = 'cancelled'
     order.save()
+    
+    # Trigger notification
+    from apps.core.notifications import send_purchase_order_notification
+    send_purchase_order_notification(order, 'cancelled')
     
     messages.success(request, f'Purchase Order {order.po_number} has been cancelled.')
     return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))

@@ -1,0 +1,68 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h1>Purchase Order {{ notification_type|title }}</h1>
+    </div>
+    
+    <div class="content">
+        <p>Dear {{ supplier.name }},</p>
+        
+        {% if notification_type == 'created' %}
+        <p>We have created a new purchase order for your review.</p>
+        {% elif notification_type == 'approved' %}
+        <p>The purchase order has been approved and is ready for processing.</p>
+        {% elif notification_type == 'sent' %}
+        <p>Please find the purchase order details below for your immediate attention.</p>
+        {% elif notification_type == 'cancelled' %}
+        <p>We regret to inform you that the following purchase order has been cancelled.</p>
+        {% endif %}
+        
+        <div class="details-box">
+            <h3>Purchase Order Details</h3>
+            <p><strong>PO Number:</strong> {{ purchase_order.po_number }}</p>
+            <p><strong>Order Date:</strong> {{ purchase_order.created_at|date:"F d, Y" }}</p>
+            <p><strong>Total Amount:</strong> KES {{ purchase_order.total_amount|floatformat:2 }}</p>
+            <p><strong>Status:</strong> {{ purchase_order.get_status_display }}</p>
+            {% if purchase_order.delivery_date %}
+            <p><strong>Required Delivery Date:</strong> {{ purchase_order.delivery_date|date:"F d, Y" }}</p>
+            {% endif %}
+        </div>
+        
+        {% if purchase_order.items.exists %}
+        <div class="items-box">
+            <h3>Items Ordered</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="padding: 8px; text-align: left; border: 1px solid #dee2e6;">Item</th>
+                        <th style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">Quantity</th>
+                        <th style="padding: 8px; text-align: right; border: 1px solid #dee2e6;">Unit Price</th>
+                        <th style="padding: 8px; text-align: right; border: 1px solid #dee2e6;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in purchase_order.items.all %}
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #dee2e6;">{{ item.item.name }}</td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">{{ item.quantity }}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #dee2e6;">KES {{ item.unit_price|floatformat:2 }}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #dee2e6;">KES {{ item.total_amount|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        {% if notification_type != 'cancelled' %}
+        <p>Please confirm receipt of this order and provide delivery timeline.</p>
+        {% endif %}
+        
+        <p>For any questions or clarifications, please contact us.</p>
+        
+        <p>Best regards,<br>{{ business.name }}</p>
+    </div>
+</div>
+{% endblock %}

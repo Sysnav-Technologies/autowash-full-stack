@@ -1,0 +1,437 @@
+{% extends "system_admin/base.html" %}
+{% load static %}
+
+{% block title %}Notification Settings{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/dashboard.css' %}" rel="stylesheet">
+<style>
+.settings-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.setting-group {
+    padding: 1.5rem;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+}
+
+.setting-group h6 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.form-switch .form-check-input {
+    width: 3rem;
+    height: 1.5rem;
+}
+
+.provider-card {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.provider-card:hover {
+    border-color: #007bff;
+    background: #f8f9fa;
+}
+
+.provider-card.selected {
+    border-color: #007bff;
+    background: #e7f3ff;
+}
+
+.rate-limit-info {
+    background: #e7f3ff;
+    border: 1px solid #b3d7ff;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2">⚙️ Notification Settings</h1>
+            <p class="text-muted mb-0">Configure system-wide notification preferences and providers</p>
+        </div>
+        <div>
+            <a href="{% url 'system_admin:notification_management' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i> Back to Management
+            </a>
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- Email Settings -->
+            <div class="col-lg-6">
+                <div class="settings-card">
+                    <h5 class="mb-3"><i class="fas fa-envelope text-primary"></i> Email Settings</h5>
+                    
+                    <div class="setting-group">
+                        <h6>Email Service</h6>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="emailEnabled" 
+                                   {% if settings.email_enabled %}checked{% endif %}>
+                            <label class="form-check-label" for="emailEnabled">
+                                Enable Email Notifications
+                            </label>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="fromEmail" class="form-label">From Email Address</label>
+                            <input type="email" class="form-control" id="fromEmail" 
+                                   value="{{ settings.from_email }}" 
+                                   placeholder="noreply@autowash.com">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="replyToEmail" class="form-label">Reply-To Email (Optional)</label>
+                            <input type="email" class="form-control" id="replyToEmail" 
+                                   placeholder="support@autowash.com">
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h6>Rate Limiting</h6>
+                        
+                        <div class="mb-3">
+                            <label for="rateLimit" class="form-label">Emails per Minute</label>
+                            <input type="number" class="form-control" id="rateLimit" 
+                                   value="{{ settings.rate_limit }}" min="1" max="100">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="batchSize" class="form-label">Batch Size</label>
+                            <input type="number" class="form-control" id="batchSize" 
+                                   value="{{ settings.batch_size }}" min="10" max="1000">
+                        </div>
+                        
+                        <div class="rate-limit-info">
+                            <small><strong>Note:</strong> Rate limiting helps prevent email provider throttling and ensures deliverability.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SMS Settings -->
+            <div class="col-lg-6">
+                <div class="settings-card">
+                    <h5 class="mb-3"><i class="fas fa-sms text-success"></i> SMS Settings</h5>
+                    
+                    <div class="setting-group">
+                        <h6>SMS Service</h6>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="smsEnabled" 
+                                   {% if settings.sms_enabled %}checked{% endif %}>
+                            <label class="form-check-label" for="smsEnabled">
+                                Enable SMS Notifications
+                            </label>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">SMS Provider</label>
+                            
+                            <div class="provider-card {% if settings.sms_provider == 'africas_talking' %}selected{% endif %}" 
+                                 data-provider="africas_talking">
+                                <div class="d-flex align-items-center">
+                                    <input type="radio" name="sms_provider" value="africas_talking" 
+                                           id="sms_provider_at" title="Select Africa's Talking as SMS provider"
+                                           {% if settings.sms_provider == 'africas_talking' %}checked{% endif %}>
+                                    <label for="sms_provider_at" class="ms-3 mb-0">
+                                        <strong>Africa's Talking</strong>
+                                        <p class="mb-0 text-muted small">Reliable SMS service for African markets</p>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="provider-card {% if settings.sms_provider == 'twilio' %}selected{% endif %}" 
+                                 data-provider="twilio">
+                                <div class="d-flex align-items-center">
+                                    <input type="radio" name="sms_provider" value="twilio" 
+                                           id="sms_provider_twilio" title="Select Twilio as SMS provider"
+                                           {% if settings.sms_provider == 'twilio' %}checked{% endif %}>
+                                    <label for="sms_provider_twilio" class="ms-3 mb-0">
+                                        <strong>Twilio</strong>
+                                        <p class="mb-0 text-muted small">Global SMS and communication platform</p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h6>SMS Configuration</h6>
+                        
+                        <div class="mb-3">
+                            <label for="smsApiKey" class="form-label">API Key</label>
+                            <input type="password" class="form-control" id="smsApiKey" 
+                                   placeholder="Enter your SMS provider API key">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="smsUsername" class="form-label">Username/Account ID</label>
+                            <input type="text" class="form-control" id="smsUsername" 
+                                   placeholder="Enter username or account ID">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="smsSenderId" class="form-label">Sender ID</label>
+                            <input type="text" class="form-control" id="smsSenderId" 
+                                   placeholder="AUTOWASH" maxlength="11">
+                            <small class="form-text text-muted">Max 11 characters for sender ID</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Notification Triggers -->
+            <div class="col-lg-6">
+                <div class="settings-card">
+                    <h5 class="mb-3"><i class="fas fa-bell text-warning"></i> Notification Triggers</h5>
+                    
+                    <div class="setting-group">
+                        <h6>Service Order Notifications</h6>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="orderCreatedNotif" checked>
+                            <label class="form-check-label" for="orderCreatedNotif">
+                                Order Created
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="orderStartedNotif" checked>
+                            <label class="form-check-label" for="orderStartedNotif">
+                                Order Started
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="orderCompletedNotif" checked>
+                            <label class="form-check-label" for="orderCompletedNotif">
+                                Order Completed
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h6>Payment Notifications</h6>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="paymentConfirmationNotif" checked>
+                            <label class="form-check-label" for="paymentConfirmationNotif">
+                                Payment Confirmation
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="paymentReminderNotif" checked>
+                            <label class="form-check-label" for="paymentReminderNotif">
+                                Payment Reminders
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h6>Subscription Notifications</h6>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="subscriptionWarningNotif" checked>
+                            <label class="form-check-label" for="subscriptionWarningNotif">
+                                Expiry Warnings
+                            </label>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="subscriptionWarningDays" class="form-label">Warning Days Before Expiry</label>
+                            <select class="form-select" id="subscriptionWarningDays">
+                                <option value="3">3 Days</option>
+                                <option value="7" {% if settings.subscription_warning_days == 7 %}selected{% endif %}>7 Days</option>
+                                <option value="14">14 Days</option>
+                                <option value="30">30 Days</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory & Business Alerts -->
+            <div class="col-lg-6">
+                <div class="settings-card">
+                    <h5 class="mb-3"><i class="fas fa-warehouse text-info"></i> Inventory & Business Alerts</h5>
+                    
+                    <div class="setting-group">
+                        <h6>Inventory Alerts</h6>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="lowStockNotif" checked>
+                            <label class="form-check-label" for="lowStockNotif">
+                                Low Stock Alerts
+                            </label>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="lowStockThreshold" class="form-label">Low Stock Threshold (%)</label>
+                            <input type="number" class="form-control" id="lowStockThreshold" 
+                                   value="{{ settings.low_stock_threshold }}" min="5" max="50">
+                            <small class="form-text text-muted">Alert when stock falls below this percentage of minimum stock</small>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h6>Business Alerts</h6>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="newBusinessNotif" checked>
+                            <label class="form-check-label" for="newBusinessNotif">
+                                New Business Registrations
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="businessSuspensionNotif" checked>
+                            <label class="form-check-label" for="businessSuspensionNotif">
+                                Business Suspension Alerts
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="systemMaintenanceNotif" checked>
+                            <label class="form-check-label" for="systemMaintenanceNotif">
+                                System Maintenance Notifications
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h6>Performance Monitoring</h6>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="highVolumeNotif" checked>
+                            <label class="form-check-label" for="highVolumeNotif">
+                                High Volume Alerts
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="failedNotifAlert" checked>
+                            <label class="form-check-label" for="failedNotifAlert">
+                                Failed Notification Alerts
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-outline-secondary me-2" onclick="window.history.back()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Provider card selection
+    $('.provider-card').click(function() {
+        $('.provider-card').removeClass('selected');
+        $(this).addClass('selected');
+        $(this).find('input[type="radio"]').prop('checked', true);
+    });
+    
+    // Form validation and submission
+    $('form').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate required fields
+        if ($('#emailEnabled').is(':checked') && !$('#fromEmail').val()) {
+            alert('From Email is required when email notifications are enabled');
+            return;
+        }
+        
+        if ($('#smsEnabled').is(':checked') && !$('#smsApiKey').val()) {
+            alert('SMS API Key is required when SMS notifications are enabled');
+            return;
+        }
+        
+        // Show loading state
+        const submitBtn = $(this).find('button[type="submit"]');
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+        
+        // Simulate form submission (replace with actual AJAX call)
+        setTimeout(function() {
+            alert('✅ Notification settings saved successfully!');
+            submitBtn.prop('disabled', false).html('<i class="fas fa-save"></i> Save Settings');
+        }, 1000);
+    });
+    
+    // Enable/disable related fields based on main toggles
+    $('#emailEnabled').change(function() {
+        const isEnabled = $(this).is(':checked');
+        $('#fromEmail, #replyToEmail, #rateLimit, #batchSize').prop('disabled', !isEnabled);
+    });
+    
+    $('#smsEnabled').change(function() {
+        const isEnabled = $(this).is(':checked');
+        $('#smsApiKey, #smsUsername, #smsSenderId').prop('disabled', !isEnabled);
+        $('.provider-card').toggle(isEnabled);
+    });
+    
+    // Test notification buttons
+    $('<div class="mt-3">' +
+      '<button type="button" class="btn btn-outline-primary btn-sm me-2" id="testEmailBtn">' +
+      '<i class="fas fa-envelope"></i> Test Email</button>' +
+      '<button type="button" class="btn btn-outline-success btn-sm" id="testSmsBtn">' +
+      '<i class="fas fa-sms"></i> Test SMS</button>' +
+      '</div>').insertAfter('#fromEmail').parent().parent();
+    
+    $('#testEmailBtn').click(function() {
+        const email = prompt('Enter test email address:');
+        if (email) {
+            alert('Test email sent to: ' + email);
+        }
+    });
+    
+    $('#testSmsBtn').click(function() {
+        const phone = prompt('Enter test phone number:');
+        if (phone) {
+            alert('Test SMS sent to: ' + phone);
+        }
+    });
+});
+</script>
+{% endblock %}

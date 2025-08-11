@@ -38,6 +38,14 @@ urlpatterns = [
     path('settings/security/', views.security_settings_view, name='security_settings'),
     path('settings/users/', views.user_management_view, name='user_management'),
 
+    # Subscription Management
+    path('subscription/', views.subscription_overview, name='subscription_overview'),
+    path('subscription/overview/', views.subscription_overview, name='subscription_overview'),
+    path('subscription/billing/', views.billing_history, name='billing_history'),
+    path('subscription/payment-methods/', views.payment_methods, name='payment_methods'),
+    path('subscription/usage/', views.usage_analytics, name='usage_analytics'),
+    path('subscription/settings/', views.subscription_settings, name='subscription_settings'),
+
     # Settings API endpoints
     path('settings/api/backup/create/', views.create_backup_ajax, name='create_backup'),
     path('settings/api/backup/download/<str:backup_id>/', views.download_backup, name='download_backup'),

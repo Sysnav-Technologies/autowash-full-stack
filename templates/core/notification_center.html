@@ -1,0 +1,277 @@
+{% extends "base/dashboard.html" %}
+
+{% block title %}Notification Center{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2">Notification Center</h1>
+            <p class="text-muted mb-0">Monitor and manage system notifications</p>
+        </div>
+        <div>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#testNotificationModal">
+                <i class="fas fa-paper-plane me-2"></i>Test Notifications
+            </button>
+        </div>
+    </div>
+
+    <!-- Notification Stats -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Order Notifications Today</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ order_notifications_today }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-bell fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Payment Confirmations Today</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ payment_notifications_today }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-credit-card fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Low Stock Alerts</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ low_stock_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Subscription Status</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ subscription_status }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Settings -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Notification Settings</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="font-weight-bold">Email Notifications</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="orderNotifications" checked>
+                                    <label class="form-check-label" for="orderNotifications">
+                                        Order status updates
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="paymentNotifications" checked>
+                                    <label class="form-check-label" for="paymentNotifications">
+                                        Payment confirmations
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="inventoryNotifications" checked>
+                                    <label class="form-check-label" for="inventoryNotifications">
+                                        Low stock alerts
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6 class="font-weight-bold">SMS Notifications</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="smsOrderNotifications" checked>
+                                    <label class="form-check-label" for="smsOrderNotifications">
+                                        Order status updates
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="smsPaymentNotifications" checked>
+                                    <label class="form-check-label" for="smsPaymentNotifications">
+                                        Payment confirmations
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="lowStockThreshold">Low Stock Alert Threshold</label>
+                                    <input type="number" class="form-control" id="lowStockThreshold" value="10">
+                                    <small class="form-text text-muted">Send alert when stock falls below this level</small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="subscriptionWarningDays">Subscription Warning Days</label>
+                                    <input type="number" class="form-control" id="subscriptionWarningDays" value="7">
+                                    <small class="form-text text-muted">Send warning X days before expiry</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Recent Notifications</h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">Order #ORD001 Created</div>
+                                <small class="text-muted">Sent to customer@example.com</small>
+                            </div>
+                            <small>2 min ago</small>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">Payment Confirmed</div>
+                                <small class="text-muted">KES 2,500 payment received</small>
+                            </div>
+                            <small>5 min ago</small>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">Low Stock Alert</div>
+                                <small class="text-muted">Car shampoo running low</small>
+                            </div>
+                            <small>1 hour ago</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Notification Modal -->
+<div class="modal fade" id="testNotificationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Test Notifications</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="testNotificationForm">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="testEmail" class="form-label">Test Email Address</label>
+                        <input type="email" class="form-control" id="testEmail" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notificationType" class="form-label">Notification Type</label>
+                        <select class="form-select" id="notificationType" required>
+                            <option value="">Select notification type...</option>
+                            <option value="order_created">Order Created</option>
+                            <option value="order_started">Order Started</option>
+                            <option value="order_completed">Order Completed</option>
+                            <option value="payment_confirmation">Payment Confirmation</option>
+                            <option value="low_stock_alert">Low Stock Alert</option>
+                            <option value="subscription_warning">Subscription Warning</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-2"></i>Send Test Notification
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('#testNotificationForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const testEmail = $('#testEmail').val();
+        const notificationType = $('#notificationType').val();
+        
+        // Send test notification
+        $.ajax({
+            url: '{% url "core:test_notification" %}',
+            method: 'POST',
+            data: {
+                'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val(),
+                'email': testEmail,
+                'type': notificationType
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('Test notification sent successfully!');
+                    $('#testNotificationModal').modal('hide');
+                } else {
+                    alert('Failed to send test notification: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('Error sending test notification');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

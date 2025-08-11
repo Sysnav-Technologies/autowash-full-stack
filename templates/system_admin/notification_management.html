@@ -1,0 +1,440 @@
+{% extends "system_admin/base.html" %}
+{% load static %}
+
+{% block title %}Notification Management{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/dashboard.css' %}" rel="stylesheet">
+<style>
+.notification-stats .stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.notification-stats .stat-card .stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.notification-stats .stat-card.warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.notification-stats .stat-card.success {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.notification-stats .stat-card.info {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.recent-notifications {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    padding: 1.5rem;
+}
+
+.notification-item {
+    padding: 1rem;
+    border-left: 4px solid #007bff;
+    margin-bottom: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.notification-item.success {
+    border-left-color: #28a745;
+}
+
+.notification-item.warning {
+    border-left-color: #ffc107;
+}
+
+.notification-item.danger {
+    border-left-color: #dc3545;
+}
+
+.bulk-notification-form {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    padding: 1.5rem;
+}
+
+.business-checkbox {
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.business-checkbox:hover {
+    background: #f8f9fa;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2">🔔 Notification Management</h1>
+            <p class="text-muted mb-0">Monitor and manage system-wide notifications</p>
+        </div>
+        <div>
+            <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#testNotificationModal">
+                <i class="fas fa-paper-plane"></i> Test Notification
+            </button>
+            <a href="{% url 'system_admin:notification_settings' %}" class="btn btn-outline-primary">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+        </div>
+    </div>
+
+    <!-- Notification Statistics -->
+    <div class="row notification-stats mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.orders_today }}</div>
+                <div class="stat-label">Order Notifications Today</div>
+                <small>Service orders created: {{ stats.orders_today }}</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card success">
+                <div class="stat-number">{{ stats.payments_today }}</div>
+                <div class="stat-label">Payment Confirmations Today</div>
+                <small>Payments processed: {{ stats.payments_today }}</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card warning">
+                <div class="stat-number">{{ stats.low_stock_items }}</div>
+                <div class="stat-label">Low Stock Alerts</div>
+                <small>Items below minimum stock</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card info">
+                <div class="stat-number">{{ stats.expiring_soon }}</div>
+                <div class="stat-label">Subscription Warnings</div>
+                <small>Expiring within 7 days</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Notifications -->
+        <div class="col-lg-8">
+            <div class="recent-notifications">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="fas fa-bell text-primary"></i> Recent Notifications</h5>
+                    <a href="{% url 'system_admin:notification_logs' %}" class="btn btn-sm btn-outline-primary">
+                        View All Logs
+                    </a>
+                </div>
+                
+                {% for notification in recent_notifications %}
+                <div class="notification-item {% if notification.status == 'Sent' %}success{% elif notification.status == 'Failed' %}danger{% else %}warning{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">{{ notification.type }}</h6>
+                            <p class="mb-1 text-muted">
+                                <i class="fas fa-envelope"></i> {{ notification.recipient }}
+                                <span class="mx-2">•</span>
+                                <i class="fas fa-building"></i> {{ notification.business }}
+                            </p>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-{% if notification.status == 'Sent' %}success{% elif notification.status == 'Failed' %}danger{% else %}warning{% endif %}">
+                                {{ notification.status }}
+                            </span>
+                            <small class="d-block text-muted mt-1">
+                                {{ notification.timestamp|timesince }} ago
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-inbox fa-3x mb-3"></i>
+                    <p>No recent notifications</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick Actions & Alerts -->
+        <div class="col-lg-4">
+            <!-- Subscription Alerts -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-white">
+                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Subscription Alerts</h6>
+                </div>
+                <div class="card-body p-0">
+                    {% for subscription in expiring_subscriptions %}
+                    <div class="p-3 border-bottom">
+                        <h6 class="mb-1">{{ subscription.business.name }}</h6>
+                        <p class="mb-1 text-muted small">{{ subscription.plan.name }}</p>
+                        <small class="text-warning">
+                            <i class="fas fa-clock"></i>
+                            Expires {{ subscription.end_date|timeuntil }}
+                        </small>
+                    </div>
+                    {% empty %}
+                    <div class="p-3 text-center text-muted">
+                        <i class="fas fa-check-circle text-success"></i>
+                        No subscriptions expiring soon
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Quick Stats</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Active Subscriptions</span>
+                        <strong>{{ stats.active_subscriptions }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Orders This Week</span>
+                        <strong>{{ stats.orders_week }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Payments This Week</span>
+                        <strong>{{ stats.payments_week }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Estimated Notifications</span>
+                        <strong>{{ stats.total_notifications_estimate }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Notification Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="bulk-notification-form">
+                <h5 class="mb-3"><i class="fas fa-broadcast-tower text-primary"></i> Bulk Notifications</h5>
+                
+                <form id="bulkNotificationForm" method="post">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Select Businesses</h6>
+                            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px; padding: 1rem;">
+                                <div class="mb-2">
+                                    <label class="form-check-label">
+                                        <input type="checkbox" id="selectAll" class="form-check-input">
+                                        <strong>Select All ({{ recent_businesses.count }} businesses)</strong>
+                                    </label>
+                                </div>
+                                <hr>
+                                {% for business in recent_businesses %}
+                                <div class="business-checkbox">
+                                    <label class="form-check-label d-flex align-items-center">
+                                        <input type="checkbox" name="business_ids" value="{{ business.id }}" class="form-check-input me-2 business-checkbox-item">
+                                        <div>
+                                            <strong>{{ business.name }}</strong>
+                                            <small class="d-block text-muted">{{ business.email }}</small>
+                                        </div>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="notificationType" class="form-label">Notification Type</label>
+                                <select class="form-select" id="notificationType" name="notification_type" required>
+                                    <option value="">Select notification type...</option>
+                                    <option value="subscription_reminder">Subscription Renewal Reminder</option>
+                                    <option value="system_announcement">System Announcement</option>
+                                    <option value="maintenance_notice">Maintenance Notice</option>
+                                    <option value="custom">Custom Message</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3" id="customFields" style="display: none;">
+                                <label for="customSubject" class="form-label">Subject</label>
+                                <input type="text" class="form-control" id="customSubject" name="subject" placeholder="Enter email subject">
+                                
+                                <label for="customMessage" class="form-label mt-2">Message</label>
+                                <textarea class="form-control" id="customMessage" name="message" rows="4" placeholder="Enter your custom message"></textarea>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success" id="sendBulkBtn">
+                                <i class="fas fa-paper-plane"></i> Send Bulk Notification
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Notification Modal -->
+<div class="modal fade" id="testNotificationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Test Notification System</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="testNotificationForm">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="testEmail" class="form-label">Test Email Address</label>
+                        <input type="email" class="form-control" id="testEmail" required 
+                               placeholder="admin@example.com">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="testNotificationType" class="form-label">Notification Type</label>
+                        <select class="form-select" id="testNotificationType" required>
+                            <option value="">Select notification type...</option>
+                            <option value="order_created">Order Created</option>
+                            <option value="order_started">Order Started</option>
+                            <option value="order_completed">Order Completed</option>
+                            <option value="payment_confirmation">Payment Confirmation</option>
+                            <option value="subscription_warning">Subscription Expiry Warning</option>
+                            <option value="low_stock_alert">Low Stock Alert</option>
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        This will send a test notification with sample data to verify the email system is working correctly.
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Send Test Notification
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Select all functionality
+    $('#selectAll').change(function() {
+        $('.business-checkbox-item').prop('checked', this.checked);
+    });
+    
+    // Update select all when individual checkboxes change
+    $('.business-checkbox-item').change(function() {
+        const total = $('.business-checkbox-item').length;
+        const checked = $('.business-checkbox-item:checked').length;
+        $('#selectAll').prop('checked', total === checked);
+        $('#selectAll').prop('indeterminate', checked > 0 && checked < total);
+    });
+    
+    // Show/hide custom fields
+    $('#notificationType').change(function() {
+        if ($(this).val() === 'custom') {
+            $('#customFields').show();
+        } else {
+            $('#customFields').hide();
+        }
+    });
+    
+    // Test notification form
+    $('#testNotificationForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const testEmail = $('#testEmail').val();
+        const notificationType = $('#testNotificationType').val();
+        
+        $.ajax({
+            url: '{% url "system_admin:test_notification" %}',
+            method: 'POST',
+            data: {
+                'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val(),
+                'email': testEmail,
+                'type': notificationType
+            },
+            beforeSend: function() {
+                $('#testNotificationForm button[type=submit]').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Sending...');
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('✅ Test notification sent successfully!');
+                    $('#testNotificationModal').modal('hide');
+                } else {
+                    alert('❌ Failed to send test notification: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('❌ Error sending test notification');
+            },
+            complete: function() {
+                $('#testNotificationForm button[type=submit]').prop('disabled', false).html('<i class="fas fa-paper-plane"></i> Send Test Notification');
+            }
+        });
+    });
+    
+    // Bulk notification form
+    $('#bulkNotificationForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const selectedBusinesses = $('.business-checkbox-item:checked').length;
+        
+        if (selectedBusinesses === 0) {
+            alert('Please select at least one business');
+            return;
+        }
+        
+        if (!confirm(`Send notification to ${selectedBusinesses} businesses?`)) {
+            return;
+        }
+        
+        const formData = $(this).serialize();
+        
+        $.ajax({
+            url: '{% url "system_admin:send_bulk_notification" %}',
+            method: 'POST',
+            data: formData,
+            beforeSend: function() {
+                $('#sendBulkBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Sending...');
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert(`✅ ${response.message}`);
+                    location.reload();
+                } else {
+                    alert('❌ ' + response.message);
+                }
+            },
+            error: function() {
+                alert('❌ Error sending bulk notifications');
+            },
+            complete: function() {
+                $('#sendBulkBtn').prop('disabled', false).html('<i class="fas fa-paper-plane"></i> Send Bulk Notification');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

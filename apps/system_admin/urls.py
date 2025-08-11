@@ -48,6 +48,13 @@ urlpatterns = [
     path('suspensions/subscription/<uuid:subscription_id>/suspend/', views.suspend_subscription, name='suspend_subscription'),
     path('suspensions/subscription/<uuid:subscription_id>/reactivate/', views.reactivate_subscription, name='reactivate_subscription'),
     path('suspensions/employee/<uuid:business_id>/<uuid:employee_id>/suspend/', views.suspend_employee, name='suspend_employee'),
+    
+    # Notification Management
+    path('notifications/', views.notification_management, name='notification_management'),
+    path('notifications/test/', views.test_notification, name='test_notification'),
+    path('notifications/settings/', views.notification_settings, name='notification_settings'),
+    path('notifications/logs/', views.notification_logs, name='notification_logs'),
+    path('notifications/send-bulk/', views.send_bulk_notification, name='send_bulk_notification'),
     path('suspensions/employee/<uuid:business_id>/<uuid:employee_id>/reactivate/', views.reactivate_employee, name='reactivate_employee'),
     
     # Analytics
