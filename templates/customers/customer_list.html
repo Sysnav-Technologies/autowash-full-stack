@@ -174,8 +174,8 @@
     
     <div class="card-body">
         {% if customers %}
-        <div class="table-responsive">
-            <table class="table table-hover">
+        <div class="table-responsive mobile-table-responsive" style="overflow-x:auto;">
+            <table class="table table-hover table-mobile">
                 <thead>
                     <tr>
                         <th>Customer</th>
@@ -192,7 +192,7 @@
                 <tbody>
                     {% for customer in customers %}
                     <tr class="customer-row" data-customer-id="{{ customer.id }}">
-                        <td>
+                        <td data-label="Customer">
                             <div class="customer-info">
                                 <div class="customer-name">
                                     <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="customer-link">
@@ -207,8 +207,7 @@
                                 <small class="text-muted">ID: {{ customer.customer_id }}</small>
                             </div>
                         </td>
-                        
-                        <td>
+                        <td data-label="Contact">
                             <div class="contact-info">
                                 {% if customer.phone %}
                                 <div><i class="fas fa-phone text-muted"></i> {{ customer.phone }}</div>
@@ -221,14 +220,12 @@
                                 {% endif %}
                             </div>
                         </td>
-                        
-                        <td>
+                        <td data-label="Type">
                             <span class="badge badge-{{ customer.customer_type|yesno:'info,primary' }}">
                                 {{ customer.get_customer_type_display }}
                             </span>
                         </td>
-                        
-                        <td>
+                        <td data-label="Vehicles">
                             <div class="vehicles-info">
                                 {% for vehicle in customer.vehicles.all|slice:":2" %}
                                 <div class="vehicle-item">
@@ -241,76 +238,43 @@
                                 {% endif %}
                             </div>
                         </td>
-                        
-                        <td>
+                        <td data-label="Orders">
                             <div class="orders-info">
                                 <strong>{{ customer.total_orders|default:0 }}</strong>
                                 <small class="text-muted d-block">orders</small>
                             </div>
                         </td>
-                        
-                        <td>
+                        <td data-label="Total Spent">
                             <div class="spending-info">
                                 <strong>KES {{ customer.total_spent|floatformat:0|default:0 }}</strong>
                             </div>
                         </td>
-                        
-                        <td>
+                        <td data-label="Loyalty Points">
                             <div class="loyalty-info">
                                 <span class="loyalty-points">{{ customer.loyalty_points|default:0 }}</span>
                                 <small class="text-muted d-block">points</small>
                             </div>
                         </td>
-                        
-                        <td>
+                        <td data-label="Status">
                             {% if customer.is_active %}
                             <span class="badge badge-success">Active</span>
                             {% else %}
                             <span class="badge badge-secondary">Inactive</span>
                             {% endif %}
                         </td>
-                        
-                        <td>
-                            <div class="customer-actions">
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                        Actions
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/">
-                                            <i class="fas fa-eye"></i> View Details
-                                        </a></li>
-                                        
-                                        {% if user_role in 'owner,manager,supervisor' %}
-                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/edit/">
-                                            <i class="fas fa-edit"></i> Edit Customer
-                                        </a></li>
-                                        {% endif %}
-                                        
-                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/vehicles/add/">
-                                            <i class="fas fa-plus"></i> Add Vehicle
-                                        </a></li>
-                                        
-                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/orders/quick/?customer={{ customer.pk }}">
-                                            <i class="fas fa-plus-circle"></i> Create Order
-                                        </a></li>
-                                        
-                                        <li><hr class="dropdown-divider"></li>
-                                        
-                                        {% if user_role in 'owner,manager' %}
-                                        <li><a class="dropdown-item" href="#" onclick="toggleVIPStatus('{{ customer.pk }}', {{ customer.is_vip|yesno:'false,true' }})">
-                                            <i class="fas fa-crown"></i> 
-                                            {% if customer.is_vip %}Remove VIP{% else %}Make VIP{% endif %}
-                                        </a></li>
-                                        
-                                        {% if customer.is_active %}
-                                        <li><a class="dropdown-item text-warning" href="#" onclick="deactivateCustomer('{{ customer.pk }}')">
-                                            <i class="fas fa-user-times"></i> Deactivate
-                                        </a></li>
-                                        {% endif %}
-                                        {% endif %}
-                                    </ul>
-                                </div>
+                        <td data-label="Actions">
+                            <div class="customer-actions d-flex flex-wrap gap-1">
+                                <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/" class="btn btn-sm btn-outline-primary" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if user_role in 'owner,manager,supervisor' %}
+                                <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/edit/" class="btn btn-sm btn-outline-secondary" title="Edit Customer">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% endif %}
+                                <a href="/business/{{ request.tenant.slug }}/customers/{{ customer.pk }}/vehicles/add/" class="btn btn-sm btn-outline-success" title="Add Vehicle">
+                                    <i class="fas fa-car"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>

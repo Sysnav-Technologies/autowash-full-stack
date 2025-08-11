@@ -3,7 +3,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}{% if customer_form.instance and customer_form.instance.pk %}Edit Customer{% else %}Add New Customer{% endif %} - {{ block.super }}{% endblock %}
+{% block title %}Add New Customer - {{ block.super }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -12,25 +12,16 @@
         <div>
             <h1 class="h3 mb-1">
                 <i class="fas fa-user-plus text-primary me-2"></i>
-                {% if customer_form.instance and customer_form.instance.pk %}Edit Customer{% else %}Add New Customer{% endif %}
+                Add New Customer
             </h1>
             <p class="text-muted mb-0">
-                {% if customer_form.instance and customer_form.instance.pk %}
-                    Update customer information and preferences
-                {% else %}
-                    Create a new customer profile and optionally add their first vehicle
-                {% endif %}
+                Create a new customer profile and optionally add their first vehicle
             </p>
         </div>
         <div class="btn-toolbar">
-            <a href="{% url 'customers:list' %}" class="btn btn-outline-secondary me-2">
+            <a href="/business/{{ request.tenant.slug }}/customers/" class="btn btn-outline-secondary me-2">
                 <i class="fas fa-arrow-left me-1"></i>Back to Customers
             </a>
-            {% if customer_form.instance and customer_form.instance.pk %}
-            <a href="{% url 'customers:detail' pk=customer_form.instance.pk %}" class="btn btn-outline-primary">
-                <i class="fas fa-eye me-1"></i>View Customer
-            </a>
-            {% endif %}
         </div>
     </div>
 
@@ -447,15 +438,11 @@
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary btn-lg">
                                 <i class="fas fa-save me-2"></i>
-                                {% if customer_form.instance and customer_form.instance.pk %}Update Customer{% else %}Save Customer{% endif %}
+                                Save Customer
                             </button>
-                            
-                            {% if not customer_form.instance or not customer_form.instance.pk %}
                             <button type="submit" name="create_another" value="1" class="btn btn-success">
                                 <i class="fas fa-plus me-2"></i>Save & Add Another
                             </button>
-                            {% endif %}
-                            
                             <a href="{% url 'customers:list' %}" class="btn btn-outline-secondary">
                                 <i class="fas fa-times me-2"></i>Cancel
                             </a>
@@ -463,32 +450,7 @@
                     </div>
                 </div>
 
-                <!-- Quick Actions Card (Edit mode only) -->
-                {% if customer_form.instance and customer_form.instance.pk %}
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-light">
-                        <h6 class="card-title mb-0">
-                            <i class="fas fa-bolt me-2"></i>Quick Actions
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-grid gap-2">
-                            <a href="{% url 'customers:detail' pk=customer_form.instance.pk %}" class="btn btn-outline-primary btn-sm">
-                                <i class="fas fa-eye me-2"></i>View Details
-                            </a>
-                            <a href="{% url 'customers:vehicle_create' customer_pk=customer_form.instance.pk %}" class="btn btn-outline-success btn-sm">
-                                <i class="fas fa-car me-2"></i>Add Vehicle
-                            </a>
-                            <a href="{% url 'customers:note_create' customer_pk=customer_form.instance.pk %}" class="btn btn-outline-info btn-sm">
-                                <i class="fas fa-sticky-note me-2"></i>Add Note
-                            </a>
-                            <a href="{% url 'customers:documents' customer_pk=customer_form.instance.pk %}" class="btn btn-outline-warning btn-sm">
-                                <i class="fas fa-file-upload me-2"></i>Documents
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
+
 
                 <!-- Tips Card -->
                 <div class="card shadow-sm">
@@ -691,41 +653,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Auto-save draft to localStorage
-    const formFields = form?.querySelectorAll('input, select, textarea');
-    if (formFields) {
-        // Load saved data on page load
-        formFields.forEach(field => {
-            const savedValue = localStorage.getItem(`customer_form_${field.name}`);
-            if (savedValue && !field.value && field.type !== 'hidden') {
-                if (field.type === 'checkbox') {
-                    field.checked = savedValue === 'true';
-                } else {
-                    field.value = savedValue;
-                }
-            }
-        });
-        
-        // Save data on change
-        formFields.forEach(field => {
-            field.addEventListener('change', function() {
-                if (field.type === 'checkbox') {
-                    localStorage.setItem(`customer_form_${field.name}`, field.checked);
-                } else {
-                    localStorage.setItem(`customer_form_${field.name}`, field.value);
-                }
-            });
-        });
-        
-        // Clear saved data on successful submit
-        form.addEventListener('submit', function() {
-            setTimeout(() => {
-                formFields.forEach(field => {
-                    localStorage.removeItem(`customer_form_${field.name}`);
-                });
-            }, 1000);
-        });
-    }
+
     
     // Add loading state to submit buttons
     const submitButtons = document.querySelectorAll('button[type="submit"]');
