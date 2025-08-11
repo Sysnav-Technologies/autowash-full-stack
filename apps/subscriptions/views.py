@@ -112,8 +112,14 @@ def subscription_selection_view(request):
     
     # Check if business already has active subscription
     if business.subscription and business.subscription.is_active:
-        messages.info(request, "You already have an active subscription.")
-        return redirect('/auth/verification-pending/')
+        # If user has active subscription and business is verified, go to dashboard
+        if business.is_verified and business.is_approved:
+            messages.success(request, "You already have an active subscription.")
+            return redirect(f'/business/{business.slug}/')
+        else:
+            # If subscription is active but business not fully verified, go to verification
+            messages.info(request, "Your subscription is active. Please wait for business verification to complete.")
+            return redirect('/auth/verification-pending/')
     
     # Get available plans
     plans = SubscriptionPlan.objects.filter(is_active=True).order_by('sort_order', 'price')
@@ -156,8 +162,14 @@ def subscribe_view(request, plan_slug):
     
     # Check if business already has active subscription
     if business.subscription and business.subscription.is_active:
-        messages.warning(request, "You already have an active subscription.")
-        return redirect('subscriptions:manage_subscription')
+        # If user has active subscription and business is verified, go to subscription management
+        if business.is_verified and business.is_approved:
+            messages.info(request, "You already have an active subscription.")
+            return redirect('subscriptions:manage_subscription')
+        else:
+            # If subscription is active but business not fully verified, go to verification
+            messages.info(request, "Your subscription is active. Please wait for business verification to complete.")
+            return redirect('/auth/verification-pending/')
     
     if request.method == 'POST':
         form = SubscriptionForm(request.POST, plan=plan)
