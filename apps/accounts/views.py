@@ -561,8 +561,8 @@ def password_reset_confirm_view(request, uidb64, token):
     
     if user is not None and default_token_generator.check_token(user, token):
         if request.method == 'POST':
-            password1 = request.POST.get('password1')
-            password2 = request.POST.get('password2')
+            password1 = request.POST.get('new_password1')
+            password2 = request.POST.get('new_password2')
             
             if password1 and password2:
                 if password1 == password2:
@@ -640,7 +640,7 @@ def password_change_done_view(request):
 
 def email_verification_sent(request):
     """Email verification sent confirmation"""
-    return render(request, 'auth/email_verification_sent.html')
+    return render(request, 'account/email_verification_sent.html')
 
 
 def resend_verification_email(request):
@@ -657,7 +657,7 @@ def resend_verification_email(request):
 
 def email_verification_success_view(request):
     """Email verification success page"""
-    return render(request, 'auth/email_verification_success.html')
+    return render(request, 'account/email_verification_success.html')
 
 
 @login_required
