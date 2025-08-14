@@ -1,189 +1,464 @@
 {% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}Report Templates{% endblock %}
+{% block title %}Report Templates - {{ request.tenant.name }}{% endblock %}
 
-{% block breadcrumbs %}
-<li class="breadcrumb-item"><a href="{% url 'businesses:dashboard' %}">Dashboard</a></li>
-<li class="breadcrumb-item"><a href="{% url 'reports:dashboard' %}">Reports</a></li>
-<li class="breadcrumb-item active">Templates</li>
+{% block extra_css %}
+<style>
+    .templates-page {
+        padding: 20px 0;
+        background: #f8f9fa;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .template-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        border: none;
+        position: relative;
+    }
+    
+    .template-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    }
+    
+    .template-header {
+        display: flex;
+        justify-content: between;
+        align-items: start;
+        margin-bottom: 15px;
+    }
+    
+    .template-type-badge {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .template-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 5px;
+        margin-right: 120px;
+    }
+    
+    .template-description {
+        color: #6c757d;
+        margin-bottom: 15px;
+        line-height: 1.5;
+    }
+    
+    .template-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 20px;
+        font-size: 0.9rem;
+    }
+    
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: #6c757d;
+    }
+    
+    .template-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        border-top: 1px solid #e9ecef;
+        padding-top: 15px;
+    }
+    
+    .btn-sm {
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        border-radius: 6px;
+        font-weight: 500;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        color: #e9ecef;
+        margin-bottom: 20px;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 30px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    }
+    
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    
+    .status-active {
+        background-color: #28a745;
+    }
+    
+    .status-inactive {
+        background-color: #dc3545;
+    }
+    
+    .status-scheduled {
+        background-color: #ffc107;
+    }
+    
+    /* Type-specific colors */
+    .type-financial { background-color: #e3f2fd; color: #1565c0; }
+    .type-sales { background-color: #e8f5e8; color: #2e7d32; }
+    .type-customer { background-color: #fff3e0; color: #ef6c00; }
+    .type-employee { background-color: #f3e5f5; color: #7b1fa2; }
+    .type-inventory { background-color: #e0f2f1; color: #00695c; }
+    .type-service { background-color: #e8eaf6; color: #3f51b5; }
+    .type-payment { background-color: #e1f5fe; color: #0277bd; }
+    .type-operational { background-color: #fce4ec; color: #c2185b; }
+    .type-custom { background-color: #f5f5f5; color: #424242; }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="h3 mb-2">Report Templates</h1>
-            <p class="text-muted mb-0">Create and manage report templates for automated insights</p>
-        </div>
-        <div>
-            <a href="{% url 'reports:template_create' %}" class="btn btn-primary">
-                <i class="fas fa-plus me-2"></i>New Template
-            </a>
-        </div>
-    </div>
-</div>
-
-<!-- Filters -->
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="get" class="row g-3">
-            <div class="col-md-4">
-                <label for="type" class="form-label">Report Type</label>
-                <select name="type" id="type" class="form-select">
-                    <option value="">All Types</option>
-                    {% for value, label in report_types %}
-                    <option value="{{ value }}" {% if current_type == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label for="search" class="form-label">Search</label>
-                <input type="text" name="search" id="search" class="form-control" 
-                       placeholder="Search templates..." value="{{ current_search }}">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">&nbsp;</label>
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-outline-primary">
-                        <i class="fas fa-search me-2"></i>Filter
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Templates Grid -->
-<div class="row">
-    {% for template in templates %}
-    <div class="col-xl-4 col-lg-6 col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <h6 class="card-title mb-1">{{ template.name }}</h6>
-                    <small class="text-muted">{{ template.get_report_type_display }}</small>
-                </div>
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{% url 'reports:generate_report' template.id %}">
-                            <i class="fas fa-play me-2"></i>Generate Report
-                        </a></li>
-                        <li><a class="dropdown-item" href="{% url 'reports:template_edit' template.pk %}">
-                            <i class="fas fa-edit me-2"></i>Edit Template
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'reports:template_delete' template.pk %}">
-                            <i class="fas fa-trash me-2"></i>Delete
-                        </a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="card-body">
-                <p class="card-text">{{ template.description|truncatewords:15 }}</p>
-                
-                <div class="row text-center mb-3">
-                    <div class="col-4">
-                        <div class="small text-muted">Data Sources</div>
-                        <div class="fw-semibold">{{ template.data_sources|length }}</div>
-                    </div>
-                    <div class="col-4">
-                        <div class="small text-muted">Columns</div>
-                        <div class="fw-semibold">{{ template.columns|length }}</div>
-                    </div>
-                    <div class="col-4">
-                        <div class="small text-muted">Charts</div>
-                        <div class="fw-semibold">{{ template.charts|length }}</div>
-                    </div>
-                </div>
-
-                <div class="d-flex flex-wrap gap-1 mb-3">
-                    {% if template.is_scheduled %}
-                    <span class="badge bg-primary">Scheduled</span>
-                    {% endif %}
-                    {% if template.is_public %}
-                    <span class="badge bg-success">Public</span>
-                    {% endif %}
-                    {% if template.auto_email %}
-                    <span class="badge bg-info">Auto Email</span>
-                    {% endif %}
-                    {% if not template.is_active %}
-                    <span class="badge bg-secondary">Inactive</span>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="card-footer">
-                <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                        Updated {{ template.updated_at|timesince }} ago
-                    </small>
-                    <a href="{% url 'reports:generate_report' template.id %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-play me-1"></i>Generate
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% empty %}
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body text-center py-5">
-                <i class="fas fa-file-alt fa-4x text-muted mb-4"></i>
-                <h4>No Report Templates Found</h4>
-                <p class="text-muted mb-4">
-                    {% if current_search or current_type %}
-                    No templates match your current filters. Try adjusting your search criteria.
-                    {% else %}
-                    Get started by creating your first report template to generate automated insights.
-                    {% endif %}
+<div class="container-fluid px-4 templates-page">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2">
+                    <i class="fas fa-file-alt me-3"></i>
+                    Report Templates
+                </h1>
+                <p class="mb-0 opacity-75">
+                    Create and manage reusable report templates for your business
                 </p>
-                {% if current_search or current_type %}
-                <a href="{% url 'reports:template_list' %}" class="btn btn-outline-primary me-2">Clear Filters</a>
-                {% endif %}
-                <a href="{% url 'reports:template_create' %}" class="btn btn-primary">
+            </div>
+            <div class="col-md-4 text-end">
+                <a href="/business/{{ request.tenant.slug }}/reports/templates/create/" class="btn btn-light btn-lg">
                     <i class="fas fa-plus me-2"></i>Create Template
                 </a>
             </div>
         </div>
     </div>
-    {% endfor %}
-</div>
 
-<!-- Pagination -->
-{% if is_paginated %}
-<nav aria-label="Template pagination">
-    <ul class="pagination justify-content-center">
-        {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">
-                <i class="fas fa-chevron-left"></i>
-            </a>
-        </li>
-        {% endif %}
-        
-        {% for num in page_obj.paginator.page_range %}
-        {% if page_obj.number == num %}
-        <li class="page-item active">
-            <span class="page-link">{{ num }}</span>
-        </li>
-        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ num }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">{{ num }}</a>
-        </li>
-        {% endif %}
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="/business/{{ request.tenant.slug }}/dashboard/" class="text-decoration-none">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/business/{{ request.tenant.slug }}/reports/" class="text-decoration-none">Reports</a>
+            </li>
+            <li class="breadcrumb-item active">Templates</li>
+        </ol>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         {% endfor %}
+    {% endif %}
+
+    <!-- Filters -->
+    <div class="filter-card">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="report_type" class="form-label fw-semibold">
+                    <i class="fas fa-filter me-1"></i>Filter by Type
+                </label>
+                <select class="form-select" id="report_type" name="report_type" onchange="this.form.submit()">
+                    <option value="">All Types</option>
+                    <option value="financial" {% if request.GET.report_type == 'financial' %}selected{% endif %}>Financial</option>
+                    <option value="sales" {% if request.GET.report_type == 'sales' %}selected{% endif %}>Sales</option>
+                    <option value="customer" {% if request.GET.report_type == 'customer' %}selected{% endif %}>Customer</option>
+                    <option value="employee" {% if request.GET.report_type == 'employee' %}selected{% endif %}>Employee</option>
+                    <option value="inventory" {% if request.GET.report_type == 'inventory' %}selected{% endif %}>Inventory</option>
+                    <option value="service" {% if request.GET.report_type == 'service' %}selected{% endif %}>Service</option>
+                    <option value="payment" {% if request.GET.report_type == 'payment' %}selected{% endif %}>Payment</option>
+                    <option value="operational" {% if request.GET.report_type == 'operational' %}selected{% endif %}>Operational</option>
+                    <option value="custom" {% if request.GET.report_type == 'custom' %}selected{% endif %}>Custom</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="status" class="form-label fw-semibold">
+                    <i class="fas fa-toggle-on me-1"></i>Status
+                </label>
+                <select class="form-select" id="status" name="status" onchange="this.form.submit()">
+                    <option value="">All Status</option>
+                    <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    <option value="scheduled" {% if request.GET.status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="search" class="form-label fw-semibold">
+                    <i class="fas fa-search me-1"></i>Search Templates
+                </label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       placeholder="Search by name or description..." 
+                       value="{{ request.GET.search }}"
+                       onkeypress="if(event.key==='Enter') this.form.submit()">
+            </div>
+            <div class="col-md-2">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="/business/{{ request.tenant.slug }}/reports/templates/" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Templates List -->
+    {% if object_list %}
+        <div class="row">
+            {% for template in object_list %}
+                <div class="col-xl-6 col-lg-12">
+                    <div class="template-card">
+                        <div class="template-type-badge type-{{ template.report_type }}">
+                            {{ template.get_report_type_display }}
+                        </div>
+                        
+                        <div class="template-header">
+                            <div class="flex-grow-1">
+                                <h3 class="template-title">{{ template.name }}</h3>
+                                <p class="template-description">
+                                    {{ template.description|default:"No description provided"|truncatechars:100 }}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="template-meta">
+                            <div class="meta-item">
+                                <span class="status-indicator {% if template.is_active %}status-active{% else %}status-inactive{% endif %}"></span>
+                                {% if template.is_active %}Active{% else %}Inactive{% endif %}
+                            </div>
+                            
+                            {% if template.is_scheduled %}
+                                <div class="meta-item">
+                                    <i class="fas fa-clock text-warning"></i>
+                                    Scheduled ({{ template.get_frequency_display }})
+                                </div>
+                            {% endif %}
+                            
+                            {% if template.is_public %}
+                                <div class="meta-item">
+                                    <i class="fas fa-globe text-info"></i>
+                                    Public Access
+                                </div>
+                            {% else %}
+                                <div class="meta-item">
+                                    <i class="fas fa-lock text-secondary"></i>
+                                    Role Restricted
+                                </div>
+                            {% endif %}
+                            
+                            <div class="meta-item">
+                                <i class="fas fa-calendar text-muted"></i>
+                                Created {{ template.created_at|date:"M d, Y" }}
+                            </div>
+                            
+                            <div class="meta-item">
+                                <i class="fas fa-file text-muted"></i>
+                                {{ template.generated_reports.count }} reports generated
+                            </div>
+                        </div>
+                        
+                        <div class="template-actions">
+                            <a href="/business/{{ request.tenant.slug }}/reports/templates/{{ template.id }}/generate/" 
+                               class="btn btn-success btn-sm" title="Generate Report">
+                                <i class="fas fa-play"></i> Generate
+                            </a>
+                            <a href="/business/{{ request.tenant.slug }}/reports/templates/{{ template.id }}/edit/" 
+                               class="btn btn-outline-primary btn-sm" title="Edit Template">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <a href="/business/{{ request.tenant.slug }}/reports/templates/{{ template.id }}/delete/" 
+                               class="btn btn-outline-danger btn-sm" title="Delete Template"
+                               onclick="return confirm('Are you sure you want to delete this template?')">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
         
-        {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">
-                <i class="fas fa-chevron-right"></i>
-            </a>
-        </li>
+        <!-- Pagination -->
+        {% if is_paginated %}
+            <nav aria-label="Templates pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
         {% endif %}
-    </ul>
-</nav>
-{% endif %}
+    {% else %}
+        <!-- Empty State -->
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <h3 class="mb-3">No Report Templates Found</h3>
+            {% if request.GET.search or request.GET.report_type or request.GET.status %}
+                <p class="text-muted mb-4">
+                    No templates match your current filters. Try adjusting your search criteria.
+                </p>
+                <a href="/business/{{ request.tenant.slug }}/reports/templates/" class="btn btn-outline-primary me-3">
+                    <i class="fas fa-times me-2"></i>Clear Filters
+                </a>
+            {% else %}
+                <p class="text-muted mb-4">
+                    You haven't created any report templates yet. Create your first template to get started with automated reporting.
+                </p>
+            {% endif %}
+            <a href="/business/{{ request.tenant.slug }}/reports/templates/create/" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Create Your First Template
+            </a>
+        </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="mt-4">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="template-card text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-chart-bar fa-3x text-primary"></i>
+                    </div>
+                    <h5>Financial Reports</h5>
+                    <p class="text-muted small">Revenue, expenses, and profitability analysis</p>
+                    <a href="/business/{{ request.tenant.slug }}/reports/templates/create/?type=financial" class="btn btn-outline-primary btn-sm">
+                        Create Financial Template
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="template-card text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-users fa-3x text-success"></i>
+                    </div>
+                    <h5>Customer Reports</h5>
+                    <p class="text-muted small">Customer analytics and behavior insights</p>
+                    <a href="/business/{{ request.tenant.slug }}/reports/templates/create/?type=customer" class="btn btn-outline-success btn-sm">
+                        Create Customer Template
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="template-card text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-wrench fa-3x text-info"></i>
+                    </div>
+                    <h5>Service Reports</h5>
+                    <p class="text-muted small">Service performance and operational metrics</p>
+                    <a href="/business/{{ request.tenant.slug }}/reports/templates/create/?type=service" class="btn btn-outline-info btn-sm">
+                        Create Service Template
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-submit search form after typing stops
+    let searchTimeout;
+    const searchInput = document.getElementById('search');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.form.submit();
+            }, 1000); // Submit after 1 second of no typing
+        });
+    }
+    
+    // Confirm delete actions
+    document.querySelectorAll('[onclick*="confirm"]').forEach(link => {
+        link.addEventListener('click', function(e) {
+            if (!confirm('Are you sure you want to delete this template? This action cannot be undone.')) {
+                e.preventDefault();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
