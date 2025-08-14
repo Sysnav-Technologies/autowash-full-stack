@@ -89,7 +89,11 @@ class ReportSchedule(TenantTimeStampedModel):
     ]
     
     name = models.CharField(max_length=200, null=True, blank=True)
-    report_type = models.CharField(max_length=50, choices=BusinessReport.REPORT_TYPES)
+    report_type = models.CharField(
+        max_length=50, 
+        choices=BusinessReport.REPORT_TYPES,
+        default='daily_summary'  # Add this default
+    )
     frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES)
     
     # Recipients
