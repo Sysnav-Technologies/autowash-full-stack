@@ -776,34 +776,49 @@ def stock_adjustment_view(request, item_id=None):
                 with transaction.atomic():
                     adjustment = form.save(commit=False)
                     adjustment.old_stock = adjustment.item.current_stock
-                    adjustment.new_stock = adjustment.old_stock + adjustment.quantity
-                    adjustment.created_by = request.user
+                    
+                    # Handle quantity based on adjustment type
+                    if adjustment.adjustment_type == 'decrease':
+                        actual_quantity = -abs(adjustment.quantity)  # Make sure it's negative
+                    else:
+                        actual_quantity = abs(adjustment.quantity)   # Make sure it's positive
+                    
+                    adjustment.quantity = actual_quantity
+                    adjustment.new_stock = adjustment.old_stock + actual_quantity
+                    adjustment.set_created_by(request.user)
                     adjustment.save()
                     
                     # Update item stock
                     adjustment.item.current_stock = adjustment.new_stock
                     adjustment.item.save()
                     
-                    # Create stock movement
-                    StockMovement.objects.create(
-                        item=adjustment.item,
-                        movement_type='adjustment',
-                        quantity=adjustment.quantity,
-                        unit_cost=adjustment.unit_cost,
-                        old_stock=adjustment.old_stock,
-                        new_stock=adjustment.new_stock,
-                        reference_type='adjustment',
-                        reason=adjustment.reason,
-                        created_by=request.user
-                    )
-                    
                     # Auto-approve if user has permission
                     employee = getattr(request, 'employee', None)
                     if employee and employee.role in ['owner', 'manager']:
                         adjustment.approve(request.user)
+                    else:
+                        # Create stock movement only if not auto-approved
+                        # (approve method will create it if auto-approved)
+                        stock_movement = StockMovement.objects.create(
+                            item=adjustment.item,
+                            movement_type='adjustment',
+                            quantity=actual_quantity,
+                            unit_cost=adjustment.unit_cost,
+                            old_stock=adjustment.old_stock,
+                            new_stock=adjustment.new_stock,
+                            reference_type='adjustment',
+                            reason=adjustment.reason,
+                        )
+                        # Set created_by user ID
+                        stock_movement.set_created_by(request.user)
+                        stock_movement.save()
                     
                     messages.success(request, 'Stock adjustment created successfully!')
-                    return redirect(get_business_url(request, 'inventory:item_detail', pk=adjustment.item.pk))
+                    try:
+                        return redirect(get_business_url(request, 'inventory:item_detail', pk=adjustment.item.pk))
+                    except:
+                        # Fallback if item detail redirect fails
+                        return redirect(get_business_url(request, 'inventory:list'))
                     
             except Exception as e:
                 messages.error(request, f'Error creating adjustment: {str(e)}')
@@ -936,6 +951,34 @@ def stock_take_detail_view(request, pk):
         'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/stock_take_detail.html', context)
+
+@login_required
+@employee_required(['owner', 'manager', 'supervisor'])
+def stock_take_edit_view(request, pk):
+    """Edit stock take"""
+    stock_take = get_object_or_404(StockTake, pk=pk)
+    
+    # Only allow editing of planned stock takes
+    if stock_take.status not in ['planned']:
+        messages.error(request, 'This stock take cannot be edited.')
+        return redirect(get_business_url(request, 'inventory:stock_take_detail', pk=pk))
+    
+    if request.method == 'POST':
+        form = StockTakeForm(request.POST, instance=stock_take)
+        if form.is_valid():
+            stock_take = form.save()
+            messages.success(request, f'Stock take "{stock_take.name}" updated successfully!')
+            return redirect(get_business_url(request, 'inventory:stock_take_detail', pk=stock_take.pk))
+    else:
+        form = StockTakeForm(instance=stock_take)
+    
+    context = {
+        'form': form,
+        'stock_take': stock_take,
+        'title': f'Edit Stock Take - {stock_take.name}',
+        'urls': get_inventory_urls(request),
+    }
+    return render(request, 'inventory/stock_take_form.html', context)
 
 @login_required
 @employee_required()
@@ -1973,3 +2016,130 @@ def update_operations_target(request):
             'success': False,
             'error': str(e)
         })
+
+
+@employee_required()
+def create_purchase_orders_ajax(request):
+    """Create purchase orders for low stock items via AJAX"""
+    if request.method == 'POST':
+        try:
+            import json
+            from apps.suppliers.models import PurchaseOrder, PurchaseOrderItem, Supplier
+            from django.db import transaction
+            
+            data = json.loads(request.body)
+            item_ids = data.get('item_ids', [])
+            
+            if not item_ids:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No items selected'
+                })
+            
+            created_orders = []
+            
+            with transaction.atomic():
+                # Group items by supplier
+                items_by_supplier = {}
+                
+                for item_id in item_ids:
+                    try:
+                        item = InventoryItem.objects.get(id=item_id)
+                        supplier = item.primary_supplier
+                        
+                        if not supplier:
+                            continue
+                            
+                        if supplier.id not in items_by_supplier:
+                            items_by_supplier[supplier.id] = {
+                                'supplier': supplier,
+                                'items': []
+                            }
+                        
+                        # Calculate reorder quantity
+                        reorder_qty = item.reorder_quantity or (item.maximum_stock_level - item.current_stock)
+                        if reorder_qty <= 0:
+                            reorder_qty = item.minimum_stock_level * 2  # Default to 2x minimum
+                        
+                        items_by_supplier[supplier.id]['items'].append({
+                            'item': item,
+                            'quantity': reorder_qty
+                        })
+                        
+                    except InventoryItem.DoesNotExist:
+                        continue
+                
+                # Create purchase orders for each supplier
+                for supplier_data in items_by_supplier.values():
+                    supplier = supplier_data['supplier']
+                    items = supplier_data['items']
+                    
+                    if not items:
+                        continue
+                    
+                    # Generate PO number
+                    import datetime
+                    po_number = f"PO-{datetime.datetime.now().strftime('%Y%m%d')}-{supplier.supplier_code}"
+                    
+                    # Create purchase order
+                    po = PurchaseOrder.objects.create(
+                        po_number=po_number,
+                        supplier=supplier,
+                        status='draft',
+                        priority='normal',
+                        order_date=timezone.now().date(),
+                        expected_delivery_date=timezone.now().date() + timezone.timedelta(days=supplier.lead_time_days or 7),
+                        payment_terms=supplier.payment_terms,
+                        delivery_terms=supplier.delivery_terms,
+                        requested_by=request.user.employee if hasattr(request.user, 'employee') else None,
+                        notes=f"Auto-generated for low stock items on {timezone.now().date()}"
+                    )
+                    
+                    # Add items to purchase order
+                    total_amount = 0
+                    for item_data in items:
+                        item = item_data['item']
+                        quantity = item_data['quantity']
+                        unit_price = item.unit_cost or 0
+                        line_total = quantity * unit_price
+                        
+                        PurchaseOrderItem.objects.create(
+                            purchase_order=po,
+                            item=item,
+                            quantity=quantity,
+                            unit_price=unit_price,
+                            line_total=line_total,
+                            notes=f"Restock for low inventory (Current: {item.current_stock} {item.unit.abbreviation})"
+                        )
+                        
+                        total_amount += line_total
+                    
+                    # Update purchase order totals
+                    po.subtotal = total_amount
+                    po.total_amount = total_amount
+                    po.save()
+                    
+                    created_orders.append({
+                        'po_number': po.po_number,
+                        'supplier': supplier.name,
+                        'total_amount': float(total_amount),
+                        'item_count': len(items),
+                        'url': f"/business/{request.tenant.slug}/suppliers/orders/{po.id}/"
+                    })
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Created {len(created_orders)} purchase order(s) successfully',
+                'orders': created_orders
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Failed to create purchase orders: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'Invalid request method'
+    })

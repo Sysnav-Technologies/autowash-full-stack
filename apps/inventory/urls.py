@@ -22,6 +22,7 @@ urlpatterns = [
     path('stock-takes/', views.stock_take_list_view, name='stock_take_list'),
     path('stock-takes/create/', views.stock_take_create_view, name='stock_take_create'),
     path('stock-takes/<uuid:pk>/', views.stock_take_detail_view, name='stock_take_detail'),
+    path('stock-takes/<uuid:pk>/edit/', views.stock_take_edit_view, name='stock_take_edit'),
     path('stock-takes/<uuid:pk>/start/', views.start_stock_take, name='start_stock_take'),
     path('stock-takes/<uuid:pk>/complete/', views.complete_stock_take, name='complete_stock_take'),
     path('stock-takes/<uuid:stock_take_id>/count/<uuid:item_id>/', views.update_stock_count, name='update_stock_count'),
@@ -66,6 +67,10 @@ urlpatterns = [
     path('ajax/bay-status/', views.get_bay_status, name='get_bay_status'),
     path('ajax/activity-feed/', views.get_activity_feed, name='get_activity_feed'),
     path('ajax/update-target/', views.update_operations_target, name='update_operations_target'),
+    path('ajax/create-purchase-orders/', views.create_purchase_orders_ajax, name='create_purchase_orders_ajax'),
+    
+    # API endpoints (alternative paths)
+    path('api/search-items/', views.item_search_ajax, name='api_item_search'),
     # path('ajax/stock-check/', views.stock_check_ajax, name='stock_check'),
     
     # # Mobile/Quick Actions
