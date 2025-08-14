@@ -1,396 +1,431 @@
 {% extends 'base/base.html' %}
 {% load static %}
+{% load humanize %}
 {% load math_filters %}
 
 {% block title %}{{ item.name }} - Inventory - {{ request.tenant.name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+<style>
+    .item-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px 0;
+        margin: -20px -20px 30px -20px;
+        border-radius: 0 0 15px 15px;
+    }
+    
+    .item-image-container {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    
+    .item-main-image {
+        width: 200px;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        border: 4px solid white;
+    }
+    
+    .item-placeholder-large {
+        width: 200px;
+        height: 200px;
+        border-radius: 15px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        border: 4px solid white;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    
+    .info-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .info-card h5 {
+        color: #495057;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f1f3f4;
+    }
+    
+    .stock-status {
+        padding: 8px 16px;
+        border-radius: 25px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-block;
+    }
+    
+    .stock-status.normal {
+        background: #d1f2eb;
+        color: #0c5460;
+        border: 2px solid #b6f7d8;
+    }
+    
+    .stock-status.low {
+        background: #fff3cd;
+        color: #856404;
+        border: 2px solid #ffeaa7;
+    }
+    
+    .stock-status.out {
+        background: #f8d7da;
+        color: #721c24;
+        border: 2px solid #f5c6cb;
+    }
+    
+    .stock-status.over {
+        background: #cce5ff;
+        color: #004085;
+        border: 2px solid #b3d7ff;
+    }
+    
+    .stat-box {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%);
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 15px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .stat-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #495057;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .action-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s ease;
+        margin-bottom: 10px;
+        width: 100%;
+        text-align: center;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .action-btn.success {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    }
+    
+    .action-btn.warning {
+        background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+    }
+    
+    .action-btn.danger {
+        background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%);
+    }
+    
+    .movement-item, .consumption-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 0;
+        border-bottom: 1px solid #f1f3f4;
+    }
+    
+    .movement-item:last-child, .consumption-item:last-child {
+        border-bottom: none;
+    }
+    
+    .movement-badge {
+        padding: 4px 10px;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .movement-badge.in {
+        background: #d1f2eb;
+        color: #0c5460;
+    }
+    
+    .movement-badge.out {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .breadcrumb-custom {
+        background: rgba(255,255,255,0.1);
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 0;
+    }
+    
+    .breadcrumb-custom a {
+        color: rgba(255,255,255,0.8);
+        text-decoration: none;
+    }
+    
+    .breadcrumb-custom a:hover {
+        color: white;
+    }
+    
+    .breadcrumb-custom .breadcrumb-current {
+        color: white;
+        font-weight: 500;
+    }
+    
+    .alert-item {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: between;
+        align-items: center;
+    }
+    
+    .progress-custom {
+        height: 25px;
+        border-radius: 15px;
+        background: #e9ecef;
+        overflow: hidden;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .progress-bar-custom {
+        height: 100%;
+        border-radius: 15px;
+        transition: width 0.6s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <div class="page-breadcrumb">
-            <a href="/business/{{ request.tenant.slug }}/inventory/" class="breadcrumb-link">Inventory</a>
-            <i class="fas fa-chevron-right"></i>
-            <a href="/business/{{ request.tenant.slug }}/inventory/items/" class="breadcrumb-link">Items</a>
-            <i class="fas fa-chevron-right"></i>
+<div class="item-header">
+    <div class="container">
+        <div class="breadcrumb-custom">
+            <a href="/business/{{ request.tenant.slug }}/inventory/">Inventory</a>
+            <i class="fas fa-chevron-right mx-2"></i>
+            <a href="/business/{{ request.tenant.slug }}/inventory/items/">Items</a>
+            <i class="fas fa-chevron-right mx-2"></i>
             <span class="breadcrumb-current">{{ item.name }}</span>
         </div>
-        <h1 class="page-title">
-            {{ item.name }}
-            <span class="stock-status {{ item.stock_status }}">
-                {{ item.get_stock_status_display }}
-            </span>
-        </h1>
-        <div class="page-actions">
-            <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.id }}/" class="btn btn-success">
-                <i class="fas fa-exchange-alt"></i>
-                Stock Adjustment
-            </a>
-            <div class="dropdown">
-                <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                    <i class="fas fa-cog"></i>
-                    Actions
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/edit/">
-                        <i class="fas fa-edit"></i> Edit Item
-                    </a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#locationModal">
-                        <i class="fas fa-map-marker-alt"></i> Manage Locations
-                    </a></li>
-                    <li><a class="dropdown-item" href="#" onclick="printItemDetails()">
-                        <i class="fas fa-print"></i> Print Details
-                    </a></li>
-                </ul>
+        
+        <div class="row align-items-center mt-4">
+            <div class="col-md-8">
+                <h1 class="mb-2">
+                    {{ item.name }}
+                    <span class="stock-status {{ item.stock_status }} ms-3">
+                        {{ item.get_stock_status_display }}
+                    </span>
+                </h1>
+                <p class="mb-0 opacity-75">
+                    SKU: {{ item.sku }} | Category: {{ item.category.name|default:"Uncategorized" }}
+                </p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="item-image-container">
+                    {% if item.image %}
+                        <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-main-image">
+                    {% else %}
+                        <div class="item-placeholder-large">
+                            <i class="fas fa-box fa-4x text-muted"></i>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <div class="row">
-    <!-- Item Information -->
+    <!-- Main Content -->
     <div class="col-md-8">
         <!-- Basic Information -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-info-circle"></i>
-                    Item Information
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label text-muted">Name</label>
-                                    <div class="form-control-plaintext">{{ item.name }}</div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label text-muted">SKU</label>
-                                    <div class="form-control-plaintext">
-                                        <code>{{ item.sku }}</code>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label text-muted">Category</label>
-                                    <div class="form-control-plaintext">
-                                        {% if item.category %}
-                                            <a href="/business/{{ request.tenant.slug }}/inventory/categories/{{ item.category.id }}/" class="text-decoration-none">
-                                                {{ item.category.name }}
-                                            </a>
-                                        {% else %}
-                                            <span class="text-muted">No category</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label text-muted">Type</label>
-                                    <div class="form-control-plaintext">{{ item.get_item_type_display }}</div>
-                                </div>
-                            </div>
-                            {% if item.barcode %}
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label text-muted">Barcode</label>
-                                    <div class="form-control-plaintext">
-                                        <code>{{ item.barcode }}</code>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endif %}
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label text-muted">Unit</label>
-                                    <div class="form-control-plaintext">{{ item.unit.name }} ({{ item.unit.abbreviation }})</div>
-                                </div>
-                            </div>
-                        </div>
-                        {% if item.description %}
-                        <div class="mb-3">
-                            <label class="form-label text-muted">Description</label>
-                            <div class="form-control-plaintext">{{ item.description }}</div>
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-4 text-center">
-                        {% if item.image %}
-                            <img src="{{ item.image.url }}" alt="{{ item.name }}" class="img-fluid rounded" style="max-height: 200px;">
-                        {% else %}
-                            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 200px;">
-                                <i class="fas fa-box fa-4x text-muted"></i>
-                            </div>
-                        {% endif %}
-                    </div>
+        <div class="info-card">
+            <h5><i class="fas fa-info-circle text-primary"></i> Basic Information</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Name:</strong> {{ item.name }}</p>
+                    <p><strong>SKU:</strong> <code>{{ item.sku }}</code></p>
+                    <p><strong>Category:</strong> {{ item.category.name|default:"Uncategorized" }}</p>
+                    <p><strong>Type:</strong> {{ item.get_item_type_display }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Unit:</strong> {{ item.unit.name }} ({{ item.unit.abbreviation }})</p>
+                    <p><strong>Unit Cost:</strong> KES {{ item.unit_cost|floatformat:2 }}</p>
+                    <p><strong>Supplier:</strong> {{ item.primary_supplier.name|default:"Not assigned" }}</p>
+                    <p><strong>Barcode:</strong> {{ item.barcode|default:"Not set" }}</p>
                 </div>
             </div>
+            {% if item.description %}
+                <div class="mt-3">
+                    <strong>Description:</strong>
+                    <p class="text-muted">{{ item.description }}</p>
+                </div>
+            {% endif %}
         </div>
 
         <!-- Stock Information -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-warehouse"></i>
-                    Stock Information
-                </h5>
+        <div class="info-card">
+            <h5><i class="fas fa-cubes text-success"></i> Stock Information</h5>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <div class="stat-value">{{ item.current_stock }}</div>
+                        <div class="stat-label">Current Stock</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <div class="stat-value">{{ item.minimum_stock_level }}</div>
+                        <div class="stat-label">Min Level</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <div class="stat-value">{{ item.maximum_stock_level }}</div>
+                        <div class="stat-label">Max Level</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <div class="stat-value">{{ item.reorder_point }}</div>
+                        <div class="stat-label">Reorder Point</div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="text-center mb-3">
-                            <div class="stat-value text-primary">{{ item.current_stock }}</div>
-                            <div class="stat-label">Current Stock</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center mb-3">
-                            <div class="stat-value text-warning">{{ item.minimum_stock_level }}</div>
-                            <div class="stat-label">Minimum Level</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center mb-3">
-                            <div class="stat-value text-success">{{ item.maximum_stock_level }}</div>
-                            <div class="stat-label">Maximum Level</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center mb-3">
-                            <div class="stat-value text-info">{{ item.reorder_point }}</div>
-                            <div class="stat-label">Reorder Point</div>
-                        </div>
+            
+            <!-- Stock Level Progress Bar -->
+            <div class="mt-3">
+                <label class="form-label">Stock Level Progress</label>
+                <div class="progress-custom">
+                    <div class="progress-bar-custom" 
+                         style="width: {{ stock_percentage }}%; 
+                                background: {% if item.current_stock <= 0 %}#dc3545{% elif item.current_stock <= item.minimum_stock_level %}#ffc107{% elif item.current_stock >= item.maximum_stock_level %}#17a2b8{% else %}#28a745{% endif %};">
+                        {{ stock_percentage|floatformat:1 }}%
                     </div>
                 </div>
-                
-                <!-- Stock Progress -->
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Stock Level Progress</span>
-                        <span class="text-muted">{{ item.current_stock }}/{{ item.maximum_stock_level }}</span>
-                    </div>
-                    <div class="stock-progress">
-                        {% if item.current_stock <= item.minimum_stock_level %}
-                            <div class="stock-progress-bar danger" style="width: {{ item.stock_percentage|floatformat:0 }}%"></div>
-                        {% elif item.current_stock <= item.reorder_point %}
-                            <div class="stock-progress-bar warning" style="width: {{ item.stock_percentage|floatformat:0 }}%"></div>
-                        {% else %}
-                            <div class="stock-progress-bar" style="width: {{ item.stock_percentage|floatformat:0 }}%"></div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                {% if item.reorder_quantity %}
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label text-muted">Reorder Quantity</label>
-                            <div class="form-control-plaintext">{{ item.reorder_quantity }}</div>
-                        </div>
-                    </div>
-                    {% if stats.days_until_stockout > 0 %}
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label text-muted">Days Until Stockout</label>
-                            <div class="form-control-plaintext">
-                                <span class="{% if stats.days_until_stockout <= 7 %}text-danger{% elif stats.days_until_stockout <= 14 %}text-warning{% else %}text-success{% endif %}">
-                                    {{ stats.days_until_stockout|floatformat:0 }} days
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
             </div>
         </div>
 
-        <!-- Pricing Information -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-dollar-sign"></i>
-                    Pricing & Valuation
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <div class="stat-value text-primary">KES {{ item.unit_cost }}</div>
-                            <div class="stat-label">Unit Cost</div>
-                        </div>
-                    </div>
-                    {% if item.selling_price %}
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <div class="stat-value text-success">KES {{ item.selling_price }}</div>
-                            <div class="stat-label">Selling Price</div>
-                        </div>
-                    </div>
-                    {% endif %}
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <div class="stat-value text-info">KES {{ item.stock_value|floatformat:2 }}</div>
-                            <div class="stat-label">Stock Value</div>
-                        </div>
+        <!-- Financial Information -->
+        <div class="info-card">
+            <h5><i class="fas fa-dollar-sign text-warning"></i> Financial Information</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <div class="stat-value">KES {{ item.unit_cost|floatformat:2 }}</div>
+                        <div class="stat-label">Unit Cost</div>
                     </div>
                 </div>
-                
-                {% if item.selling_price and item.unit_cost %}
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label text-muted">Profit Margin</label>
-                            <div class="form-control-plaintext">
-                                {% with margin=item.selling_price|floatformat:2|add:0|sub:item.unit_cost|floatformat:2|add:0 %}
-                                    KES {{ margin|floatformat:2 }} 
-                                    ({% widthratio margin item.selling_price 100 %}%)
-                                {% endwith %}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label text-muted">Markup</label>
-                            <div class="form-control-plaintext">
-                                {% with markup=item.selling_price|floatformat:2|add:0|sub:item.unit_cost|floatformat:2|add:0 %}
-                                    {% widthratio markup item.unit_cost 100 %}%
-                                {% endwith %}
-                            </div>
-                        </div>
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <div class="stat-value">KES {{ item.current_stock|mul:item.unit_cost|floatformat:0|intcomma }}</div>
+                        <div class="stat-label">Total Value</div>
                     </div>
                 </div>
-                {% endif %}
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <div class="stat-value">{{ stats.avg_daily_consumption|floatformat:1 }}</div>
+                        <div class="stat-label">Daily Usage</div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Recent Stock Movements -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-exchange-alt"></i>
-                    Recent Stock Movements
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if recent_movements %}
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Quantity</th>
-                                    <th>Old Stock</th>
-                                    <th>New Stock</th>
-                                    <th>Reason</th>
-                                    <th>Created By</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for movement in recent_movements %}
-                                    <tr>
-                                        <td>{{ movement.created_at|date:"M d, Y H:i" }}</td>
-                                        <td>
-                                            <span class="movement-type-badge {{ movement.movement_type }}">
-                                                {{ movement.get_movement_type_display }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="movement-{{ movement.movement_type }}">
-                                                {% if movement.movement_type == 'in' %}+{% elif movement.movement_type == 'out' %}-{% endif %}{{ movement.quantity }}
-                                            </span>
-                                        </td>
-                                        <td>{{ movement.old_stock }}</td>
-                                        <td>{{ movement.new_stock }}</td>
-                                        <td>{{ movement.reason|default:"-" }}</td>
-                                        <td>
-                                            {% if movement.created_by %}
-                                                {{ movement.created_by.get_full_name|default:movement.created_by.username }}
-                                            {% else %}
-                                                <span class="text-muted">System</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+        <div class="info-card">
+            <h5><i class="fas fa-exchange-alt text-info"></i> Recent Stock Movements</h5>
+            {% if recent_movements %}
+                {% for movement in recent_movements %}
+                    <div class="movement-item">
+                        <div>
+                            <strong>{{ movement.get_movement_type_display }}</strong>
+                            <span class="movement-badge {{ movement.movement_type }}">
+                                {% if movement.movement_type == 'in' %}+{% else %}-{% endif %}{{ movement.quantity }} {{ item.unit.abbreviation }}
+                            </span>
+                            <br>
+                            <small class="text-muted">
+                                {{ movement.reason|default:"No reason provided" }} • {{ movement.created_at|naturaltime }}
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">
+                                {% if movement.created_by %}
+                                    {{ movement.created_by.get_full_name|default:movement.created_by.username }}
+                                {% else %}
+                                    System
+                                {% endif %}
+                            </small>
+                        </div>
                     </div>
-                    <div class="text-center mt-3">
-                        <a href="/business/{{ request.tenant.slug }}/inventory/stock/movements/?item={{ item.id }}" class="btn btn-outline-primary btn-sm">
-                            View All Movements
-                        </a>
-                    </div>
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-exchange-alt fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">No stock movements yet</p>
-                    </div>
-                {% endif %}
-            </div>
+                {% endfor %}
+                <div class="text-center mt-3">
+                    <a href="/business/{{ request.tenant.slug }}/inventory/stock/movements/?item={{ item.id }}" class="btn btn-outline-info btn-sm">
+                        View All Movements
+                    </a>
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-exchange-alt text-muted fa-3x mb-3"></i>
+                    <p class="text-muted">No stock movements recorded</p>
+                </div>
+            {% endif %}
         </div>
+
         <!-- Recent Consumption -->
         {% if recent_consumption %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-line"></i>
-                    Recent Consumption (Last 30 Days)
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Service Order</th>
-                                <th>Service</th>
-                                <th>Quantity Used</th>
-                                <th>Cost</th>
-                                <th>Used By</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for consumption in recent_consumption %}
-                                <tr>
-                                    <td>{{ consumption.created_at|date:"M d, Y H:i" }}</td>
-                                    <td>
-                                        {% if consumption.service_order %}
-                                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ consumption.service_order.id }}/" class="text-decoration-none">
-                                                {{ consumption.service_order.order_number }}
-                                            </a>
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if consumption.service %}
-                                            {{ consumption.service.name }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ consumption.quantity }}</td>
-                                    <td>KES {{ consumption.unit_cost|floatformat:2 }}</td>
-                                    <td>{{ consumption.used_by.get_full_name|default:consumption.used_by.username }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        <div class="info-card">
+            <h5><i class="fas fa-chart-line text-danger"></i> Recent Consumption</h5>
+            {% for consumption in recent_consumption %}
+                <div class="consumption-item">
+                    <div>
+                        <strong>Service Order #{{ consumption.service_order.id }}</strong><br>
+                        <small class="text-muted">
+                            {{ consumption.service.name }} • {{ consumption.quantity }} {{ item.unit.abbreviation }} • 
+                            {{ consumption.created_at|naturaltime }}
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        <span class="text-danger">-{{ consumption.quantity }}</span><br>
+                        <small class="text-muted">{{ consumption.used_by.get_full_name|default:consumption.used_by.username }}</small>
+                    </div>
                 </div>
-            </div>
+            {% endfor %}
         </div>
         {% endif %}
     </div>
@@ -398,362 +433,77 @@
     <!-- Sidebar -->
     <div class="col-md-4">
         <!-- Quick Actions -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-bolt"></i>
-                    Quick Actions
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.id }}/" class="btn btn-success">
-                        <i class="fas fa-plus-circle"></i>
-                        Add Stock
-                    </a>
-                    <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.id }}/" class="btn btn-warning">
-                        <i class="fas fa-minus-circle"></i>
-                        Remove Stock
-                    </a>
-                    <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#consumptionModal">
-                        <i class="fas fa-tools"></i>
-                        Record Usage
-                    </button>
-                    <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/edit/" class="btn btn-outline-primary">
-                        <i class="fas fa-edit"></i>
-                        Edit Item
-                    </a>
-                </div>
-            </div>
+        <div class="info-card">
+            <h5><i class="fas fa-bolt text-primary"></i> Quick Actions</h5>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.id }}/" class="action-btn success">
+                <i class="fas fa-plus-circle"></i> Add Stock
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.id }}/" class="action-btn warning">
+                <i class="fas fa-minus-circle"></i> Remove Stock
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/edit/" class="action-btn">
+                <i class="fas fa-edit"></i> Edit Item
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock/movements/?item={{ item.id }}" class="action-btn">
+                <i class="fas fa-history"></i> View History
+            </a>
         </div>
 
         <!-- Active Alerts -->
         {% if active_alerts %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-exclamation-triangle text-warning"></i>
-                    Active Alerts
-                </h5>
-            </div>
-            <div class="card-body">
-                {% for alert in active_alerts %}
-                    <div class="alert-item {% if alert.alert_type == 'low_stock' %}low-stock{% elif alert.alert_type == 'out_of_stock' %}out-of-stock{% endif %}">
-                        <div class="alert-icon {% if alert.priority == 'high' %}danger{% else %}warning{% endif %}">
-                            <i class="fas fa-{% if alert.alert_type == 'out_of_stock' %}times{% else %}exclamation{% endif %}"></i>
-                        </div>
-                        <div class="alert-content">
-                            <div class="alert-title">{{ alert.get_alert_type_display }}</div>
-                            <div class="alert-description">{{ alert.message }}</div>
-                        </div>
-                        <form method="POST" action="/business/{{ request.tenant.slug }}/inventory/alerts/{{ alert.id }}/resolve/" class="d-inline">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-success" title="Resolve Alert">
-                                <i class="fas fa-check"></i>
-                            </button>
-                        </form>
+        <div class="info-card">
+            <h5><i class="fas fa-bell text-warning"></i> Active Alerts</h5>
+            {% for alert in active_alerts %}
+                <div class="alert-item">
+                    <div class="flex-fill">
+                        <strong>{{ alert.get_alert_type_display }}</strong><br>
+                        <small>{{ alert.message }}</small>
                     </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Storage Locations -->
-        {% if locations %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-map-marker-alt"></i>
-                    Storage Locations
-                </h5>
-            </div>
-            <div class="card-body">
-                {% for location in locations %}
-                    <div class="mb-3 p-2 border rounded">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong>{{ location.warehouse|default:"Main Warehouse" }}</strong>
-                                {% if location.zone %}<br><small class="text-muted">Zone: {{ location.zone }}</small>{% endif %}
-                                {% if location.aisle %}<br><small class="text-muted">Aisle: {{ location.aisle }}</small>{% endif %}
-                                {% if location.shelf %}<br><small class="text-muted">Shelf: {{ location.shelf }}</small>{% endif %}
-                                {% if location.bin %}<br><small class="text-muted">Bin: {{ location.bin }}</small>{% endif %}
-                            </div>
-                            <div class="text-end">
-                                <div class="fw-bold">{{ location.quantity }}</div>
-                                {% if location.is_primary %}
-                                    <span class="badge badge-primary">Primary</span>
-                                {% endif %}
-                                {% if location.is_picking_location %}
-                                    <span class="badge badge-info">Picking</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-                
-                <button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#locationModal">
-                    <i class="fas fa-plus"></i>
-                    Add Location
-                </button>
-            </div>
+                    <a href="/business/{{ request.tenant.slug }}/inventory/alerts/{{ alert.id }}/resolve/" 
+                       class="btn btn-sm btn-outline-warning ms-2">
+                        Resolve
+                    </a>
+                </div>
+            {% endfor %}
         </div>
         {% endif %}
 
         <!-- Statistics -->
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-bar"></i>
-                    Statistics
-                </h5>
+        <div class="info-card">
+            <h5><i class="fas fa-chart-bar text-info"></i> Statistics</h5>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.movements_in|default:0 }}</div>
+                <div class="stat-label">Total Received</div>
             </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Movements In:</span>
-                        <span class="fw-bold text-success">{{ stats.movements_in|floatformat:0 }}</span>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Movements Out:</span>
-                        <span class="fw-bold text-danger">{{ stats.movements_out|floatformat:0 }}</span>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Total Consumed:</span>
-                        <span class="fw-bold text-info">{{ stats.total_consumed|floatformat:0 }}</span>
-                    </div>
-                </div>
-                {% if stats.avg_daily_consumption > 0 %}
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Daily Usage (Avg):</span>
-                        <span class="fw-bold">{{ stats.avg_daily_consumption|floatformat:1 }}</span>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <hr>
-                
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Created:</span>
-                        <span>{{ item.created_at|date:"M d, Y" }}</span>
-                    </div>
-                </div>
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Updated:</span>
-                        <span>{{ item.updated_at|date:"M d, Y" }}</span>
-                    </div>
-                </div>
-                {% if item.created_by %}
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Created By:</span>
-                        <span>{{ item.created_by.get_full_name|default:item.created_by.username }}</span>
-                    </div>
-                </div>
-                {% endif %}
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.movements_out|default:0 }}</div>
+                <div class="stat-label">Total Issued</div>
             </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.total_consumed|default:0 }}</div>
+                <div class="stat-label">Total Consumed</div>
+            </div>
+            {% if stats.days_until_stockout > 0 %}
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.days_until_stockout|floatformat:0 }}</div>
+                <div class="stat-label">Days Until Stockout</div>
+            </div>
+            {% endif %}
         </div>
+
+        <!-- Locations -->
+        {% if locations %}
+        <div class="info-card">
+            <h5><i class="fas fa-map-marker-alt text-secondary"></i> Storage Locations</h5>
+            {% for location in locations %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>{{ location.name }}</span>
+                    <span class="badge bg-light text-dark">{{ location.current_stock }} {{ item.unit.abbreviation }}</span>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 </div>
 
-<!-- Location Management Modal -->
-<div class="modal fade" id="locationModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Manage Storage Locations</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="locationForm">
-                    {% csrf_token %}
-                    <input type="hidden" name="item" value="{{ item.id }}">
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Warehouse</label>
-                                <input type="text" class="form-control" name="warehouse" placeholder="Main Warehouse">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Zone</label>
-                                <input type="text" class="form-control" name="zone" placeholder="A">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Aisle</label>
-                                <input type="text" class="form-control" name="aisle" placeholder="A1">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Shelf</label>
-                                <input type="text" class="form-control" name="shelf" placeholder="1">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Bin</label>
-                                <input type="text" class="form-control" name="bin" placeholder="A">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Quantity</label>
-                                <input type="number" class="form-control" name="quantity" step="0.01" required>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="is_primary" id="isPrimary">
-                                <label class="form-check-label" for="isPrimary">
-                                    Primary Location
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="is_picking_location" id="isPickingLocation">
-                                <label class="form-check-label" for="isPickingLocation">
-                                    Picking Location
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveLocation()">Save Location</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Consumption Modal -->
-<div class="modal fade" id="consumptionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Record Item Usage</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="consumptionForm">
-                    {% csrf_token %}
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Service Order (Optional)</label>
-                        <input type="text" class="form-control" name="service_order_id" placeholder="Enter order number">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Quantity Used <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" name="quantity" step="0.01" required max="{{ item.current_stock }}">
-                            <span class="input-group-text">{{ item.unit.abbreviation }}</span>
-                        </div>
-                        <div class="form-text">Available: {{ item.current_stock }} {{ item.unit.abbreviation }}</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Reason/Notes</label>
-                        <textarea class="form-control" name="notes" rows="3" placeholder="Reason for usage..."></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="recordConsumption()">Record Usage</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% endblock %}
-
-{% block extra_js %}
-<script>
-// Location management
-function saveLocation() {
-    const form = document.getElementById('locationForm');
-    const formData = new FormData(form);
-    
-    fetch(`/business/{{ request.tenant.slug }}/inventory/locations/create/`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error saving location: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error saving location');
-    });
-}
-
-// Consumption recording
-function recordConsumption() {
-    const form = document.getElementById('consumptionForm');
-    const formData = new FormData(form);
-    formData.append('item_id', '{{ item.id }}');
-    
-    fetch(`/business/{{ request.tenant.slug }}/inventory/ajax/consumption/`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error recording consumption: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error recording consumption');
-    });
-}
-
-// Print item details
-function printItemDetails() {
-    window.print();
-}
-
-// Calculate stock percentage for progress bar
-document.addEventListener('DOMContentLoaded', function() {
-    const currentStock = {{ item.current_stock }};
-    const maxStock = {{ item.maximum_stock_level }};
-    const percentage = Math.min((currentStock / maxStock) * 100, 100);
-    
-    const progressBar = document.querySelector('.stock-progress-bar');
-    if (progressBar && !progressBar.style.width) {
-        progressBar.style.width = percentage + '%';
-    }
-});
-</script>
 {% endblock %}

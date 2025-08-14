@@ -1,3 +1,4 @@
+
 import csv
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
@@ -16,6 +17,8 @@ from apps.core.decorators import employee_required, ajax_required, owner_require
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
 from apps.employees.models import Employee
 from apps.payments.models import Payment
+from django.views.decorators.http import require_GET
+
 from .models import (
     Service, ServiceCategory, ServicePackage, ServiceOrder, 
     ServiceOrderItem, ServiceQueue, ServiceBay
@@ -74,6 +77,23 @@ def get_business_url(request, url_name, **kwargs):
         url = url.replace(f"{{{key}}}", str(value))
     
     return url
+
+@login_required
+@employee_required()
+@require_GET
+def services_list_ajax(request):
+    """AJAX endpoint to return a list of all active services as JSON."""
+    services = Service.objects.filter(is_active=True).select_related('category')
+    services_list = []
+    for s in services:
+        services_list.append({
+            'id': s.id,
+            'name': s.name,
+            'base_price': float(s.base_price) if s.base_price is not None else 0,
+            'category': s.category.name if s.category else 'Uncategorized',
+            'estimated_duration': s.estimated_duration if hasattr(s, 'estimated_duration') else 0
+        })
+    return JsonResponse({'services': services_list})
 
 @login_required
 @employee_required()
@@ -1078,7 +1098,7 @@ def service_edit_view(request, pk):
         if form.is_valid():
             service = form.save()
             messages.success(request, f'Service "{service.name}" updated successfully!')
-            return redirect('services:detail', pk=service.pk)
+            return redirect(get_business_url(request, 'services:detail', pk=service.pk))
     else:
         form = ServiceForm(instance=service)
     
@@ -1098,7 +1118,7 @@ def service_delete_view(request, pk):
     if request.method == 'POST':
         service.delete()  # Soft delete
         messages.success(request, f'Service "{service.name}" deleted successfully!')
-        return redirect('services:list')
+    return redirect(get_business_url(request, 'services:list'))
     
     context = {
         'service': service,
@@ -1129,7 +1149,7 @@ def category_create_view(request):
         if form.is_valid():
             category = form.save()
             messages.success(request, f'Category "{category.name}" created successfully!')
-            return redirect('services:category_list')
+            return redirect(get_business_url(request, 'services:category_list'))
     else:
         form = ServiceCategoryForm()
     
@@ -1150,7 +1170,7 @@ def category_edit_view(request, pk):
         if form.is_valid():
             category = form.save()
             messages.success(request, f'Category "{category.name}" updated successfully!')
-            return redirect('services:category_list')
+            return redirect(get_business_url(request, 'services:category_list'))
     else:
         form = ServiceCategoryForm(instance=category)
     
@@ -1170,7 +1190,7 @@ def cancel_service(request, order_id):
     
     if not order.can_be_cancelled:
         messages.error(request, 'This order cannot be cancelled.')
-        return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     cancellation_reason = request.POST.get('reason', '')
     
@@ -1190,7 +1210,7 @@ def cancel_service(request, order_id):
         queue_entry.save()
     
     messages.success(request, f'Order {order.order_number} cancelled successfully.')
-    return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 @login_required
 @employee_required()
@@ -1201,7 +1221,7 @@ def pause_service(request, order_id):
     
     if order.status != 'in_progress':
         messages.error(request, 'Service is not in progress.')
-        return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     # Record pause time in internal notes
     order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
@@ -1222,7 +1242,7 @@ def pause_service(request, order_id):
     from apps.core.utils import get_business_url
     return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
-    return redirect('services:order_detail', pk=order.pk)@login_required
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 @employee_required()
 @require_POST
 def resume_service(request, order_id):
@@ -1231,14 +1251,14 @@ def resume_service(request, order_id):
     
     if order.status != 'in_progress':
         messages.error(request, 'Service is not paused.')
-        return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     # Record resume time in internal notes
     order.internal_notes += f"\nResumed by {request.employee.full_name} at {timezone.now()}"
     order.save()
     
     messages.success(request, 'Service resumed.')
-    return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 @login_required
 @employee_required()
@@ -1249,13 +1269,13 @@ def process_payment(request, order_id):
     # Check if payment can be processed
     if not order.can_process_payment():
         messages.error(request, 'Payment cannot be processed for this order.')
-        return redirect('services:order_detail', order_id=order.id)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.id))
     
     # Get tenant slug for proper URL routing
     tenant_slug = request.tenant.slug
     
     # Redirect with business slug
-    return redirect(f'/business/{tenant_slug}/payments/create/{order.id}/')
+    return redirect(get_business_url(request, 'payments:create', order_id=order.id))
 
 @login_required
 @employee_required()
@@ -1273,7 +1293,7 @@ def payment_receipt(request, order_id):
     if not latest_payment:
         messages.warning(request, 'No completed payment found for this order.')
         tenant_slug = request.tenant.slug
-        return redirect(f'/business/{tenant_slug}/payments/create/{order.id}/')
+    return redirect(get_business_url(request, 'payments:create', order_id=order.id))
     
     context = {
         'order': order,
@@ -2102,7 +2122,7 @@ def package_create_view(request):
         if form.is_valid():
             package = form.save()
             messages.success(request, f'Package "{package.name}" created successfully!')
-            return redirect('services:package_detail', pk=package.pk)
+            return redirect(get_business_url(request, 'services:package_detail', pk=package.pk))
     else:
         form = ServicePackageForm()
     
@@ -2137,7 +2157,7 @@ def package_edit_view(request, pk):
         if form.is_valid():
             package = form.save()
             messages.success(request, f'Package "{package.name}" updated successfully!')
-            return redirect('services:package_detail', pk=package.pk)
+            return redirect(get_business_url(request, 'services:package_detail', pk=package.pk))
     else:
         form = ServicePackageForm(instance=package)
     

@@ -66,14 +66,14 @@ def check_low_stock_alert(sender, instance, **kwargs):
             
             # Check if stock changed and is now below minimum
             if (old_instance.current_stock != instance.current_stock and 
-                instance.current_stock <= instance.minimum_stock and
-                old_instance.current_stock > instance.minimum_stock):
+                instance.current_stock <= instance.minimum_stock_level and
+                old_instance.current_stock > instance.minimum_stock_level):
                 
                 # Send low stock alert
                 send_low_stock_alert(
                     inventory_item=instance,
                     current_stock=instance.current_stock,
-                    minimum_stock=instance.minimum_stock
+                    minimum_stock=instance.minimum_stock_level
                 )
                 logger.info(f"Low stock alert sent for {instance.name}")
                 

@@ -1,0 +1,504 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Reports Library{% endblock %}
+
+{% block extra_css %}
+<style>
+    .reports-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .reports-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M0 0h40v40H0V0zm10 10h20v20H10V10z'/%3E%3C/g%3E%3C/svg%3E") repeat;
+        z-index: 0;
+    }
+    
+    .filter-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    
+    .report-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .report-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        border: 1px solid #f0f0f0;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .report-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        border-color: #667eea;
+    }
+    
+    .report-type-badge {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .report-type-badge.employee_performance {
+        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        color: white;
+    }
+    
+    .report-type-badge.service_performance {
+        background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        color: white;
+    }
+    
+    .report-type-badge.payment_summary {
+        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        color: white;
+    }
+    
+    .report-type-badge.customer_analysis {
+        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        color: white;
+    }
+    
+    .report-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .report-icon.employee_performance {
+        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        color: white;
+    }
+    
+    .report-icon.service_performance {
+        background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        color: white;
+    }
+    
+    .report-icon.payment_summary {
+        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        color: white;
+    }
+    
+    .report-icon.customer_analysis {
+        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        color: white;
+    }
+    
+    .report-meta {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .report-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-view {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .btn-view:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .btn-export {
+        background: #f8f9fa;
+        color: #495057;
+        border: 1px solid #dee2e6;
+    }
+    
+    .btn-export:hover {
+        background: #e9ecef;
+        color: #495057;
+        text-decoration: none;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    
+    .empty-icon {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 2rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        color: #6c757d;
+    }
+    
+    .pagination-wrapper {
+        display: flex;
+        justify-content: center;
+        margin-top: 2rem;
+    }
+    
+    .page-link {
+        border-radius: 8px;
+        margin: 0 2px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .page-link:hover {
+        background: #667eea;
+        border-color: #667eea;
+        color: white;
+    }
+    
+    .page-item.active .page-link {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: #667eea;
+    }
+    
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .status-completed {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-processing {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-failed {
+        background: #f8d7da;
+        color: #721c24;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Reports Header -->
+    <div class="reports-header">
+        <div class="position-relative">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="display-6 mb-2">
+                        <i class="fas fa-chart-bar me-3"></i>
+                        Reports Library
+                    </h1>
+                    <p class="lead mb-0">Access and manage all your business reports</p>
+                    <p class="mb-0 opacity-75">
+                        <i class="fas fa-file-alt me-2"></i>
+                        {{ page_obj.paginator.count }} report{{ page_obj.paginator.count|pluralize }} available
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="/business/{{ request.tenant.slug }}/reports/" class="btn btn-light btn-lg me-2">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/reports/generate/" class="btn btn-success btn-lg">
+                        <i class="fas fa-plus me-2"></i>Generate New
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="type" class="form-label fw-bold">
+                    <i class="fas fa-filter me-2"></i>Filter by Type
+                </label>
+                <select name="type" id="type" class="form-select">
+                    <option value="">All Report Types</option>
+                    {% for value, label in report_types %}
+                        <option value="{{ value }}" {% if current_type == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="date_from" class="form-label fw-bold">
+                    <i class="fas fa-calendar me-2"></i>Date From
+                </label>
+                <input type="date" name="date_from" id="date_from" class="form-control" value="{{ request.GET.date_from }}">
+            </div>
+            <div class="col-md-4">
+                <label for="date_to" class="form-label fw-bold">Date To</label>
+                <input type="date" name="date_to" id="date_to" class="form-control" value="{{ request.GET.date_to }}">
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search me-2"></i>Apply Filters
+                </button>
+                <a href="/business/{{ request.tenant.slug }}/reports/list/" class="btn btn-outline-secondary ms-2">
+                    <i class="fas fa-times me-2"></i>Clear Filters
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Reports Grid -->
+    {% if page_obj.object_list %}
+    <div class="report-grid">
+        {% for report in page_obj.object_list %}
+        <div class="report-card">
+            <div class="report-type-badge {{ report.report_type }}">
+                {{ report.get_report_type_display }}
+            </div>
+            
+            <div class="report-icon {{ report.report_type }}">
+                {% if report.report_type == 'employee_performance' %}
+                    <i class="fas fa-users"></i>
+                {% elif report.report_type == 'service_performance' %}
+                    <i class="fas fa-cogs"></i>
+                {% elif report.report_type == 'payment_summary' %}
+                    <i class="fas fa-credit-card"></i>
+                {% elif report.report_type == 'customer_analysis' %}
+                    <i class="fas fa-user-chart"></i>
+                {% else %}
+                    <i class="fas fa-chart-line"></i>
+                {% endif %}
+            </div>
+            
+            <h5 class="mb-2">{{ report.title }}</h5>
+            <p class="text-muted mb-3">{{ report.description|default:"No description provided"|truncatechars:80 }}</p>
+            
+            <div class="report-meta">
+                <div class="flex-grow-1">
+                    <small class="text-muted d-block">
+                        <i class="fas fa-calendar-alt me-1"></i>
+                        Generated: {{ report.created_at|date:"M j, Y" }}
+                    </small>
+                    <small class="text-muted d-block">
+                        <i class="fas fa-clock me-1"></i>
+                        {{ report.created_at|date:"g:i A" }}
+                    </small>
+                </div>
+                <div>
+                    <span class="status-indicator status-{{ report.status }}">
+                        {% if report.status == 'completed' %}
+                            <i class="fas fa-check-circle"></i>
+                        {% elif report.status == 'processing' %}
+                            <i class="fas fa-spinner fa-spin"></i>
+                        {% else %}
+                            <i class="fas fa-exclamation-triangle"></i>
+                        {% endif %}
+                        {{ report.get_status_display }}
+                    </span>
+                </div>
+            </div>
+            
+            {% if report.date_range %}
+            <div class="mb-3">
+                <small class="text-info">
+                    <i class="fas fa-calendar-week me-1"></i>
+                    <strong>Period:</strong> 
+                    {{ report.date_range.0|date:"M j" }} - {{ report.date_range.1|date:"M j, Y" }}
+                </small>
+            </div>
+            {% endif %}
+            
+            <div class="report-actions">
+                <a href="/business/{{ request.tenant.slug }}/reports/detail/{{ report.id }}/" class="btn-icon btn-view">
+                    <i class="fas fa-eye"></i>
+                    View Report
+                </a>
+                <a href="/business/{{ request.tenant.slug }}/reports/export/{{ report.id }}/pdf/" class="btn-icon btn-export">
+                    <i class="fas fa-download"></i>
+                    Export PDF
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-wrapper">
+        <nav aria-label="Reports pagination">
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if current_type %}&type={{ current_type }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if current_type %}&type={{ current_type }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_type %}&type={{ current_type }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="fas fa-chart-bar"></i>
+        </div>
+        <h3 class="mb-3">No Reports Found</h3>
+        {% if current_type or request.GET.date_from or request.GET.date_to %}
+            <p class="text-muted mb-4">No reports match your current filters. Try adjusting your search criteria.</p>
+            <a href="/business/{{ request.tenant.slug }}/reports/list/" class="btn btn-outline-primary me-2">
+                <i class="fas fa-times me-2"></i>Clear Filters
+            </a>
+        {% else %}
+            <p class="text-muted mb-4">You haven't generated any reports yet. Create your first report to get started.</p>
+        {% endif %}
+        <a href="/business/{{ request.tenant.slug }}/reports/generate/" class="btn btn-primary btn-lg">
+            <i class="fas fa-plus me-2"></i>Generate Your First Report
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-submit form when filters change
+document.getElementById('type').addEventListener('change', function() {
+    this.form.submit();
+});
+
+// Add loading states for export buttons
+document.querySelectorAll('.btn-export').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        const originalText = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+        this.classList.add('disabled');
+        
+        // Reset after 3 seconds (in case download doesn't start)
+        setTimeout(() => {
+            this.innerHTML = originalText;
+            this.classList.remove('disabled');
+        }, 3000);
+    });
+});
+
+// Enhance status indicators with tooltips
+document.querySelectorAll('.status-indicator').forEach(indicator => {
+    const status = indicator.textContent.trim();
+    let tooltip = '';
+    
+    if (status.includes('Completed')) {
+        tooltip = 'Report has been successfully generated and is ready for viewing.';
+    } else if (status.includes('Processing')) {
+        tooltip = 'Report is currently being generated. Please wait...';
+    } else if (status.includes('Failed')) {
+        tooltip = 'Report generation failed. Please try generating again.';
+    }
+    
+    if (tooltip) {
+        indicator.setAttribute('title', tooltip);
+        indicator.setAttribute('data-bs-toggle', 'tooltip');
+    }
+});
+
+// Initialize tooltips if Bootstrap is available
+if (typeof bootstrap !== 'undefined') {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
+</script>
+{% endblock %}

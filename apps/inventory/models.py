@@ -243,6 +243,18 @@ class StockMovement(TenantTimeStampedModel):
         return f"{self.item.name} - {self.get_movement_type_display()} ({self.quantity})"
     
     @property
+    def created_by(self):
+        """Get the user who created this movement"""
+        if self.created_by_user_id:
+            try:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                return User.objects.get(id=self.created_by_user_id)
+            except User.DoesNotExist:
+                return None
+        return None
+    
+    @property
     def total_value(self):
         """Calculate total value of movement"""
         return abs(self.quantity) * self.unit_cost
@@ -292,6 +304,18 @@ class StockAdjustment(TenantTimeStampedModel):
         return f"{self.item.name} - {self.get_adjustment_type_display()} ({self.quantity})"
     
     @property
+    def created_by(self):
+        """Get the user who created this adjustment"""
+        if self.created_by_user_id:
+            try:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                return User.objects.get(id=self.created_by_user_id)
+            except User.DoesNotExist:
+                return None
+        return None
+    
+    @property
     def total_value(self):
         """Calculate total value of adjustment"""
         return abs(self.quantity) * self.unit_cost
@@ -304,7 +328,7 @@ class StockAdjustment(TenantTimeStampedModel):
         self.save()
         
         # Create stock movement
-        StockMovement.objects.create(
+        stock_movement = StockMovement.objects.create(
             item=self.item,
             movement_type='adjustment',
             quantity=self.quantity,
@@ -313,8 +337,10 @@ class StockAdjustment(TenantTimeStampedModel):
             new_stock=self.new_stock,
             reference_type='adjustment',
             reason=self.reason,
-            created_by=user
         )
+        # Set created_by user ID
+        stock_movement.set_created_by(user)
+        stock_movement.save()
     
     class Meta:
         verbose_name = "Stock Adjustment"
