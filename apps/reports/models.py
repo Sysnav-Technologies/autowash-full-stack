@@ -88,7 +88,7 @@ class ReportSchedule(TenantTimeStampedModel):
         ('quarterly', 'Quarterly'),
     ]
     
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, null=True, blank=True)
     report_type = models.CharField(max_length=50, choices=BusinessReport.REPORT_TYPES)
     frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES)
     
