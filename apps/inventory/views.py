@@ -982,17 +982,29 @@ def stock_take_edit_view(request, pk):
 
 @login_required
 @employee_required()
+@ajax_required
 @require_POST
 def update_stock_count(request, stock_take_id, item_id):
     """Update stock count for an item"""
+    import json
+    
     stock_take = get_object_or_404(StockTake, pk=stock_take_id)
     item = get_object_or_404(InventoryItem, pk=item_id)
     
     if stock_take.status != 'in_progress':
         return JsonResponse({'error': 'Stock take is not in progress'}, status=400)
     
-    counted_quantity = request.POST.get('counted_quantity')
-    notes = request.POST.get('notes', '')
+    # Handle both JSON and form data
+    if request.content_type == 'application/json':
+        try:
+            data = json.loads(request.body)
+            counted_quantity = data.get('counted_quantity')
+            notes = data.get('notes', '')
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    else:
+        counted_quantity = request.POST.get('counted_quantity')
+        notes = request.POST.get('notes', '')
     
     try:
         counted_quantity = float(counted_quantity)

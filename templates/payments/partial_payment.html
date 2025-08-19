@@ -1,0 +1,227 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Partial Payment - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .payment-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border: none;
+    }
+    
+    .payment-header {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        border-radius: 12px 12px 0 0;
+        padding: 1.5rem;
+    }
+    
+    .balance-summary {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .balance-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .balance-item:last-child {
+        border-bottom: none;
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #28a745;
+    }
+    
+    .payment-history {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .payment-item {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-left: 4px solid #28a745;
+    }
+    
+    .payment-item.pending {
+        border-left-color: #ffc107;
+    }
+    
+    .payment-item.failed {
+        border-left-color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="payment-card">
+                <div class="payment-header">
+                    <h3 class="mb-1 fw-bold">
+                        <i class="fas fa-coins me-2"></i>Partial Payment
+                    </h3>
+                    <p class="mb-0 opacity-75">Service Order: {{ service_order.order_number }}</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    <!-- Balance Summary -->
+                    <div class="balance-summary">
+                        <h5 class="fw-bold mb-3">
+                            <i class="fas fa-calculator text-primary me-2"></i>Payment Summary
+                        </h5>
+                        <div class="balance-item">
+                            <span>Total Amount:</span>
+                            <span>KES {{ service_order.total_amount|floatformat:2 }}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span>Amount Paid:</span>
+                            <span>KES {{ total_paid|floatformat:2 }}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span>Balance Due:</span>
+                            <span>KES {{ service_order.balance_due|floatformat:2 }}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Previous Payments -->
+                    {% if payments %}
+                    <div class="payment-history">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fas fa-history text-secondary me-2"></i>Previous Payments
+                        </h6>
+                        {% for payment in payments %}
+                        <div class="payment-item {{ payment.status }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ payment.payment_method.name }}</strong> - KES {{ payment.amount|floatformat:2 }}<br>
+                                    <small class="text-muted">{{ payment.created_at|date:"M d, Y H:i" }} • {{ payment.get_status_display }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-{{ payment.status|default:'secondary' }}">
+                                        {{ payment.get_status_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Partial Payment Form -->
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <h5 class="fw-bold mb-3">
+                                <i class="fas fa-plus-circle text-primary me-2"></i>New Partial Payment
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <input type="number" class="form-control" id="amount" name="amount" 
+                                               step="0.01" min="1" max="{{ service_order.balance_due }}" 
+                                               placeholder="0.00" required>
+                                        <label for="amount">Payment Amount (KES)</label>
+                                    </div>
+                                    <small class="text-muted">Maximum: KES {{ service_order.balance_due|floatformat:2 }}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <select class="form-select" id="paymentMethod" name="payment_method" required>
+                                            <option value="">Choose Payment Method</option>
+                                            {% for method in payment_methods %}
+                                            {% if method.is_active %}
+                                            <option value="{{ method.id }}" data-type="{{ method.method_type }}">
+                                                {{ method.name }}
+                                            </option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                        <label for="paymentMethod">Payment Method</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Method-specific fields -->
+                            <div id="mpesaFields" style="display: none;" class="mb-3">
+                                <div class="form-floating">
+                                    <input type="tel" class="form-control" name="mpesa_phone" placeholder="254712345678">
+                                    <label>M-Pesa Phone Number</label>
+                                </div>
+                            </div>
+                            
+                            <div id="cashFields" style="display: none;" class="mb-3">
+                                <div class="form-floating">
+                                    <input type="number" class="form-control" name="cash_received" step="0.01" placeholder="0.00">
+                                    <label>Cash Received (KES)</label>
+                                </div>
+                            </div>
+                            
+                            <div class="form-floating mb-3">
+                                <textarea class="form-control" id="notes" name="notes" placeholder="Notes" style="height: 80px;"></textarea>
+                                <label for="notes">Payment Notes (Optional)</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="/business/{{ request.tenant.slug }}/payments/" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check me-2"></i>Process Partial Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Payment method selection
+document.getElementById('paymentMethod').addEventListener('change', function() {
+    const methodType = this.options[this.selectedIndex].dataset.type;
+    
+    // Hide all method-specific fields
+    document.getElementById('mpesaFields').style.display = 'none';
+    document.getElementById('cashFields').style.display = 'none';
+    
+    // Show relevant fields
+    if (methodType === 'mpesa') {
+        document.getElementById('mpesaFields').style.display = 'block';
+    } else if (methodType === 'cash') {
+        document.getElementById('cashFields').style.display = 'block';
+    }
+});
+
+// Amount validation
+document.getElementById('amount').addEventListener('input', function() {
+    const amount = parseFloat(this.value);
+    const maxAmount = parseFloat(this.getAttribute('max'));
+    
+    if (amount > maxAmount) {
+        this.setCustomValidity(`Amount cannot exceed balance due of KES ${maxAmount.toFixed(2)}`);
+    } else {
+        this.setCustomValidity('');
+    }
+});
+</script>
+{% endblock %}

@@ -1,209 +1,361 @@
 {% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}Cash Payment - {{ payment.payment_id }} - {{ block.super }}{% endblock %}
+{% block title %}Cash Payment - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <style>
-.cash-container { max-width: 800px; margin: 0 auto; }
-.cash-header { background: #ecfdf5; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid #10b981; }
-.cash-form { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; }
-.summary-table { background: white; border: 1px solid #e5e7eb; border-radius: 8px; }
-.summary-table td, .summary-table th { padding: 0.75rem; border-bottom: 1px solid #f3f4f6; }
-.summary-table tr:last-child td { border-bottom: none; }
-.amount-input { font-size: 1.25rem; font-weight: 600; text-align: center; padding: 1rem; }
-.change-display { background: #dcfce7; border: 1px solid #16a34a; border-radius: 8px; padding: 1rem; text-align: center; font-size: 1.5rem; font-weight: 700; color: #15803d; margin: 1rem 0; }
-.quick-amounts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
-.quick-btn { padding: 0.5rem; border: 1px solid #d1d5db; background: white; border-radius: 4px; cursor: pointer; }
-.quick-btn:hover { background: #f3f4f6; }
-.quick-btn.selected { background: #10b981; color: white; }
+    .cash-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border: none;
+    }
+    
+    .cash-header {
+        background: linear-gradient(135deg, #ffc107, #fd7e14);
+        color: white;
+        border-radius: 12px 12px 0 0;
+        padding: 1.5rem;
+    }
+    
+    .denomination-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .denomination-item {
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .denomination-item:focus-within {
+        border-color: #ffc107;
+        background: #fff3cd;
+    }
+    
+    .denomination-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+    
+    .denomination-input {
+        border: none;
+        background: transparent;
+        text-align: center;
+        font-weight: 700;
+        font-size: 1.1rem;
+        width: 100%;
+    }
+    
+    .denomination-input:focus {
+        outline: none;
+        box-shadow: none;
+    }
+    
+    .calculation-summary {
+        background: linear-gradient(135deg, #e3f2fd, #f1f8e9);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+    }
+    
+    .calc-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .calc-item:last-child {
+        border-bottom: none;
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+    
+    .change-due {
+        color: #28a745;
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+    
+    .change-negative {
+        color: #dc3545;
+    }
+    
+    .quick-amounts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .quick-amount-btn {
+        border: 2px solid #e9ecef;
+        background: white;
+        border-radius: 8px;
+        padding: 0.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .quick-amount-btn:hover {
+        border-color: #ffc107;
+        background: #fff3cd;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="cash-container">
-    <!-- Header -->
-    <div class="cash-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h4 class="mb-1">Cash Payment</h4>
-                <p class="mb-0">Payment ID: {{ payment.payment_id }} • Amount: KES {{ payment.amount|floatformat:2 }}</p>
+<div class="container-fluid px-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="cash-card">
+                <div class="cash-header">
+                    <h3 class="mb-1 fw-bold">
+                        <i class="fas fa-coins me-2"></i>Cash Payment
+                    </h3>
+                    <p class="mb-0 opacity-75">Payment ID: {{ payment.payment_id }}</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    <!-- Payment Summary -->
+                    <div class="alert alert-info border-0 mb-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="mb-1">Payment Amount</h5>
+                                <h3 class="mb-0 text-primary fw-bold">KES {{ payment.amount|floatformat:2 }}</h3>
+                            </div>
+                            <div class="col-md-6">
+                                {% if payment.customer %}
+                                <p class="mb-1"><strong>Customer:</strong> {{ payment.customer.display_name }}</p>
+                                {% endif %}
+                                {% if payment.service_order %}
+                                <p class="mb-0"><strong>Service Order:</strong> {{ payment.service_order.order_number }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <form method="post" id="cashPaymentForm">
+                        {% csrf_token %}
+                        
+                        <!-- Quick Amount Buttons -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold mb-3">
+                                <i class="fas fa-bolt text-warning me-2"></i>Quick Amount
+                            </h5>
+                            <div class="quick-amounts">
+                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ payment.amount }})">
+                                    Exact
+                                </button>
+                                {% with payment.amount as amount %}
+                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ amount|add:50 }})">
+                                    +50
+                                </button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ amount|add:100 }})">
+                                    +100
+                                </button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ amount|add:200 }})">
+                                    +200
+                                </button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ amount|add:500 }})">
+                                    +500
+                                </button>
+                                {% endwith %}
+                            </div>
+                        </div>
+                        
+                        <!-- Cash Received -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold mb-3">
+                                <i class="fas fa-hand-holding-usd text-success me-2"></i>Cash Received
+                            </h5>
+                            <div class="form-floating">
+                                <input type="number" class="form-control form-control-lg" 
+                                       id="amountTendered" name="amount_tendered" 
+                                       step="0.01" min="{{ payment.amount }}" 
+                                       placeholder="0.00" required
+                                       oninput="calculateChange()">
+                                <label for="amountTendered">Amount Tendered (KES)</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Denomination Breakdown (Optional) -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold mb-3">
+                                <i class="fas fa-money-bill-wave text-info me-2"></i>Cash Breakdown (Optional)
+                            </h5>
+                            <div class="denomination-grid">
+                                <div class="denomination-item">
+                                    <div class="denomination-label">1000 Notes</div>
+                                    <input type="number" class="denomination-input" name="notes_1000" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                                <div class="denomination-item">
+                                    <div class="denomination-label">500 Notes</div>
+                                    <input type="number" class="denomination-input" name="notes_500" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                                <div class="denomination-item">
+                                    <div class="denomination-label">200 Notes</div>
+                                    <input type="number" class="denomination-input" name="notes_200" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                                <div class="denomination-item">
+                                    <div class="denomination-label">100 Notes</div>
+                                    <input type="number" class="denomination-input" name="notes_100" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                                <div class="denomination-item">
+                                    <div class="denomination-label">50 Notes</div>
+                                    <input type="number" class="denomination-input" name="notes_50" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                                <div class="denomination-item">
+                                    <div class="denomination-label">20 Notes</div>
+                                    <input type="number" class="denomination-input" name="notes_20" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                                <div class="denomination-item">
+                                    <div class="denomination-label">10 Coins</div>
+                                    <input type="number" class="denomination-input" name="coins_10" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                                <div class="denomination-item">
+                                    <div class="denomination-label">5 Coins</div>
+                                    <input type="number" class="denomination-input" name="coins_5" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                                <div class="denomination-item">
+                                    <div class="denomination-label">1 Coins</div>
+                                    <input type="number" class="denomination-input" name="coins_1" 
+                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Calculation Summary -->
+                        <div class="calculation-summary">
+                            <h5 class="fw-bold mb-3">
+                                <i class="fas fa-calculator text-primary me-2"></i>Payment Calculation
+                            </h5>
+                            <div class="calc-item">
+                                <span>Payment Due:</span>
+                                <span>KES {{ payment.amount|floatformat:2 }}</span>
+                            </div>
+                            <div class="calc-item">
+                                <span>Cash Received:</span>
+                                <span id="displayTendered">KES 0.00</span>
+                            </div>
+                            <div class="calc-item">
+                                <span>Change Due:</span>
+                                <span id="displayChange" class="change-due">KES 0.00</span>
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" id="changeGiven" name="change_given" value="0">
+                        
+                        <!-- Additional Fields -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" name="till_number" placeholder="Till Number">
+                                    <label>Till Number (Optional)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" name="receipt_number" placeholder="Receipt Number">
+                                    <label>Receipt Number (Optional)</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-floating mb-4">
+                            <textarea class="form-control" name="notes" placeholder="Notes" style="height: 80px;"></textarea>
+                            <label>Transaction Notes (Optional)</label>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/" 
+                               class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success btn-lg" id="processBtn">
+                                <i class="fas fa-check me-2"></i>Process Cash Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back
-            </a>
         </div>
     </div>
-
-    <form method="post" id="cashForm">
-        {% csrf_token %}
-        
-        <div class="row">
-            <div class="col-md-6">
-                <!-- Payment Details -->
-                <div class="cash-form">
-                    <h5 class="mb-3">Payment Details</h5>
-                    <table class="table summary-table">
-                        <tr>
-                            <td>Payment Amount:</td>
-                            <td><strong>KES {{ payment.amount|floatformat:2 }}</strong></td>
-                        </tr>
-                        {% if payment.processing_fee > 0 %}
-                        <tr>
-                            <td>Processing Fee:</td>
-                            <td>KES {{ payment.processing_fee|floatformat:2 }}</td>
-                        </tr>
-                        {% endif %}
-                        <tr class="table-success">
-                            <td><strong>Total to Collect:</strong></td>
-                            <td><strong>KES {{ payment.amount|floatformat:2 }}</strong></td>
-                        </tr>
-                    </table>
-                    
-                    <!-- Quick Amount Selection -->
-                    <h6 class="mt-3 mb-2">Quick Select</h6>
-                    <div class="quick-amounts">
-                        <button type="button" class="quick-btn" onclick="setAmount({{ payment.amount }})">Exact</button>
-                        <button type="button" class="quick-btn" onclick="setAmount({{ payment.amount|add:50 }})">+50</button>
-                        <button type="button" class="quick-btn" onclick="setAmount({{ payment.amount|add:100 }})">+100</button>
-                        <button type="button" class="quick-btn" onclick="setAmount({{ payment.amount|add:200 }})">+200</button>
-                        <button type="button" class="quick-btn" onclick="setAmount({{ payment.amount|add:500 }})">+500</button>
-                        <button type="button" class="quick-btn" onclick="setAmount({{ payment.amount|add:1000 }})">+1000</button>
-                    </div>
-                    
-                    <!-- Amount Tendered -->
-                    <div class="form-group">
-                        <label class="form-label">Amount Tendered</label>
-                        <input type="number" class="form-control amount-input" name="amount_tendered" 
-                               id="amount_tendered" min="{{ payment.amount }}" step="0.01" 
-                               value="{{ payment.amount }}" oninput="calculateChange()" required>
-                    </div>
-                    
-                    <!-- Change Display -->
-                    <div class="change-display" id="changeDisplay">
-                        Change: KES 0.00
-                    </div>
-                    
-                    <input type="hidden" name="change_given" id="change_given" value="0">
-                    
-                    <!-- Optional additional fields -->
-                    <div class="mt-3">
-                        <label class="form-label">Till Number (Optional)</label>
-                        <input type="text" class="form-control" name="till_number" placeholder="Till 01">
-                    </div>
-                    
-                    <!-- Hidden denomination fields -->
-                    <input type="hidden" name="notes_1000" value="0">
-                    <input type="hidden" name="notes_500" value="0">
-                    <input type="hidden" name="notes_200" value="0">
-                    <input type="hidden" name="notes_100" value="0">
-                    <input type="hidden" name="notes_50" value="0">
-                    <input type="hidden" name="coins_40" value="0">
-                    <input type="hidden" name="coins_20" value="0">
-                    <input type="hidden" name="coins_10" value="0">
-                    <input type="hidden" name="coins_5" value="0">
-                    <input type="hidden" name="coins_1" value="0">
-                </div>
-            </div>
-            
-            <div class="col-md-6">
-                <!-- Transaction Summary -->
-                <div class="cash-form">
-                    <h5 class="mb-3">Transaction Summary</h5>
-                    <table class="table summary-table">
-                        <tr>
-                            <td>Payment ID:</td>
-                            <td><strong>{{ payment.payment_id }}</strong></td>
-                        </tr>
-                        <tr>
-                            <td>Customer:</td>
-                            <td>{{ payment.customer.display_name|default:"Walk-in Customer" }}</td>
-                        </tr>
-                        {% if payment.service_order %}
-                        <tr>
-                            <td>Order:</td>
-                            <td>{{ payment.service_order.order_number }}</td>
-                        </tr>
-                        {% endif %}
-                        <tr>
-                            <td>Amount Due:</td>
-                            <td><strong>KES {{ payment.amount|floatformat:2 }}</strong></td>
-                        </tr>
-                        <tr>
-                            <td>Amount Tendered:</td>
-                            <td><strong id="summaryTendered">KES {{ payment.amount|floatformat:2 }}</strong></td>
-                        </tr>
-                        <tr class="table-warning">
-                            <td>Change Due:</td>
-                            <td><strong id="summaryChange">KES 0.00</strong></td>
-                        </tr>
-                        <tr>
-                            <td>Cashier:</td>
-                            <td>{{ request.user.get_full_name|default:request.user.username }}</td>
-                        </tr>
-                    </table>
-                    
-                    <!-- Action Buttons -->
-                    <div class="d-grid gap-2 mt-3">
-                        <button type="submit" class="btn btn-success btn-lg" id="completeBtn">
-                            <i class="fas fa-check me-2"></i>Complete Cash Payment
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </form>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
 const paymentAmount = {{ payment.amount }};
 
 function setAmount(amount) {
-    document.querySelectorAll('.quick-btn').forEach(btn => btn.classList.remove('selected'));
-    event.target.classList.add('selected');
-    document.getElementById('amount_tendered').value = amount.toFixed(2);
+    document.getElementById('amountTendered').value = amount.toFixed(2);
     calculateChange();
 }
 
 function calculateChange() {
-    const tendered = parseFloat(document.getElementById('amount_tendered').value) || 0;
-    const change = Math.max(0, tendered - paymentAmount);
+    const tendered = parseFloat(document.getElementById('amountTendered').value) || 0;
+    const change = tendered - paymentAmount;
     
-    document.getElementById('changeDisplay').textContent = `Change: KES ${change.toFixed(2)}`;
-    document.getElementById('change_given').value = change.toFixed(2);
-    document.getElementById('summaryTendered').textContent = `KES ${tendered.toFixed(2)}`;
-    document.getElementById('summaryChange').textContent = `KES ${change.toFixed(2)}`;
+    document.getElementById('changeGiven').value = Math.max(0, change).toFixed(2);
+    document.getElementById('displayTendered').textContent = `KES ${tendered.toFixed(2)}`;
+    document.getElementById('displayChange').textContent = `KES ${change.toFixed(2)}`;
     
-    const btn = document.getElementById('completeBtn');
-    if (tendered < paymentAmount) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Insufficient Amount';
-        btn.className = 'btn btn-danger btn-lg';
+    const changeElement = document.getElementById('displayChange');
+    if (change < 0) {
+        changeElement.className = 'change-due change-negative';
+        document.getElementById('processBtn').disabled = true;
+        document.getElementById('processBtn').innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Insufficient Amount';
     } else {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check me-2"></i>Complete Cash Payment';
-        btn.className = 'btn btn-success btn-lg';
+        changeElement.className = 'change-due';
+        document.getElementById('processBtn').disabled = false;
+        document.getElementById('processBtn').innerHTML = '<i class="fas fa-check me-2"></i>Process Cash Payment';
     }
 }
 
-function resetForm() {
-    document.getElementById('amount_tendered').value = paymentAmount.toFixed(2);
-    document.querySelectorAll('.quick-btn').forEach(btn => btn.classList.remove('selected'));
+function calculateFromDenominations() {
+    const denominations = [
+        { name: 'notes_1000', value: 1000 },
+        { name: 'notes_500', value: 500 },
+        { name: 'notes_200', value: 200 },
+        { name: 'notes_100', value: 100 },
+        { name: 'notes_50', value: 50 },
+        { name: 'notes_20', value: 20 },
+        { name: 'coins_10', value: 10 },
+        { name: 'coins_5', value: 5 },
+        { name: 'coins_1', value: 1 }
+    ];
+    
+    let total = 0;
+    denominations.forEach(denom => {
+        const count = parseInt(document.querySelector(`input[name="${denom.name}"]`).value) || 0;
+        total += count * denom.value;
+    });
+    
+    document.getElementById('amountTendered').value = total.toFixed(2);
     calculateChange();
 }
 
-document.getElementById('cashForm').addEventListener('submit', function(e) {
-    const btn = document.getElementById('completeBtn');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
-    btn.disabled = true;
-});
-
 // Initialize
-calculateChange();
+document.addEventListener('DOMContentLoaded', function() {
+    calculateChange();
+});
 </script>
 {% endblock %}

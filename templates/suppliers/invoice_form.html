@@ -1,42 +1,20 @@
-<!-- templates/suppliers/invoice_form.html -->
-{% extends 'base/base.html' %}
+{% extends "base/base.html" %}
 {% load static %}
 {% load widget_tweaks %}
 
-{% block title %}{% if object %}Edit Invoice{% else %}Create Invoice{% endif %}{% endblock %}
+{% block title %}{% if invoice %}Edit Invoice {{ invoice.invoice_number }}{% else %}Create New Invoice{% endif %} - {{ block.super }}{% endblock %}
 
-{% block breadcrumbs %}
-<li class="breadcrumb-item"><a href="{{ urls.businesses_dashboard }}">Dashboard</a></li>
-<li class="breadcrumb-item"><a href="{{ urls.dashboard }}">Suppliers</a></li>
-<li class="breadcrumb-item"><a href="{{ urls.invoice_list }}">Invoices</a></li>
-<li class="breadcrumb-item active">{% if object %}Edit {{ object.invoice_number }}{% else %}Create Invoice{% endif %}</li>
-{% endblock %}
+{% block page_title %}{% if invoice %}Edit Invoice{% else %}New Invoice{% endif %}{% endblock %}
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
 .form-header {
-    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border-radius: 12px;
     padding: 2rem;
     margin-bottom: 2rem;
-}
-
-.auto-filled-card {
-    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-    border: 1px solid #f87171;
-    border-radius: 12px;
-    margin-bottom: 1.5rem;
-}
-
-.auto-filled-header {
-    background: rgba(248, 113, 113, 0.2);
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid rgba(248, 113, 113, 0.3);
-    border-radius: 12px 12px 0 0;
-    font-weight: 600;
-    color: #991b1b;
 }
 
 .form-card {
@@ -56,61 +34,74 @@
     color: #1e293b;
 }
 
-.invoice-table {
+.items-table {
     background: white;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid #e2e8f0;
 }
 
-.invoice-table th {
-    background: #f8fafc;
-    color: #374151;
+.items-table th {
+    background: #f1f5f9;
     font-weight: 600;
-    font-size: 0.875rem;
+    color: #475569;
+    padding: 1rem 0.75rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.items-table td {
     padding: 0.75rem;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 1px solid #f1f5f9;
 }
 
-.invoice-table td {
-    padding: 0.5rem;
-    vertical-align: middle;
-    border-bottom: 1px solid #f3f4f6;
+.item-row {
+    transition: all 0.2s ease;
 }
 
-.invoice-table .form-control,
-.invoice-table .form-select {
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    padding: 0.375rem 0.75rem;
+.item-row:hover {
+    background-color: #f8fafc;
 }
 
-.invoice-table .form-control:focus,
-.invoice-table .form-select:focus {
-    border-color: #dc2626;
-    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+.item-row.removing {
+    background-color: #fef2f2;
+    opacity: 0.7;
 }
 
-.readonly-field {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    color: #6b7280;
-    cursor: not-allowed;
-}
-
-.auto-calculated {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #dc2626;
-    font-weight: 500;
-}
-
-.calculation-summary {
-    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+.btn-add-item {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    color: white;
+    padding: 0.75rem 1.5rem;
     border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-add-item:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-remove-item {
+    background: #ef4444;
+    border: none;
+    color: white;
+    padding: 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.btn-remove-item:hover {
+    background: #dc2626;
+    transform: scale(1.05);
+}
+
+.summary-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
     padding: 1.5rem;
-    margin-top: 1rem;
 }
 
 .summary-row {
@@ -118,105 +109,20 @@
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem 0;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .summary-row:last-child {
     border-bottom: none;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #1e293b;
 }
 
-.summary-label {
-    font-weight: 500;
-    color: #374151;
+.form-control:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
 }
-
-.summary-value {
-    font-weight: 600;
-    color: #1f2937;
-}
-
-.total-summary {
-    background: #dc2626;
-    color: white;
-    padding: 1rem;
-    border-radius: 6px;
-    margin-top: 0.5rem;
-}
-
-.btn-add-item {
-    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-    border: none;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-}
-
-.btn-add-item:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
-    color: white;
-}
-
-.btn-remove-item {
-    background: #ef4444;
-    border: none;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    transition: all 0.2s ease;
-}
-
-.btn-remove-item:hover {
-    background: #dc2626;
-    color: white;
-}
-
-.po-info-card {
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-    border: 1px solid #93c5fd;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-
-.supplier-locked {
-    background: #fffbeb;
-    border: 1px solid #fbbf24;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-
-.auto-fill-controls {
-    background: #fef3c7;
-    border: 1px solid #fbbf24;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-
-.form-actions {
-    background: #f8fafc;
-    padding: 1.5rem;
-    border-top: 1px solid #e2e8f0;
-    border-radius: 0 0 12px 12px;
-}
-
-.payment-status-badge {
-    padding: 0.5rem 1rem;
-    border-radius: 1rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.status-pending { background: #fef3c7; color: #92400e; }
-.status-partial { background: #dbeafe; color: #1e40af; }
-.status-paid { background: #d1fae5; color: #065f46; }
-.status-overdue { background: #fee2e2; color: #991b1b; }
 
 .select2-container--default .select2-selection--single {
     height: 38px;
@@ -228,575 +134,311 @@
     line-height: 36px;
     padding-left: 12px;
 }
-
-.item-row {
-    transition: all 0.3s ease;
-}
-
-.item-row.removing {
-    opacity: 0.5;
-    background-color: #fee2e2;
-}
-
-.total-row {
-    background: #f8fafc;
-    font-weight: 600;
-}
-
-@media (max-width: 768px) {
-    .form-header {
-        padding: 1.5rem;
-    }
-    
-    .invoice-table {
-        font-size: 0.8rem;
-    }
-    
-    .invoice-table th,
-    .invoice-table td {
-        padding: 0.5rem 0.25rem;
-    }
-    
-    .btn-add-item {
-        width: 100%;
-        margin-top: 1rem;
-    }
-}
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Form Header -->
-<div class="form-header">
-    <div class="row align-items-center">
-        <div class="col-auto">
-            <div class="bg-white bg-opacity-20 rounded-3 p-3">
-                <i class="fas fa-file-invoice fa-2x"></i>
-            </div>
-        </div>
-        <div class="col">
-            <h1 class="h2 mb-2">
-                {% if object %}Edit Invoice{% else %}Create Invoice{% endif %}
-                {% if purchase_order %} - From PO-{{ purchase_order.po_number }}{% endif %}
-            </h1>
-            <p class="mb-0 opacity-90">
-                {% if object %}
-                Update invoice details for {{ object.invoice_number }}
-                {% else %}
-                Create a new supplier invoice with automatic calculations
-                {% endif %}
-            </p>
-        </div>
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="form-header text-center">
+        <h1 class="mb-3">
+            <i class="fas fa-file-invoice me-2"></i>
+            {% if invoice %}Edit Invoice {{ invoice.invoice_number }}{% else %}Create New Invoice{% endif %}
+        </h1>
+        <p class="mb-0">
+            {% if invoice %}
+                Modify invoice details and items for {{ invoice.supplier.name }}
+            {% else %}
+                Create a comprehensive supplier invoice with detailed line items
+            {% endif %}
+        </p>
     </div>
-</div>
 
-<!-- Error Messages -->
-{% if form.non_field_errors or items_formset.non_form_errors %}
-<div class="alert alert-danger">
-    <h6><i class="fas fa-exclamation-triangle me-2"></i>Please correct the following errors:</h6>
-    <ul class="mb-0">
-        {% for error in form.non_field_errors %}
-        <li>{{ error }}</li>
-        {% endfor %}
-        {% for error in items_formset.non_form_errors %}
-        <li>{{ error }}</li>
-        {% endfor %}
-    </ul>
-</div>
-{% endif %}
-
-<!-- Purchase Order Selection (Only if no PO pre-selected) -->
-{% if not purchase_order %}
-<div class="form-card">
-    <div class="form-card-header">
-        <i class="fas fa-search me-2"></i>Link to Purchase Order (Optional)
-    </div>
-    <div class="p-4">
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>
-            <strong>Optional:</strong> Link this invoice to a completed purchase order to auto-fill items and amounts.
-        </div>
+    <form method="post" id="invoice-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ items_formset.management_form }}
         
         <div class="row">
-            <div class="col-md-8">
-                <label for="po-selector" class="form-label">Purchase Order</label>
-                <select id="po-selector" class="form-select">
-                    <option value="">Create invoice manually or select a purchase order...</option>
-                    <!-- This will be populated by JavaScript or server-side -->
-                </select>
-                <div class="form-text">Only completed purchase orders are shown</div>
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
-                <button type="button" class="btn btn-primary w-100" id="load-po-btn" disabled>
-                    <i class="fas fa-download me-2"></i>Load from PO
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
+            <div class="col-lg-8">
+                <!-- Basic Information -->
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Basic Information
+                    </div>
+                    <div class="p-3">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.supplier.id_for_label }}" class="form-label">Supplier *</label>
+                                {{ form.supplier|add_class:"form-select" }}
+                                {% if form.supplier.errors %}
+                                    <div class="text-danger small">{{ form.supplier.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.purchase_order.id_for_label }}" class="form-label">Purchase Order</label>
+                                {{ form.purchase_order|add_class:"form-select" }}
+                                {% if form.purchase_order.errors %}
+                                    <div class="text-danger small">{{ form.purchase_order.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.invoice_number.id_for_label }}" class="form-label">Invoice Number *</label>
+                                {{ form.invoice_number|add_class:"form-control" }}
+                                {% if form.invoice_number.errors %}
+                                    <div class="text-danger small">{{ form.invoice_number.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.supplier_invoice_number.id_for_label }}" class="form-label">Supplier Invoice #</label>
+                                {{ form.supplier_invoice_number|add_class:"form-control" }}
+                                {% if form.supplier_invoice_number.errors %}
+                                    <div class="text-danger small">{{ form.supplier_invoice_number.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.status.id_for_label }}" class="form-label">Status</label>
+                                {{ form.status|add_class:"form-select" }}
+                                {% if form.status.errors %}
+                                    <div class="text-danger small">{{ form.status.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.invoice_date.id_for_label }}" class="form-label">Invoice Date *</label>
+                                {{ form.invoice_date|add_class:"form-control" }}
+                                {% if form.invoice_date.errors %}
+                                    <div class="text-danger small">{{ form.invoice_date.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.due_date.id_for_label }}" class="form-label">Due Date *</label>
+                                {{ form.due_date|add_class:"form-control" }}
+                                {% if form.due_date.errors %}
+                                    <div class="text-danger small">{{ form.due_date.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.received_date.id_for_label }}" class="form-label">Received Date</label>
+                                {{ form.received_date|add_class:"form-control" }}
+                                {% if form.received_date.errors %}
+                                    <div class="text-danger small">{{ form.received_date.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-<form method="post" id="invoice-form" enctype="multipart/form-data">
-    {% csrf_token %}
-    
-    <!-- Auto-Filled Purchase Order Information -->
-    {% if purchase_order %}
-    <div class="auto-filled-card">
-        <div class="auto-filled-header d-flex justify-content-between align-items-center">
-            <div>
-                <i class="fas fa-file-invoice me-2"></i>Purchase Order Information (Auto-Filled)
-            </div>
-            <span class="payment-status-badge status-{{ purchase_order.status }}">
-                {{ purchase_order.get_status_display }}
-            </span>
-        </div>
-        <div class="p-4">
-            <div class="row">
-                <div class="col-md-3 mb-3">
-                    <div class="small text-muted">Purchase Order</div>
-                    <div class="fw-semibold fs-5">PO-{{ purchase_order.po_number }}</div>
-                    <div class="small text-muted">{{ purchase_order.order_date|date:"M d, Y" }}</div>
+                <!-- Invoice Items -->
+                <div class="form-card">
+                    <div class="form-card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="fas fa-list me-2"></i>
+                            Invoice Items
+                        </span>
+                        <button type="button" class="btn btn-add-item btn-sm" id="add-item">
+                            <i class="fas fa-plus me-1"></i>
+                            Add Item
+                        </button>
+                    </div>
+                    <div class="p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm items-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 25%;">Description</th>
+                                        <th style="width: 15%;">Quantity</th>
+                                        <th style="width: 15%;">Unit Price</th>
+                                        <th style="width: 15%;">Total</th>
+                                        <th style="width: 20%;">Notes</th>
+                                        <th style="width: 10%;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="items-tbody">
+                                    {% for form in items_formset %}
+                                        <tr class="item-row" data-form-index="{{ forloop.counter0 }}">
+                                            <td>
+                                                {{ form.description|add_class:"form-control" }}
+                                                {% if form.description.errors %}
+                                                    <div class="text-danger small">{{ form.description.errors.0 }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ form.quantity|add_class:"form-control quantity-input" }}
+                                                {% if form.quantity.errors %}
+                                                    <div class="text-danger small">{{ form.quantity.errors.0 }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ form.unit_price|add_class:"form-control unit-price-input" }}
+                                                {% if form.unit_price.errors %}
+                                                    <div class="text-danger small">{{ form.unit_price.errors.0 }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control item-total" readonly value="0.00">
+                                            </td>
+                                            <td>
+                                                {{ form.notes|add_class:"form-control" }}
+                                                {% if form.notes.errors %}
+                                                    <div class="text-danger small">{{ form.notes.errors.0 }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-remove-item btn-sm" title="Remove Item">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                                {{ form.DELETE }}
+                                                {{ form.id }}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="small text-muted">Delivery Date</div>
-                    <div class="fw-semibold">{{ purchase_order.delivery_date|date:"M d, Y"|default:"Not delivered" }}</div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="small text-muted">Total Value</div>
-                    <div class="fw-semibold">KES {{ purchase_order.total_amount|floatformat:2 }}</div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="small text-muted">Items</div>
-                    <div class="fw-semibold">{{ purchase_order.items.count }} items</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 
-    <!-- Auto-Filled Supplier Information -->
-    {% if purchase_order %}
-    <div class="supplier-locked">
-        <div class="d-flex align-items-center mb-3">
-            <i class="fas fa-lock text-warning me-2"></i>
-            <h6 class="mb-0 text-warning">Supplier Information (Auto-Filled from Purchase Order)</h6>
-        </div>
-        <div class="row">
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Supplier Name</div>
-                <div class="fw-semibold">{{ purchase_order.supplier.name }}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Supplier Code</div>
-                <div>{{ purchase_order.supplier.supplier_code }}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Payment Terms</div>
-                <div>{{ purchase_order.supplier.get_payment_terms_display }}</div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <div class="row">
-        <!-- Main Form -->
-        <div class="col-lg-8 mb-4">
-            <!-- Invoice Information -->
-            <div class="form-card">
-                <div class="form-card-header">
-                    <i class="fas fa-info-circle me-2"></i>Invoice Information
-                </div>
-                <div class="p-4">
-                    <!-- Hidden fields for auto-filled data -->
-                    {% if purchase_order %}
-                    <input type="hidden" name="purchase_order" value="{{ purchase_order.pk }}" id="id_purchase_order">
-                    <input type="hidden" name="supplier" value="{{ purchase_order.supplier.pk }}" id="id_supplier">
-                    {% endif %}
-                    
-                    <div class="row">
-                        {% if not purchase_order %}
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.supplier.id_for_label }}" class="form-label">
-                                Supplier <span class="text-danger">*</span>
-                            </label>
-                            {{ form.supplier|add_class:"form-select" }}
-                            {% if form.supplier.errors %}
-                                <div class="invalid-feedback">{{ form.supplier.errors.0 }}</div>
-                            {% endif %}
+                <!-- Additional Information -->
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <i class="fas fa-sticky-note me-2"></i>
+                        Additional Information
+                    </div>
+                    <div class="p-3">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                                {{ form.description|add_class:"form-control" }}
+                                {% if form.description.errors %}
+                                    <div class="text-danger small">{{ form.description.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">Internal Notes</label>
+                                {{ form.notes|add_class:"form-control" }}
+                                {% if form.notes.errors %}
+                                    <div class="text-danger small">{{ form.notes.errors.0 }}</div>
+                                {% endif %}
+                            </div>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.purchase_order.id_for_label }}" class="form-label">Purchase Order</label>
-                            {{ form.purchase_order|add_class:"form-select" }}
-                            <div class="form-text">Optional - link to a purchase order</div>
-                        </div>
-                        {% endif %}
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="invoice_number_display" class="form-label">Invoice Number</label>
-                            <input type="text" class="form-control readonly-field" id="invoice_number_display" readonly 
-                                   value="{% if object %}{{ object.invoice_number }}{% else %}Auto-generated on save{% endif %}">
-                            <div class="form-text">Invoice number will be automatically generated</div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.supplier_invoice_number.id_for_label }}" class="form-label">
-                                Supplier Invoice Number <span class="text-danger">*</span>
-                            </label>
-                            {{ form.supplier_invoice_number|add_class:"form-control" }}
-                            {% if form.supplier_invoice_number.errors %}
-                                <div class="invalid-feedback">{{ form.supplier_invoice_number.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.invoice_date.id_for_label }}" class="form-label">
-                                Invoice Date <span class="text-danger">*</span>
-                            </label>
-                            {{ form.invoice_date|add_class:"form-control" }}
-                            {% if form.invoice_date.errors %}
-                                <div class="invalid-feedback">{{ form.invoice_date.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.due_date.id_for_label }}" class="form-label">
-                                Due Date <span class="text-danger">*</span>
-                            </label>
-                            {{ form.due_date|add_class:"form-control" }}
-                            {% if form.due_date.errors %}
-                                <div class="invalid-feedback">{{ form.due_date.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.currency.id_for_label }}" class="form-label">Currency</label>
-                            {{ form.currency|add_class:"form-control" }}
-                        </div>
-                        
-                        <div class="col-md-12 mb-3">
-                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
-                            {{ form.description|add_class:"form-control" }}
-                        </div>
-                        
-                        <div class="col-md-12 mb-3">
+                        <div class="mb-3">
                             <label for="{{ form.invoice_file.id_for_label }}" class="form-label">Invoice File</label>
                             {{ form.invoice_file|add_class:"form-control" }}
-                            <div class="form-text">Upload the original invoice file (PDF, image, etc.)</div>
+                            {% if form.invoice_file.errors %}
+                                <div class="text-danger small">{{ form.invoice_file.errors.0 }}</div>
+                            {% endif %}
+                            {% if invoice and invoice.invoice_file %}
+                                <small class="form-text text-muted">
+                                    Current file: <a href="{{ invoice.invoice_file.url }}" target="_blank">{{ invoice.invoice_file.name }}</a>
+                                </small>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Supplier Information Display (for manual invoices) -->
-            {% if not purchase_order %}
-            <div id="supplier-info-card" class="form-card mb-4" style="display: none;">
-                <div class="form-card-header">
-                    <i class="fas fa-truck me-2"></i>Supplier Information
-                </div>
-                <div class="p-4">
-                    <div class="row" id="supplier-details">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-            {% if po_items %}
-            <div class="auto-fill-controls">
-                <h6 class="mb-3">
-                    <i class="fas fa-magic me-2"></i>Quick Actions for {{ po_items|length }} Purchase Order Items
-                </h6>
-                <div class="row">
-                    <div class="col-md-6 mb-2">
-                        <button type="button" class="btn btn-warning w-100" onclick="addAllPOItems()">
-                            <i class="fas fa-plus me-2"></i>Add All PO Items
-                        </button>
-                    </div>
-                    <div class="col-md-6 mb-2">
-                        <button type="button" class="btn btn-info w-100" onclick="calculateFromPO()">
-                            <i class="fas fa-calculator me-2"></i>Auto-Calculate Totals
-                        </button>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Invoice Items -->
-            <div class="form-card">
-                <div class="form-card-header d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-list me-2"></i>Invoice Items</span>
-                    <button type="button" class="btn btn-add-item btn-sm" id="add-item-btn">
-                        <i class="fas fa-plus me-2"></i>Add Item
-                    </button>
-                </div>
-                <div class="p-3">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Tip:</strong> Add items from the invoice. Unit prices and totals are calculated automatically.
-                    </div>
-                    
-                    {{ items_formset.management_form }}
-                    
-                    <div class="table-responsive">
-                        <table class="invoice-table table table-bordered mb-0" id="items-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 30%">Description <span class="text-danger">*</span></th>
-                                    <th style="width: 12%">Item Code</th>
-                                    <th style="width: 12%">Quantity <span class="text-danger">*</span></th>
-                                    <th style="width: 15%">Unit Price <span class="text-danger">*</span></th>
-                                    <th style="width: 15%">Total</th>
-                                    <th style="width: 11%">Notes</th>
-                                    <th style="width: 5%">Delete</th>
-                                </tr>
-                            </thead>
-                            <tbody id="items-tbody">
-                                {% for form in items_formset %}
-                                {% if form.instance.pk or form.description.value %}
-                                <tr class="item-row" data-form-index="{{ forloop.counter0 }}">
-                                    <td>
-                                        {% for hidden in form.hidden_fields %}
-                                            {{ hidden }}
-                                        {% endfor %}
-                                        {{ form.description|add_class:"form-control item-description" }}
-                                        {% if form.description.errors %}
-                                            <div class="invalid-feedback">{{ form.description.errors.0 }}</div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {{ form.item_code|add_class:"form-control" }}
-                                    </td>
-                                    <td>
-                                        {{ form.quantity|add_class:"form-control quantity-input" }}
-                                        {% if form.quantity.errors %}
-                                            <div class="invalid-feedback">{{ form.quantity.errors.0 }}</div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {{ form.unit_price|add_class:"form-control unit-price-input" }}
-                                        {% if form.unit_price.errors %}
-                                            <div class="invalid-feedback">{{ form.unit_price.errors.0 }}</div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <input type="text" class="form-control auto-calculated item-total" readonly placeholder="0.00">
-                                    </td>
-                                    <td>
-                                        {{ form.notes|add_class:"form-control"|attr:"placeholder:Notes" }}
-                                    </td>
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-remove-item" title="Remove Item">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                        {{ form.DELETE }}
-                                    </td>
-                                </tr>
-                                {% endif %}
-                                {% endfor %}
+            <!-- Summary Sidebar -->
+            <div class="col-lg-4">
+                <div class="sticky-top" style="top: 20px;">
+                    <div class="form-card">
+                        <div class="form-card-header">
+                            <i class="fas fa-calculator me-2"></i>
+                            Invoice Summary
+                        </div>
+                        <div class="p-3">
+                            <div class="summary-card">
+                                <div class="summary-row">
+                                    <span>Subtotal:</span>
+                                    <strong id="subtotal-display">KSh 0.00</strong>
+                                </div>
                                 
-                                <!-- Show message if no items -->
-                                {% if not object %}
-                                <tr id="no-items-row">
-                                    <td colspan="7" class="text-center text-muted py-4">
-                                        <i class="fas fa-plus-circle fa-2x mb-2"></i>
-                                        <div>No items added yet. Click "Add Item" to get started.</div>
-                                    </td>
-                                </tr>
-                                {% endif %}
-                            </tbody>
-                            <tfoot class="table-light">
-                                <tr class="total-row">
-                                    <td colspan="4" class="text-end fw-semibold">Subtotal:</td>
-                                    <td id="subtotal-display" class="fw-semibold">KES 0.00</td>
-                                    <td colspan="2"></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    
-                    <!-- Calculation Summary -->
-                    <div class="calculation-summary">
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="{{ form.subtotal.id_for_label }}" class="form-label">Subtotal</label>
-                                        {{ form.subtotal|add_class:"form-control auto-calculated" }}
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="{{ form.tax_amount.id_for_label }}" class="form-label">Tax Amount</label>
-                                        {{ form.tax_amount|add_class:"form-control calculation-input" }}
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="{{ form.shipping_cost.id_for_label }}" class="form-label">Shipping Cost</label>
-                                        {{ form.shipping_cost|add_class:"form-control calculation-input" }}
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="{{ form.discount_amount.id_for_label }}" class="form-label">Discount Amount</label>
-                                        {{ form.discount_amount|add_class:"form-control calculation-input" }}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
                                 <div class="summary-row">
-                                    <span class="summary-label">Subtotal:</span>
-                                    <span class="summary-value" id="summary-subtotal">KES 0.00</span>
-                                </div>
-                                <div class="summary-row">
-                                    <span class="summary-label">Tax:</span>
-                                    <span class="summary-value" id="summary-tax">KES 0.00</span>
-                                </div>
-                                <div class="summary-row">
-                                    <span class="summary-label">Shipping:</span>
-                                    <span class="summary-value" id="summary-shipping">KES 0.00</span>
-                                </div>
-                                <div class="summary-row">
-                                    <span class="summary-label">Discount:</span>
-                                    <span class="summary-value text-success" id="summary-discount">KES 0.00</span>
-                                </div>
-                                <div class="total-summary">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span class="fw-bold">Total Amount:</span>
-                                        <span class="fw-bold fs-5" id="summary-total">KES 0.00</span>
+                                    <span>VAT/Tax:</span>
+                                    <div class="input-group input-group-sm" style="width: 120px;">
+                                        {{ form.tax_amount|add_class:"form-control form-control-sm text-end" }}
                                     </div>
+                                </div>
+                                
+                                <div class="summary-row">
+                                    <span>Discount:</span>
+                                    <div class="input-group input-group-sm" style="width: 120px;">
+                                        {{ form.discount_amount|add_class:"form-control form-control-sm text-end" }}
+                                    </div>
+                                </div>
+                                
+                                <div class="summary-row">
+                                    <span>Shipping:</span>
+                                    <div class="input-group input-group-sm" style="width: 120px;">
+                                        {{ form.shipping_cost|add_class:"form-control form-control-sm text-end" }}
+                                    </div>
+                                </div>
+                                
+                                <div class="summary-row">
+                                    <span>Total Amount:</span>
+                                    <strong id="total-display" style="font-size: 1.2rem; color: #059669;">KSh 0.00</strong>
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- Hidden total amount field -->
-                        <input type="hidden" name="total_amount" id="id_total_amount">
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="form-card">
+                        <div class="form-card-header">
+                            <i class="fas fa-cogs me-2"></i>
+                            Actions
+                        </div>
+                        <div class="p-3">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-secondary" onclick="saveDraft()">
+                                    <i class="fas fa-save me-2"></i>Save as Draft
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-check me-2"></i>
+                                    {% if invoice %}Update{% else %}Create{% endif %} Invoice
+                                </button>
+                                <a href="/business/{{ request.tenant.slug }}/suppliers/invoices/" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Back to List
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Sidebar -->
-        <div class="col-lg-4">
-            <!-- Invoice Summary -->
-            <div class="form-card mb-4">
-                <div class="form-card-header">
-                    <i class="fas fa-chart-bar me-2"></i>Invoice Summary
-                </div>
-                <div class="p-4">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Total Items:</span>
-                        <span class="fw-semibold" id="total-items">0</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Subtotal:</span>
-                        <span class="fw-semibold" id="sidebar-subtotal">KES 0.00</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Total Amount:</span>
-                        <span class="fw-semibold text-primary" id="sidebar-total">KES 0.00</span>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Payment Status:</span>
-                        <span class="payment-status-badge status-pending">Pending</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Payment Information -->
-            <div class="form-card mb-4">
-                <div class="form-card-header">
-                    <i class="fas fa-credit-card me-2"></i>Payment Information
-                </div>
-                <div class="p-4">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-info-circle me-2"></i>
-                        Payment tracking will be available after the invoice is created.
-                    </div>
-                    
-                    <div class="mb-3">
-                        <div class="small text-muted">Days until due</div>
-                        <div class="fw-semibold" id="days-until-due">-</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Additional Information -->
-            <div class="form-card">
-                <div class="form-card-header">
-                    <i class="fas fa-sticky-note me-2"></i>Additional Information
-                </div>
-                <div class="p-4">
-                    <div class="mb-3">
-                        <label for="{{ form.notes.id_for_label }}" class="form-label">Internal Notes</label>
-                        {{ form.notes|add_class:"form-control" }}
-                        {% if form.notes.errors %}
-                            <div class="invalid-feedback">{{ form.notes.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Form Actions -->
-    <div class="form-card">
-        <div class="form-actions">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <a href="{{ urls.invoice_list }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>Cancel
-                    </a>
-                </div>
-                <div class="d-flex gap-2">
-                    {% if object %}
-                        <button type="submit" name="save" class="btn btn-primary">
-                            <i class="fas fa-save me-2"></i>Update Invoice
-                        </button>
-                        {% if object.status == 'received' %}
-                        <button type="submit" name="verify" class="btn btn-warning">
-                            <i class="fas fa-check me-2"></i>Verify
-                        </button>
-                        {% elif object.status == 'verified' %}
-                        <button type="submit" name="approve" class="btn btn-success">
-                            <i class="fas fa-check-circle me-2"></i>Approve
-                        </button>
-                        {% endif %}
-                    {% else %}
-                        <button type="submit" name="save_draft" class="btn btn-secondary">
-                            <i class="fas fa-save me-2"></i>Save as Draft
-                        </button>
-                        <button type="submit" name="save_and_verify" class="btn btn-success">
-                            <i class="fas fa-check-circle me-2"></i>Save & Verify
-                        </button>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-</form>
+    </form>
+</div>
 
 <!-- Item Row Template (Hidden) -->
 <template id="item-row-template">
     <tr class="item-row" data-form-index="__prefix__">
         <td>
-            <input type="text" name="items-__prefix__-description" class="form-control item-description" placeholder="Item description" id="id_items-__prefix__-description">
+            <input type="text" name="items-__prefix__-description" class="form-control" placeholder="Item description" required>
         </td>
         <td>
-            <input type="text" name="items-__prefix__-item_code" class="form-control" placeholder="Code" id="id_items-__prefix__-item_code">
+            <input type="number" name="items-__prefix__-quantity" class="form-control quantity-input" step="0.01" min="0.01" value="1" required>
         </td>
         <td>
-            <input type="number" name="items-__prefix__-quantity" class="form-control quantity-input" step="0.01" min="0.01" placeholder="1" id="id_items-__prefix__-quantity">
+            <input type="number" name="items-__prefix__-unit_price" class="form-control unit-price-input" step="0.01" min="0.01" required>
         </td>
         <td>
-            <input type="number" name="items-__prefix__-unit_price" class="form-control unit-price-input" step="0.01" min="0.01" placeholder="0.00" id="id_items-__prefix__-unit_price">
+            <input type="text" class="form-control item-total" readonly value="0.00">
         </td>
         <td>
-            <input type="text" class="form-control auto-calculated item-total" readonly placeholder="0.00">
-        </td>
-        <td>
-            <input type="text" name="items-__prefix__-notes" class="form-control" placeholder="Notes" id="id_items-__prefix__-notes">
+            <input type="text" name="items-__prefix__-notes" class="form-control" placeholder="Notes">
         </td>
         <td class="text-center">
-            <button type="button" class="btn btn-remove-item" title="Remove Item">
+            <button type="button" class="btn btn-remove-item btn-sm" title="Remove Item">
                 <i class="fas fa-trash"></i>
             </button>
-            <input type="hidden" name="items-__prefix__-DELETE" id="id_items-__prefix__-DELETE">
-            <input type="hidden" name="items-__prefix__-id" id="id_items-__prefix__-id">
+            <input type="hidden" name="items-__prefix__-DELETE">
+            <input type="hidden" name="items-__prefix__-id">
         </td>
     </tr>
 </template>
@@ -806,464 +448,95 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 $(document).ready(function() {
-    let formIndex = 0; // Start with 0 since we don't create empty rows
+    let formIndex = {{ items_formset.total_form_count }};
     const maxForms = {{ items_formset.max_num }};
-    let purchaseOrderData = null;
     
-    // Count existing items to set proper form index
-    $('.item-row').each(function(index) {
-        formIndex = Math.max(formIndex, parseInt($(this).data('form-index')) + 1);
-    });
-    
-    // Initialize Select2 for supplier and PO
-    {% if not purchase_order %}
-    $('#id_supplier').select2({
+    // Initialize Select2
+    $('#{{ form.supplier.id_for_label }}').select2({
         placeholder: 'Select a supplier...',
         allowClear: true
     });
     
-    $('#id_purchase_order').select2({
-        placeholder: 'Optional - select a purchase order...',
+    $('#{{ form.purchase_order.id_for_label }}').select2({
+        placeholder: 'Select a purchase order...',
         allowClear: true
     });
     
-    // Load available purchase orders and suppliers
-    loadAvailablePurchaseOrders();
-    loadSuppliers();
-    
-    // Handle supplier selection to filter POs
-    $('#id_supplier').on('change', function() {
-        const supplierId = $(this).val();
-        filterPurchaseOrdersBySupplier(supplierId);
-        
-        if (supplierId) {
-            loadSupplierInfo(supplierId);
-        } else {
-            $('#supplier-info-card').hide();
-        }
-    });
-    
-    // Handle PO selection to auto-fill supplier
-    $('#id_purchase_order').on('change', function() {
-        const poId = $(this).val();
-        if (poId) {
-            autoFillSupplierFromPO(poId);
-        }
-    });
+    // Set default dates for new invoices
+    {% if not invoice %}
+    setDefaultDates();
     {% endif %}
     
-    // Initialize PO selector if available
-    {% if not purchase_order %}
-    initializePOSelector();
-    {% else %}
-    // PO is pre-selected, store data
-    purchaseOrderData = {
-        id: '{{ purchase_order.pk }}',
-        po_number: '{{ purchase_order.po_number }}',
-        supplier_id: '{{ purchase_order.supplier.pk }}',
-        supplier_name: '{{ purchase_order.supplier.name|escapejs }}'
-    };
-    {% endif %}
+    // Calculate totals on page load
+    calculateTotals();
     
-    // Set default dates
-    if (!$('#id_invoice_date').val()) {
-        const today = new Date().toISOString().split('T')[0];
-        $('#id_invoice_date').val(today);
-    }
-    
-    // Auto-calculate due date when invoice date changes
-    $('#id_invoice_date').on('change', function() {
-        if (!$('#id_due_date').val()) {
-            const invoiceDate = new Date($(this).val());
-            invoiceDate.setDate(invoiceDate.getDate() + 30); // Default 30 days
-            $('#id_due_date').val(invoiceDate.toISOString().split('T')[0]);
-        }
-        updateDaysUntilDue();
+    // Event handlers
+    $(document).on('input', '.quantity-input, .unit-price-input, #{{ form.tax_amount.id_for_label }}, #{{ form.discount_amount.id_for_label }}, #{{ form.shipping_cost.id_for_label }}', function() {
+        calculateRowTotal($(this).closest('.item-row'));
+        calculateTotals();
     });
     
-    $('#id_due_date').on('change', function() {
-        updateDaysUntilDue();
-    });
-    
-    function initializePOSelector() {
-        $('#po-selector').select2({
-            placeholder: 'Search and select a purchase order...',
-            allowClear: true,
-            templateResult: formatPOOption,
-            templateSelection: formatPOSelection
-        });
-        
-        // Load available POs
-        loadPOSelectorOptions();
-        
-        // Enable/disable load button based on selection
-        $('#po-selector').on('change', function() {
-            const hasSelection = $(this).val();
-            $('#load-po-btn').prop('disabled', !hasSelection);
-        });
-        
-        // Load PO button click
-        $('#load-po-btn').on('click', function() {
-            const poId = $('#po-selector').val();
-            if (poId) {
-                loadFromPurchaseOrder(poId);
-            }
-        });
-    }
-    
-    function loadPOSelectorOptions() {
-        // Load completed purchase orders
-        $.ajax({
-            url: '{{ urls.ajax_purchase_order_items }}',
-            data: { 
-                action: 'get_completed_pos' 
-            },
-            success: function(data) {
-                const selector = $('#po-selector');
-                selector.empty().append('<option value="">Create invoice manually or select a purchase order...</option>');
-                
-                if (data.purchase_orders) {
-                    data.purchase_orders.forEach(po => {
-                        selector.append(`
-                            <option value="${po.id}" 
-                                    data-supplier="${po.supplier_name}"
-                                    data-supplier-id="${po.supplier_id}"
-                                    data-items="${po.items_count}"
-                                    data-total="${po.total_amount}">
-                                PO-${po.po_number} - ${po.supplier_name} (KES ${parseFloat(po.total_amount).toLocaleString()})
-                            </option>
-                        `);
-                    });
-                }
-            },
-            error: function() {
-                console.log('Could not load purchase orders');
-            }
-        });
-    }
-    
-    function loadAvailablePurchaseOrders() {
-        // Load purchase orders for the dropdown in the form
-        $.ajax({
-            url: '{{ urls.ajax_purchase_order_items }}',
-            data: { 
-                action: 'get_completed_pos' 
-            },
-            success: function(data) {
-                const poSelect = $('#id_purchase_order');
-                poSelect.empty().append('<option value="">Optional - select a purchase order...</option>');
-                
-                if (data.purchase_orders) {
-                    data.purchase_orders.forEach(po => {
-                        poSelect.append(`
-                            <option value="${po.id}" data-supplier-id="${po.supplier_id}">
-                                PO-${po.po_number} - ${po.supplier_name} (KES ${parseFloat(po.total_amount).toLocaleString()})
-                            </option>
-                        `);
-                    });
-                }
-            },
-            error: function() {
-                console.log('Could not load purchase orders');
-            }
-        });
-    }
-    
-    function loadSuppliers() {
-        // Load suppliers for the dropdown
-        $.ajax({
-            url: '{{ urls.ajax_purchase_order_items }}',
-            data: { 
-                action: 'get_suppliers' 
-            },
-            success: function(data) {
-                const supplierSelect = $('#id_supplier');
-                supplierSelect.empty().append('<option value="">Select a supplier...</option>');
-                
-                if (data.suppliers) {
-                    data.suppliers.forEach(supplier => {
-                        supplierSelect.append(`
-                            <option value="${supplier.id}">
-                                ${supplier.name} (${supplier.supplier_code})
-                            </option>
-                        `);
-                    });
-                }
-            },
-            error: function() {
-                console.log('Could not load suppliers');
-            }
-        });
-    }
-    
-    function filterPurchaseOrdersBySupplier(supplierId) {
-        if (!supplierId) {
-            loadAvailablePurchaseOrders();
-            return;
-        }
-        
-        // Filter POs by supplier
-        $('#id_purchase_order option').each(function() {
-            const option = $(this);
-            const poSupplierId = option.data('supplier-id');
-            
-            if (!poSupplierId || poSupplierId == supplierId) {
-                option.show();
-            } else {
-                option.hide();
-            }
-        });
-        
-        // Clear selection if current PO doesn't match supplier
-        const currentPO = $('#id_purchase_order option:selected');
-        if (currentPO.data('supplier-id') && currentPO.data('supplier-id') != supplierId) {
-            $('#id_purchase_order').val('').trigger('change');
-        }
-    }
-    
-    function autoFillSupplierFromPO(poId) {
-        const selectedPO = $(`#id_purchase_order option[value="${poId}"]`);
-        const supplierId = selectedPO.data('supplier-id');
-        
-        if (supplierId && !$('#id_supplier').val()) {
-            $('#id_supplier').val(supplierId).trigger('change');
-        }
-    }
-    
-    function loadSupplierInfo(supplierId) {
-        // Load and display supplier information
-        $.ajax({
-            url: '{{ urls.ajax_purchase_order_items }}',
-            data: { 
-                action: 'get_supplier_info',
-                supplier_id: supplierId 
-            },
-            success: function(data) {
-                if (data.supplier) {
-                    displaySupplierInfo(data.supplier);
-                }
-            },
-            error: function() {
-                console.log('Could not load supplier information');
-            }
-        });
-    }
-    
-    function displaySupplierInfo(supplier) {
-        const supplierDetails = $('#supplier-details');
-        supplierDetails.html(`
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Supplier Name</div>
-                <div class="fw-semibold">${supplier.name}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Supplier Code</div>
-                <div>${supplier.supplier_code}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Payment Terms</div>
-                <div>${supplier.payment_terms || 'Not specified'}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Email</div>
-                <div>${supplier.email || 'Not provided'}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Phone</div>
-                <div>${supplier.phone || 'Not provided'}</div>
-            </div>
-            <div class="col-md-4 mb-2">
-                <div class="small text-muted">Currency</div>
-                <div>${supplier.currency || 'KES'}</div>
-            </div>
-        `);
-        
-        $('#supplier-info-card').show();
-        
-        // Auto-fill currency if available
-        if (supplier.currency && !$('#id_currency').val()) {
-            $('#id_currency').val(supplier.currency);
-        }
-        
-        // Auto-calculate due date based on payment terms
-        if (supplier.payment_terms && $('#id_invoice_date').val() && !$('#id_due_date').val()) {
-            const invoiceDate = new Date($('#id_invoice_date').val());
-            let daysToAdd = 30; // Default
-            
-            if (supplier.payment_terms.includes('15')) daysToAdd = 15;
-            else if (supplier.payment_terms.includes('30')) daysToAdd = 30;
-            else if (supplier.payment_terms.includes('45')) daysToAdd = 45;
-            else if (supplier.payment_terms.includes('60')) daysToAdd = 60;
-            
-            invoiceDate.setDate(invoiceDate.getDate() + daysToAdd);
-            $('#id_due_date').val(invoiceDate.toISOString().split('T')[0]);
-            updateDaysUntilDue();
-        }
-    }
-    
-    function formatPOOption(option) {
-        if (!option.id) return option.text;
-        
-        const $option = $(option.element);
-        const supplier = $option.data('supplier');
-        const items = $option.data('items');
-        const total = $option.data('total');
-        
-        return $(`
-            <div>
-                <div class="fw-semibold">${option.text}</div>
-                <div class="small text-muted">
-                    ${items} items • KES ${parseFloat(total).toLocaleString()}
-                </div>
-            </div>
-        `);
-    }
-    
-    function formatPOSelection(option) {
-        return option.text;
-    }
-    
-    function loadFromPurchaseOrder(poId) {
-        // Navigate to the form with the selected PO
-        const currentUrl = new URL(window.location);
-        currentUrl.searchParams.set('po', poId);
-        window.location.href = currentUrl.toString();
-    }
-    
-    // Add new item row
-    $('#add-item-btn').click(function() {
+    $('#add-item').click(function() {
         if (formIndex < maxForms) {
-            $('#no-items-row').remove();
             addNewItemRow();
         } else {
-            showAlert('Maximum number of items reached.', 'warning');
+            alert('Maximum number of items reached.');
         }
     });
     
-    // Remove item row
     $(document).on('click', '.btn-remove-item', function() {
-        const row = $(this).closest('tr');
-        const deleteInput = row.find('input[name$="-DELETE"]');
-        
-        if (deleteInput.length && row.find('input[name$="-id"]').val()) {
-            // Mark for deletion if it's an existing item with ID
-            deleteInput.val('true');
-            row.addClass('removing').hide();
-        } else {
-            // Remove completely if it's a new item
-            row.remove();
-            updateFormIndex();
+        removeItemRow($(this).closest('.item-row'));
+    });
+    
+    // Form validation
+    $('#invoice-form').submit(function(e) {
+        if (!validateForm()) {
+            e.preventDefault();
         }
-        
-        // Show "no items" message if no items left
-        if ($('.item-row:visible').length === 0) {
-            $('#items-tbody').append(`
-                <tr id="no-items-row">
-                    <td colspan="7" class="text-center text-muted py-4">
-                        <i class="fas fa-plus-circle fa-2x mb-2"></i>
-                        <div>No items added yet. Click "Add Item" to get started.</div>
-                    </td>
-                </tr>
-            `);
-        }
-        
-        calculateTotals();
     });
     
-    // Handle quantity and price changes
-    $(document).on('input', '.quantity-input, .unit-price-input', function() {
-        const row = $(this).closest('tr');
-        calculateRowTotal(row);
-    });
-    
-    // Handle calculation inputs
-    $(document).on('input', '.calculation-input', function() {
-        calculateTotals();
-    });
-    
-    // Auto-fill functions for PO items
-    {% if po_items %}
-    window.addAllPOItems = function() {
-        // Clear existing items first
-        $('.item-row').each(function() {
-            const deleteInput = $(this).find('input[name$="-DELETE"]');
-            if (deleteInput.length && $(this).find('input[name$="-id"]').val()) {
-                deleteInput.val('true');
-                $(this).hide();
-            } else {
-                $(this).remove();
-            }
-        });
-        
-        $('#no-items-row').remove();
-        
-        // Add all PO items
-        const poItems = [
-            {% for item in po_items %}
-            {
-                description: '{{ item.item.name|escapejs }}',
-                item_code: '{{ item.item.sku|default:""|escapejs }}',
-                quantity: {{ item.quantity }},
-                unit_price: {{ item.unit_price }}
-            }{% if not forloop.last %},{% endif %}
-            {% endfor %}
-        ];
-        
-        poItems.forEach(item => {
-            addNewItemRow(item);
-        });
-        
-        calculateTotals();
-        showAlert(`Added ${poItems.length} items from purchase order.`, 'success');
-    };
-    
-    window.calculateFromPO = function() {
-        // Auto-calculate totals from PO
-        const poSubtotal = {{ purchase_order.subtotal|default:0 }};
-        const poTax = {{ purchase_order.tax_amount|default:0 }};
-        const poShipping = {{ purchase_order.shipping_cost|default:0 }};
-        const poDiscount = {{ purchase_order.discount_amount|default:0 }};
-        
-        $('#id_tax_amount').val(poTax.toFixed(2));
-        $('#id_shipping_cost').val(poShipping.toFixed(2));
-        $('#id_discount_amount').val(poDiscount.toFixed(2));
-        
-        calculateTotals();
-        showAlert('Totals calculated from purchase order.', 'success');
-    };
-    {% endif %}
-    
-    function addNewItemRow(itemData = null) {
+    function addNewItemRow() {
         const template = $('#item-row-template').html();
         const newRow = template.replace(/__prefix__/g, formIndex);
         
         $('#items-tbody').append(newRow);
         
-        // If item data provided, fill it in
-        if (itemData) {
-            const row = $(`.item-row[data-form-index="${formIndex}"]`);
-            row.find('.item-description').val(itemData.description);
-            row.find('input[name$="-item_code"]').val(itemData.item_code);
-            row.find('.quantity-input').val(itemData.quantity);
-            row.find('.unit-price-input').val(itemData.unit_price);
-            calculateRowTotal(row);
+        formIndex++;
+        updateFormIndex();
+        
+        // Focus on the new description field
+        $(`input[name="items-${formIndex-1}-description"]`).focus();
+    }
+    
+    function removeItemRow(row) {
+        const deleteInput = row.find('input[name$="-DELETE"]');
+        
+        if (deleteInput.length > 0) {
+            // Mark for deletion if it's an existing item
+            deleteInput.val('1');
+            row.hide().addClass('removing');
+        } else {
+            // Remove from DOM if it's a new item
+            row.remove();
         }
         
-        formIndex++;
+        calculateTotals();
         updateFormIndex();
     }
     
     function updateFormIndex() {
-        $('#id_items-TOTAL_FORMS').val($('.item-row:visible').length);
+        const visibleRows = $('.item-row:visible').length;
+        $('#{{ items_formset.management_form.total_forms.id_for_label }}').val(formIndex);
     }
     
     function calculateRowTotal(row) {
+        if (row.length === 0) return;
+        
         const quantity = parseFloat(row.find('.quantity-input').val()) || 0;
         const unitPrice = parseFloat(row.find('.unit-price-input').val()) || 0;
         const total = quantity * unitPrice;
         
         row.find('.item-total').val(total.toFixed(2));
-        calculateTotals();
     }
     
     function calculateTotals() {
@@ -1271,310 +544,63 @@ $(document).ready(function() {
         
         // Calculate subtotal from all visible rows
         $('.item-row:visible').each(function() {
+            calculateRowTotal($(this));
             const total = parseFloat($(this).find('.item-total').val()) || 0;
             subtotal += total;
         });
         
-        const tax = parseFloat($('#id_tax_amount').val()) || 0;
-        const shipping = parseFloat($('#id_shipping_cost').val()) || 0;
-        const discount = parseFloat($('#id_discount_amount').val()) || 0;
+        const tax = parseFloat($('#{{ form.tax_amount.id_for_label }}').val()) || 0;
+        const discount = parseFloat($('#{{ form.discount_amount.id_for_label }}').val()) || 0;
+        const shipping = parseFloat($('#{{ form.shipping_cost.id_for_label }}').val()) || 0;
         
         const grandTotal = subtotal + tax + shipping - discount;
         
         // Update displays
-        $('#subtotal-display').text(`KES ${subtotal.toFixed(2)}`);
-        $('#summary-subtotal').text(`KES ${subtotal.toFixed(2)}`);
-        $('#summary-tax').text(`KES ${tax.toFixed(2)}`);
-        $('#summary-shipping').text(`KES ${shipping.toFixed(2)}`);
-        $('#summary-discount').text(`KES ${discount.toFixed(2)}`);
-        $('#summary-total').text(`KES ${grandTotal.toFixed(2)}`);
-        
-        // Update sidebar
-        $('#sidebar-subtotal').text(`KES ${subtotal.toFixed(2)}`);
-        $('#sidebar-total').text(`KES ${grandTotal.toFixed(2)}`);
-        $('#total-items').text($('.item-row:visible').length);
-        
-        // Update hidden fields
-        $('#id_subtotal').val(subtotal.toFixed(2));
-        $('#id_total_amount').val(grandTotal.toFixed(2));
+        $('#subtotal-display').text(`KSh ${subtotal.toFixed(2)}`);
+        $('#total-display').text(`KSh ${grandTotal.toFixed(2)}`);
     }
     
-    function updateDaysUntilDue() {
-        const invoiceDate = $('#id_invoice_date').val();
-        const dueDate = $('#id_due_date').val();
+    function setDefaultDates() {
+        const today = new Date();
+        const thirtyDaysLater = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
         
-        if (invoiceDate && dueDate) {
-            const invoice = new Date(invoiceDate);
-            const due = new Date(dueDate);
-            const diffTime = due - invoice;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            $('#days-until-due').text(`${diffDays} days`);
-        }
+        $('#{{ form.invoice_date.id_for_label }}').val(today.toISOString().split('T')[0]);
+        $('#{{ form.due_date.id_for_label }}').val(thirtyDaysLater.toISOString().split('T')[0]);
     }
-    
-    // Form validation
-    $('#invoice-form').on('submit', function(e) {
-        if (!validateForm()) {
-            e.preventDefault();
-        }
-    });
     
     function validateForm() {
         let isValid = true;
-        const errors = [];
         
-        // Remove existing validation classes
-        $('.is-invalid').removeClass('is-invalid');
-        
-        // Check if supplier is selected
-        if (!$('#id_supplier').val()) {
-            errors.push('Please select a supplier.');
-            $('#id_supplier').addClass('is-invalid');
-            isValid = false;
+        // Check if at least one item exists
+        if ($('.item-row:visible').length === 0) {
+            alert('Please add at least one invoice item.');
+            return false;
         }
         
-        // Check supplier invoice number
-        if (!$('#id_supplier_invoice_number').val()) {
-            errors.push('Please enter the supplier\'s invoice number.');
-            $('#id_supplier_invoice_number').addClass('is-invalid');
-            isValid = false;
-        }
-        
-        // Check invoice date
-        if (!$('#id_invoice_date').val()) {
-            errors.push('Please provide an invoice date.');
-            $('#id_invoice_date').addClass('is-invalid');
-            isValid = false;
-        }
-        
-        // Check due date
-        if (!$('#id_due_date').val()) {
-            errors.push('Please provide a due date.');
-            $('#id_due_date').addClass('is-invalid');
-            isValid = false;
-        }
-        
-        // Validate due date is after invoice date
-        const invoiceDate = new Date($('#id_invoice_date').val());
-        const dueDate = new Date($('#id_due_date').val());
-        if (dueDate <= invoiceDate) {
-            errors.push('Due date must be after the invoice date.');
-            $('#id_due_date').addClass('is-invalid');
-            isValid = false;
-        }
-        
-        // Check if at least one item is added
-        const visibleRows = $('.item-row:visible').length;
-        if (visibleRows === 0) {
-            errors.push('Please add at least one item to the invoice.');
-            isValid = false;
-        }
-        
-        // Validate each item row
+        // Validate required fields in visible rows
         $('.item-row:visible').each(function() {
-            const row = $(this);
-            const description = row.find('.item-description').val();
-            const quantity = row.find('.quantity-input').val();
-            const unitPrice = row.find('.unit-price-input').val();
+            const description = $(this).find('input[name$="-description"]').val().trim();
+            const quantity = parseFloat($(this).find('.quantity-input').val());
+            const unitPrice = parseFloat($(this).find('.unit-price-input').val());
             
-            if (!description) {
-                row.find('.item-description').addClass('is-invalid');
-                if (errors.indexOf('Please provide descriptions for all items.') === -1) {
-                    errors.push('Please provide descriptions for all items.');
-                }
+            if (!description || quantity <= 0 || unitPrice <= 0) {
+                alert('Please fill in all required fields for each item.');
                 isValid = false;
-            }
-            
-            if (!quantity || parseFloat(quantity) <= 0) {
-                row.find('.quantity-input').addClass('is-invalid');
-                if (errors.indexOf('Please enter valid quantities for all items.') === -1) {
-                    errors.push('Please enter valid quantities for all items.');
-                }
-                isValid = false;
-            }
-            
-            if (!unitPrice || parseFloat(unitPrice) <= 0) {
-                row.find('.unit-price-input').addClass('is-invalid');
-                if (errors.indexOf('Please enter valid unit prices for all items.') === -1) {
-                    errors.push('Please enter valid unit prices for all items.');
-                }
-                isValid = false;
+                return false;
             }
         });
-        
-        if (!isValid) {
-            showValidationErrors(errors);
-        }
         
         return isValid;
     }
     
-    function showValidationErrors(errors) {
-        let errorHtml = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
-        errorHtml += '<h6><i class="fas fa-exclamation-triangle me-2"></i>Please correct the following errors:</h6>';
-        errorHtml += '<ul class="mb-0">';
-        errors.forEach(error => {
-            errorHtml += `<li>${error}</li>`;
-        });
-        errorHtml += '</ul>';
-        errorHtml += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-        errorHtml += '</div>';
+    function saveDraft() {
+        // Set status to draft before submitting
+        $('#{{ form.status.id_for_label }}').val('draft');
         
-        $('.alert-danger').remove();
-        $('.form-header').after(errorHtml);
-        
-        $('html, body').animate({
-            scrollTop: $('.alert-danger').offset().top - 100
-        }, 500);
-    }
-    
-    function showAlert(message, type) {
-        // Remove existing alerts
-        $('.auto-alert').remove();
-        
-        const alertHtml = `
-            <div class="auto-alert alert alert-${type} alert-dismissible fade show" role="alert">
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        
-        $('.form-header').after(alertHtml);
-        
-        // Auto-hide success and info alerts after 4 seconds
-        if (type === 'success' || type === 'info') {
-            setTimeout(() => {
-                $('.auto-alert').fadeOut();
-            }, 4000);
+        if (validateForm()) {
+            $('#invoice-form').submit();
         }
     }
-    
-    // Keyboard shortcuts
-    $(document).keydown(function(e) {
-        // Ctrl/Cmd + Enter to save and verify
-        if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
-            e.preventDefault();
-            $('button[name="save_and_verify"]').click();
-        }
-        
-        // Ctrl/Cmd + S to save
-        if ((e.ctrlKey || e.metaKey) && e.keyCode === 83) {
-            e.preventDefault();
-            $('button[name="save"], button[name="save_draft"]').first().click();
-        }
-    });
-    
-    // Auto-save functionality
-    let autoSaveTimer;
-    function scheduleAutoSave() {
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(function() {
-            if ($('.item-row:visible').length > 0 && $('#id_supplier_invoice_number').val()) {
-                autoSave();
-            }
-        }, 30000); // Auto-save every 30 seconds
-    }
-    
-    function autoSave() {
-        const formData = new FormData($('#invoice-form')[0]);
-        formData.append('save_draft', 'true');
-        formData.append('auto_save', 'true');
-        
-        $.ajax({
-            url: window.location.href,
-            method: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                // Silent success
-                console.log('Auto-saved successfully');
-            },
-            error: function() {
-                // Silent fail
-                console.log('Auto-save failed');
-            }
-        });
-    }
-    
-    // Track form changes for auto-save
-    $(document).on('input change', '#invoice-form', function() {
-        scheduleAutoSave();
-    });
-    
-    // Prevent accidental navigation
-    let formChanged = false;
-    $(document).on('input change', '#invoice-form', function() {
-        formChanged = true;
-    });
-    
-    $(window).on('beforeunload', function(e) {
-        if (formChanged) {
-            const message = 'You have unsaved changes. Are you sure you want to leave?';
-            e.returnValue = message;
-            return message;
-        }
-    });
-    
-    $('#invoice-form').on('submit', function() {
-        formChanged = false;
-        $(window).off('beforeunload');
-    });
-    
-    // Remove validation classes on input
-    $(document).on('input change', '.form-control, .form-select', function() {
-        $(this).removeClass('is-invalid');
-        $('.alert-danger').fadeOut();
-    });
-    
-    // Number formatting for currency inputs
-    $(document).on('blur', '.unit-price-input, .calculation-input', function() {
-        const value = parseFloat($(this).val());
-        if (!isNaN(value)) {
-            $(this).val(value.toFixed(2));
-        }
-    });
-    
-    // Initialize calculations on page load for existing items
-    $('.item-row').each(function() {
-        const row = $(this);
-        const quantity = parseFloat(row.find('.quantity-input').val()) || 0;
-        const unitPrice = parseFloat(row.find('.unit-price-input').val()) || 0;
-        
-        if (quantity && unitPrice) {
-            calculateRowTotal(row);
-        }
-    });
-    
-    // Initialize calculations
-    calculateTotals();
-    updateDaysUntilDue();
-    
-    // Smart tab navigation
-    $(document).on('keydown', '.quantity-input, .unit-price-input', function(e) {
-        if (e.keyCode === 13) { // Enter key
-            e.preventDefault();
-            
-            // Move to next quantity field
-            const currentRow = $(this).closest('tr');
-            const nextRow = currentRow.next('.item-row');
-            
-            if (nextRow.length) {
-                nextRow.find('.quantity-input').focus().select();
-            } else {
-                // If last row, focus on add item button
-                $('#add-item-btn').focus();
-            }
-        }
-    });
-    
-    // Auto-select text in number fields for faster editing
-    $(document).on('focus', '.quantity-input, .unit-price-input', function() {
-        $(this).select();
-    });
-    
-    // Initialize tooltips
-    $('[data-bs-toggle="tooltip"]').tooltip();
 });
 </script>
 {% endblock %}

@@ -648,25 +648,30 @@ class ServiceOrder(TenantTimeStampedModel):
         return self.status in ['pending', 'confirmed']
     
     def calculate_totals(self):
-        """Calculate order totals"""
+        """Calculate order totals with inclusive VAT"""
         if self.package:
-            self.subtotal = self.package.total_price
+            # Package prices are VAT inclusive
+            self.total_amount = self.package.total_price
+            # Calculate VAT amount from inclusive price (16% VAT rate)
+            self.tax_amount = self.total_amount * Decimal('0.16') / Decimal('1.16')
+            self.subtotal = self.total_amount - self.tax_amount
         else:
+            # Service prices are VAT inclusive
             items_total = sum(
                 item.quantity * item.unit_price 
                 for item in self.order_items.all()
             )
-            self.subtotal = items_total
+            self.total_amount = items_total
+            # Calculate VAT amount from inclusive price (16% VAT rate)
+            self.tax_amount = self.total_amount * Decimal('0.16') / Decimal('1.16')
+            self.subtotal = self.total_amount - self.tax_amount
         
-        # Apply discount
-        discounted_amount = self.subtotal - self.discount_amount
-        
-        # Calculate tax (assuming 16% VAT for Kenya)
-        tax_rate = Decimal('0.16')
-        self.tax_amount = discounted_amount * tax_rate
-        
-        # Calculate total
-        self.total_amount = discounted_amount + self.tax_amount
+        # Apply discount to total amount
+        if self.discount_amount > 0:
+            self.total_amount = self.total_amount - self.discount_amount
+            # Recalculate VAT on discounted amount
+            self.tax_amount = self.total_amount * Decimal('0.16') / Decimal('1.16')
+            self.subtotal = self.total_amount - self.tax_amount
     
     def recalculate_and_save(self):
         """Recalculate totals and save the order"""

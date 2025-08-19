@@ -1,0 +1,658 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .order-form-container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .section-title {
+        color: #495057;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #007bff;
+        display: inline-block;
+    }
+    
+    .info-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        border-left: 4px solid #007bff;
+    }
+    
+    .services-selection {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+    
+    .service-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+        transition: all 0.2s;
+    }
+    
+    .service-item:hover {
+        border-color: #007bff;
+        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.15);
+    }
+    
+    .service-item.selected {
+        border-color: #007bff;
+        background-color: #e3f2fd;
+    }
+    
+    .service-item.current-service {
+        border-color: #28a745;
+        background-color: #d4edda;
+    }
+    
+    .service-info {
+        flex-grow: 1;
+    }
+    
+    .service-name {
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .service-description {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    
+    .service-price {
+        font-weight: 600;
+        color: #28a745;
+        margin-left: 1rem;
+    }
+    
+    .service-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-left: 1rem;
+    }
+    
+    .btn-remove-service {
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+    }
+    
+    .btn-remove-service:hover {
+        background: #c82333;
+    }
+    
+    .order-summary {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 2rem;
+        position: sticky;
+        top: 2rem;
+    }
+    
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+    
+    .summary-row.total {
+        font-weight: 600;
+        font-size: 1.1rem;
+        border-top: 1px solid #dee2e6;
+        padding-top: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .btn-action {
+        min-width: 120px;
+        margin: 0 0.25rem;
+    }
+    
+    .form-control:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    
+    .current-services {
+        background: #e8f5e8;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #28a745;
+    }
+    
+    .alert-info {
+        border-left: 4px solid #17a2b8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="page-title">
+                    <i class="fas fa-edit"></i>
+                    Edit Order {{ order.order_number }}
+                </h1>
+                <p class="page-subtitle">
+                    Status: <span class="badge badge-{{ order.status }}">{{ order.get_status_display }}</span>
+                    | Created {{ order.created_at|date:"M d, Y \a\t g:i A" }}
+                </p>
+            </div>
+            
+            <div class="d-flex align-items-center" style="gap: 0.5rem;">
+                <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" class="btn btn-outline-secondary btn-action">
+                    <i class="fas fa-eye"></i> View Order
+                </a>
+                <a href="/business/{{ request.tenant.slug }}/services/orders/" class="btn btn-outline-primary btn-action">
+                    <i class="fas fa-arrow-left"></i> Back to Orders
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="order-form-container">
+                <form method="post" id="order-form">
+                    {% csrf_token %}
+                    
+                    <!-- Customer & Vehicle Section (Read-only) -->
+                    <div class="form-section">
+                        <h5 class="section-title">
+                            <i class="fas fa-user"></i> Customer & Vehicle Information
+                        </h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="info-card">
+                                    <h6>Customer</h6>
+                                    <strong>{{ order.customer.display_name }}</strong><br>
+                                    <small class="text-muted">{{ order.customer.phone }}</small>
+                                    {% if order.customer.email %}
+                                        <br><small class="text-muted">{{ order.customer.email }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="info-card">
+                                    <h6>Vehicle</h6>
+                                    <strong>{{ order.vehicle.registration_number }}</strong><br>
+                                    <small class="text-muted">{{ order.vehicle.make }} {{ order.vehicle.model }}</small><br>
+                                    <small class="text-muted">{{ order.vehicle.color }} {{ order.vehicle.get_vehicle_type_display }}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Services Section -->
+                    <div class="form-section">
+                        <h5 class="section-title">
+                            <i class="fas fa-cog"></i> Current Services
+                        </h5>
+                        
+                        <div class="current-services">
+                            <h6 class="text-success">Currently Selected Services:</h6>
+                            <div id="current-services-list">
+                                {% for item in order.order_items.all %}
+                                <div class="service-item current-service" data-service-id="{{ item.service.id }}">
+                                    <div class="service-info">
+                                        <div class="service-name">{{ item.service.name }}</div>
+                                        {% if item.service.description %}
+                                        <div class="service-description">{{ item.service.description|truncatechars:100 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="service-price">
+                                        KSh {{ item.total_price|floatformat:2 }}
+                                    </div>
+                                    <div class="service-actions">
+                                        <button type="button" class="btn-remove-service" onclick="removeService('{{ item.service.id }}')">
+                                            <i class="fas fa-times"></i> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <p class="text-muted">No services currently selected</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Add Services Section -->
+                    <div class="form-section">
+                        <h5 class="section-title">
+                            <i class="fas fa-plus"></i> Add Services
+                        </h5>
+                        
+                        <div class="services-selection" id="services-selection">
+                            <div class="row">
+                                {% for category in service_categories %}
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-primary">{{ category.name }}</h6>
+                                    {% for service in category.services.all %}
+                                    <div class="service-item" data-service-id="{{ service.id }}" data-price="{{ service.base_price }}">
+                                        <div class="form-check">
+                                            <input class="form-check-input service-checkbox" 
+                                                   type="checkbox" 
+                                                   id="service_{{ service.id }}"
+                                                   name="services"
+                                                   value="{{ service.id }}"
+                                                   {% if service in order.services.all %}checked{% endif %}>
+                                            <label class="form-check-label" for="service_{{ service.id }}">
+                                                <div class="service-info">
+                                                    <div class="service-name">{{ service.name }}</div>
+                                                    {% if service.description %}
+                                                    <div class="service-description">{{ service.description|truncatechars:100 }}</div>
+                                                    {% endif %}
+                                                </div>
+                                            </label>
+                                        </div>
+                                        <div class="service-price">
+                                            KSh {{ service.base_price|floatformat:2 }}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Assignment & Scheduling Section -->
+                    <div class="form-section">
+                        <h5 class="section-title">
+                            <i class="fas fa-calendar-alt"></i> Assignment & Scheduling
+                        </h5>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="assigned_attendant">Assigned Attendant</label>
+                                    <select name="assigned_attendant" id="assigned_attendant" class="form-control">
+                                        <option value="">Select Attendant</option>
+                                        {% for employee in employees %}
+                                        <option value="{{ employee.id }}" {% if order.assigned_attendant.id == employee.id %}selected{% endif %}>
+                                            {{ employee.full_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="scheduled_date">Scheduled Date</label>
+                                    <input type="date" name="scheduled_date" id="scheduled_date" class="form-control" 
+                                           value="{{ order.scheduled_date|date:'Y-m-d' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="scheduled_time">Scheduled Time</label>
+                                    <input type="time" name="scheduled_time" id="scheduled_time" class="form-control" 
+                                           value="{{ order.scheduled_time|time:'H:i' }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="priority">Priority</label>
+                            <select name="priority" id="priority" class="form-control">
+                                <option value="low" {% if order.priority == 'low' %}selected{% endif %}>Low</option>
+                                <option value="normal" {% if order.priority == 'normal' %}selected{% endif %}>Normal</option>
+                                <option value="high" {% if order.priority == 'high' %}selected{% endif %}>High</option>
+                                <option value="urgent" {% if order.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Additional Information Section -->
+                    <div class="form-section">
+                        <h5 class="section-title">
+                            <i class="fas fa-sticky-note"></i> Additional Information
+                        </h5>
+                        
+                        <div class="form-group">
+                            <label for="special_instructions">Special Instructions</label>
+                            <textarea name="special_instructions" id="special_instructions" class="form-control" rows="3"
+                                      placeholder="Any special requests or notes for the service team">{{ order.special_instructions }}</textarea>
+                            <small class="form-text text-muted">
+                                Any special requests or notes for the service team
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Form Actions -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <button type="submit" class="btn btn-primary btn-action">
+                                <i class="fas fa-save"></i> Update Order
+                            </button>
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" 
+                               class="btn btn-secondary btn-action">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                        
+                        {% if order.status == 'pending' %}
+                        <div>
+                            <button type="button" class="btn btn-success btn-action" onclick="confirmOrder()">
+                                <i class="fas fa-check"></i> Confirm Order
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- Order Summary -->
+            <div class="order-summary">
+                <h5 class="section-title">
+                    <i class="fas fa-calculator"></i> Order Summary
+                </h5>
+                
+                <div id="selected-services">
+                    <div class="selected-services-list">
+                        {% for item in order.order_items.all %}
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="service-name">{{ item.service.name }}</span>
+                            <span class="service-price">KSh {{ item.total_price|floatformat:2 }}</span>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">No services selected</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span id="subtotal">KSh {{ order.subtotal|floatformat:2 }}</span>
+                </div>
+                
+                <div class="summary-row">
+                    <span>VAT (16%):</span>
+                    <span id="vat-amount">KSh {{ order.tax_amount|floatformat:2 }}</span>
+                </div>
+                
+                <div class="summary-row total">
+                    <span>Total Amount:</span>
+                    <span id="total-amount">KSh {{ order.total_amount|floatformat:2 }}</span>
+                </div>
+                
+                <div class="mt-3 pt-3 border-top">
+                    {% with payments_total=order.payments.aggregate.total_paid|default:0 %}
+                    <div class="summary-row">
+                        <span>Payments Made:</span>
+                        <span class="text-success">KSh {{ payments_total|floatformat:2 }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Balance Due:</span>
+                        <span class="text-{% if order.total_amount > payments_total %}danger{% else %}success{% endif %}">
+                            KSh {{ order.total_amount|add:payments_total|floatformat:2 }}
+                        </span>
+                    </div>
+                    {% endwith %}
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="order-summary mt-3">
+                <h5 class="section-title">
+                    <i class="fas fa-bolt"></i> Quick Actions
+                </h5>
+                
+                <div class="d-grid gap-2">
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-receipt"></i> View Receipt
+                    </a>
+                    
+                    {% if order.status in 'pending,confirmed' %}
+                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="startService()">
+                        <i class="fas fa-play"></i> Start Service
+                    </button>
+                    {% endif %}
+                    
+                    {% if order.status == 'in_progress' %}
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="completeService()">
+                        <i class="fas fa-check-circle"></i> Complete Service
+                    </button>
+                    {% endif %}
+                    
+                    {% if order.status in 'pending,confirmed' %}
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="cancelOrder()">
+                        <i class="fas fa-times-circle"></i> Cancel Order
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize form
+    updateOrderSummary();
+    
+    // Service selection handling
+    $('.service-checkbox').change(function() {
+        updateOrderSummary();
+        $(this).closest('.service-item').toggleClass('selected', this.checked);
+    });
+    
+    // Initialize selected services
+    $('.service-checkbox:checked').each(function() {
+        $(this).closest('.service-item').addClass('selected');
+    });
+});
+
+function updateOrderSummary() {
+    let subtotal = 0;
+    let selectedServices = [];
+    
+    // Get current services from order items
+    {% for item in order.order_items.all %}
+    selectedServices.push({
+        name: '{{ item.service.name }}',
+        price: {{ item.total_price }}
+    });
+    subtotal += {{ item.total_price }};
+    {% endfor %}
+    
+    // Add newly selected services
+    $('.service-checkbox:checked').each(function() {
+        const serviceItem = $(this).closest('.service-item');
+        const price = parseFloat(serviceItem.data('price') || 0);
+        const name = serviceItem.find('.service-name').text();
+        
+        // Check if this service is not already in current services
+        const serviceId = serviceItem.data('service-id');
+        const isCurrentService = $('#current-services-list .service-item[data-service-id="' + serviceId + '"]').length > 0;
+        
+        if (!isCurrentService) {
+            subtotal += price;
+            selectedServices.push({
+                name: name,
+                price: price
+            });
+        }
+    });
+    
+    // Calculate VAT (inclusive pricing)
+    const vatAmount = subtotal * 0.16 / 1.16;
+    const subtotalExVat = subtotal - vatAmount;
+    
+    // Update summary display
+    updateSelectedServicesDisplay(selectedServices);
+    $('#subtotal').text('KSh ' + subtotalExVat.toFixed(2));
+    $('#vat-amount').text('KSh ' + vatAmount.toFixed(2));
+    $('#total-amount').text('KSh ' + subtotal.toFixed(2));
+}
+
+function updateSelectedServicesDisplay(services) {
+    const container = $('#selected-services');
+    
+    if (services.length === 0) {
+        container.html('<p class="text-muted">No services selected</p>');
+        return;
+    }
+    
+    let html = '<div class="selected-services-list">';
+    services.forEach(service => {
+        html += `
+            <div class="d-flex justify-content-between mb-1">
+                <span class="service-name">${service.name}</span>
+                <span class="service-price">KSh ${service.price.toFixed(2)}</span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    container.html(html);
+}
+
+function removeService(serviceId) {
+    if (confirm('Are you sure you want to remove this service?')) {
+        // Uncheck the service if it's selected in the add services section
+        $(`#service_${serviceId}`).prop('checked', false);
+        
+        // Remove from current services display
+        $(`.current-service[data-service-id="${serviceId}"]`).remove();
+        
+        // Update summary
+        updateOrderSummary();
+        
+        // Mark for removal in form submission
+        if (!$('#services-to-remove').length) {
+            $('#order-form').append('<input type="hidden" id="services-to-remove" name="remove_services" value="">');
+        }
+        
+        let removedServices = $('#services-to-remove').val();
+        removedServices = removedServices ? removedServices.split(',') : [];
+        if (!removedServices.includes(serviceId)) {
+            removedServices.push(serviceId);
+            $('#services-to-remove').val(removedServices.join(','));
+        }
+    }
+}
+
+// Quick action functions
+function confirmOrder() {
+    if (confirm('Are you sure you want to confirm this order?')) {
+        $.ajax({
+            url: '/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/confirm/',
+            method: 'POST',
+            data: {
+                'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('Failed to confirm order');
+            }
+        });
+    }
+}
+
+function startService() {
+    if (confirm('Are you sure you want to start this service?')) {
+        $.ajax({
+            url: '/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/start/',
+            method: 'POST',
+            data: {
+                'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('Failed to start service');
+            }
+        });
+    }
+}
+
+function completeService() {
+    if (confirm('Are you sure you want to complete this service?')) {
+        $.ajax({
+            url: '/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/complete/',
+            method: 'POST',
+            data: {
+                'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('Failed to complete service');
+            }
+        });
+    }
+}
+
+function cancelOrder() {
+    const reason = prompt('Please provide a reason for cancellation:');
+    if (reason) {
+        $.ajax({
+            url: '/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/cancel/',
+            method: 'POST',
+            data: {
+                'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val(),
+                'reason': reason
+            },
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('Failed to cancel order');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

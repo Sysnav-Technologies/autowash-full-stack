@@ -1,0 +1,397 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Supplier Performance Report - {{ block.super }}{% endblock %}
+
+{% block page_title %}Supplier Performance Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="page-title">
+                    <i class="fas fa-chart-line text-primary"></i>
+                    Supplier Performance Report
+                </h1>
+                <p class="page-subtitle">Analyze supplier performance metrics and delivery statistics</p>
+            </div>
+            
+            <div class="d-flex align-items-center">
+                <button type="button" class="btn btn-outline-primary me-2" onclick="exportReport()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#filterModal">
+                    <i class="fas fa-filter"></i> Filter Report
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filter Summary -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <strong>Report Period:</strong> 
+                {{ date_from|date:"M d, Y" }} to {{ date_to|date:"M d, Y" }}
+                {% if selected_supplier %}
+                    | <strong>Supplier:</strong> {{ selected_supplier.name }}
+                {% endif %}
+                {% if selected_category %}
+                    | <strong>Category:</strong> {{ selected_category.name }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Performance Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-primary">
+                    <i class="fas fa-truck"></i>
+                </div>
+                <div class="stats-content">
+                    <h3>{{ total_suppliers }}</h3>
+                    <p>Active Suppliers</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stats-content">
+                    <h3>{{ on_time_delivery_rate }}%</h3>
+                    <p>On-Time Delivery</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-warning">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stats-content">
+                    <h3>{{ average_rating|floatformat:1 }}</h3>
+                    <p>Average Rating</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-info">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="stats-content">
+                    <h3>KSh {{ total_orders_value|floatformat:0 }}</h3>
+                    <p>Total Orders Value</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Performance Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">Supplier Performance Details</h5>
+                </div>
+                
+                <div class="card-body">
+                    {% if performance_data %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th>Category</th>
+                                    <th>Total Orders</th>
+                                    <th>Order Value</th>
+                                    <th>On-Time Delivery</th>
+                                    <th>Avg. Rating</th>
+                                    <th>Last Order</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for data in performance_data %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="supplier-avatar">
+                                                {{ data.supplier.name|first }}
+                                            </div>
+                                            <div class="ms-2">
+                                                <strong>{{ data.supplier.name }}</strong>
+                                                <br><small class="text-muted">{{ data.supplier.contact_person }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ data.supplier.category.name|default:"Uncategorized" }}</td>
+                                    <td>
+                                        <span class="badge badge-primary">{{ data.total_orders }}</span>
+                                    </td>
+                                    <td>KSh {{ data.total_value|floatformat:0 }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-{{ data.delivery_rate|floatformat:0|add:0|divisibleby:3|yesno:'success,warning' }}" 
+                                                 style="width: {{ data.delivery_rate }}%">
+                                                {{ data.delivery_rate|floatformat:0 }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="rating">
+                                            {% for i in "12345" %}
+                                                <i class="fas fa-star {% if forloop.counter <= data.avg_rating %}text-warning{% else %}text-muted{% endif %}"></i>
+                                            {% endfor %}
+                                            <span class="ms-1">{{ data.avg_rating|floatformat:1 }}</span>
+                                        </div>
+                                    </td>
+                                    <td>{{ data.last_order_date|date:"M d, Y"|default:"No orders" }}</td>
+                                    <td>
+                                        <span class="badge badge-{{ data.supplier.is_active|yesno:'success,danger' }}">
+                                            {{ data.supplier.is_active|yesno:'Active,Inactive' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h5>No Performance Data</h5>
+                        <p>No supplier performance data available for the selected period.</p>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#filterModal">
+                            <i class="fas fa-filter"></i> Adjust Filters
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Modal -->
+<div class="modal fade" id="filterModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Filter Performance Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="get">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dateFrom" class="form-label">Date From</label>
+                                <input type="date" class="form-control" id="dateFrom" name="date_from" 
+                                       value="{{ date_from|date:'Y-m-d' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dateTo" class="form-label">Date To</label>
+                                <input type="date" class="form-control" id="dateTo" name="date_to" 
+                                       value="{{ date_to|date:'Y-m-d' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="supplierFilter" class="form-label">Supplier</label>
+                                <select class="form-control" id="supplierFilter" name="supplier">
+                                    <option value="">All Suppliers</option>
+                                    {% for supplier in suppliers %}
+                                    <option value="{{ supplier.id }}" {% if supplier.id == selected_supplier.id %}selected{% endif %}>
+                                        {{ supplier.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="categoryFilter" class="form-label">Category</label>
+                                <select class="form-control" id="categoryFilter" name="category">
+                                    <option value="">All Categories</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}" {% if category.id == selected_category.id %}selected{% endif %}>
+                                        {{ category.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Minimum Rating</label>
+                        <div class="rating-filter">
+                            {% for i in "12345" %}
+                            <input type="radio" id="rating{{ i }}" name="min_rating" value="{{ i }}" 
+                                   {% if i == min_rating|stringformat:"s" %}checked{% endif %}>
+                            <label for="rating{{ i }}">
+                                {% for j in "12345" %}
+                                <i class="fas fa-star {% if forloop.counter <= i|add:0 %}text-warning{% else %}text-muted{% endif %}"></i>
+                                {% endfor %}
+                            </label>
+                            {% endfor %}
+                            <input type="radio" id="ratingAll" name="min_rating" value="" 
+                                   {% if not min_rating %}checked{% endif %}>
+                            <label for="ratingAll">All Ratings</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stats-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.stats-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    margin-right: 1rem;
+}
+
+.stats-content h3 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.stats-content p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.content-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+.supplier-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #007bff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+}
+
+.rating {
+    display: flex;
+    align-items: center;
+}
+
+.rating-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.rating-filter input[type="radio"] {
+    display: none;
+}
+
+.rating-filter label {
+    cursor: pointer;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.rating-filter input[type="radio"]:checked + label {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.badge-success { background-color: #28a745; }
+.badge-danger { background-color: #dc3545; }
+.badge-primary { background-color: #007bff; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function exportReport() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'true');
+    window.open(`${window.location.pathname}?${params.toString()}`);
+}
+
+// Set default dates if not provided
+document.addEventListener('DOMContentLoaded', function() {
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
+    
+    if (!dateFrom.value) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        dateFrom.value = thirtyDaysAgo.toISOString().split('T')[0];
+    }
+    
+    if (!dateTo.value) {
+        const today = new Date();
+        dateTo.value = today.toISOString().split('T')[0];
+    }
+});
+</script>
+{% endblock %}

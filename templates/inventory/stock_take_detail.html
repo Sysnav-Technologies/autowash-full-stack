@@ -1134,11 +1134,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Save after 1 second of no changes
         saveTimeout = setTimeout(() => {
-            fetch(`/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.pk }}/update-count/${countId}/`, {
+            const csrfTokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
+            const csrfToken = csrfTokenElement ? csrfTokenElement.value : getCookie('csrftoken');
+            
+            fetch(`/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.pk }}/count/${countId}/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: JSON.stringify({
                     counted_quantity: newQuantity

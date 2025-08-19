@@ -1,710 +1,691 @@
 {% extends 'base/base.html' %}
 {% load static %}
-{% load crispy_forms_tags %}
+{% load math_filters %}
 
 {% block title %}Process Refund - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <style>
-.refund-container { 
-    max-width: 1000px; 
-    margin: 0 auto; 
-}
-
-.refund-header { 
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white; 
-    padding: 2rem; 
-    border-radius: 12px; 
-    margin-bottom: 2rem;
-    position: relative;
-    overflow: hidden;
-}
-
-.refund-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="white" opacity="0.1"/><circle cx="80" cy="40" r="1.5" fill="white" opacity="0.1"/><circle cx="40" cy="80" r="1" fill="white" opacity="0.1"/></svg>');
-    animation: float 20s infinite linear;
-}
-
-@keyframes float {
-    0% { transform: translateX(0px) translateY(0px); }
-    100% { transform: translateX(-100px) translateY(-100px); }
-}
-
-.payment-info-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.payment-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-}
-
-.info-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem;
-    background: #f8fafc;
-    border-radius: 8px;
-    border-left: 4px solid #3b82f6;
-}
-
-.info-label {
-    font-weight: 600;
-    color: #374151;
-}
-
-.info-value {
-    font-weight: 500;
-    color: #1f2937;
-}
-
-.amount-highlight {
-    font-size: 1.25rem;
-    color: #059669;
-}
-
-.refund-form-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 2rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.warning-box {
-    background: #fef3c7;
-    border: 1px solid #fcd34d;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 1.5rem 0;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-}
-
-.warning-icon {
-    color: #d97706;
-    margin-top: 0.125rem;
-}
-
-.refund-reasons {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-}
-
-.reason-chip {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-radius: 20px;
-    padding: 0.5rem 1rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.875rem;
-    color: #1e40af;
-}
-
-.reason-chip:hover {
-    background: #dbeafe;
-    border-color: #93c5fd;
-}
-
-.reason-chip.selected {
-    background: #3b82f6;
-    border-color: #3b82f6;
-    color: white;
-}
-
-.refund-calculation {
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 1rem 0;
-}
-
-.calc-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #dcfce7;
-}
-
-.calc-row:last-child {
-    border-bottom: none;
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: #059669;
-}
-
-.btn-refund {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-    border: none;
-    color: white;
-    padding: 0.75rem 2rem;
-    font-weight: 600;
-    border-radius: 8px;
-    transition: all 0.2s;
-}
-
-.btn-refund:hover {
-    background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-}
-
-.refund-history {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    margin-top: 1.5rem;
-}
-
-.refund-history-header {
-    background: #f8fafc;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #e5e7eb;
-    border-radius: 12px 12px 0 0;
-    font-weight: 600;
-    color: #374151;
-}
-
-.refund-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #f3f4f6;
-}
-
-.refund-item:last-child {
-    border-bottom: none;
-}
-
-.status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.status-completed {
-    background: #d1fae5;
-    color: #065f46;
-}
-
-.status-pending {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-.status-failed {
-    background: #fee2e2;
-    color: #991b1b;
-}
-
-@media (max-width: 768px) {
     .refund-container {
-        margin: 0 1rem;
+        max-width: 800px;
+        margin: 0 auto;
     }
     
-    .payment-info-grid {
-        grid-template-columns: 1fr;
+    .refund-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .payment-info-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .payment-amount {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .payment-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .payment-status.completed {
+        background: rgba(34, 197, 94, 0.2);
+        color: #16a34a;
+    }
+    
+    .refund-form {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 1.5rem;
+    }
+    
+    .refund-amount-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .amount-option {
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .amount-option:hover {
+        border-color: #3b82f6;
+        background: #eff6ff;
+    }
+    
+    .amount-option.selected {
+        border-color: #3b82f6;
+        background: #dbeafe;
+    }
+    
+    .amount-option .amount {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #1f2937;
+        margin-bottom: 0.25rem;
+    }
+    
+    .amount-option .label {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .custom-amount-input {
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 1rem;
+        font-size: 1.125rem;
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+    
+    .custom-amount-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
     
     .refund-reasons {
-        grid-template-columns: 1fr;
+        margin-bottom: 1.5rem;
     }
     
-    .calc-row {
-        font-size: 0.875rem;
+    .reason-option {
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
     }
-}
+    
+    .reason-option:hover {
+        border-color: #3b82f6;
+        background: #eff6ff;
+    }
+    
+    .reason-option.selected {
+        border-color: #3b82f6;
+        background: #dbeafe;
+    }
+    
+    .refund-method-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .method-card {
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 1.25rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .method-card:hover {
+        border-color: #3b82f6;
+        background: #eff6ff;
+    }
+    
+    .method-card.selected {
+        border-color: #3b82f6;
+        background: #dbeafe;
+    }
+    
+    .method-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        color: #6b7280;
+    }
+    
+    .method-card.selected .method-icon {
+        color: #3b82f6;
+    }
+    
+    .method-name {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    .method-description {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .refund-summary {
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .summary-row:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+        font-weight: bold;
+        font-size: 1.125rem;
+    }
+    
+    .processing-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+    
+    .processing-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        text-align: center;
+        max-width: 400px;
+        width: 90%;
+    }
+    
+    .processing-spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid #f3f4f6;
+        border-top: 4px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .btn-refund {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        border: none;
+        border-radius: 10px;
+        padding: 1rem 2rem;
+        color: white;
+        font-weight: 600;
+        font-size: 1.125rem;
+        width: 100%;
+        margin-top: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-refund:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+        color: white;
+    }
+    
+    .btn-refund:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .alert-warning {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    .form-control {
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.75rem;
+        width: 100%;
+        transition: border-color 0.3s ease;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .hidden {
+        display: none;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="refund-container">
-    <!-- Header -->
-    <div class="refund-header">
-        <div class="d-flex justify-content-between align-items-center position-relative">
-            <div>
-                <h2 class="mb-2">
-                    <i class="fas fa-undo-alt me-2"></i>
-                    Process Refund
-                </h2>
-                <p class="mb-0 opacity-90">
-                    Payment ID: {{ payment.payment_id }}
-                </p>
-            </div>
-            <a href="/business/{{ request.tenant.slug }}/payments/detail/{{ payment.payment_id }}/" class="btn btn-light">
-                <i class="fas fa-arrow-left me-1"></i> Back to Payment
+<div class="container-fluid px-4">
+    <div class="refund-container">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">
+                <i class="fas fa-undo me-2"></i>Process Refund
+            </h2>
+            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.id }}/" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Payment
             </a>
         </div>
-    </div>
-
-    <div class="row">
-        <div class="col-lg-8">
-            <!-- Payment Information -->
-            <div class="payment-info-card">
-                <h5 class="mb-3">
-                    <i class="fas fa-receipt me-2 text-primary"></i>
-                    Payment Information
-                </h5>
-                
-                <div class="payment-info-grid">
-                    <div class="info-item">
-                        <span class="info-label">Payment ID:</span>
-                        <span class="info-value">{{ payment.payment_id }}</span>
+        
+        <!-- Payment Information -->
+        <div class="payment-info-card">
+            <div class="row">
+                <div class="col-md-8">
+                    <h4>Payment Information</h4>
+                    <div class="payment-amount">KES {{ payment.amount|floatformat:2 }}</div>
+                    <div class="mb-2">
+                        <span class="payment-status {{ payment.status }}">{{ payment.get_status_display }}</span>
                     </div>
-                    
-                    <div class="info-item">
-                        <span class="info-label">Amount Paid:</span>
-                        <span class="info-value amount-highlight">KES {{ payment.amount|floatformat:2 }}</span>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="info-label">Payment Date:</span>
-                        <span class="info-value">{{ payment.completed_at|date:"M d, Y H:i" }}</span>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="info-label">Payment Method:</span>
-                        <span class="info-value">
-                            <i class="{{ payment.payment_method.icon }} me-1"></i>
-                            {{ payment.payment_method.name }}
-                        </span>
-                    </div>
-                    
-                    {% if payment.service_order %}
-                    <div class="info-item">
-                        <span class="info-label">Order Number:</span>
-                        <span class="info-value">{{ payment.service_order.order_number }}</span>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="info-label">Customer:</span>
-                        <span class="info-value">{{ payment.customer.display_name }}</span>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="info-item">
-                        <span class="info-label">Total Refunded:</span>
-                        <span class="info-value text-danger">KES {{ payment.total_refunded|default:0|floatformat:2 }}</span>
-                    </div>
-                    
-                    <div class="info-item">
-                        <span class="info-label">Available for Refund:</span>
-                        <span class="info-value text-success amount-highlight">
-                            KES {{ payment.refundable_amount|floatformat:2 }}
-                        </span>
+                    <div class="row text-sm">
+                        <div class="col-sm-6">
+                            <strong>Payment ID:</strong> {{ payment.payment_id }}
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Date:</strong> {{ payment.created_at|date:"M d, Y" }}
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Method:</strong> {{ payment.payment_method.name }}
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Customer:</strong> {{ payment.customer.display_name|default:"N/A" }}
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Refund Form -->
-            <div class="refund-form-card">
-                <h5 class="mb-3">
-                    <i class="fas fa-edit me-2 text-warning"></i>
-                    Refund Details
-                </h5>
-
-                <form method="post" id="refundForm">
-                    {% csrf_token %}
-                    
-                    <!-- Quick Reason Selection -->
-                    <div class="mb-3">
-                        <label class="form-label">Quick Reason Selection:</label>
-                        <div class="refund-reasons">
-                            <div class="reason-chip" onclick="selectReason('Customer request')">
-                                <i class="fas fa-user me-1"></i>
-                                Customer Request
-                            </div>
-                            <div class="reason-chip" onclick="selectReason('Service not delivered')">
-                                <i class="fas fa-times-circle me-1"></i>
-                                Service Not Delivered
-                            </div>
-                            <div class="reason-chip" onclick="selectReason('Quality issue')">
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                Quality Issue
-                            </div>
-                            <div class="reason-chip" onclick="selectReason('Billing error')">
-                                <i class="fas fa-calculator me-1"></i>
-                                Billing Error
-                            </div>
-                            <div class="reason-chip" onclick="selectReason('Duplicate payment')">
-                                <i class="fas fa-copy me-1"></i>
-                                Duplicate Payment
-                            </div>
-                            <div class="reason-chip" onclick="selectReason('Other')">
-                                <i class="fas fa-question me-1"></i>
-                                Other
-                            </div>
-                        </div>
+                <div class="col-md-4 text-md-end">
+                    {% if payment.service_order %}
+                    <div>
+                        <strong>Service Order:</strong><br>
+                        {{ payment.service_order.order_number }}
                     </div>
-
-                    <!-- Form Fields -->
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="id_amount" class="form-label">Refund Amount (KES)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">KES</span>
-                                    {{ form.amount }}
-                                </div>
-                                <small class="form-text text-muted">
-                                    Maximum: KES {{ payment.refundable_amount|floatformat:2 }}
-                                </small>
-                                {% if form.amount.errors %}
-                                    <div class="text-danger mt-1">
-                                        {% for error in form.amount.errors %}
-                                            <small>{{ error }}</small>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <!-- Real-time calculation -->
-                            <div class="refund-calculation">
-                                <div class="calc-row">
-                                    <span>Refund Amount:</span>
-                                    <span id="refundAmount">KES 0.00</span>
-                                </div>
-                                <div class="calc-row">
-                                    <span>Processing Fee:</span>
-                                    <span id="processingFee">KES 0.00</span>
-                                </div>
-                                <div class="calc-row">
-                                    <span>Net Refund to Customer:</span>
-                                    <span id="netRefund">KES 0.00</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="id_reason" class="form-label">Refund Reason</label>
-                        {{ form.reason }}
-                        {% if form.reason.errors %}
-                            <div class="text-danger mt-1">
-                                {% for error in form.reason.errors %}
-                                    <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <!-- Warning Box -->
-                    <div class="warning-box">
-                        <i class="fas fa-exclamation-triangle warning-icon"></i>
-                        <div>
-                            <strong>Important Notice:</strong>
-                            <ul class="mb-0 mt-1">
-                                <li>Refunds cannot be reversed once processed</li>
-                                <li>Customer will be notified via SMS and email</li>
-                                <li>Processing may take 3-5 business days depending on payment method</li>
-                                <li>Partial refunds are allowed for this payment</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="d-flex gap-2 justify-content-end">
-                        <a href="/business/{{ request.tenant.slug }}/payments/detail/{{ payment.payment_id }}/" class="btn btn-outline-secondary">
-                            <i class="fas fa-times me-1"></i>
-                            Cancel
-                        </a>
-                        <button type="submit" class="btn btn-refund" id="processRefundBtn">
-                            <i class="fas fa-undo-alt me-1"></i>
-                            Process Refund
-                        </button>
-                    </div>
-                </form>
+                    {% endif %}
+                </div>
             </div>
         </div>
-
-        <div class="col-lg-4">
-            <!-- Previous Refunds -->
-            {% if payment.refunds.exists %}
-            <div class="refund-history">
-                <div class="refund-history-header">
-                    <i class="fas fa-history me-2"></i>
-                    Previous Refunds
-                </div>
-                {% for refund in payment.refunds.all %}
-                <div class="refund-item">
-                    <div>
-                        <div class="fw-bold">{{ refund.refund_id }}</div>
-                        <small class="text-muted">{{ refund.created_at|date:"M d, Y H:i" }}</small>
-                        <div class="mt-1">
-                            <small class="text-muted">{{ refund.reason|truncatewords:8 }}</small>
+        
+        <!-- Refund Form -->
+        <div class="refund-card">
+            <form id="refundForm" method="post">
+                {% csrf_token %}
+                
+                <!-- Refund Amount Selection -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-money-bill-wave me-2"></i>Refund Amount
+                    </label>
+                    
+                    <div class="refund-amount-selector">
+                        <div class="amount-option" data-amount="{{ payment.amount }}">
+                            <div class="amount">KES {{ payment.amount|floatformat:2 }}</div>
+                            <div class="label">Full Refund</div>
+                        </div>
+                        <div class="amount-option" data-amount="{{ payment.amount|floatformat:2|mul:0.5 }}">
+                            <div class="amount">KES {{ payment.amount|floatformat:2|mul:0.5 }}</div>
+                            <div class="label">50% Refund</div>
+                        </div>
+                        <div class="amount-option" data-amount="custom">
+                            <div class="amount">Custom</div>
+                            <div class="label">Enter Amount</div>
                         </div>
                     </div>
-                    <div class="text-end">
-                        <div class="fw-bold text-danger">KES {{ refund.amount|floatformat:2 }}</div>
-                        <span class="status-badge status-{{ refund.status }}">
-                            {{ refund.get_status_display }}
-                        </span>
+                    
+                    <input type="number" 
+                           name="refund_amount" 
+                           id="customAmountInput" 
+                           class="custom-amount-input hidden" 
+                           placeholder="Enter custom amount..." 
+                           min="0.01" 
+                           max="{{ payment.amount }}" 
+                           step="0.01">
+                </div>
+                
+                <!-- Refund Reason -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-clipboard-list me-2"></i>Reason for Refund
+                    </label>
+                    
+                    <div class="refund-reasons">
+                        <div class="reason-option" data-reason="customer_request">
+                            <strong>Customer Request</strong> - Customer requested refund
+                        </div>
+                        <div class="reason-option" data-reason="service_issue">
+                            <strong>Service Issue</strong> - Problem with service delivery
+                        </div>
+                        <div class="reason-option" data-reason="duplicate_payment">
+                            <strong>Duplicate Payment</strong> - Payment was processed twice
+                        </div>
+                        <div class="reason-option" data-reason="cancelled_order">
+                            <strong>Cancelled Order</strong> - Order was cancelled
+                        </div>
+                        <div class="reason-option" data-reason="other">
+                            <strong>Other</strong> - Other reason (specify below)
+                        </div>
+                    </div>
+                    
+                    <input type="hidden" name="refund_reason" id="refundReason">
+                </div>
+                
+                <!-- Additional Notes -->
+                <div class="form-group">
+                    <label class="form-label" for="refundNotes">
+                        <i class="fas fa-sticky-note me-2"></i>Additional Notes
+                    </label>
+                    <textarea name="refund_notes" 
+                              id="refundNotes" 
+                              class="form-control" 
+                              rows="3" 
+                              placeholder="Enter any additional details about the refund..."></textarea>
+                </div>
+                
+                <!-- Refund Method -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-credit-card me-2"></i>Refund Method
+                    </label>
+                    
+                    <div class="refund-method-selector">
+                        {% if payment.payment_method.code == 'cash' %}
+                        <div class="method-card" data-method="cash">
+                            <div class="method-icon">
+                                <i class="fas fa-money-bill"></i>
+                            </div>
+                            <div class="method-name">Cash Refund</div>
+                            <div class="method-description">Return cash to customer</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if payment.payment_method.code == 'mpesa' %}
+                        <div class="method-card" data-method="mpesa">
+                            <div class="method-icon">
+                                <i class="fas fa-mobile-alt"></i>
+                            </div>
+                            <div class="method-name">M-Pesa Reversal</div>
+                            <div class="method-description">Reverse to original M-Pesa</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if payment.payment_method.code == 'card' %}
+                        <div class="method-card" data-method="card">
+                            <div class="method-icon">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            <div class="method-name">Card Refund</div>
+                            <div class="method-description">Refund to original card</div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="method-card" data-method="bank_transfer">
+                            <div class="method-icon">
+                                <i class="fas fa-university"></i>
+                            </div>
+                            <div class="method-name">Bank Transfer</div>
+                            <div class="method-description">Transfer to bank account</div>
+                        </div>
+                    </div>
+                    
+                    <input type="hidden" name="refund_method" id="refundMethod">
+                </div>
+                
+                <!-- Bank Details (for bank transfer) -->
+                <div id="bankDetailsSection" class="hidden">
+                    <div class="form-group">
+                        <label class="form-label" for="bankName">Bank Name</label>
+                        <input type="text" name="bank_name" id="bankName" class="form-control" placeholder="Enter bank name">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label" for="accountNumber">Account Number</label>
+                                <input type="text" name="account_number" id="accountNumber" class="form-control" placeholder="Enter account number">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label" for="accountName">Account Name</label>
+                                <input type="text" name="account_name" id="accountName" class="form-control" placeholder="Enter account holder name">
+                            </div>
+                        </div>
                     </div>
                 </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <!-- Quick Actions -->
-            <div class="payment-info-card mt-3">
-                <h6 class="mb-3">
-                    <i class="fas fa-bolt me-2 text-primary"></i>
-                    Quick Actions
-                </h6>
                 
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="setRefundAmount({{ payment.refundable_amount }})">
-                        <i class="fas fa-money-bill-wave me-1"></i>
-                        Full Refund (KES {{ payment.refundable_amount|floatformat:2 }})
-                    </button>
-                    
-                    {% if payment.refundable_amount >= 100 %}
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setRefundAmount({{ payment.refundable_amount|floatformat:2|add:'-50' }})">
-                        <i class="fas fa-percent me-1"></i>
-                        Partial Refund (50% less)
-                    </button>
-                    {% endif %}
-                    
-                    <a href="/business/{{ request.tenant.slug }}/payments/detail/{{ payment.payment_id }}/" class="btn btn-outline-info btn-sm">
-                        <i class="fas fa-eye me-1"></i>
-                        View Payment Details
-                    </a>
-                    
-                    {% if payment.service_order %}
-                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ payment.service_order.id }}/" class="btn btn-outline-success btn-sm">
-                        <i class="fas fa-clipboard-list me-1"></i>
-                        View Service Order
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Contact Information -->
-            {% if payment.customer %}
-            <div class="payment-info-card mt-3">
-                <h6 class="mb-3">
-                    <i class="fas fa-user me-2 text-info"></i>
-                    Customer Information
-                </h6>
-                
-                <div class="info-item mb-2">
-                    <span class="info-label">Name:</span>
-                    <span class="info-value">{{ payment.customer.display_name }}</span>
+                <!-- Warning -->
+                <div class="alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> Refunds cannot be undone. Please ensure all details are correct before processing.
                 </div>
                 
-                <div class="info-item mb-2">
-                    <span class="info-label">Phone:</span>
-                    <span class="info-value">
-                        <a href="tel:{{ payment.customer.phone }}" class="text-decoration-none">
-                            {{ payment.customer.phone }}
-                        </a>
-                    </span>
+                <!-- Refund Summary -->
+                <div class="refund-summary hidden" id="refundSummary">
+                    <h6 class="mb-3">
+                        <i class="fas fa-receipt me-2"></i>Refund Summary
+                    </h6>
+                    <div class="summary-row">
+                        <span>Original Payment:</span>
+                        <span>KES {{ payment.amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Refund Amount:</span>
+                        <span id="summaryRefundAmount">KES 0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Processing Fee:</span>
+                        <span id="summaryProcessingFee">KES 0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Net Refund:</span>
+                        <span id="summaryNetRefund">KES 0.00</span>
+                    </div>
                 </div>
                 
-                {% if payment.customer.email %}
-                <div class="info-item">
-                    <span class="info-label">Email:</span>
-                    <span class="info-value">
-                        <a href="mailto:{{ payment.customer.email }}" class="text-decoration-none">
-                            {{ payment.customer.email }}
-                        </a>
-                    </span>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
+                <!-- Submit Button -->
+                <button type="submit" class="btn-refund" id="processRefundBtn" disabled>
+                    <i class="fas fa-undo me-2"></i>Process Refund
+                </button>
+            </form>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<!-- Processing Overlay -->
+<div class="processing-overlay" id="processingOverlay">
+    <div class="processing-card">
+        <div class="processing-spinner"></div>
+        <h5>Processing Refund...</h5>
+        <p class="text-muted">Please wait while we process your refund request.</p>
+    </div>
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const amountInput = document.getElementById('id_amount');
-    const reasonTextarea = document.getElementById('id_reason');
-    const processBtn = document.getElementById('processRefundBtn');
-    
-    // Update calculations when amount changes
-    if (amountInput) {
-        amountInput.addEventListener('input', updateCalculations);
-        updateCalculations(); // Initial calculation
-    }
-    
-    // Form validation
-    document.getElementById('refundForm').addEventListener('submit', function(e) {
-        if (!validateForm()) {
-            e.preventDefault();
+let selectedAmount = null;
+let selectedReason = null;
+let selectedMethod = null;
+
+// Amount selection
+document.querySelectorAll('.amount-option').forEach(option => {
+    option.addEventListener('click', function() {
+        document.querySelectorAll('.amount-option').forEach(opt => opt.classList.remove('selected'));
+        this.classList.add('selected');
+        
+        const amount = this.dataset.amount;
+        const customInput = document.getElementById('customAmountInput');
+        
+        if (amount === 'custom') {
+            customInput.classList.remove('hidden');
+            customInput.focus();
+            selectedAmount = null;
+        } else {
+            customInput.classList.add('hidden');
+            selectedAmount = parseFloat(amount);
         }
+        
+        updateSummary();
+        checkFormValidity();
     });
 });
 
-function selectReason(reason) {
-    // Remove selected class from all chips
-    document.querySelectorAll('.reason-chip').forEach(chip => {
-        chip.classList.remove('selected');
+// Custom amount input
+document.getElementById('customAmountInput').addEventListener('input', function() {
+    selectedAmount = parseFloat(this.value) || 0;
+    updateSummary();
+    checkFormValidity();
+});
+
+// Reason selection
+document.querySelectorAll('.reason-option').forEach(option => {
+    option.addEventListener('click', function() {
+        document.querySelectorAll('.reason-option').forEach(opt => opt.classList.remove('selected'));
+        this.classList.add('selected');
+        
+        selectedReason = this.dataset.reason;
+        document.getElementById('refundReason').value = selectedReason;
+        
+        checkFormValidity();
     });
+});
+
+// Method selection
+document.querySelectorAll('.method-card').forEach(card => {
+    card.addEventListener('click', function() {
+        document.querySelectorAll('.method-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        
+        selectedMethod = this.dataset.method;
+        document.getElementById('refundMethod').value = selectedMethod;
+        
+        // Show/hide bank details
+        const bankSection = document.getElementById('bankDetailsSection');
+        if (selectedMethod === 'bank_transfer') {
+            bankSection.classList.remove('hidden');
+        } else {
+            bankSection.classList.add('hidden');
+        }
+        
+        updateSummary();
+        checkFormValidity();
+    });
+});
+
+function updateSummary() {
+    if (!selectedAmount || !selectedMethod) return;
     
-    // Add selected class to clicked chip
-    event.target.classList.add('selected');
+    const summaryDiv = document.getElementById('refundSummary');
+    const refundAmountSpan = document.getElementById('summaryRefundAmount');
+    const processingFeeSpan = document.getElementById('summaryProcessingFee');
+    const netRefundSpan = document.getElementById('summaryNetRefund');
     
-    // Set reason in textarea
-    const reasonTextarea = document.getElementById('id_reason');
-    reasonTextarea.value = reason;
+    // Calculate processing fee based on method
+    let processingFee = 0;
+    if (selectedMethod === 'mpesa') {
+        processingFee = Math.min(selectedAmount * 0.01, 50); // 1% fee, max 50 KES
+    } else if (selectedMethod === 'card') {
+        processingFee = selectedAmount * 0.025; // 2.5% fee
+    } else if (selectedMethod === 'bank_transfer') {
+        processingFee = 30; // Flat 30 KES fee
+    }
     
-    // Trigger change event
-    reasonTextarea.dispatchEvent(new Event('input'));
+    const netRefund = selectedAmount - processingFee;
+    
+    refundAmountSpan.textContent = `KES ${selectedAmount.toFixed(2)}`;
+    processingFeeSpan.textContent = `KES ${processingFee.toFixed(2)}`;
+    netRefundSpan.textContent = `KES ${netRefund.toFixed(2)}`;
+    
+    summaryDiv.classList.remove('hidden');
 }
 
-function setRefundAmount(amount) {
-    const amountInput = document.getElementById('id_amount');
-    amountInput.value = amount.toFixed(2);
-    updateCalculations();
+function checkFormValidity() {
+    const submitBtn = document.getElementById('processRefundBtn');
+    let isValid = selectedAmount > 0 && selectedReason && selectedMethod;
     
-    // Add visual feedback
-    amountInput.classList.add('border-success');
+    // Check bank details if bank transfer is selected
+    if (selectedMethod === 'bank_transfer') {
+        const bankName = document.getElementById('bankName').value.trim();
+        const accountNumber = document.getElementById('accountNumber').value.trim();
+        const accountName = document.getElementById('accountName').value.trim();
+        
+        isValid = isValid && bankName && accountNumber && accountName;
+    }
+    
+    submitBtn.disabled = !isValid;
+}
+
+// Form submission
+document.getElementById('refundForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!selectedAmount || !selectedReason || !selectedMethod) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+    
+    // Show processing overlay
+    document.getElementById('processingOverlay').style.display = 'flex';
+    
+    // Add hidden fields to form
+    const form = this;
+    
+    // Add refund amount
+    const amountInput = document.createElement('input');
+    amountInput.type = 'hidden';
+    amountInput.name = 'refund_amount';
+    amountInput.value = selectedAmount;
+    form.appendChild(amountInput);
+    
+    // Submit form
     setTimeout(() => {
-        amountInput.classList.remove('border-success');
+        form.submit();
     }, 1000);
-}
-
-function updateCalculations() {
-    const amountInput = document.getElementById('id_amount');
-    const refundAmount = parseFloat(amountInput.value) || 0;
-    
-    // Calculate processing fee (typically 0 for refunds, but can be configured)
-    const processingFeeRate = 0; // You can make this configurable
-    const processingFee = refundAmount * processingFeeRate;
-    const netRefund = refundAmount - processingFee;
-    
-    // Update display
-    document.getElementById('refundAmount').textContent = `KES ${refundAmount.toFixed(2)}`;
-    document.getElementById('processingFee').textContent = `KES ${processingFee.toFixed(2)}`;
-    document.getElementById('netRefund').textContent = `KES ${netRefund.toFixed(2)}`;
-    
-    // Update button state
-    const processBtn = document.getElementById('processRefundBtn');
-    if (refundAmount > 0 && refundAmount <= {{ payment.refundable_amount }}) {
-        processBtn.disabled = false;
-        processBtn.innerHTML = `<i class="fas fa-undo-alt me-1"></i> Process Refund (KES ${netRefund.toFixed(2)})`;
-    } else {
-        processBtn.disabled = true;
-        processBtn.innerHTML = `<i class="fas fa-undo-alt me-1"></i> Process Refund`;
-    }
-}
-
-function validateForm() {
-    const amountInput = document.getElementById('id_amount');
-    const reasonTextarea = document.getElementById('id_reason');
-    const amount = parseFloat(amountInput.value) || 0;
-    const reason = reasonTextarea.value.trim();
-    
-    // Validate amount
-    if (amount <= 0) {
-        showError('Please enter a valid refund amount');
-        amountInput.focus();
-        return false;
-    }
-    
-    if (amount > {{ payment.refundable_amount }}) {
-        showError('Refund amount cannot exceed the available refund amount');
-        amountInput.focus();
-        return false;
-    }
-    
-    // Validate reason
-    if (reason.length < 10) {
-        showError('Please provide a detailed reason for the refund (minimum 10 characters)');
-        reasonTextarea.focus();
-        return false;
-    }
-    
-    // Confirmation dialog
-    return confirm(`Are you sure you want to process a refund of KES ${amount.toFixed(2)}?\n\nThis action cannot be undone.`);
-}
-
-function showError(message) {
-    // Create toast notification
-    const toast = document.createElement('div');
-    toast.className = 'toast align-items-center text-white bg-danger border-0 position-fixed';
-    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999;';
-    toast.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">
-                <i class="fas fa-exclamation-circle me-2"></i>
-                ${message}
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-    `;
-    
-    document.body.appendChild(toast);
-    const bsToast = new bootstrap.Toast(toast);
-    bsToast.show();
-    
-    // Remove from DOM after hiding
-    toast.addEventListener('hidden.bs.toast', () => {
-        toast.remove();
-    });
-}
-
-// Auto-save form data to localStorage
-function autoSaveForm() {
-    const formData = {
-        amount: document.getElementById('id_amount').value,
-        reason: document.getElementById('id_reason').value
-    };
-    localStorage.setItem('refund_form_{{ payment.payment_id }}', JSON.stringify(formData));
-}
-
-// Restore form data from localStorage
-function restoreFormData() {
-    const savedData = localStorage.getItem('refund_form_{{ payment.payment_id }}');
-    if (savedData) {
-        const formData = JSON.parse(savedData);
-        document.getElementById('id_amount').value = formData.amount || '';
-        document.getElementById('id_reason').value = formData.reason || '';
-        updateCalculations();
-    }
-}
-
-// Initialize auto-save
-document.addEventListener('DOMContentLoaded', function() {
-    restoreFormData();
-    
-    document.getElementById('id_amount').addEventListener('input', autoSaveForm);
-    document.getElementById('id_reason').addEventListener('input', autoSaveForm);
-    
-    // Clear saved data when form is submitted
-    document.getElementById('refundForm').addEventListener('submit', function() {
-        localStorage.removeItem('refund_form_{{ payment.payment_id }}');
-    });
 });
+
+// Add event listeners for bank details validation
+document.getElementById('bankName').addEventListener('input', checkFormValidity);
+document.getElementById('accountNumber').addEventListener('input', checkFormValidity);
+document.getElementById('accountName').addEventListener('input', checkFormValidity);
 </script>
 {% endblock %}

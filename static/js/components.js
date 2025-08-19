@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeDropdowns();
     initializeResponsive();
     initializeSearch();
+    restoreDropdownStates();
 });
 
 /**
@@ -38,36 +39,68 @@ function initializeSidebar() {
  * Initialize dropdown functionality
  */
 function initializeDropdowns() {
-    // Handle navigation dropdowns
-    const dropdownToggles = document.querySelectorAll('.nav-dropdown-toggle');
+    console.log('Dropdown initialization skipped - handled by nexus-components.js'); // Debug log
     
-    dropdownToggles.forEach(toggle => {
-        toggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            const dropdown = this.closest('.nav-dropdown');
-            const isOpen = dropdown.classList.contains('open');
-            
-            // Close all other dropdowns
-            document.querySelectorAll('.nav-dropdown.open').forEach(openDropdown => {
-                if (openDropdown !== dropdown) {
-                    openDropdown.classList.remove('open');
+    // The dropdown functionality is already handled by nexus-components.js
+    // We'll just handle the mobile-specific behaviors here
+    
+    // Handle submenu item clicks on mobile
+    const submenuLinks = document.querySelectorAll('.nav-submenu .nav-link');
+    submenuLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.querySelector('.sidebar-overlay');
+                
+                // Close mobile sidebar when navigating
+                if (sidebar && sidebar.classList.contains('mobile-open')) {
+                    sidebar.classList.remove('mobile-open');
+                    document.body.classList.remove('sidebar-open');
+                    if (overlay) {
+                        overlay.classList.remove('show');
+                        setTimeout(() => overlay.style.display = 'none', 300);
+                    }
+                    // Close all dropdowns
+                    document.querySelectorAll('.nav-dropdown.open, .nav-dropdown.expanded').forEach(dropdown => {
+                        dropdown.classList.remove('open', 'expanded');
+                    });
                 }
-            });
-            
-            // Toggle current dropdown
-            dropdown.classList.toggle('open', !isOpen);
+            }
         });
     });
-    
-    // Close dropdowns when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.nav-dropdown')) {
-            document.querySelectorAll('.nav-dropdown.open').forEach(dropdown => {
-                dropdown.classList.remove('open');
-            });
-        }
-    });
 }
+
+/**
+ * Toggle dropdown function (global) - Fallback only
+ */
+function toggleDropdown(dropdownId) {
+    // This is a fallback - the main function is in nexus-components.js
+    console.log('Fallback toggleDropdown called for:', dropdownId);
+    if (window.toggleDropdown && window.toggleDropdown !== toggleDropdown) {
+        window.toggleDropdown(dropdownId);
+    }
+}
+
+/**
+ * Restore dropdown states from localStorage
+ */
+function restoreDropdownStates() {
+    try {
+        const openDropdowns = JSON.parse(localStorage.getItem('openDropdowns') || '[]');
+        openDropdowns.forEach(dropdownId => {
+            const dropdown = document.getElementById(dropdownId);
+            if (dropdown) {
+                dropdown.classList.add('expanded'); // Use expanded class to match nexus-components.js
+            }
+        });
+    } catch (e) {
+        console.warn('Could not restore dropdown states:', e);
+    }
+}
+
+// Make toggleDropdown available globally
+window.toggleDropdown = toggleDropdown;
 
 /**
  * Initialize responsive behavior
@@ -83,13 +116,24 @@ function initializeResponsive() {
             if (isMobile) {
                 sidebar.classList.add('mobile');
                 
+                // Close all dropdowns when switching to mobile
+                document.querySelectorAll('.nav-dropdown.open, .nav-dropdown.expanded').forEach(dropdown => {
+                    dropdown.classList.remove('open', 'expanded');
+                });
+                
                 // Add overlay for mobile sidebar
                 if (!document.querySelector('.sidebar-overlay')) {
                     const overlay = document.createElement('div');
                     overlay.className = 'sidebar-overlay';
                     overlay.addEventListener('click', function() {
                         sidebar.classList.remove('mobile-open');
-                        this.style.display = 'none';
+                        document.body.classList.remove('sidebar-open');
+                        this.classList.remove('show');
+                        setTimeout(() => this.style.display = 'none', 300);
+                        // Close all dropdowns when overlay is clicked
+                        document.querySelectorAll('.nav-dropdown.open, .nav-dropdown.expanded').forEach(dropdown => {
+                            dropdown.classList.remove('open', 'expanded');
+                        });
                     });
                     document.body.appendChild(overlay);
                 }
@@ -99,6 +143,8 @@ function initializeResponsive() {
                 if (overlay) {
                     overlay.style.display = 'none';
                 }
+                // Restore dropdown states from localStorage when switching back to desktop
+                restoreDropdownStates();
             }
         }
     }
@@ -109,10 +155,28 @@ function initializeResponsive() {
         sidebarToggle.addEventListener('click', function() {
             const isMobile = window.innerWidth <= 768;
             if (isMobile && sidebar) {
+                const isOpening = !sidebar.classList.contains('mobile-open');
                 sidebar.classList.toggle('mobile-open');
                 const overlay = document.querySelector('.sidebar-overlay');
-                if (overlay) {
-                    overlay.style.display = sidebar.classList.contains('mobile-open') ? 'block' : 'none';
+                
+                if (isOpening) {
+                    // Opening sidebar
+                    document.body.classList.add('sidebar-open');
+                    if (overlay) {
+                        overlay.style.display = 'block';
+                        setTimeout(() => overlay.classList.add('show'), 10);
+                    }
+                } else {
+                    // Closing sidebar
+                    document.body.classList.remove('sidebar-open');
+                    if (overlay) {
+                        overlay.classList.remove('show');
+                        setTimeout(() => overlay.style.display = 'none', 300);
+                    }
+                    // Close all dropdowns when closing mobile sidebar
+                    document.querySelectorAll('.nav-dropdown.open, .nav-dropdown.expanded').forEach(dropdown => {
+                        dropdown.classList.remove('open', 'expanded');
+                    });
                 }
             }
         });

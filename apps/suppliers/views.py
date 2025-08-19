@@ -5,13 +5,13 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.urls import reverse_lazy, reverse
 from django.db.models import Q, Sum, Count, Avg, F
 from django.db.models.functions import TruncMonth
+from django.db import models, transaction
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import transaction
 from datetime import datetime, timedelta
 import json
 import csv
@@ -1385,7 +1385,7 @@ class SupplierPaymentDetailView(DetailView):
         outstanding_invoices = context.get('outstanding_invoices')
         if outstanding_invoices:
             context['total_outstanding'] = sum(
-                float(inv.outstanding_amount) for inv in outstanding_invoices
+                float(inv.total_amount - (inv.paid_amount or 0)) for inv in outstanding_invoices
             )
         else:
             context['total_outstanding'] = 0
@@ -1540,9 +1540,13 @@ class InvoiceListView(ListView):
             due_date__lt=timezone.now().date(),
             payment_status__in=['pending', 'partial']
         ).count()
-        context['total_outstanding'] = invoices.filter(
-            payment_status__in=['pending', 'partial']
-        ).aggregate(Sum('outstanding_amount'))['outstanding_amount'] or 0
+        # Calculate outstanding amount as total_amount - paid_amount
+        outstanding_invoices = invoices.filter(payment_status__in=['pending', 'partial'])
+        total_outstanding = 0
+        for invoice in outstanding_invoices:
+            outstanding = invoice.total_amount - (invoice.paid_amount or 0)
+            total_outstanding += outstanding
+        context['total_outstanding'] = total_outstanding
         
         context['urls'] = get_supplier_urls(self.request)
         return context
@@ -1686,6 +1690,145 @@ class InvoiceCreateView(CreateView):
         items = self.object.items.all()
         self.object.subtotal = sum(item.total_amount for item in items)
         self.object.save()
+
+@method_decorator([login_required, business_required, employee_required(['owner', 'manager'])], name='dispatch')
+class InvoiceUpdateView(UpdateView):
+    model = Invoice
+    form_class = InvoiceForm
+    template_name = 'suppliers/invoice_form.html'
+    
+    def get_queryset(self):
+        return Invoice.objects.filter(status__in=['draft', 'received'])
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.POST:
+            context['items_formset'] = InvoiceItemFormSet(
+                self.request.POST, 
+                instance=self.object
+            )
+        else:
+            context['items_formset'] = InvoiceItemFormSet(instance=self.object)
+        
+        context['urls'] = get_supplier_urls(self.request)
+        return context
+    
+    def form_valid(self, form):
+        context = self.get_context_data()
+        items_formset = context['items_formset']
+        
+        if items_formset.is_valid():
+            with transaction.atomic():
+                self.object = form.save()
+                items_formset.save()
+                
+                # Calculate totals
+                self.calculate_invoice_totals()
+                
+                messages.success(self.request, f'Invoice {self.object.invoice_number} updated successfully!')
+                return redirect(get_business_url(self.request, 'suppliers:invoice_detail', pk=self.object.pk))
+        else:
+            return self.form_invalid(form)
+    
+    def calculate_invoice_totals(self):
+        """Calculate and update invoice totals"""
+        items = self.object.items.all()
+        self.object.subtotal = sum(item.total_amount for item in items)
+        self.object.save()
+    
+    def get_success_url(self):
+        return get_business_url(self.request, 'suppliers:invoice_detail', pk=self.object.pk)
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager'])
+def get_purchase_order_items(request, po_id):
+    """Get items from a purchase order for invoice creation"""
+    try:
+        po = get_object_or_404(PurchaseOrder, pk=po_id, status='completed')
+        
+        # Get items that have been received
+        items = po.items.filter(received_quantity__gt=0).select_related('item')
+        
+        items_data = []
+        for item in items:
+            items_data.append({
+                'id': item.id,
+                'item_name': item.item.name if item.item else item.description,
+                'description': item.description,
+                'quantity': float(item.received_quantity),
+                'unit_price': float(item.unit_price),
+                'total_amount': float(item.received_quantity * item.unit_price),
+                'item_code': item.item.sku if item.item else '',
+                'notes': item.notes or ''
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'items': items_data,
+            'supplier_name': po.supplier.name,
+            'po_number': po.po_number
+        })
+        
+    except PurchaseOrder.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Purchase order not found'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+@login_required
+@business_required
+@employee_required(['owner', 'manager'])
+def get_inventory_items(request):
+    """Get inventory items for invoice creation"""
+    try:
+        # Import here to avoid circular imports
+        from apps.inventory.models import InventoryItem
+        
+        search = request.GET.get('search', '')
+        supplier_id = request.GET.get('supplier_id')
+        
+        items = InventoryItem.objects.filter(is_active=True)
+        
+        if search:
+            items = items.filter(
+                models.Q(name__icontains=search) | 
+                models.Q(sku__icontains=search) |
+                models.Q(description__icontains=search)
+            )
+        
+        if supplier_id:
+            items = items.filter(suppliers__id=supplier_id)
+        
+        items = items[:20]  # Limit results
+        
+        items_data = []
+        for item in items:
+            items_data.append({
+                'id': item.id,
+                'name': item.name,
+                'sku': item.sku,
+                'description': item.description or '',
+                'cost_price': float(item.cost_price or 0),
+                'current_stock': float(item.current_stock or 0),
+                'unit': item.unit or 'pcs'
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'items': items_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 @login_required
 @business_required

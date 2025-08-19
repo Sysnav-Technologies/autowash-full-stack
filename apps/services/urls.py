@@ -25,6 +25,7 @@ urlpatterns = [
     path('orders/<uuid:pk>/', views.order_detail_view, name='order_detail'),
     path('orders/<uuid:pk>/edit/', views.order_edit_view, name='order_edit'),
     path('orders/<uuid:pk>/print/', views.order_print_view, name='order_print'),
+    path('orders/<uuid:pk>/receipt/', views.order_receipt_view, name='order_receipt'),
     
     # Service Actions
     path('orders/<uuid:order_id>/start/', views.start_service, name='start_service'),

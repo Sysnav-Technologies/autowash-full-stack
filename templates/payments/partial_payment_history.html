@@ -1,0 +1,276 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payment History - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .history-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border: none;
+    }
+    
+    .history-header {
+        background: linear-gradient(135deg, #6f42c1, #5a32a3);
+        color: white;
+        border-radius: 12px 12px 0 0;
+        padding: 1.5rem;
+    }
+    
+    .payment-timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+    
+    .payment-timeline::before {
+        content: '';
+        position: absolute;
+        left: 15px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e9ecef;
+    }
+    
+    .timeline-item {
+        position: relative;
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        margin-left: 1rem;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -26px;
+        top: 1.5rem;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #28a745;
+        border: 2px solid white;
+        box-shadow: 0 0 0 2px #28a745;
+    }
+    
+    .timeline-item.pending::before {
+        background: #ffc107;
+        box-shadow: 0 0 0 2px #ffc107;
+    }
+    
+    .timeline-item.failed::before {
+        background: #dc3545;
+        box-shadow: 0 0 0 2px #dc3545;
+    }
+    
+    .timeline-item.refunded::before {
+        background: #6c757d;
+        box-shadow: 0 0 0 2px #6c757d;
+    }
+    
+    .payment-summary-card {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .summary-stat {
+        text-align: center;
+        padding: 1rem;
+    }
+    
+    .summary-stat .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #28a745;
+    }
+    
+    .summary-stat .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="history-card">
+                <div class="history-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h3 class="mb-1 fw-bold">
+                                <i class="fas fa-history me-2"></i>Payment History
+                            </h3>
+                            <p class="mb-0 opacity-75">Service Order: {{ service_order.order_number }}</p>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <a href="/business/{{ request.tenant.slug }}/payments/" class="btn btn-light">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Payments
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body p-4">
+                    <!-- Summary Statistics -->
+                    <div class="payment-summary-card">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="summary-stat">
+                                    <div class="stat-value">{{ payments.count }}</div>
+                                    <div class="stat-label">Total Payments</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="summary-stat">
+                                    <div class="stat-value">KES {{ service_order.total_amount|floatformat:2 }}</div>
+                                    <div class="stat-label">Order Total</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="summary-stat">
+                                    <div class="stat-value">KES {{ total_paid|floatformat:2 }}</div>
+                                    <div class="stat-label">Amount Paid</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="summary-stat">
+                                    <div class="stat-value 
+                                        {% if balance_due > 0 %}text-warning{% else %}text-success{% endif %}">
+                                        KES {{ balance_due|floatformat:2 }}
+                                    </div>
+                                    <div class="stat-label">Balance Due</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    {% if balance_due > 0 %}
+                    <div class="text-center mb-4">
+                        <a href="/business/{{ request.tenant.slug }}/payments/partial/create/{{ service_order.id }}/" 
+                           class="btn btn-success btn-lg">
+                            <i class="fas fa-plus me-2"></i>Add Partial Payment
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success text-center mb-4">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Payment Complete!</strong> This order has been fully paid.
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Payment Timeline -->
+                    <div class="payment-timeline">
+                        {% for payment in payments %}
+                        <div class="timeline-item {{ payment.status }}">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <div class="payment-method-icon me-3">
+                                            {% if payment.payment_method.method_type == 'mpesa' %}
+                                                <i class="fas fa-mobile-alt text-success"></i>
+                                            {% elif payment.payment_method.method_type == 'cash' %}
+                                                <i class="fas fa-coins text-warning"></i>
+                                            {% elif payment.payment_method.method_type == 'card' %}
+                                                <i class="fas fa-credit-card text-info"></i>
+                                            {% else %}
+                                                <i class="fas fa-money-bill text-secondary"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-0 fw-bold">{{ payment.payment_method.name }}</h6>
+                                            <small class="text-muted">{{ payment.payment_id }}</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="payment-details">
+                                        <p class="mb-1">
+                                            <strong>Amount:</strong> KES {{ payment.amount|floatformat:2 }}
+                                            {% if payment.processing_fee > 0 %}
+                                            <span class="text-muted">(Fee: KES {{ payment.processing_fee|floatformat:2 }})</span>
+                                            {% endif %}
+                                        </p>
+                                        <p class="mb-1">
+                                            <strong>Date:</strong> {{ payment.created_at|date:"M d, Y H:i" }}
+                                        </p>
+                                        {% if payment.processed_by %}
+                                        <p class="mb-1">
+                                            <strong>Processed by:</strong> {{ payment.processed_by.user.get_full_name }}
+                                        </p>
+                                        {% endif %}
+                                        {% if payment.description %}
+                                        <p class="mb-1">
+                                            <strong>Description:</strong> {{ payment.description }}
+                                        </p>
+                                        {% endif %}
+                                        {% if payment.transaction_id %}
+                                        <p class="mb-1">
+                                            <strong>Transaction ID:</strong> {{ payment.transaction_id }}
+                                        </p>
+                                        {% endif %}
+                                        {% if payment.customer_phone %}
+                                        <p class="mb-1">
+                                            <strong>Customer Phone:</strong> {{ payment.customer_phone }}
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-md-end">
+                                    <span class="badge bg-{{ payment.status|default:'secondary' }} fs-6 mb-2">
+                                        {{ payment.get_status_display }}
+                                    </span>
+                                    
+                                    <div class="btn-group-vertical d-grid gap-2">
+                                        <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye me-1"></i>View Details
+                                        </a>
+                                        
+                                        {% if payment.status == 'completed' or payment.status == 'verified' %}
+                                        <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/" 
+                                           class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-receipt me-1"></i>Receipt
+                                        </a>
+                                        {% endif %}
+                                        
+                                        {% if payment.status == 'completed' and payment.payment_type != 'refund' %}
+                                        <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/refund/" 
+                                           class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-undo me-1"></i>Refund
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if payment.failure_reason %}
+                            <div class="alert alert-danger mt-3 mb-0">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Failure Reason:</strong> {{ payment.failure_reason }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        
+                        {% if not payments %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No payments found</h5>
+                            <p class="text-muted">No payments have been made for this service order yet.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

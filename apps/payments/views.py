@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.db.models import Q, Count, Sum, Avg
 from django.utils import timezone
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.conf import settings
@@ -79,131 +79,266 @@ def get_payment_urls(request):
     }
 
 @login_required
-# Owner or manager required for payment dashboard
 @employee_required(['owner', 'manager'])
 def payment_dashboard_view(request):
-    """Payment dashboard with key metrics"""
-    today = timezone.now().date()
-    
-    # Today's statistics
-    today_payments = Payment.objects.filter(
-        created_at__date=today,
-        status__in=['completed', 'verified']
-    )
-    
-    today_stats = {
-        'total_amount': today_payments.aggregate(Sum('amount'))['amount__sum'] or 0,
-        'total_count': today_payments.count(),
-        'cash_amount': today_payments.filter(payment_method__method_type='cash').aggregate(Sum('amount'))['amount__sum'] or 0,
-        'card_amount': today_payments.filter(payment_method__method_type='card').aggregate(Sum('amount'))['amount__sum'] or 0,
-        'mpesa_amount': today_payments.filter(payment_method__method_type='mpesa').aggregate(Sum('amount'))['amount__sum'] or 0,
-    }
-    
-    # Pending payments
-    pending_payments = Payment.objects.filter(
-        status__in=['pending', 'processing']
-    ).order_by('-created_at')[:10]
-    
-    # Recent transactions
-    recent_payments = Payment.objects.filter(
-        status__in=['completed', 'verified']
-    ).select_related('customer', 'service_order', 'payment_method').order_by('-completed_at')[:15]
-    
-    # Payment method breakdown (this month)
-    current_month = timezone.now().replace(day=1)
-    method_stats = PaymentMethod.objects.filter(
-        is_active=True
-    ).annotate(
-        this_month_count=Count(
-            'payments',
-            filter=Q(payments__created_at__gte=current_month, payments__status__in=['completed', 'verified'])
-        ),
-        this_month_amount=Sum(
-            'payments__amount',
-            filter=Q(payments__created_at__gte=current_month, payments__status__in=['completed', 'verified'])
+    """Enhanced payment dashboard with comprehensive metrics and proper data handling"""
+    try:
+        today = timezone.now().date()
+        
+        # Get all payments for today with proper error handling
+        today_payments = Payment.objects.filter(
+            created_at__date=today,
+            status__in=['completed', 'verified']
+        ).select_related('payment_method', 'customer', 'service_order__customer')
+        
+        # Calculate today's statistics with safety checks
+        today_stats = {
+            'total_amount': today_payments.aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+            'total_count': today_payments.count(),
+            'cash_amount': today_payments.filter(
+                payment_method__method_type='cash'
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+            'card_amount': today_payments.filter(
+                payment_method__method_type='card'
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+            'mpesa_amount': today_payments.filter(
+                payment_method__method_type='mpesa'
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        }
+        
+        # Get pending payments with proper relations
+        pending_payments = Payment.objects.filter(
+            status__in=['pending', 'processing']
+        ).select_related(
+            'customer', 'service_order__customer', 'payment_method'
+        ).order_by('-created_at')[:10]
+        
+        # Get recent successful payments with all necessary relations
+        recent_payments = Payment.objects.filter(
+            status__in=['completed', 'verified']
+        ).select_related(
+            'customer', 'service_order__customer', 'payment_method', 'processed_by'
+        ).prefetch_related(
+            'service_order__customer'
+        ).order_by('-created_at')[:15]
+        
+        # Get failed payments count
+        failed_payments = Payment.objects.filter(
+            status='failed',
+            created_at__date=today
+        ).count()
+        
+        # Get all payment methods (both active and inactive for display)
+        payment_methods = PaymentMethod.objects.all().order_by('display_order', 'name')
+        
+        # Count transactions by method for today
+        mpesa_count = today_payments.filter(payment_method__method_type='mpesa').count()
+        cash_count = today_payments.filter(payment_method__method_type='cash').count()
+        card_count = today_payments.filter(payment_method__method_type='card').count()
+        
+        # Payment method statistics for this month
+        current_month = timezone.now().replace(day=1)
+        method_stats = PaymentMethod.objects.filter(
+            is_active=True
+        ).annotate(
+            this_month_count=Count(
+                'payments',
+                filter=Q(
+                    payments__created_at__gte=current_month, 
+                    payments__status__in=['completed', 'verified']
+                )
+            ),
+            this_month_amount=Sum(
+                'payments__amount',
+                filter=Q(
+                    payments__created_at__gte=current_month, 
+                    payments__status__in=['completed', 'verified']
+                )
+            )
         )
-    )
-    
-    # Failed payments that need attention
-    failed_payments = Payment.objects.filter(
-        status='failed',
-        created_at__date=today
-    ).count()
-    
-    context = {
-        'today_stats': today_stats,
-        'pending_payments': pending_payments,
-        'recent_payments': recent_payments,
-        'method_stats': method_stats,
-        'failed_payments': failed_payments,
-        'title': 'Payments Dashboard'
-    }
+        
+        context = {
+            'today_stats': today_stats,
+            'pending_payments': pending_payments,
+            'recent_payments': recent_payments,
+            'method_stats': method_stats,
+            'failed_payments': failed_payments,
+            'payment_methods': payment_methods,
+            'mpesa_count': mpesa_count,
+            'cash_count': cash_count,
+            'card_count': card_count,
+            'title': 'Payments Dashboard',
+            'page_title': 'Payment Dashboard'
+        }
+        
+    except Exception as e:
+        # Log the error and provide fallback data
+        logger.error(f"Error in payment_dashboard_view: {str(e)}")
+        
+        # Provide safe fallback data
+        context = {
+            'today_stats': {
+                'total_amount': Decimal('0'),
+                'total_count': 0,
+                'cash_amount': Decimal('0'),
+                'card_amount': Decimal('0'),
+                'mpesa_amount': Decimal('0'),
+            },
+            'pending_payments': [],
+            'recent_payments': [],
+            'method_stats': [],
+            'failed_payments': 0,
+            'payment_methods': PaymentMethod.objects.all().order_by('name'),
+            'mpesa_count': 0,
+            'cash_count': 0,
+            'card_count': 0,
+            'title': 'Payments Dashboard',
+            'page_title': 'Payment Dashboard',
+            'error_message': 'Unable to load payment data. Please try again.'
+        }
     
     return render(request, 'payments/dashboard.html', context)
 
 @login_required
 @employee_required()
 def payment_list_view(request):
-    """List payments with filtering"""
-    payments = Payment.objects.select_related(
-        'customer', 'service_order', 'payment_method', 'processed_by'
-    ).order_by('-created_at')
+    """Enhanced payment list view with comprehensive filtering and data"""
+    try:
+        # Base queryset with proper relations
+        payments = Payment.objects.select_related(
+            'customer', 
+            'service_order__customer', 
+            'payment_method', 
+            'processed_by'
+        ).prefetch_related(
+            'service_order__customer'
+        ).order_by('-created_at')
+        
+        # Apply filters with proper error handling
+        status = request.GET.get('status')
+        method_id = request.GET.get('method')
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        search = request.GET.get('search')
+        
+        # Status filter
+        if status:
+            payments = payments.filter(status=status)
+        
+        # Payment method filter
+        if method_id:
+            try:
+                payments = payments.filter(payment_method_id=int(method_id))
+            except (ValueError, TypeError):
+                pass
+        
+        # Date filters
+        if date_from:
+            try:
+                payments = payments.filter(created_at__date__gte=date_from)
+            except (ValueError, TypeError):
+                pass
+                
+        if date_to:
+            try:
+                payments = payments.filter(created_at__date__lte=date_to)
+            except (ValueError, TypeError):
+                pass
+        
+        # Search filter with comprehensive search
+        if search:
+            payments = payments.filter(
+                Q(payment_id__icontains=search) |
+                Q(customer__first_name__icontains=search) |
+                Q(customer__last_name__icontains=search) |
+                Q(customer__phone__icontains=search) |
+                Q(service_order__customer__first_name__icontains=search) |
+                Q(service_order__customer__last_name__icontains=search) |
+                Q(service_order__customer__phone__icontains=search) |
+                Q(reference_number__icontains=search) |
+                Q(transaction_id__icontains=search) |
+                Q(customer_phone__icontains=search)
+            )
+        
+        # Calculate summary statistics for current filter
+        summary_stats = {
+            'total_count': payments.count(),
+            'total_amount': payments.aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+            'completed_count': payments.filter(status__in=['completed', 'verified']).count(),
+            'pending_count': payments.filter(status__in=['pending', 'processing']).count(),
+            'failed_count': payments.filter(status='failed').count(),
+            'completed_amount': payments.filter(
+                status__in=['completed', 'verified']
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+            'pending_amount': payments.filter(
+                status__in=['pending', 'processing']
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        }
+        
+        # Pagination with better handling
+        page_size = request.GET.get('per_page', 25)
+        try:
+            page_size = int(page_size)
+            if page_size not in [10, 25, 50, 100]:
+                page_size = 25
+        except (ValueError, TypeError):
+            page_size = 25
+            
+        paginator = Paginator(payments, page_size)
+        page = request.GET.get('page', 1)
+        
+        try:
+            payments_page = paginator.page(page)
+        except PageNotAnInteger:
+            payments_page = paginator.page(1)
+        except EmptyPage:
+            payments_page = paginator.page(paginator.num_pages)
+        
+        # Get all payment methods for filter dropdown
+        payment_methods = PaymentMethod.objects.all().order_by('name')
+        
+        context = {
+            'payments': payments_page,
+            'payment_methods': payment_methods,
+            'summary_stats': summary_stats,
+            'current_filters': {
+                'status': status,
+                'method': method_id,
+                'date_from': date_from,
+                'date_to': date_to,
+                'search': search,
+            },
+            'title': 'All Payments',
+            'page_title': 'Payment List'
+        }
+        
+    except Exception as e:
+        # Log error and provide fallback
+        logger.error(f"Error in payment_list_view: {str(e)}")
+        
+        # Provide empty page with error message
+        from django.core.paginator import Page
+        empty_page = Page([], 1, Paginator(Payment.objects.none(), 25))
+        
+        context = {
+            'payments': empty_page,
+            'payment_methods': PaymentMethod.objects.all().order_by('name'),
+            'summary_stats': {
+                'total_count': 0,
+                'total_amount': Decimal('0'),
+                'completed_count': 0,
+                'pending_count': 0,
+                'failed_count': 0,
+                'completed_amount': Decimal('0'),
+                'pending_amount': Decimal('0'),
+            },
+            'current_filters': {},
+            'title': 'All Payments',
+            'page_title': 'Payment List',
+            'error_message': 'Unable to load payment data. Please try again.'
+        }
     
-    # Filters
-    status = request.GET.get('status')
-    method_id = request.GET.get('method')
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
-    search = request.GET.get('search')
-    
-    if status:
-        payments = payments.filter(status=status)
-    if method_id:
-        payments = payments.filter(payment_method_id=method_id)
-    if date_from:
-        payments = payments.filter(created_at__date__gte=date_from)
-    if date_to:
-        payments = payments.filter(created_at__date__lte=date_to)
-    if search:
-        payments = payments.filter(
-            Q(payment_id__icontains=search) |
-            Q(customer__first_name__icontains=search) |
-            Q(customer__last_name__icontains=search) |
-            Q(reference_number__icontains=search) |
-            Q(transaction_id__icontains=search)
-        )
-    
-    # Pagination
-    paginator = Paginator(payments, 25)
-    page = request.GET.get('page')
-    payments_page = paginator.get_page(page)
-    
-    # Get payment methods for filter
-    payment_methods = PaymentMethod.objects.filter(is_active=True)
-    
-    # Calculate totals for filtered results
-    totals = payments.aggregate(
-        total_amount=Sum('amount'),
-        completed_amount=Sum('amount', filter=Q(status__in=['completed', 'verified'])),
-        pending_amount=Sum('amount', filter=Q(status__in=['pending', 'processing']))
-    )
-    
-    context = {
-        'payments': payments_page,
-        'payment_methods': payment_methods,
-        'totals': totals,
-        'current_filters': {
-            'status': status,
-            'method': method_id,
-            'date_from': date_from,
-            'date_to': date_to,
-            'search': search
-        },
-        'status_choices': Payment.STATUS_CHOICES,
-        'title': 'Payments'
-    }
-    
-    return render(request, 'payments/payment_list.html', context)
+    return render(request, 'payments/list.html', context)
 
 @login_required
 @employee_required()
@@ -234,7 +369,7 @@ def payment_detail_view(request, payment_id):
         'title': f'Payment {payment.payment_id}'
     }
     
-    return render(request, 'payments/payment_detail.html', context)
+    return render(request, 'payments/detail.html', context)
 
 @login_required
 @employee_required()
@@ -360,6 +495,20 @@ def process_payment_view(request, order_id=None):
                         service_order.update_payment_status()
                     
                     messages.success(request, f'Payment {payment.payment_id} processed successfully!')
+                    
+                    # Check if this is a service order and if it's fully paid
+                    if payment.service_order:
+                        # Calculate total paid for the order
+                        total_paid = Payment.objects.filter(
+                            service_order=payment.service_order,
+                            status='completed'
+                        ).aggregate(total=Sum('amount'))['total'] or 0
+                        
+                        # If order is fully paid, redirect to order receipt
+                        if total_paid >= payment.service_order.total_amount:
+                            return redirect(f'/business/{tenant_slug}/services/orders/{payment.service_order.pk}/receipt/')
+                    
+                    # Otherwise redirect to payment receipt
                     return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/receipt/')
                     
         except Exception as e:
@@ -428,6 +577,20 @@ def process_partial_payment(request, partial_id):
             service_order.update_payment_status()
             
             messages.success(request, f'Partial payment {payment.payment_id} completed successfully!')
+            
+            # Check if this is a service order and if it's fully paid after this payment
+            if payment.service_order:
+                # Calculate total paid for the order
+                total_paid = Payment.objects.filter(
+                    service_order=payment.service_order,
+                    status='completed'
+                ).aggregate(total=Sum('amount'))['total'] or 0
+                
+                # If order is fully paid, redirect to order receipt
+                if total_paid >= payment.service_order.total_amount:
+                    return redirect(f'/business/{tenant_slug}/services/orders/{payment.service_order.pk}/receipt/')
+            
+            # Otherwise redirect to payment receipt
             return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/receipt/')
         except Exception as e:
             messages.error(request, f'Error completing payment: {str(e)}')
@@ -576,7 +739,19 @@ def process_cash_payment_view(request, payment_id):
                 
                 messages.success(request, f'Cash payment {payment.payment_id} completed successfully!')
                 
-                # Redirect to receipt with print option
+                # Check if this is a service order and if it's fully paid
+                if payment.service_order:
+                    # Calculate total paid for the order
+                    total_paid = Payment.objects.filter(
+                        service_order=payment.service_order,
+                        status='completed'
+                    ).aggregate(total=Sum('amount'))['total'] or 0
+                    
+                    # If order is fully paid, redirect to order receipt
+                    if total_paid >= payment.service_order.total_amount:
+                        return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/receipt/')
+                
+                # Otherwise redirect to payment receipt
                 return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/receipt/?print=true')
                 
         except (ValueError, TypeError) as e:
@@ -1078,3 +1253,65 @@ def reconciliation_view(request):
     }
     
     return render(request, 'payments/reconciliation.html', context)
+
+
+@login_required
+@employee_required()
+@require_http_methods(["POST"])
+def toggle_payment_method(request):
+    """Toggle payment method active status"""
+    try:
+        import json
+        data = json.loads(request.body)
+        method_id = data.get('method_id')
+        is_active = data.get('is_active')
+        
+        if not method_id:
+            return JsonResponse({'success': False, 'error': 'Method ID required'})
+        
+        method = get_object_or_404(PaymentMethod, id=method_id)
+        method.is_active = is_active
+        method.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Payment method {"activated" if is_active else "deactivated"} successfully'
+        })
+        
+    except PaymentMethod.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Payment method not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@employee_required()
+def get_payment_method_config(request, method_id):
+    """Get payment method configuration"""
+    try:
+        method = get_object_or_404(PaymentMethod, id=method_id)
+        
+        # Create config dict based on method type
+        config = {
+            'method_type': method.method_type,
+            'name': method.name,
+            'description': method.description,
+            'is_active': method.is_active,
+            'processing_fee_percentage': str(method.processing_fee_percentage),
+            'fixed_processing_fee': str(method.fixed_processing_fee),
+            'minimum_amount': str(method.minimum_amount),
+            'maximum_amount': str(method.maximum_amount) if method.maximum_amount else '',
+            'api_endpoint': method.api_endpoint,
+            'api_key': method.api_key,
+            'merchant_id': method.merchant_id,
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'config': config
+        })
+        
+    except PaymentMethod.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Payment method not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

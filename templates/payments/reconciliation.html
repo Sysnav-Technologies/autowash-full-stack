@@ -3,602 +3,673 @@
 
 {% block title %}Payment Reconciliation - {{ block.super }}{% endblock %}
 
-{% block breadcrumbs %}
-{{ block.super }}
-<li class="breadcrumb-item">
-    <a href="/business/{{ request.tenant.slug }}/payments/">Payments</a>
-</li>
-<li class="breadcrumb-item active">Reconciliation</li>
+{% block extra_css %}
+<style>
+    .reconciliation-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .recon-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .recon-header {
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .reconciliation-filters {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .filter-group label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #374151;
+        display: block;
+    }
+    
+    .filter-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: border-color 0.3s ease;
+    }
+    
+    .filter-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .summary-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    
+    .summary-card.success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    
+    .summary-card.warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    
+    .summary-card.danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+    
+    .summary-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .summary-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+    
+    .reconciliation-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+    
+    .reconciliation-table th {
+        background: #f8fafc;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .reconciliation-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: top;
+    }
+    
+    .reconciliation-table tr:hover {
+        background: #f8fafc;
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-reconciled {
+        background: #dcfce7;
+        color: #166534;
+    }
+    
+    .status-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .status-discrepancy {
+        background: #fef2f2;
+        color: #991b1b;
+    }
+    
+    .method-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .method-cash {
+        background: #dcfce7;
+        color: #166534;
+    }
+    
+    .method-card {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .method-mpesa {
+        background: #ecfdf5;
+        color: #065f46;
+    }
+    
+    .discrepancy-amount {
+        font-weight: bold;
+        color: #dc2626;
+    }
+    
+    .reconcile-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn-reconcile {
+        background: #059669;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        color: white;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    
+    .btn-reconcile:hover {
+        background: #047857;
+    }
+    
+    .btn-investigate {
+        background: #f59e0b;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        color: white;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    
+    .btn-investigate:hover {
+        background: #d97706;
+    }
+    
+    .reconciliation-notes {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .notes-textarea {
+        width: 100%;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 0.75rem;
+        resize: vertical;
+        min-height: 80px;
+    }
+    
+    .export-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    .btn-export {
+        background: #3b82f6;
+        border: none;
+        border-radius: 6px;
+        padding: 0.75rem 1.5rem;
+        color: white;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    
+    .btn-export:hover {
+        background: #1d4ed8;
+    }
+    
+    .reconciliation-totals {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 2rem;
+    }
+    
+    .totals-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .total-item {
+        text-align: center;
+    }
+    
+    .total-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #1f2937;
+    }
+    
+    .total-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    @media (max-width: 768px) {
+        .reconciliation-filters {
+            grid-template-columns: 1fr;
+        }
+        
+        .summary-cards {
+            grid-template-columns: 1fr;
+        }
+        
+        .reconciliation-table {
+            font-size: 0.875rem;
+        }
+        
+        .reconcile-actions {
+            flex-direction: column;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Page Header -->
-    <div class="col-12">
-        <div class="page-header">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="h3 mb-2">Payment Reconciliation</h1>
-                    <p class="text-muted mb-0">Match and reconcile payment transactions with bank statements</p>
-                </div>
-                <div class="col-md-4 text-md-end">
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#uploadStatementModal">
-                            <i class="fas fa-upload me-2"></i>Upload Statement
-                        </button>
-                        <button type="button" class="btn btn-primary" onclick="startAutoReconciliation()">
-                            <i class="fas fa-magic me-2"></i>Auto Reconcile
+<div class="container-fluid px-4">
+    <div class="reconciliation-container">
+        <!-- Header -->
+        <div class="recon-card">
+            <div class="recon-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-1">
+                            <i class="fas fa-balance-scale me-2"></i>Payment Reconciliation
+                        </h2>
+                        <p class="text-muted">Track and reconcile payment transactions</p>
+                    </div>
+                    <div>
+                        <button class="btn-export" onclick="exportReconciliation()">
+                            <i class="fas fa-download me-2"></i>Export Report
                         </button>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Reconciliation Status Overview -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <div class="text-success mb-2">
-                    <i class="fas fa-check-circle fa-2x"></i>
+            
+            <!-- Filters -->
+            <div class="reconciliation-filters">
+                <div class="filter-group">
+                    <label>Date Range</label>
+                    <select class="filter-control" id="dateRange" title="Select date range">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="last_7_days" selected>Last 7 Days</option>
+                        <option value="last_30_days">Last 30 Days</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
                 </div>
-                <h4 class="text-success mb-1">{{ reconciled_count }}</h4>
-                <p class="text-muted mb-0">Reconciled</p>
-                <small class="text-success">{{ reconciled_amount|floatformat:2 }}</small>
+                
+                <div class="filter-group">
+                    <label>Payment Method</label>
+                    <select class="filter-control" id="paymentMethod" title="Select payment method">
+                        <option value="all">All Methods</option>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                        <option value="mpesa">M-Pesa</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select class="filter-control" id="reconStatus" title="Select reconciliation status">
+                        <option value="all">All Statuses</option>
+                        <option value="reconciled">Reconciled</option>
+                        <option value="pending">Pending</option>
+                        <option value="discrepancy">Discrepancy</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Employee</label>
+                    <select class="filter-control" id="employee" title="Select employee">
+                        <option value="all">All Employees</option>
+                        {% for employee in employees %}
+                        <option value="{{ employee.id }}">{{ employee.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group d-flex align-items-end">
+                    <button class="btn-reconcile w-100" onclick="applyFilters()">
+                        <i class="fas fa-filter me-2"></i>Apply Filters
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-warning">
-            <div class="card-body text-center">
-                <div class="text-warning mb-2">
-                    <i class="fas fa-exclamation-triangle fa-2x"></i>
-                </div>
-                <h4 class="text-warning mb-1">{{ unreconciled_count }}</h4>
-                <p class="text-muted mb-0">Unreconciled</p>
-                <small class="text-warning">{{ unreconciled_amount|floatformat:2 }}</small>
+        
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="summary-card success">
+                <div class="summary-value">{{ reconciled_count }}</div>
+                <div class="summary-label">Reconciled Transactions</div>
+            </div>
+            
+            <div class="summary-card warning">
+                <div class="summary-value">{{ pending_count }}</div>
+                <div class="summary-label">Pending Reconciliation</div>
+            </div>
+            
+            <div class="summary-card danger">
+                <div class="summary-value">{{ discrepancy_count }}</div>
+                <div class="summary-label">Discrepancies Found</div>
+            </div>
+            
+            <div class="summary-card">
+                <div class="summary-value">KES {{ total_amount|floatformat:0 }}</div>
+                <div class="summary-label">Total Amount</div>
             </div>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-danger">
-            <div class="card-body text-center">
-                <div class="text-danger mb-2">
-                    <i class="fas fa-times-circle fa-2x"></i>
+        
+        <!-- Reconciliation Table -->
+        <div class="recon-card">
+            <div class="export-section">
+                <h5 class="mb-0">Transaction Reconciliation</h5>
+                <div>
+                    <input type="search" class="filter-control" placeholder="Search transactions..." id="searchTransactions" style="width: 250px;">
                 </div>
-                <h4 class="text-danger mb-1">{{ discrepancy_count }}</h4>
-                <p class="text-muted mb-0">Discrepancies</p>
-                <small class="text-danger">{{ discrepancy_amount|floatformat:2 }}</small>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table class="reconciliation-table">
+                    <thead>
+                        <tr>
+                            <th>Transaction ID</th>
+                            <th>Date & Time</th>
+                            <th>Payment Method</th>
+                            <th>System Amount</th>
+                            <th>Bank/Gateway Amount</th>
+                            <th>Variance</th>
+                            <th>Status</th>
+                            <th>Employee</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reconciliationTableBody">
+                        {% for transaction in reconciliation_data %}
+                        <tr data-transaction-id="{{ transaction.id }}">
+                            <td>
+                                <span class="font-weight-bold text-primary">{{ transaction.payment_id }}</span>
+                                {% if transaction.reference_number %}
+                                <br><small class="text-muted">Ref: {{ transaction.reference_number }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>{{ transaction.created_at|date:"M d, Y" }}</div>
+                                <small class="text-muted">{{ transaction.created_at|date:"H:i" }}</small>
+                            </td>
+                            <td>
+                                <span class="method-badge method-{{ transaction.payment_method.code }}">
+                                    {{ transaction.payment_method.name }}
+                                </span>
+                            </td>
+                            <td class="font-weight-bold">
+                                KES {{ transaction.system_amount|floatformat:2 }}
+                            </td>
+                            <td class="font-weight-bold">
+                                {% if transaction.gateway_amount %}
+                                    KES {{ transaction.gateway_amount|floatformat:2 }}
+                                {% else %}
+                                    <span class="text-muted">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if transaction.variance != 0 %}
+                                    <span class="discrepancy-amount">
+                                        KES {{ transaction.variance|floatformat:2 }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-success">KES 0.00</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ transaction.reconciliation_status }}">
+                                    {{ transaction.get_reconciliation_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if transaction.processed_by %}
+                                    <div>{{ transaction.processed_by.user.first_name }}</div>
+                                    <small class="text-muted">{{ transaction.processed_by.role }}</small>
+                                {% else %}
+                                    <span class="text-muted">System</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="reconcile-actions">
+                                    {% if transaction.reconciliation_status == 'pending' %}
+                                        <button class="btn-reconcile" onclick="markReconciled('{{ transaction.id }}')">
+                                            Reconcile
+                                        </button>
+                                    {% endif %}
+                                    {% if transaction.variance != 0 %}
+                                        <button class="btn-investigate" onclick="investigateDiscrepancy('{{ transaction.id }}')">
+                                            Investigate
+                                        </button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="viewDetails('{{ transaction.id }}')">
+                                        Details
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4">
+                                <i class="fas fa-balance-scale fa-2x text-muted mb-2"></i>
+                                <div>No transactions found for reconciliation</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-info">
-            <div class="card-body text-center">
-                <div class="text-info mb-2">
-                    <i class="fas fa-percentage fa-2x"></i>
-                </div>
-                <h4 class="text-info mb-1">{{ reconciliation_rate }}%</h4>
-                <p class="text-muted mb-0">Reconciliation Rate</p>
-                <small class="text-info">Last updated: {{ last_reconciliation|date:"M d, H:i" }}</small>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Filters and Actions -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <form method="get" id="reconciliationFilters">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-md-2">
-                            <label for="dateFrom" class="form-label">Date From</label>
-                            <input type="date" class="form-control" id="dateFrom" name="date_from" value="{{ request.GET.date_from }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label for="dateTo" class="form-label">Date To</label>
-                            <input type="date" class="form-control" id="dateTo" name="date_to" value="{{ request.GET.date_to }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label for="paymentMethod" class="form-label">Payment Method</label>
-                            <select class="form-select" id="paymentMethod" name="payment_method">
-                                <option value="">All Methods</option>
-                                {% for method in payment_methods %}
-                                <option value="{{ method.id }}" {% if request.GET.payment_method == method.id|slugify %}selected{% endif %}>
-                                    {{ method.name }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label for="status" class="form-label">Status</label>
-                            <select class="form-select" id="status" name="status">
-                                <option value="">All Status</option>
-                                <option value="reconciled" {% if request.GET.status == 'reconciled' %}selected{% endif %}>Reconciled</option>
-                                <option value="unreconciled" {% if request.GET.status == 'unreconciled' %}selected{% endif %}>Unreconciled</option>
-                                <option value="discrepancy" {% if request.GET.status == 'discrepancy' %}selected{% endif %}>Discrepancy</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label for="amount" class="form-label">Amount Range</label>
-                            <select class="form-select" id="amount" name="amount_range">
-                                <option value="">All Amounts</option>
-                                <option value="0-100" {% if request.GET.amount_range == '0-100' %}selected{% endif %}>$0 - $100</option>
-                                <option value="100-500" {% if request.GET.amount_range == '100-500' %}selected{% endif %}>$100 - $500</option>
-                                <option value="500-1000" {% if request.GET.amount_range == '500-1000' %}selected{% endif %}>$500 - $1000</option>
-                                <option value="1000+" {% if request.GET.amount_range == '1000+' %}selected{% endif %}>$1000+</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-search me-2"></i>Filter
-                            </button>
-                        </div>
+        
+        <!-- Reconciliation Notes -->
+        <div class="recon-card">
+            <h5 class="mb-3">Reconciliation Notes</h5>
+            <div class="reconciliation-notes">
+                <form id="notesForm">
+                    <div class="mb-3">
+                        <label for="reconciliationNotes" class="form-label">Add notes about discrepancies or reconciliation process:</label>
+                        <textarea class="notes-textarea" id="reconciliationNotes" placeholder="Enter your reconciliation notes here..."></textarea>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn-reconcile" onclick="saveNotes()">
+                            <i class="fas fa-save me-2"></i>Save Notes
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearNotes()">
+                            Clear
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Reconciliation Table -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-table me-2"></i>Payment Transactions
-                    </h5>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-outline-secondary" onclick="selectAll()">
-                            <i class="fas fa-check-square me-1"></i>Select All
-                        </button>
-                        <button type="button" class="btn btn-outline-primary" onclick="bulkReconcile()">
-                            <i class="fas fa-check me-1"></i>Bulk Reconcile
-                        </button>
-                        <button type="button" class="btn btn-outline-warning" onclick="markDiscrepancy()">
-                            <i class="fas fa-exclamation me-1"></i>Mark Discrepancy
-                        </button>
-                    </div>
+        
+        <!-- Reconciliation Totals -->
+        <div class="reconciliation-totals">
+            <h5 class="text-center mb-3">Reconciliation Summary</h5>
+            <div class="totals-grid">
+                <div class="total-item">
+                    <div class="total-value text-success">KES {{ reconciled_amount|floatformat:0 }}</div>
+                    <div class="total-label">Reconciled Amount</div>
                 </div>
-            </div>
-            <div class="card-body">
-                {% if transactions %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th width="40">
-                                        <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
-                                    </th>
-                                    <th>Date</th>
-                                    <th>Transaction ID</th>
-                                    <th>Customer</th>
-                                    <th>Amount</th>
-                                    <th>Method</th>
-                                    <th>Bank Reference</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for transaction in transactions %}
-                                <tr class="transaction-row" data-transaction-id="{{ transaction.id }}">
-                                    <td>
-                                        <input type="checkbox" class="transaction-checkbox" value="{{ transaction.id }}">
-                                    </td>
-                                    <td>{{ transaction.created_at|date:"M d, Y H:i" }}</td>
-                                    <td>
-                                        <a href="/business/{{ request.tenant.slug }}/payments/{{ transaction.id }}/" class="text-decoration-none">
-                                            {{ transaction.transaction_id }}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        {% if transaction.customer %}
-                                            {{ transaction.customer.full_name }}
-                                        {% else %}
-                                            <span class="text-muted">Walk-in Customer</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="fw-bold">{{ transaction.amount|floatformat:2 }}</td>
-                                    <td>
-                                        <span class="badge bg-light text-dark">{{ transaction.payment_method }}</span>
-                                    </td>
-                                    <td>
-                                        {% if transaction.bank_reference %}
-                                            <code>{{ transaction.bank_reference }}</code>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if transaction.reconciliation_status == 'reconciled' %}
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-check me-1"></i>Reconciled
-                                            </span>
-                                        {% elif transaction.reconciliation_status == 'discrepancy' %}
-                                            <span class="badge bg-danger">
-                                                <i class="fas fa-exclamation me-1"></i>Discrepancy
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-warning">
-                                                <i class="fas fa-clock me-1"></i>Unreconciled
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <button type="button" class="btn btn-outline-success" onclick="reconcileTransaction('{{ transaction.id }}')" title="Reconcile">
-                                                <i class="fas fa-check"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-outline-warning" onclick="markDiscrepancyTransaction('{{ transaction.id }}')" title="Mark Discrepancy">
-                                                <i class="fas fa-exclamation"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-outline-primary" onclick="viewTransactionDetails('{{ transaction.id }}')" title="View Details">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    {% if transactions.has_other_pages %}
-                    <nav aria-label="Transactions pagination" class="mt-4">
-                        <ul class="pagination justify-content-center">
-                            {% if transactions.has_previous %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ transactions.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Previous</a>
-                                </li>
-                            {% endif %}
-                            
-                            {% for num in transactions.paginator.page_range %}
-                                {% if transactions.number == num %}
-                                    <li class="page-item active">
-                                        <span class="page-link">{{ num }}</span>
-                                    </li>
-                                {% elif num > transactions.number|add:'-3' and num < transactions.number|add:'3' %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
-                                    </li>
-                                {% endif %}
-                            {% endfor %}
-                            
-                            {% if transactions.has_next %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ transactions.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Next</a>
-                                </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                    {% endif %}
-                {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-balance-scale fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">No Transactions Found</h5>
-                        <p class="text-muted">Adjust your filters to see more results or upload a bank statement</p>
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadStatementModal">
-                            <i class="fas fa-upload me-2"></i>Upload Bank Statement
-                        </button>
-                    </div>
-                {% endif %}
+                <div class="total-item">
+                    <div class="total-value text-warning">KES {{ pending_amount|floatformat:0 }}</div>
+                    <div class="total-label">Pending Amount</div>
+                </div>
+                <div class="total-item">
+                    <div class="total-value text-danger">KES {{ discrepancy_amount|floatformat:0 }}</div>
+                    <div class="total-label">Discrepancy Amount</div>
+                </div>
+                <div class="total-item">
+                    <div class="total-value">{{ reconciliation_percentage|floatformat:1 }}%</div>
+                    <div class="total-label">Reconciliation Rate</div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Upload Statement Modal -->
-<div class="modal fade" id="uploadStatementModal" tabindex="-1" aria-labelledby="uploadStatementModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="uploadStatementModalLabel">Upload Bank Statement</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="uploadStatementForm" method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="statementFile" class="form-label">Bank Statement File</label>
-                        <input type="file" class="form-control" id="statementFile" name="statement_file" accept=".csv,.xlsx,.xls" required>
-                        <div class="form-text">Supported formats: CSV, Excel (.xlsx, .xls)</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="bankName" class="form-label">Bank Name</label>
-                        <select class="form-select" id="bankName" name="bank_name" required>
-                            <option value="">Select bank...</option>
-                            <option value="equity">Equity Bank</option>
-                            <option value="kcb">KCB Bank</option>
-                            <option value="coop">Co-operative Bank</option>
-                            <option value="standard">Standard Chartered</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="statementPeriod" class="form-label">Statement Period</label>
-                        <div class="row">
-                            <div class="col-6">
-                                <input type="date" class="form-control" id="periodFrom" name="period_from" required>
-                            </div>
-                            <div class="col-6">
-                                <input type="date" class="form-control" id="periodTo" name="period_to" required>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Note:</strong> The system will automatically match transactions based on amount, date, and reference numbers.
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-upload me-2"></i>Upload & Process
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-.transaction-row:hover {
-    background-color: #f8f9fa;
-}
-
-.transaction-row.selected {
-    background-color: #e3f2fd;
-}
-
-.reconciliation-status {
-    display: inline-flex;
-    align-items: center;
-}
-
-code {
-    font-size: 0.875em;
-    background-color: #f8f9fa;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-}
-</style>
-{% endblock %}
-
-{% block extra_js %}
 <script>
-// Select all functionality
-function toggleSelectAll() {
-    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    const checkboxes = document.querySelectorAll('.transaction-checkbox');
+function applyFilters() {
+    const filters = {
+        date_range: document.getElementById('dateRange').value,
+        payment_method: document.getElementById('paymentMethod').value,
+        status: document.getElementById('reconStatus').value,
+        employee: document.getElementById('employee').value
+    };
     
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAllCheckbox.checked;
-        toggleRowSelection(checkbox.closest('tr'), checkbox.checked);
-    });
-}
-
-function selectAll() {
-    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    selectAllCheckbox.checked = true;
-    toggleSelectAll();
-}
-
-function toggleRowSelection(row, selected) {
-    if (selected) {
-        row.classList.add('selected');
-    } else {
-        row.classList.remove('selected');
-    }
-}
-
-// Individual checkbox handling
-document.querySelectorAll('.transaction-checkbox').forEach(checkbox => {
-    checkbox.addEventListener('change', function() {
-        toggleRowSelection(this.closest('tr'), this.checked);
-        
-        // Update select all checkbox
-        const allCheckboxes = document.querySelectorAll('.transaction-checkbox');
-        const checkedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
-        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-        
-        selectAllCheckbox.checked = allCheckboxes.length === checkedCheckboxes.length;
-        selectAllCheckbox.indeterminate = checkedCheckboxes.length > 0 && checkedCheckboxes.length < allCheckboxes.length;
-    });
-});
-
-// Reconciliation functions
-function reconcileTransaction(transactionId) {
-    if (confirm('Mark this transaction as reconciled?')) {
-        // AJAX call to reconcile transaction
-        fetch(`/business/{{ request.tenant.slug }}/payments/${transactionId}/reconcile/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                status: 'reconciled'
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while reconciling the transaction');
-        });
-    }
-}
-
-function markDiscrepancyTransaction(transactionId) {
-    const reason = prompt('Please provide a reason for marking this as a discrepancy:');
-    if (reason && reason.trim()) {
-        // AJAX call to mark discrepancy
-        fetch(`/business/{{ request.tenant.slug }}/payments/${transactionId}/reconcile/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                status: 'discrepancy',
-                reason: reason.trim()
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while marking the discrepancy');
-        });
-    }
-}
-
-function bulkReconcile() {
-    const checkedBoxes = document.querySelectorAll('.transaction-checkbox:checked');
-    if (checkedBoxes.length === 0) {
-        alert('Please select at least one transaction');
-        return;
-    }
-    
-    if (confirm(`Reconcile ${checkedBoxes.length} selected transactions?`)) {
-        const transactionIds = Array.from(checkedBoxes).map(cb => cb.value);
-        
-        fetch(`/business/{{ request.tenant.slug }}/payments/bulk-reconcile/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                transaction_ids: transactionIds,
-                status: 'reconciled'
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred during bulk reconciliation');
-        });
-    }
-}
-
-function markDiscrepancy() {
-    const checkedBoxes = document.querySelectorAll('.transaction-checkbox:checked');
-    if (checkedBoxes.length === 0) {
-        alert('Please select at least one transaction');
-        return;
-    }
-    
-    const reason = prompt('Please provide a reason for marking these as discrepancies:');
-    if (reason && reason.trim()) {
-        const transactionIds = Array.from(checkedBoxes).map(cb => cb.value);
-        
-        fetch(`/business/{{ request.tenant.slug }}/payments/bulk-reconcile/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                transaction_ids: transactionIds,
-                status: 'discrepancy',
-                reason: reason.trim()
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while marking discrepancies');
-        });
-    }
-}
-
-function startAutoReconciliation() {
-    if (confirm('Start automatic reconciliation? This will match transactions based on amount, date, and reference numbers.')) {
-        fetch(`/business/{{ request.tenant.slug }}/payments/auto-reconcile/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(`Auto reconciliation completed! ${data.reconciled_count} transactions reconciled.`);
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred during auto reconciliation');
-        });
-    }
-}
-
-function viewTransactionDetails(transactionId) {
-    window.location.href = `/business/{{ request.tenant.slug }}/payments/${transactionId}/`;
-}
-
-// Upload form handling
-document.getElementById('uploadStatementForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    
-    fetch(`/business/{{ request.tenant.slug }}/payments/reconciliation/upload/`, {
+    // Send AJAX request to update data
+    fetch('/business/{{ request.tenant.slug }}/payments/reconciliation/filter/', {
         method: 'POST',
-        body: formData
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(filters)
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateReconciliationTable(data);
+    });
+}
+
+function markReconciled(transactionId) {
+    if (confirm('Mark this transaction as reconciled?')) {
+        fetch(`/business/{{ request.tenant.slug }}/payments/reconciliation/${transactionId}/reconcile/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+}
+
+function investigateDiscrepancy(transactionId) {
+    // Open investigation modal or redirect to detailed view
+    window.open(`/business/{{ request.tenant.slug }}/payments/reconciliation/${transactionId}/investigate/`, '_blank');
+}
+
+function viewDetails(transactionId) {
+    // Open transaction details
+    window.open(`/business/{{ request.tenant.slug }}/payments/${transactionId}/`, '_blank');
+}
+
+function saveNotes() {
+    const notes = document.getElementById('reconciliationNotes').value;
+    const dateRange = document.getElementById('dateRange').value;
+    
+    fetch('/business/{{ request.tenant.slug }}/payments/reconciliation/notes/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            notes: notes,
+            date_range: dateRange
+        })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(`Statement uploaded successfully! ${data.processed_count} transactions processed.`);
-            location.reload();
+            alert('Notes saved successfully');
         } else {
-            alert('Error: ' + data.message);
+            alert('Error saving notes');
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while uploading the statement');
+    });
+}
+
+function clearNotes() {
+    document.getElementById('reconciliationNotes').value = '';
+}
+
+function exportReconciliation() {
+    const filters = {
+        date_range: document.getElementById('dateRange').value,
+        payment_method: document.getElementById('paymentMethod').value,
+        status: document.getElementById('reconStatus').value,
+        employee: document.getElementById('employee').value
+    };
+    
+    // Create form and submit
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/business/{{ request.tenant.slug }}/payments/reconciliation/export/';
+    
+    Object.keys(filters).forEach(key => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = filters[key];
+        form.appendChild(input);
+    });
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+// Search functionality
+document.getElementById('searchTransactions').addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase();
+    const rows = document.querySelectorAll('#reconciliationTableBody tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(query)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
+
+// Auto-apply filters on change
+document.querySelectorAll('.filter-control').forEach(control => {
+    control.addEventListener('change', function() {
+        applyFilters();
     });
 });
 </script>

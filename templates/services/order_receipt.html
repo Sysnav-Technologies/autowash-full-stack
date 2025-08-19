@@ -1,0 +1,759 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Order Receipt - {{ service_order.order_number }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Screen display styles */
+    .receipt-container {
+        max-width: 400px;
+        margin: 0 auto;
+        background: white;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    .receipt-actions {
+        padding: 1rem;
+        background: #f8f9fa;
+        text-align: center;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    /* Print styles for 80mm thermal printer */
+    @media print {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            color: #000;
+            background: white;
+        }
+        
+        .receipt-container {
+            width: 80mm;
+            max-width: 80mm;
+            margin: 0;
+            padding: 0;
+            box-shadow: none;
+            border-radius: 0;
+        }
+        
+        .receipt-actions {
+            display: none !important;
+        }
+        
+        .no-print {
+            display: none !important;
+        }
+        
+        .receipt-content {
+            width: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .header-section {
+            text-align: center;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #000;
+        }
+        
+        .business-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .business-details {
+            font-size: 10px;
+            margin-bottom: 1px;
+        }
+        
+        .receipt-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin: 8px 0 4px 0;
+            text-align: center;
+        }
+        
+        .info-section {
+            margin: 6px 0;
+            font-size: 11px;
+        }
+        
+        .info-row {
+            margin-bottom: 2px;
+            width: 100%;
+            overflow: hidden;
+            clear: both;
+        }
+        
+        .info-label {
+            width: 45%;
+            text-align: left;
+            float: left;
+            font-size: 10px;
+        }
+        
+        .info-value {
+            width: 54%;
+            text-align: right;
+            font-weight: bold;
+            float: right;
+            font-size: 10px;
+            word-wrap: break-word;
+        }
+        
+        .service-item {
+            margin: 2px 0;
+            font-size: 10px;
+            clear: both;
+        }
+        
+        .service-name {
+            font-weight: bold;
+            margin-bottom: 1px;
+        }
+        
+        .service-details {
+            display: block;
+            margin-bottom: 1px;
+        }
+        
+        .service-section-title {
+            font-weight: bold;
+            font-size: 11px;
+        }
+        
+        .service-description {
+            font-size: 9px;
+            margin-top: 1px;
+        }
+        
+        .service-qty {
+            float: left;
+        }
+        
+        .service-price {
+            float: right;
+        }
+        
+        .clear-float {
+            clear: both;
+        }
+        
+        .separator {
+            border-bottom: 1px dashed #000;
+            margin: 6px 0;
+            height: 1px;
+        }
+        
+        .double-separator {
+            border-bottom: 2px solid #000;
+            margin: 6px 0;
+            height: 2px;
+        }
+        
+        .amount-section {
+            margin: 8px 0;
+        }
+        
+        .amount-large {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin: 4px 0;
+        }
+        
+        .footer-section {
+            margin-top: 8px;
+            text-align: center;
+            font-size: 10px;
+        }
+        
+        .qr-code {
+            text-align: center;
+            margin: 8px 0;
+        }
+        
+        .thank-you {
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            margin: 8px 0;
+        }
+        
+        /* Ensure proper spacing for thermal printer */
+        .thermal-spacing {
+            margin-bottom: 2px;
+        }
+        
+        .center-text {
+            text-align: center;
+        }
+        
+        .left-text {
+            text-align: left;
+        }
+        
+        .right-text {
+            text-align: right;
+        }
+        
+        .cut-line {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 10px;
+        }
+        
+        .qr-text {
+            font-size: 8px;
+            margin-bottom: 2px;
+        }
+        
+        .qr-box {
+            font-family: monospace;
+            font-size: 6px;
+            line-height: 0.8;
+        }
+        
+        .receipt-id {
+            font-size: 8px;
+        }
+    }
+    
+    /* Screen preview styles */
+    .receipt-preview {
+        font-family: 'Courier New', monospace;
+        background: white;
+        padding: 20px;
+        line-height: 1.3;
+    }
+    
+    .preview-header {
+        text-align: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px dashed #ccc;
+    }
+    
+    .preview-business-name {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .preview-business-details {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 2px;
+    }
+    
+    .preview-title {
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        margin: 15px 0 10px 0;
+    }
+    
+    .preview-info {
+        margin: 10px 0;
+    }
+    
+    .preview-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 3px;
+        align-items: flex-start;
+        word-wrap: break-word;
+    }
+    
+    .preview-row span:first-child {
+        flex: 1;
+        margin-right: 10px;
+    }
+    
+    .preview-row span:last-child {
+        flex-shrink: 0;
+        text-align: right;
+    }
+    
+    .preview-separator {
+        border-bottom: 1px dashed #ccc;
+        margin: 10px 0;
+    }
+    
+    .preview-amount {
+        font-size: 20px;
+        font-weight: bold;
+        text-align: center;
+        margin: 15px 0;
+        color: #28a745;
+    }
+    
+    .preview-footer {
+        text-align: center;
+        margin-top: 15px;
+        font-size: 12px;
+        color: #666;
+    }
+    
+    .balance-due {
+        color: red;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="receipt-container">
+        <!-- Action Buttons (hidden in print) -->
+        <div class="receipt-actions no-print">
+            <h4 class="mb-3">Payment Receipt</h4>
+            <button class="btn btn-primary me-2" onclick="printReceipt()">
+                <i class="fas fa-print me-2"></i>Print Receipt
+            </button>
+            <button class="btn btn-outline-secondary me-2" onclick="downloadPDF()">
+                <i class="fas fa-download me-2"></i>Download PDF
+            </button>
+            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ service_order.pk }}/" class="btn btn-outline-dark">
+                <i class="fas fa-arrow-left me-2"></i>Back to Order
+            </a>
+        </div>
+        
+        <!-- Receipt Content -->
+        <div class="receipt-content">
+            <!-- For Print -->
+            <div class="d-print-block d-none">
+                <!-- Header Section -->
+                <div class="header-section">
+                    <div class="business-name">{{ request.tenant.name|upper }}</div>
+                    {% if request.tenant.address %}
+                    <div class="business-details">{{ request.tenant.address }}</div>
+                    {% endif %}
+                    {% if request.tenant.phone %}
+                    <div class="business-details">Tel: {{ request.tenant.phone }}</div>
+                    {% endif %}
+                    {% if request.tenant.email %}
+                    <div class="business-details">{{ request.tenant.email }}</div>
+                    {% endif %}
+                    {% if request.tenant.website %}
+                    <div class="business-details">{{ request.tenant.website }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="receipt-title">PAYMENT RECEIPT</div>
+                
+                <!-- Order Information -->
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="info-label">Order No:</span>
+                        <span class="info-value">{{ service_order.order_number }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Date:</span>
+                        <span class="info-value">{{ service_order.created_at|date:"d/m/Y" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Time:</span>
+                        <span class="info-value">{{ service_order.created_at|date:"H:i" }}</span>
+                    </div>
+                    {% if service_order.assigned_to %}
+                    <div class="info-row">
+                        <span class="info-label">Employee:</span>
+                        <span class="info-value">{{ service_order.assigned_to.first_name }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="separator"></div>
+                
+                <!-- Customer Information -->
+                {% if service_order.customer %}
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="info-label">Customer:</span>
+                        <span class="info-value">{{ service_order.customer.first_name }} {{ service_order.customer.last_name }}</span>
+                    </div>
+                    {% if service_order.customer.phone %}
+                    <div class="info-row">
+                        <span class="info-label">Phone:</span>
+                        <span class="info-value">{{ service_order.customer.phone }}</span>
+                    </div>
+                    {% endif %}
+                    {% if service_order.customer.customer_id %}
+                    <div class="info-row">
+                        <span class="info-label">Customer ID:</span>
+                        <span class="info-value">{{ service_order.customer.customer_id }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="separator"></div>
+                {% endif %}
+                
+                <!-- Vehicle Information -->
+                {% if service_order.vehicle %}
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="info-label">Vehicle:</span>
+                        <span class="info-value">{{ service_order.vehicle.license_plate|default:"N/A" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Make/Model:</span>
+                        <span class="info-value">{{ service_order.vehicle.make|default:"" }} {{ service_order.vehicle.model|default:"" }}</span>
+                    </div>
+                    {% if service_order.vehicle.year %}
+                    <div class="info-row">
+                        <span class="info-label">Year:</span>
+                        <span class="info-value">{{ service_order.vehicle.year }}</span>
+                    </div>
+                    {% endif %}
+                    {% if service_order.vehicle.color %}
+                    <div class="info-row">
+                        <span class="info-label">Color:</span>
+                        <span class="info-value">{{ service_order.vehicle.color }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="separator"></div>
+                {% else %}
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="info-label">Vehicle:</span>
+                        <span class="info-value">Walk-in Service</span>
+                    </div>
+                </div>
+                <div class="separator"></div>
+                {% endif %}
+                
+                <!-- Service Items -->
+                <div class="info-section">
+                    <div class="center-text thermal-spacing service-section-title">
+                        SERVICES PROVIDED
+                    </div>
+                    {% for item in service_order.order_items.all %}
+                    <div class="service-item">
+                        <div class="service-name">{{ item.service.name }}</div>
+                        <div class="service-details">
+                            <span class="service-qty">Qty: {{ item.quantity|default:1 }}</span>
+                            <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
+                            <div class="clear-float"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="separator"></div>
+                
+                <!-- Order Totals -->
+                <div class="amount-section">
+                    <div class="info-row">
+                        <span class="info-label">Subtotal (ex VAT):</span>
+                        <span class="info-value">KES {{ service_order.subtotal|floatformat:2 }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">VAT (16%):</span>
+                        <span class="info-value">KES {{ service_order.tax_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Total Order:</span>
+                        <span class="info-value">KES {{ service_order.total_amount|floatformat:2 }}</span>
+                    </div>
+                    {% if service_order.discount_amount and service_order.discount_amount > 0 %}
+                    <div class="info-row">
+                        <span class="info-label">Discount:</span>
+                        <span class="info-value">KES {{ service_order.discount_amount|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="separator"></div>
+                
+                <!-- Payment Details -->
+                <div class="info-section">
+                    <div class="center-text thermal-spacing service-section-title">
+                        PAYMENT DETAILS
+                    </div>
+                    {% for payment in payments %}
+                    <div class="service-item">
+                        <div class="service-details">
+                            <span class="service-qty">{{ payment.created_at|date:"d/m/Y H:i" }} - {{ payment.payment_method.name }}</span>
+                            <span class="service-price">KES {{ payment.amount|floatformat:2 }}</span>
+                            <div class="clear-float"></div>
+                        </div>
+                        {% if payment.transaction_id %}
+                        <div class="service-description">Ref: {{ payment.transaction_id|truncatechars:20 }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="separator"></div>
+                
+                <!-- Payment Summary -->
+                <div class="amount-section">
+                    <div class="info-row">
+                        <span class="info-label">Total Paid:</span>
+                        <span class="info-value">KES {{ total_paid|floatformat:2 }}</span>
+                    </div>
+                    {% if balance_due > 0 %}
+                    <div class="info-row">
+                        <span class="info-label">Balance Due:</span>
+                        <span class="info-value">KES {{ balance_due|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="double-separator"></div>
+                
+                <!-- QR Code Section -->
+                <div class="qr-code">
+                    <div class="center-text thermal-spacing">
+                        {% if service_order.order_number %}
+                            <!-- Simple barcode representation -->
+                            <div class="qr-box">
+                                ||||| || ||| |||| | ||| |||||| | || |||<br>
+                                {{ service_order.order_number }}<br>
+                                ||||| || ||| |||| | ||| |||||| | || |||
+                            </div>
+                        {% else %}
+                            <div class="qr-box">
+                                ||||| || ||| |||| | ||| |||||| | || |||<br>
+                                {{ service_order.id }}<br>
+                                ||||| || ||| |||| | ||| |||||| | || |||
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="separator"></div>
+                
+                <!-- Payment Status -->
+                <div class="center-text thermal-spacing">
+                    {% if balance_due > 0 %}
+                        STATUS: PARTIAL PAYMENT
+                    {% else %}
+                        STATUS: FULLY PAID
+                    {% endif %}
+                </div>
+                
+                <div class="double-separator"></div>
+                
+                <!-- Footer -->
+                <div class="footer-section">
+                    <div class="thermal-spacing">Thank you for your business!</div>
+                    <div class="thermal-spacing">Visit us again soon</div>
+                    <div class="thermal-spacing">{{ request.tenant.website|default:"www.autowash.co.ke" }}</div>
+                    <div class="thermal-spacing">Powered by AutoWash</div>
+                </div>
+                
+                <!-- Cut line indicator for thermal printer -->
+                <div class="cut-line">
+                    ........................................
+                </div>
+            </div>
+            
+            <!-- For Screen Preview -->
+            <div class="receipt-preview d-print-none">
+                <!-- Header -->
+                <div class="preview-header">
+                    <div class="preview-business-name">{{ request.tenant.name|upper }}</div>
+                    {% if request.tenant.address %}
+                    <div class="preview-business-details">{{ request.tenant.address }}</div>
+                    {% endif %}
+                    {% if request.tenant.phone %}
+                    <div class="preview-business-details">Tel: {{ request.tenant.phone }}</div>
+                    {% endif %}
+                    {% if request.tenant.email %}
+                    <div class="preview-business-details">{{ request.tenant.email }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="preview-title">PAYMENT RECEIPT</div>
+                
+                <!-- Order Information -->
+                <div class="preview-info">
+                    <div class="preview-row">
+                        <span>Order No:</span>
+                        <strong>{{ service_order.order_number }}</strong>
+                    </div>
+                    <div class="preview-row">
+                        <span>Date & Time:</span>
+                        <strong>{{ service_order.created_at|date:"M d, Y H:i" }}</strong>
+                    </div>
+                    {% if service_order.assigned_to %}
+                    <div class="preview-row">
+                        <span>Employee:</span>
+                        <strong>{{ service_order.assigned_to.get_full_name }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="preview-separator"></div>
+                
+                <!-- Customer Information -->
+                {% if service_order.customer %}
+                <div class="preview-info">
+                    <div class="preview-row">
+                        <span>Customer:</span>
+                        <strong>{{ service_order.customer.first_name }} {{ service_order.customer.last_name }}</strong>
+                    </div>
+                    {% if service_order.customer.phone %}
+                    <div class="preview-row">
+                        <span>Phone:</span>
+                        <strong>{{ service_order.customer.phone }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="preview-separator"></div>
+                {% endif %}
+                
+                <!-- Vehicle Information -->
+                {% if service_order.vehicle %}
+                <div class="preview-info">
+                    <div class="preview-row">
+                        <span>Vehicle:</span>
+                        <strong>{{ service_order.vehicle.license_plate|default:"N/A" }}</strong>
+                    </div>
+                    <div class="preview-row">
+                        <span>Make/Model:</span>
+                        <strong>{{ service_order.vehicle.make|default:"" }} {{ service_order.vehicle.model|default:"" }}</strong>
+                    </div>
+                    {% if service_order.vehicle.year %}
+                    <div class="preview-row">
+                        <span>Year:</span>
+                        <strong>{{ service_order.vehicle.year }}</strong>
+                    </div>
+                    {% endif %}
+                    {% if service_order.vehicle.color %}
+                    <div class="preview-row">
+                        <span>Color:</span>
+                        <strong>{{ service_order.vehicle.color }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="preview-separator"></div>
+                {% else %}
+                <div class="preview-info">
+                    <div class="preview-row">
+                        <span>Service Type:</span>
+                        <strong>Walk-in Service</strong>
+                    </div>
+                </div>
+                <div class="preview-separator"></div>
+                {% endif %}
+                
+                <!-- Service Items -->
+                <div class="preview-info">
+                    <h6 class="text-center mb-2">Services Provided</h6>
+                    {% for item in service_order.order_items.all %}
+                    <div class="mb-2">
+                        <div class="preview-row">
+                            <span><strong>{{ item.service.name }}</strong></span>
+                            <strong>KES {{ item.total_price|floatformat:2 }}</strong>
+                        </div>
+                        <div class="preview-row">
+                            <span><small>Qty: {{ item.quantity|default:1 }}</small></span>
+                            <span><small>@ KES {{ item.unit_price|floatformat:2 }}</small></span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="preview-separator"></div>
+                
+                <!-- Order Totals -->
+                <div class="preview-info">
+                    <div class="preview-row">
+                        <span>Subtotal (ex VAT):</span>
+                        <strong>KES {{ service_order.subtotal|floatformat:2 }}</strong>
+                    </div>
+                    <div class="preview-row">
+                        <span>VAT (16%):</span>
+                        <strong>KES {{ service_order.tax_amount|floatformat:2 }}</strong>
+                    </div>
+                    <div class="preview-row">
+                        <span><strong>Total Order:</strong></span>
+                        <strong>KES {{ service_order.total_amount|floatformat:2 }}</strong>
+                    </div>
+                    {% if service_order.discount_amount and service_order.discount_amount > 0 %}
+                    <div class="preview-row">
+                        <span>Discount Applied:</span>
+                        <strong>KES {{ service_order.discount_amount|floatformat:2 }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="preview-separator"></div>
+                
+                <!-- Payment Summary -->
+                <div class="preview-info">
+                    <h6 class="text-center mb-2">Payment Details</h6>
+                    {% for payment in payments %}
+                    <div class="mb-2">
+                        <div class="preview-row">
+                            <span>{{ payment.created_at|date:"M d H:i" }} - {{ payment.payment_method.name }}</span>
+                            <strong>KES {{ payment.amount|floatformat:2 }}</strong>
+                        </div>
+                        {% if payment.transaction_id %}
+                        <div class="preview-row">
+                            <span><small>Ref: {{ payment.transaction_id }}</small></span>
+                            <span></span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="preview-separator"></div>
+                    
+                    <div class="preview-row">
+                        <span><strong>Total Paid:</strong></span>
+                        <strong>KES {{ total_paid|floatformat:2 }}</strong>
+                    </div>
+                    {% if balance_due > 0 %}
+                    <div class="preview-row">
+                        <span><strong>Balance Due:</strong></span>
+                        <strong class="balance-due">KES {{ balance_due|floatformat:2 }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="preview-amount">
+                    {% if balance_due > 0 %}
+                        PARTIAL PAYMENT - BALANCE: KES {{ balance_due|floatformat:2 }}
+                    {% else %}
+                        FULLY PAID - KES {{ total_paid|floatformat:2 }}
+                    {% endif %}
+                </div>
+                
+                <div class="preview-footer">
+                    <div>Thank you for your business!</div>
+                    <div>Visit us again soon</div>
+                    <div>{{ request.tenant.website|default:"www.autowash.co.ke" }}</div>
+                    <div>Powered by AutoWash</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function printReceipt() {
+        window.print();
+    }
+    
+    function downloadPDF() {
+        // You can implement PDF generation here
+        alert('PDF download functionality can be implemented here');
+    }
+</script>
+{% endblock %}

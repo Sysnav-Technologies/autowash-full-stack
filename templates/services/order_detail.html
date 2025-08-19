@@ -627,7 +627,7 @@
                 Order {{ order.order_number }}
             </h1>
             <p class="page-subtitle">
-                Created {{ order.created_at|date:"M d, Y \a\t g:i A" }} by {{ order.created_by.get_full_name|default:order.created_by.username }}
+                Created {{ order.created_at|date:"M d, Y \a\t g:i A" }}{% if order.created_by %} by {{ order.created_by.get_full_name|default:order.created_by.username }}{% endif %}
             </p>
         </div>
         
@@ -944,10 +944,10 @@
                         </a>
                     {% endif %}
                     
-                    {% if order.status == 'completed' and order.payment_status == 'paid' and payment_id %}
-                        <a href="/business/{{ request.tenant.slug }}/payments/{{ payment_id }}/receipt/" class="btn btn-outline-primary">
+                    {% if order.status == 'completed' %}
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-outline-primary">
                             <i class="fas fa-receipt"></i>
-                            View Receipt
+                            Print Receipt
                         </a>
                     {% endif %}
                     
@@ -979,7 +979,7 @@
             <div class="card-body">
                 <div class="info-grid">
                     <div class="info-item">
-                        <span class="info-label">Subtotal</span>
+                        <span class="info-label">Subtotal (ex VAT)</span>
                         <span class="info-value">KES {{ order.subtotal }}</span>
                     </div>
                     
@@ -991,12 +991,12 @@
                     {% endif %}
                     
                     <div class="info-item">
-                        <span class="info-label">Tax (16%)</span>
+                        <span class="info-label">VAT (16%)</span>
                         <span class="info-value">KES {{ order.tax_amount }}</span>
                     </div>
                     
                     <div class="info-item">
-                        <span class="info-label">Total Amount</span>
+                        <span class="info-label">Total Amount (incl VAT)</span>
                         <span class="info-value" style="font-size: 1.25rem; font-weight: 700; color: var(--primary-600);">
                             KES {{ order.total_amount }}
                         </span>
