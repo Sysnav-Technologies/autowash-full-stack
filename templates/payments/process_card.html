@@ -1,0 +1,929 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Card Payment - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card-payment-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 2rem 0;
+    }
+    
+    .payment-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+    
+    .payment-amount {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .payment-description {
+        opacity: 0.9;
+        margin-bottom: 1rem;
+    }
+    
+    .payment-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .detail-item {
+        background: rgba(255,255,255,0.1);
+        padding: 0.75rem;
+        border-radius: 8px;
+    }
+    
+    .detail-label {
+        font-size: 0.875rem;
+        opacity: 0.8;
+        margin-bottom: 0.25rem;
+    }
+    
+    .detail-value {
+        font-weight: 600;
+    }
+    
+    .card-form {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .form-section {
+        margin-bottom: 2rem;
+    }
+    
+    .section-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #374151;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+    
+    .form-label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        display: block;
+        color: #374151;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: #f9fafb;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .form-control.valid {
+        border-color: #10b981;
+        background: #f0fdf4;
+    }
+    
+    .form-control.invalid {
+        border-color: #ef4444;
+        background: #fef2f2;
+    }
+    
+    .input-icon {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 1.25rem;
+    }
+    
+    .card-number-input {
+        font-family: 'Courier New', monospace;
+        font-size: 1.125rem;
+        letter-spacing: 1px;
+    }
+    
+    .card-preview {
+        background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+        border-radius: 15px;
+        padding: 1.5rem;
+        color: white;
+        margin-bottom: 1.5rem;
+        min-height: 200px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .card-preview::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+        transform: rotate(45deg);
+    }
+    
+    .card-preview .card-number {
+        font-family: 'Courier New', monospace;
+        font-size: 1.25rem;
+        letter-spacing: 2px;
+        margin: 1rem 0;
+    }
+    
+    .card-preview .card-holder {
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .card-preview .card-expiry {
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+    }
+    
+    .card-brand {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        font-size: 1.5rem;
+    }
+    
+    .security-notice {
+        background: #f0f9ff;
+        border: 1px solid #0ea5e9;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .security-icon {
+        font-size: 1.25rem;
+        color: #0ea5e9;
+    }
+    
+    .processing-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+    
+    .processing-card {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        text-align: center;
+        max-width: 400px;
+        width: 90%;
+    }
+    
+    .processing-spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid #f3f4f6;
+        border-top: 4px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .btn-pay {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 1rem 2rem;
+        color: white;
+        font-weight: 600;
+        font-size: 1.125rem;
+        width: 100%;
+        margin-top: 1rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .btn-pay:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+        color: white;
+    }
+    
+    .btn-pay:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .btn-pay::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+    }
+    
+    .btn-pay:hover::before {
+        left: 100%;
+    }
+    
+    .payment-summary {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+    
+    .summary-row:last-child {
+        margin-bottom: 0;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e5e7eb;
+        font-weight: 600;
+        font-size: 1.125rem;
+    }
+    
+    .error-message {
+        background: #fef2f2;
+        border: 1px solid #fca5a5;
+        border-radius: 8px;
+        padding: 0.75rem;
+        color: #dc2626;
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .success-message {
+        background: #f0fdf4;
+        border: 1px solid #86efac;
+        border-radius: 8px;
+        padding: 0.75rem;
+        color: #166534;
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .accepted-cards {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .card-icon {
+        width: 40px;
+        height: 25px;
+        background: #374151;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+    
+    .card-icon.visa {
+        background: #1a1f71;
+    }
+    
+    .card-icon.mastercard {
+        background: #eb001b;
+    }
+    
+    .card-icon.amex {
+        background: #006fcf;
+    }
+    
+    .progress-steps {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
+    }
+    
+    .step {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0 1rem;
+    }
+    
+    .step-number {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #e5e7eb;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    .step.active .step-number {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .step.completed .step-number {
+        background: #10b981;
+        color: white;
+    }
+    
+    .step-text {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .step.active .step-text {
+        color: #3b82f6;
+        font-weight: 600;
+    }
+    
+    .step.completed .step-text {
+        color: #10b981;
+    }
+    
+    .hidden {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="card-payment-container">
+        <!-- Progress Steps -->
+        <div class="progress-steps">
+            <div class="step completed">
+                <div class="step-number">1</div>
+                <div class="step-text">Amount</div>
+            </div>
+            <div class="step active">
+                <div class="step-number">2</div>
+                <div class="step-text">Card Details</div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-text">Confirmation</div>
+            </div>
+        </div>
+        
+        <!-- Payment Information Card -->
+        <div class="payment-card">
+            <div class="payment-amount">KES {{ amount|floatformat:2 }}</div>
+            <div class="payment-description">
+                {% if description %}
+                    {{ description }}
+                {% else %}
+                    Payment for services
+                {% endif %}
+            </div>
+            
+            <div class="payment-details">
+                {% if customer %}
+                <div class="detail-item">
+                    <div class="detail-label">Customer</div>
+                    <div class="detail-value">{{ customer.display_name }}</div>
+                </div>
+                {% endif %}
+                
+                {% if service_order %}
+                <div class="detail-item">
+                    <div class="detail-label">Order</div>
+                    <div class="detail-value">{{ service_order.order_number }}</div>
+                </div>
+                {% endif %}
+                
+                <div class="detail-item">
+                    <div class="detail-label">Payment Method</div>
+                    <div class="detail-value">Credit/Debit Card</div>
+                </div>
+                
+                <div class="detail-item">
+                    <div class="detail-label">Merchant</div>
+                    <div class="detail-value">{{ request.tenant.name }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Security Notice -->
+        <div class="security-notice">
+            <div class="security-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <div>
+                <strong>Secure Payment</strong><br>
+                Your card information is encrypted and secure. We never store your card details.
+            </div>
+        </div>
+        
+        <!-- Card Form -->
+        <div class="card-form">
+            <form id="cardPaymentForm" method="post">
+                {% csrf_token %}
+                
+                <!-- Card Preview -->
+                <div class="card-preview">
+                    <div class="card-brand" id="cardBrand">
+                        <i class="fas fa-credit-card"></i>
+                    </div>
+                    <div class="card-number" id="previewCardNumber">•••• •••• •••• ••••</div>
+                    <div class="d-flex justify-content-between align-items-end">
+                        <div>
+                            <div class="card-holder" id="previewCardHolder">CARD HOLDER NAME</div>
+                        </div>
+                        <div>
+                            <div class="card-expiry" id="previewCardExpiry">MM/YY</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Card Details Section -->
+                <div class="form-section">
+                    <div class="section-title">
+                        <i class="fas fa-credit-card me-2"></i>Card Information
+                    </div>
+                    
+                    <!-- Card Number -->
+                    <div class="form-group">
+                        <label class="form-label" for="cardNumber">Card Number</label>
+                        <input type="text" 
+                               name="card_number" 
+                               id="cardNumber" 
+                               class="form-control card-number-input" 
+                               placeholder="1234 5678 9012 3456"
+                               maxlength="19"
+                               required>
+                        <div class="input-icon" id="cardTypeIcon">
+                            <i class="fas fa-credit-card"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Expiry Date -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label" for="expiryDate">Expiry Date</label>
+                                <input type="text" 
+                                       name="expiry_date" 
+                                       id="expiryDate" 
+                                       class="form-control" 
+                                       placeholder="MM/YY"
+                                       maxlength="5"
+                                       required>
+                                <div class="input-icon">
+                                    <i class="fas fa-calendar"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- CVV -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label" for="cvv">CVV</label>
+                                <input type="text" 
+                                       name="cvv" 
+                                       id="cvv" 
+                                       class="form-control" 
+                                       placeholder="123"
+                                       maxlength="4"
+                                       required>
+                                <div class="input-icon">
+                                    <i class="fas fa-lock"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Cardholder Information -->
+                <div class="form-section">
+                    <div class="section-title">
+                        <i class="fas fa-user me-2"></i>Cardholder Information
+                    </div>
+                    
+                    <!-- Cardholder Name -->
+                    <div class="form-group">
+                        <label class="form-label" for="cardholderName">Cardholder Name</label>
+                        <input type="text" 
+                               name="cardholder_name" 
+                               id="cardholderName" 
+                               class="form-control" 
+                               placeholder="John Doe"
+                               value="{{ customer.display_name|default:'' }}"
+                               required>
+                    </div>
+                    
+                    <!-- Email -->
+                    <div class="form-group">
+                        <label class="form-label" for="email">Email Address</label>
+                        <input type="email" 
+                               name="email" 
+                               id="email" 
+                               class="form-control" 
+                               placeholder="john@example.com"
+                               value="{{ customer.email|default:'' }}"
+                               required>
+                    </div>
+                    
+                    <!-- Phone -->
+                    <div class="form-group">
+                        <label class="form-label" for="phone">Phone Number</label>
+                        <input type="tel" 
+                               name="phone" 
+                               id="phone" 
+                               class="form-control" 
+                               placeholder="+254 700 000 000"
+                               value="{{ customer.phone|default:'' }}"
+                               required>
+                    </div>
+                </div>
+                
+                <!-- Payment Summary -->
+                <div class="payment-summary">
+                    <h6 class="mb-3">Payment Summary</h6>
+                    <div class="summary-row">
+                        <span>Amount:</span>
+                        <span>KES {{ amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Processing Fee:</span>
+                        <span id="processingFee">KES {{ processing_fee|floatformat:2 }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Total:</span>
+                        <span id="totalAmount">KES {{ total_amount|floatformat:2 }}</span>
+                    </div>
+                </div>
+                
+                <!-- Accepted Cards -->
+                <div class="text-center">
+                    <div class="text-muted mb-2">We accept</div>
+                    <div class="accepted-cards justify-content-center">
+                        <div class="card-icon visa">VISA</div>
+                        <div class="card-icon mastercard">MC</div>
+                        <div class="card-icon amex">AMEX</div>
+                    </div>
+                </div>
+                
+                <!-- Submit Button -->
+                <button type="submit" class="btn-pay" id="payButton">
+                    <i class="fas fa-lock me-2"></i>
+                    Pay KES {{ total_amount|floatformat:2 }}
+                </button>
+                
+                <!-- Error/Success Messages -->
+                <div id="errorMessage" class="error-message hidden"></div>
+                <div id="successMessage" class="success-message hidden"></div>
+            </form>
+        </div>
+        
+        <!-- Back Button -->
+        <div class="text-center">
+            <a href="/business/{{ request.tenant.slug }}/payments/process/" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Payment Options
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Processing Overlay -->
+<div class="processing-overlay" id="processingOverlay">
+    <div class="processing-card">
+        <div class="processing-spinner"></div>
+        <h5>Processing Payment...</h5>
+        <p class="text-muted">Please wait while we securely process your card payment.</p>
+        <p><strong>Do not close or refresh this page.</strong></p>
+    </div>
+</div>
+
+<script>
+// Card number formatting and validation
+document.getElementById('cardNumber').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+    
+    // Add spaces every 4 digits
+    let formattedValue = value.replace(/(.{4})/g, '$1 ').trim();
+    
+    // Limit to 16 digits
+    if (value.length > 16) {
+        formattedValue = formattedValue.slice(0, 19);
+    }
+    
+    e.target.value = formattedValue;
+    
+    // Update preview
+    updateCardPreview();
+    
+    // Detect card type
+    detectCardType(value);
+    
+    // Validate
+    validateCardNumber(value);
+});
+
+// Expiry date formatting
+document.getElementById('expiryDate').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.length >= 2) {
+        value = value.slice(0, 2) + '/' + value.slice(2, 4);
+    }
+    
+    e.target.value = value;
+    updateCardPreview();
+    validateExpiryDate(value);
+});
+
+// CVV validation
+document.getElementById('cvv').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    e.target.value = value;
+    validateCVV(value);
+});
+
+// Cardholder name
+document.getElementById('cardholderName').addEventListener('input', function(e) {
+    updateCardPreview();
+});
+
+function updateCardPreview() {
+    const cardNumber = document.getElementById('cardNumber').value || '•••• •••• •••• ••••';
+    const cardHolder = document.getElementById('cardholderName').value || 'CARD HOLDER NAME';
+    const expiryDate = document.getElementById('expiryDate').value || 'MM/YY';
+    
+    document.getElementById('previewCardNumber').textContent = cardNumber;
+    document.getElementById('previewCardHolder').textContent = cardHolder.toUpperCase();
+    document.getElementById('previewCardExpiry').textContent = expiryDate;
+}
+
+function detectCardType(number) {
+    const cardBrand = document.getElementById('cardBrand');
+    const cardTypeIcon = document.getElementById('cardTypeIcon');
+    
+    // Remove existing classes
+    cardBrand.className = 'card-brand';
+    
+    if (number.match(/^4/)) {
+        // Visa
+        cardBrand.innerHTML = '<i class="fab fa-cc-visa"></i>';
+        cardTypeIcon.innerHTML = '<i class="fab fa-cc-visa"></i>';
+        cardBrand.classList.add('visa');
+    } else if (number.match(/^5[1-5]/)) {
+        // Mastercard
+        cardBrand.innerHTML = '<i class="fab fa-cc-mastercard"></i>';
+        cardTypeIcon.innerHTML = '<i class="fab fa-cc-mastercard"></i>';
+        cardBrand.classList.add('mastercard');
+    } else if (number.match(/^3[47]/)) {
+        // American Express
+        cardBrand.innerHTML = '<i class="fab fa-cc-amex"></i>';
+        cardTypeIcon.innerHTML = '<i class="fab fa-cc-amex"></i>';
+        cardBrand.classList.add('amex');
+    } else {
+        cardBrand.innerHTML = '<i class="fas fa-credit-card"></i>';
+        cardTypeIcon.innerHTML = '<i class="fas fa-credit-card"></i>';
+    }
+}
+
+function validateCardNumber(number) {
+    const input = document.getElementById('cardNumber');
+    
+    if (number.length === 0) {
+        input.classList.remove('valid', 'invalid');
+        return false;
+    }
+    
+    // Luhn algorithm
+    let sum = 0;
+    let isEven = false;
+    
+    for (let i = number.length - 1; i >= 0; i--) {
+        let digit = parseInt(number.charAt(i));
+        
+        if (isEven) {
+            digit *= 2;
+            if (digit > 9) {
+                digit -= 9;
+            }
+        }
+        
+        sum += digit;
+        isEven = !isEven;
+    }
+    
+    const isValid = (sum % 10) === 0 && number.length >= 13 && number.length <= 16;
+    
+    if (isValid) {
+        input.classList.add('valid');
+        input.classList.remove('invalid');
+    } else {
+        input.classList.add('invalid');
+        input.classList.remove('valid');
+    }
+    
+    return isValid;
+}
+
+function validateExpiryDate(expiry) {
+    const input = document.getElementById('expiryDate');
+    
+    if (expiry.length === 0) {
+        input.classList.remove('valid', 'invalid');
+        return false;
+    }
+    
+    if (expiry.length === 5) {
+        const [month, year] = expiry.split('/');
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear() % 100;
+        const currentMonth = currentDate.getMonth() + 1;
+        
+        const expMonth = parseInt(month);
+        const expYear = parseInt(year);
+        
+        const isValid = expMonth >= 1 && expMonth <= 12 && 
+                       (expYear > currentYear || (expYear === currentYear && expMonth >= currentMonth));
+        
+        if (isValid) {
+            input.classList.add('valid');
+            input.classList.remove('invalid');
+        } else {
+            input.classList.add('invalid');
+            input.classList.remove('valid');
+        }
+        
+        return isValid;
+    } else {
+        input.classList.remove('valid', 'invalid');
+        return false;
+    }
+}
+
+function validateCVV(cvv) {
+    const input = document.getElementById('cvv');
+    
+    if (cvv.length === 0) {
+        input.classList.remove('valid', 'invalid');
+        return false;
+    }
+    
+    const isValid = cvv.length >= 3 && cvv.length <= 4;
+    
+    if (isValid) {
+        input.classList.add('valid');
+        input.classList.remove('invalid');
+    } else {
+        input.classList.add('invalid');
+        input.classList.remove('valid');
+    }
+    
+    return isValid;
+}
+
+function validateForm() {
+    const cardNumber = document.getElementById('cardNumber').value.replace(/\s/g, '');
+    const expiryDate = document.getElementById('expiryDate').value;
+    const cvv = document.getElementById('cvv').value;
+    const cardholderName = document.getElementById('cardholderName').value.trim();
+    const email = document.getElementById('email').value.trim();
+    
+    return validateCardNumber(cardNumber) && 
+           validateExpiryDate(expiryDate) && 
+           validateCVV(cvv) && 
+           cardholderName.length > 0 && 
+           email.length > 0;
+}
+
+// Form submission
+document.getElementById('cardPaymentForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+        showError('Please fill in all fields correctly.');
+        return;
+    }
+    
+    // Show processing overlay
+    document.getElementById('processingOverlay').style.display = 'flex';
+    
+    // Simulate payment processing (replace with actual payment gateway integration)
+    setTimeout(() => {
+        // In a real implementation, you would send the card details to your payment processor
+        // and handle the response accordingly
+        
+        const formData = new FormData(this);
+        
+        fetch('/business/{{ request.tenant.slug }}/payments/process-card/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('processingOverlay').style.display = 'none';
+            
+            if (data.success) {
+                showSuccess('Payment processed successfully! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = data.redirect_url || '/business/{{ request.tenant.slug }}/payments/success/';
+                }, 2000);
+            } else {
+                showError(data.error || 'Payment failed. Please try again.');
+            }
+        })
+        .catch(error => {
+            document.getElementById('processingOverlay').style.display = 'none';
+            showError('Network error. Please check your connection and try again.');
+        });
+    }, 2000);
+});
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    const successDiv = document.getElementById('successMessage');
+    
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    successDiv.classList.add('hidden');
+    
+    // Scroll to error
+    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function showSuccess(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    const successDiv = document.getElementById('successMessage');
+    
+    successDiv.textContent = message;
+    successDiv.classList.remove('hidden');
+    errorDiv.classList.add('hidden');
+}
+
+// Real-time form validation
+document.querySelectorAll('input[required]').forEach(input => {
+    input.addEventListener('blur', function() {
+        if (this.value.trim() === '') {
+            this.classList.add('invalid');
+            this.classList.remove('valid');
+        } else {
+            this.classList.add('valid');
+            this.classList.remove('invalid');
+        }
+    });
+});
+
+// Initialize
+updateCardPreview();
+</script>
+{% endblock %}

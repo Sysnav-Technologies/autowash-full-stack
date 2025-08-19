@@ -1154,15 +1154,15 @@
                             
                             <div class="summary-totals" id="summaryTotals" style="display: none;">
                                 <div class="total-row">
-                                    <span>Subtotal:</span>
+                                    <span>Subtotal (ex VAT):</span>
                                     <span id="subtotalAmount">KES 0</span>
                                 </div>
                                 <div class="total-row">
-                                    <span>Tax (16%):</span>
+                                    <span>VAT (16%):</span>
                                     <span id="taxAmount">KES 0</span>
                                 </div>
                                 <div class="total-row main">
-                                    <span>Total:</span>
+                                    <span>Total (incl VAT):</span>
                                     <span id="totalAmount">KES 0</span>
                                 </div>
                                 <div class="total-row">
@@ -1810,13 +1810,15 @@ function updateOrderSummary() {
     
     selectedServicesList.innerHTML = servicesHtml;
     
-    // Update totals
-    const tax = subtotal * 0.16;
-    const total = subtotal + tax;
+    // Update totals with inclusive VAT
+    // subtotal already includes VAT, so we need to extract the VAT component
+    const totalInclusiveVAT = subtotal; // This is actually the total with VAT
+    const taxAmount = totalInclusiveVAT * 0.16 / 1.16; // Extract VAT from inclusive price
+    const subtotalExVAT = totalInclusiveVAT - taxAmount; // Subtotal without VAT
     
-    document.getElementById('subtotalAmount').textContent = `KES ${subtotal.toFixed(2)}`;
-    document.getElementById('taxAmount').textContent = `KES ${tax.toFixed(2)}`;
-    document.getElementById('totalAmount').textContent = `KES ${total.toFixed(2)}`;
+    document.getElementById('subtotalAmount').textContent = `KES ${subtotalExVAT.toFixed(2)}`;
+    document.getElementById('taxAmount').textContent = `KES ${taxAmount.toFixed(2)}`;
+    document.getElementById('totalAmount').textContent = `KES ${totalInclusiveVAT.toFixed(2)}`;
     document.getElementById('estimatedDuration').textContent = totalDuration;
     
     // Update hidden field based on service type
@@ -1879,16 +1881,16 @@ function updateReviewStep() {
     });
     document.getElementById('reviewServicesInfo').innerHTML = servicesHtml;
     
-    // Update total info
-    const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
-    const tax = subtotal * 0.16;
-    const total = subtotal + tax;
+    // Update total info with inclusive VAT
+    const totalInclusiveVAT = selectedServices.reduce((sum, service) => sum + service.price, 0); // Prices already include VAT
+    const taxAmount = totalInclusiveVAT * 0.16 / 1.16; // Extract VAT from inclusive price
+    const subtotalExVAT = totalInclusiveVAT - taxAmount; // Subtotal without VAT
     const duration = selectedServices.reduce((sum, service) => sum + service.duration, 0);
     
     document.getElementById('reviewTotalInfo').innerHTML = `
-        <div>Subtotal: KES ${subtotal.toFixed(2)}</div>
-        <div>Tax: KES ${tax.toFixed(2)}</div>
-        <div><strong>Total: KES ${total.toFixed(2)}</strong></div>
+        <div>Subtotal (ex VAT): KES ${subtotalExVAT.toFixed(2)}</div>
+        <div>VAT (16%): KES ${taxAmount.toFixed(2)}</div>
+        <div><strong>Total (incl VAT): KES ${totalInclusiveVAT.toFixed(2)}</strong></div>
         <div><small>Duration: ${duration} minutes</small></div>
     `;
 }

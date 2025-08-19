@@ -463,7 +463,7 @@ def quick_order_view(request):
                         phone=customer_phone,
                         email=request.POST.get('customer_email', '').strip(),
                         customer_id=generate_unique_code('CUST', 6),
-                        created_by_id=request.user.id
+                        created_by_user_id=request.user.id
                     )
                     logger.info(f"Created new customer: {customer.full_name}")
                 
@@ -529,7 +529,7 @@ def quick_order_view(request):
                         color=vehicle_color,
                         vehicle_type=vehicle_type,
                         year=int(request.POST.get('vehicle_year', 2020)),
-                        created_by_id=request.user.id
+                        created_by_user_id=request.user.id
                     )
                     logger.info(f"Created new vehicle: {vehicle.registration_number}")
                 
@@ -1684,14 +1684,15 @@ def calculate_order_price(request):
         except (Service.DoesNotExist, ValueError):
             continue
     
-    # Calculate tax (16% VAT for Kenya)
-    tax_amount = total_price * Decimal('0.16')
-    total_with_tax = total_price + tax_amount
+    # Prices are VAT inclusive (16% VAT for Kenya)
+    # Calculate VAT amount from inclusive price
+    tax_amount = total_price * Decimal('0.16') / Decimal('1.16')
+    subtotal = total_price - tax_amount
     
     return JsonResponse({
-        'subtotal': float(total_price),
+        'subtotal': float(subtotal),
         'tax_amount': float(tax_amount),
-        'total_amount': float(total_with_tax),
+        'total_amount': float(total_price),  # This is already VAT inclusive
         'estimated_duration': estimated_duration
     })
 
@@ -1911,32 +1912,106 @@ def category_delete(request, pk):
 # Order Management Views
 @login_required
 @employee_required()
+@login_required
+@employee_required()
 def order_edit_view(request, pk):
-    """Edit service order"""
+    """Edit service order - simplified approach like quick order"""
     order = get_object_or_404(ServiceOrder, pk=pk)
     
     # Only allow editing pending/confirmed orders
     if order.status not in ['pending', 'confirmed']:
         messages.error(request, 'This order cannot be edited.')
-        return redirect('services:order_detail', pk=order.pk)
+        return redirect('/business/{}/services/orders/{}/'.format(request.tenant.slug, order.pk))
     
     if request.method == 'POST':
-        form = ServiceOrderForm(request.POST, instance=order)
-        if form.is_valid():
-            order = form.save()
+        try:
+            # Update basic order fields
+            order.priority = request.POST.get('priority', 'normal')
+            order.special_instructions = request.POST.get('special_instructions', '').strip()
             
-            # Recalculate totals if services changed
-            order.calculate_totals()
+            # Handle assigned attendant
+            attendant_id = request.POST.get('assigned_attendant')
+            if attendant_id:
+                try:
+                    from apps.employees.models import Employee
+                    order.assigned_attendant = Employee.objects.get(id=attendant_id)
+                except Employee.DoesNotExist:
+                    order.assigned_attendant = None
+            else:
+                order.assigned_attendant = None
+            
+            # Handle scheduled date and time
+            scheduled_date = request.POST.get('scheduled_date')
+            scheduled_time = request.POST.get('scheduled_time')
+            if scheduled_date:
+                order.scheduled_date = scheduled_date
+            if scheduled_time:
+                order.scheduled_time = scheduled_time
+            
+            # Handle services selection - Clear and recreate
+            selected_services = request.POST.getlist('services')
+            
+            # Clear existing services
+            order.order_items.all().delete()
+            
+            # Add selected services
+            total_amount = Decimal('0')
+            if selected_services:
+                for service_id in selected_services:
+                    try:
+                        service = Service.objects.get(id=service_id)
+                        ServiceOrderItem.objects.create(
+                            order=order,
+                            service=service,
+                            quantity=1,
+                            unit_price=service.base_price,
+                            total_price=service.base_price
+                        )
+                        total_amount += service.base_price
+                    except Service.DoesNotExist:
+                        continue
+            
+            # Calculate totals (VAT inclusive pricing)
+            if total_amount > 0:
+                # Price includes VAT - extract it
+                vat_amount = total_amount * Decimal('0.16') / Decimal('1.16')
+                subtotal = total_amount - vat_amount
+                
+                order.subtotal = subtotal
+                order.tax_amount = vat_amount
+                order.total_amount = total_amount
+            else:
+                order.subtotal = Decimal('0')
+                order.tax_amount = Decimal('0')
+                order.total_amount = Decimal('0')
+            
             order.save()
             
             messages.success(request, f'Order {order.order_number} updated successfully!')
-            return redirect('services:order_detail', pk=order.pk)
-    else:
-        form = ServiceOrderForm(instance=order)
+            return redirect('/business/{}/services/orders/{}/'.format(request.tenant.slug, order.pk))
+            
+        except Exception as e:
+            logger.error(f"Exception in order edit: {str(e)}")
+            messages.error(request, f'Error updating order: {str(e)}')
+    
+    # Get data for template
+    service_categories = ServiceCategory.objects.filter(is_active=True).prefetch_related(
+        'services'
+    ).annotate(
+        services_count=Count('services', filter=Q(services__is_active=True))
+    ).filter(services_count__gt=0)
+    
+    # Get employees for assignment
+    from apps.employees.models import Employee
+    employees = Employee.objects.filter(
+        role__in=['attendant', 'supervisor', 'manager'],
+        is_active=True
+    )
     
     context = {
-        'form': form,
         'order': order,
+        'service_categories': service_categories,
+        'employees': employees,
         'title': f'Edit Order - {order.order_number}'
     }
     return render(request, 'services/order_form.html', context)
@@ -2600,7 +2675,7 @@ def quick_customer_register(request):
                     receive_marketing_email=receive_marketing_email,
                     receive_service_reminders=receive_service_reminders,
                     customer_id=generate_unique_code('CUST', 6),
-                    created_by_id=request.user.id
+                    created_by_user_id=request.user.id
                 )
                 
                 # Create vehicles from the form
@@ -2619,7 +2694,7 @@ def quick_customer_register(request):
                             vehicle_type=request.POST.get(f'vehicles[{i}][vehicle_type]', 'sedan'),
                             fuel_type=request.POST.get(f'vehicles[{i}][fuel_type]', 'petrol'),
                             transmission=request.POST.get(f'vehicles[{i}][transmission]', 'manual'),
-                            created_by_id=request.user.id
+                            created_by_user_id=request.user.id
                         )
                         vehicle_count += 1
                     i += 1
@@ -2985,14 +3060,15 @@ def calculate_order_price(request):
         except (Service.DoesNotExist, ValueError):
             continue
     
-    # Calculate tax (16% VAT for Kenya)
-    tax_amount = total_price * Decimal('0.16')
-    total_with_tax = total_price + tax_amount
+    # Prices are VAT inclusive (16% VAT for Kenya)
+    # Calculate VAT amount from inclusive price
+    tax_amount = total_price * Decimal('0.16') / Decimal('1.16')
+    subtotal = total_price - tax_amount
     
     return JsonResponse({
-        'subtotal': float(total_price),
+        'subtotal': float(subtotal),
         'tax_amount': float(tax_amount),
-        'total_amount': float(total_with_tax),
+        'total_amount': float(total_price),  # This is already VAT inclusive
         'estimated_duration': estimated_duration
     })
 
@@ -3104,7 +3180,7 @@ def add_order_to_queue(order):
     ).aggregate(max_num=models.Max('queue_number'))['max_num'] or 0
     
     # Calculate estimated times
-    estimated_duration = order.estimated_duration
+    estimated_duration = order.estimated_duration  # This is a property method
     estimated_start_time = timezone.now()
     
     # Check for orders ahead in queue
@@ -3113,6 +3189,7 @@ def add_order_to_queue(order):
         # Add buffer time based on queue length
         estimated_start_time += timedelta(minutes=waiting_orders * 30)  # 30 min average per order
     
+    # Calculate estimated end time
     estimated_end_time = estimated_start_time + timedelta(minutes=estimated_duration)
     
     ServiceQueue.objects.create(
@@ -3121,5 +3198,32 @@ def add_order_to_queue(order):
         estimated_start_time=estimated_start_time,
         estimated_end_time=estimated_end_time
     )
+
+
+@login_required
+@employee_required()
+def order_receipt_view(request, pk):
+    """Service order comprehensive receipt showing all payments"""
+    order = get_object_or_404(ServiceOrder, id=pk)
+    
+    # Get all payments for this order
+    payments = order.payments.filter(
+        status__in=['completed', 'verified']
+    ).order_by('created_at')
+    
+    # Calculate totals
+    total_paid = sum(payment.amount for payment in payments)
+    balance_due = order.total_amount - total_paid
+    
+    context = {
+        'service_order': order,
+        'payments': payments,
+        'total_paid': total_paid,
+        'balance_due': balance_due,
+        'is_fully_paid': balance_due <= 0,
+        'title': f'Receipt - {order.order_number}'
+    }
+    
+    return render(request, 'services/order_receipt.html', context)
 
 

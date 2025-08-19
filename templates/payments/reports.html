@@ -3,397 +3,1006 @@
 
 {% block title %}Payment Reports - {{ block.super }}{% endblock %}
 
-{% block breadcrumbs %}
-{{ block.super }}
-<li class="breadcrumb-item">
-    <a href="/business/{{ request.tenant.slug }}/payments/">Payments</a>
-</li>
-<li class="breadcrumb-item active">Reports</li>
-{% endblock %}
-
-{% block content %}
-<div class="row">
-    <!-- Page Header -->
-    <div class="col-12">
-        <div class="page-header">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="h3 mb-2">Payment Reports</h1>
-                    <p class="text-muted mb-0">Analyze payment trends and performance metrics</p>
-                </div>
-                <div class="col-md-4 text-md-end">
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-primary" onclick="exportReport('pdf')">
-                            <i class="fas fa-file-pdf me-2"></i>PDF
-                        </button>
-                        <button type="button" class="btn btn-outline-primary" onclick="exportReport('excel')">
-                            <i class="fas fa-file-excel me-2"></i>Excel
-                        </button>
-                        <a href="/business/{{ request.tenant.slug }}/payments/export/" class="btn btn-primary">
-                            <i class="fas fa-download me-2"></i>Export CSV
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Filters -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <form method="get" id="reportFilters">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-md-3">
-                            <label for="dateRange" class="form-label">Date Range</label>
-                            <select class="form-select" id="dateRange" name="date_range">
-                                <option value="today" {% if request.GET.date_range == 'today' %}selected{% endif %}>Today</option>
-                                <option value="yesterday" {% if request.GET.date_range == 'yesterday' %}selected{% endif %}>Yesterday</option>
-                                <option value="this_week" {% if request.GET.date_range == 'this_week' %}selected{% endif %}>This Week</option>
-                                <option value="last_week" {% if request.GET.date_range == 'last_week' %}selected{% endif %}>Last Week</option>
-                                <option value="this_month" {% if request.GET.date_range == 'this_month' %}selected{% endif %}>This Month</option>
-                                <option value="last_month" {% if request.GET.date_range == 'last_month' %}selected{% endif %}>Last Month</option>
-                                <option value="custom" {% if request.GET.date_range == 'custom' %}selected{% endif %}>Custom Range</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label for="startDate" class="form-label">Start Date</label>
-                            <input type="date" class="form-control" id="startDate" name="start_date" value="{{ request.GET.start_date }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label for="endDate" class="form-label">End Date</label>
-                            <input type="date" class="form-control" id="endDate" name="end_date" value="{{ request.GET.end_date }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label for="paymentMethod" class="form-label">Payment Method</label>
-                            <select class="form-select" id="paymentMethod" name="payment_method">
-                                <option value="">All Methods</option>
-                                {% for method in payment_methods %}
-                                <option value="{{ method.id }}" {% if request.GET.payment_method == method.id|slugify %}selected{% endif %}>
-                                    {{ method.name }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label for="status" class="form-label">Status</label>
-                            <select class="form-select" id="status" name="status">
-                                <option value="">All Status</option>
-                                <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
-                                <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Pending</option>
-                                <option value="failed" {% if request.GET.status == 'failed' %}selected{% endif %}>Failed</option>
-                                <option value="refunded" {% if request.GET.status == 'refunded' %}selected{% endif %}>Refunded</option>
-                            </select>
-                        </div>
-                        <div class="col-md-1">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Summary Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <div class="text-primary mb-2">
-                    <i class="fas fa-money-bill-wave fa-2x"></i>
-                </div>
-                <h4 class="mb-1">{{ total_revenue|floatformat:2 }}</h4>
-                <p class="text-muted mb-0">Total Revenue</p>
-                <small class="text-success">
-                    <i class="fas fa-arrow-up"></i> {{ revenue_growth }}%
-                </small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <div class="text-success mb-2">
-                    <i class="fas fa-check-circle fa-2x"></i>
-                </div>
-                <h4 class="mb-1">{{ completed_payments }}</h4>
-                <p class="text-muted mb-0">Completed Payments</p>
-                <small class="text-success">
-                    {{ completion_rate }}% success rate
-                </small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <div class="text-warning mb-2">
-                    <i class="fas fa-clock fa-2x"></i>
-                </div>
-                <h4 class="mb-1">{{ pending_payments }}</h4>
-                <p class="text-muted mb-0">Pending Payments</p>
-                <small class="text-warning">
-                    {{ pending_amount|floatformat:2 }} pending
-                </small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <div class="text-info mb-2">
-                    <i class="fas fa-calculator fa-2x"></i>
-                </div>
-                <h4 class="mb-1">{{ average_payment|floatformat:2 }}</h4>
-                <p class="text-muted mb-0">Average Payment</p>
-                <small class="text-info">
-                    {{ total_transactions }} transactions
-                </small>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- Payment Trends Chart -->
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-line me-2"></i>Payment Trends
-                </h5>
-            </div>
-            <div class="card-body">
-                <canvas id="paymentTrendsChart" height="300"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <!-- Payment Methods Breakdown -->
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-pie me-2"></i>Payment Methods
-                </h5>
-            </div>
-            <div class="card-body">
-                <canvas id="paymentMethodsChart" height="300"></canvas>
-                <div class="mt-3">
-                    {% for method_stat in payment_method_stats %}
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="d-flex align-items-center">
-                            <span class="badge me-2" style="background-color: {{ method_stat.color }}; width: 12px; height: 12px;"></span>
-                            <span>{{ method_stat.name }}</span>
-                        </div>
-                        <div class="text-end">
-                            <div class="fw-bold">{{ method_stat.percentage }}%</div>
-                            <small class="text-muted">{{ method_stat.amount|floatformat:2 }}</small>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Transactions -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-list me-2"></i>Recent Transactions
-                    </h5>
-                    <a href="/business/{{ request.tenant.slug }}/payments/list/" class="btn btn-sm btn-outline-primary">
-                        View All <i class="fas fa-arrow-right ms-1"></i>
-                    </a>
-                </div>
-            </div>
-            <div class="card-body">
-                {% if recent_transactions %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Transaction ID</th>
-                                    <th>Customer</th>
-                                    <th>Amount</th>
-                                    <th>Method</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for transaction in recent_transactions %}
-                                <tr>
-                                    <td>{{ transaction.created_at|date:"M d, Y H:i" }}</td>
-                                    <td>
-                                        <a href="/business/{{ request.tenant.slug }}/payments/{{ transaction.id }}/" class="text-decoration-none">
-                                            {{ transaction.transaction_id }}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        {% if transaction.customer %}
-                                            {{ transaction.customer.full_name }}
-                                        {% else %}
-                                            <span class="text-muted">Walk-in Customer</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="fw-bold">{{ transaction.amount|floatformat:2 }}</td>
-                                    <td>
-                                        <span class="badge bg-light text-dark">{{ transaction.payment_method }}</span>
-                                    </td>
-                                    <td>
-                                        {% if transaction.status == 'completed' %}
-                                            <span class="badge bg-success">Completed</span>
-                                        {% elif transaction.status == 'pending' %}
-                                            <span class="badge bg-warning">Pending</span>
-                                        {% elif transaction.status == 'failed' %}
-                                            <span class="badge bg-danger">Failed</span>
-                                        {% elif transaction.status == 'refunded' %}
-                                            <span class="badge bg-info">Refunded</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <a href="/business/{{ request.tenant.slug }}/payments/{{ transaction.id }}/" class="btn btn-outline-primary" title="View Details">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            {% if transaction.status == 'completed' %}
-                                            <a href="/business/{{ request.tenant.slug }}/payments/{{ transaction.id }}/receipt/" class="btn btn-outline-success" title="View Receipt">
-                                                <i class="fas fa-receipt"></i>
-                                            </a>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">No Transactions Found</h5>
-                        <p class="text-muted">Adjust your filters to see more results</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
 {% block extra_css %}
 <style>
-.card {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-}
-
-.badge[style] {
-    border-radius: 50%;
-}
-
-canvas {
-    max-height: 300px;
-}
+    .reports-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: var(--card-color, #3b82f6);
+    }
+    
+    .stat-card.revenue::before {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    
+    .stat-card.transactions::before {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    }
+    
+    .stat-card.average::before {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    
+    .stat-card.pending::before {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+    
+    .stat-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        color: white;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-icon.revenue {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    
+    .stat-icon.transactions {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    }
+    
+    .stat-icon.average {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    
+    .stat-icon.pending {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #1f2937;
+        margin-bottom: 0.25rem;
+    }
+    
+    .stat-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-change {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .stat-change.positive {
+        color: #059669;
+    }
+    
+    .stat-change.negative {
+        color: #dc2626;
+    }
+    
+    .charts-section {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .chart-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .chart-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .chart-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0;
+    }
+    
+    .chart-container {
+        height: 400px;
+        position: relative;
+    }
+    
+    .reports-filters {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .filters-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        align-items: end;
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .filter-label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #374151;
+    }
+    
+    .filter-control {
+        padding: 0.75rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: border-color 0.3s ease;
+    }
+    
+    .filter-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .btn-filter {
+        background: #3b82f6;
+        border: none;
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+        color: white;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    
+    .btn-filter:hover {
+        background: #1d4ed8;
+    }
+    
+    .table-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .table-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .table-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0;
+    }
+    
+    .table-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .btn-export {
+        background: #059669;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        color: white;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    
+    .btn-export:hover {
+        background: #047857;
+    }
+    
+    .payments-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+    
+    .payments-table th {
+        background: #f8fafc;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .payments-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .payments-table tr:hover {
+        background: #f8fafc;
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+    
+    .status-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .status-failed {
+        background: #fef2f2;
+        color: #991b1b;
+    }
+    
+    .status-refunded {
+        background: #f3e8ff;
+        color: #6b21a8;
+    }
+    
+    .method-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .method-cash {
+        background: #dcfce7;
+        color: #166534;
+    }
+    
+    .method-card {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .method-mpesa {
+        background: #ecfdf5;
+        color: #065f46;
+    }
+    
+    .method-bank {
+        background: #f3e8ff;
+        color: #6b21a8;
+    }
+    
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 2rem;
+    }
+    
+    .pagination button {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #e5e7eb;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .pagination button:hover {
+        background: #f3f4f6;
+    }
+    
+    .pagination button.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+    
+    .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: #f8fafc;
+        border-radius: 10px;
+    }
+    
+    .summary-item {
+        text-align: center;
+    }
+    
+    .summary-value {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #1f2937;
+    }
+    
+    .summary-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .export-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .export-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        z-index: 1000;
+        min-width: 150px;
+        display: none;
+    }
+    
+    .export-menu.show {
+        display: block;
+    }
+    
+    .export-option {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: background 0.3s ease;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+    }
+    
+    .export-option:hover {
+        background: #f3f4f6;
+    }
+    
+    .table-overflow {
+        overflow-x: auto;
+    }
+    
+    @media (max-width: 768px) {
+        .charts-section {
+            grid-template-columns: 1fr;
+        }
+        
+        .filters-row {
+            grid-template-columns: 1fr;
+        }
+        
+        .table-card {
+            overflow-x: auto;
+        }
+        
+        .payments-table {
+            min-width: 800px;
+        }
+    }
 </style>
 {% endblock %}
 
-{% block extra_js %}
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="reports-container">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1">
+                    <i class="fas fa-chart-bar me-2"></i>Payment Reports
+                </h2>
+                <p class="text-muted">Comprehensive payment analytics and insights</p>
+            </div>
+            <div class="export-dropdown">
+                <button class="btn-export" onclick="toggleExportMenu()">
+                    <i class="fas fa-download me-2"></i>Export Report
+                </button>
+                <div class="export-menu" id="exportMenu">
+                    <button class="export-option" onclick="exportReport('pdf')">
+                        <i class="fas fa-file-pdf me-2"></i>Export as PDF
+                    </button>
+                    <button class="export-option" onclick="exportReport('excel')">
+                        <i class="fas fa-file-excel me-2"></i>Export as Excel
+                    </button>
+                    <button class="export-option" onclick="exportReport('csv')">
+                        <i class="fas fa-file-csv me-2"></i>Export as CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filters -->
+        <div class="reports-filters">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <label class="filter-label">Date Range</label>
+                    <select class="filter-control" id="dateRange" title="Select date range">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="last_7_days" selected>Last 7 Days</option>
+                        <option value="last_30_days">Last 30 Days</option>
+                        <option value="last_3_months">Last 3 Months</option>
+                        <option value="last_year">Last Year</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Payment Method</label>
+                    <select class="filter-control" id="paymentMethod" title="Select payment method">
+                        <option value="all">All Methods</option>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                        <option value="mpesa">M-Pesa</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Status</label>
+                    <select class="filter-control" id="paymentStatus" title="Select payment status">
+                        <option value="all">All Statuses</option>
+                        <option value="completed">Completed</option>
+                        <option value="pending">Pending</option>
+                        <option value="failed">Failed</option>
+                        <option value="refunded">Refunded</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Employee</label>
+                    <select class="filter-control" id="employee" title="Select employee">
+                        <option value="all">All Employees</option>
+                        {% for employee in employees %}
+                        <option value="{{ employee.id }}">{{ employee.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <button class="btn-filter" onclick="applyFilters()">
+                        <i class="fas fa-filter me-2"></i>Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card revenue">
+                <div class="stat-icon revenue">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="stat-value" id="totalRevenue">KES {{ total_revenue|floatformat:0 }}</div>
+                <div class="stat-label">Total Revenue</div>
+                <div class="stat-change positive">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>{{ revenue_change|floatformat:1 }}% from last period</span>
+                </div>
+            </div>
+            
+            <div class="stat-card transactions">
+                <div class="stat-icon transactions">
+                    <i class="fas fa-receipt"></i>
+                </div>
+                <div class="stat-value" id="totalTransactions">{{ total_transactions }}</div>
+                <div class="stat-label">Total Transactions</div>
+                <div class="stat-change positive">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>{{ transactions_change|floatformat:1 }}% from last period</span>
+                </div>
+            </div>
+            
+            <div class="stat-card average">
+                <div class="stat-icon average">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="stat-value" id="averageTransaction">KES {{ average_transaction|floatformat:0 }}</div>
+                <div class="stat-label">Average Transaction</div>
+                <div class="stat-change negative">
+                    <i class="fas fa-arrow-down"></i>
+                    <span>{{ average_change|floatformat:1 }}% from last period</span>
+                </div>
+            </div>
+            
+            <div class="stat-card pending">
+                <div class="stat-icon pending">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-value" id="pendingPayments">{{ pending_payments }}</div>
+                <div class="stat-label">Pending Payments</div>
+                <div class="stat-change positive">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>{{ pending_change|floatformat:1 }}% from last period</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Section -->
+        <div class="charts-section">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h5 class="chart-title">Revenue Trend</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="changeChartPeriod('daily')">Daily</button>
+                        <button class="btn btn-sm btn-outline-secondary active" onclick="changeChartPeriod('weekly')">Weekly</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="changeChartPeriod('monthly')">Monthly</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h5 class="chart-title">Payment Methods</h5>
+                </div>
+                <div class="chart-container">
+                    <canvas id="methodsChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Payments Table -->
+        <div class="table-card">
+            <div class="table-header">
+                <h5 class="table-title">Recent Payments</h5>
+                <div class="table-actions">
+                    <input type="search" class="filter-control" placeholder="Search payments..." id="searchPayments">
+                </div>
+            </div>
+            
+            <!-- Summary Stats -->
+            <div class="summary-stats">
+                <div class="summary-item">
+                    <div class="summary-value" id="summaryCount">{{ payments.count }}</div>
+                    <div class="summary-label">Total Records</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="summaryAmount">KES {{ summary_amount|floatformat:0 }}</div>
+                    <div class="summary-label">Total Amount</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="summaryCompleted">{{ completed_count }}</div>
+                    <div class="summary-label">Completed</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="summaryPending">{{ pending_count }}</div>
+                    <div class="summary-label">Pending</div>
+                </div>
+            </div>
+            
+            <div class="table-overflow">
+                <table class="payments-table">
+                    <thead>
+                        <tr>
+                            <th>Payment ID</th>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                            <th>Status</th>
+                            <th>Employee</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paymentsTableBody">
+                        {% for payment in payments %}
+                        <tr>
+                            <td>
+                                <span class="text-primary font-weight-bold">{{ payment.payment_id }}</span>
+                            </td>
+                            <td>
+                                <div>{{ payment.created_at|date:"M d, Y" }}</div>
+                                <small class="text-muted">{{ payment.created_at|date:"H:i" }}</small>
+                            </td>
+                            <td>
+                                {% if payment.customer %}
+                                    <div>{{ payment.customer.display_name }}</div>
+                                    <small class="text-muted">{{ payment.customer.phone|default:"N/A" }}</small>
+                                {% else %}
+                                    <span class="text-muted">Walk-in Customer</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="font-weight-bold">KES {{ payment.amount|floatformat:2 }}</span>
+                                {% if payment.processing_fee > 0 %}
+                                    <br><small class="text-muted">Fee: KES {{ payment.processing_fee|floatformat:2 }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="method-badge method-{{ payment.payment_method.code }}">
+                                    {{ payment.payment_method.name }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ payment.status }}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if payment.processed_by %}
+                                    <div>{{ payment.processed_by.user.first_name }}</div>
+                                    <small class="text-muted">{{ payment.processed_by.role }}</small>
+                                {% else %}
+                                    <span class="text-muted">System</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                        Actions
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/payments/{{ payment.id }}/">View Details</a></li>{% if payment.status == 'completed' %}
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/payments/{{ payment.id }}/receipt/">Print Receipt</a></li>
+                                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/payments/{{ payment.id }}/refund/">Process Refund</a></li>{% endif %}
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <i class="fas fa-receipt fa-2x text-muted mb-2"></i>
+                                <div>No payments found for the selected criteria</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <div class="pagination" id="pagination">
+                <!-- Pagination will be generated by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Payment Trends Chart
-const trendsCtx = document.getElementById('paymentTrendsChart').getContext('2d');
-const paymentTrendsChart = new Chart(trendsCtx, {
-    type: 'line',
-    data: {
-        labels: {{ trend_labels|safe }},
-        datasets: [{
-            label: 'Revenue',
-            data: {{ trend_data|safe }},
-            borderColor: '#007bff',
-            backgroundColor: 'rgba(0, 123, 255, 0.1)',
-            tension: 0.4,
-            fill: true
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
-            }
+// Chart configurations
+let revenueChart = null;
+let methodsChart = null;
+
+// Initialize charts
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    setupEventListeners();
+});
+
+function initializeCharts() {
+    // Revenue Chart
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    revenueChart = new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: {{ revenue_labels|safe }},
+            datasets: [{
+                label: 'Revenue',
+                data: {{ revenue_data|safe }},
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }]
         },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    callback: function(value) {
-                        return '$' + value.toLocaleString();
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'KES ' + value.toLocaleString();
+                        }
                     }
                 }
             }
         }
-    }
-});
-
-// Payment Methods Chart
-const methodsCtx = document.getElementById('paymentMethodsChart').getContext('2d');
-const paymentMethodsChart = new Chart(methodsCtx, {
-    type: 'doughnut',
-    data: {
-        labels: {{ method_labels|safe }},
-        datasets: [{
-            data: {{ method_data|safe }},
-            backgroundColor: {{ method_colors|safe }},
-            borderWidth: 2,
-            borderColor: '#fff'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
+    });
+    
+    // Payment Methods Chart
+    const methodsCtx = document.getElementById('methodsChart').getContext('2d');
+    methodsChart = new Chart(methodsCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ methods_labels|safe }},
+            datasets: [{
+                data: {{ methods_data|safe }},
+                backgroundColor: [
+                    '#10b981',
+                    '#3b82f6', 
+                    '#f59e0b',
+                    '#ef4444',
+                    '#8b5cf6'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
             }
         }
-    }
-});
-
-// Export functions
-function exportReport(format) {
-    const params = new URLSearchParams(window.location.search);
-    params.set('format', format);
-    window.open(`/business/{{ request.tenant.slug }}/payments/reports/export/?${params.toString()}`, '_blank');
+    });
 }
 
-// Handle date range changes
-document.getElementById('dateRange').addEventListener('change', function() {
-    const customFields = document.querySelectorAll('#startDate, #endDate');
-    if (this.value === 'custom') {
-        customFields.forEach(field => field.disabled = false);
-    } else {
-        customFields.forEach(field => field.disabled = true);
-    }
-});
+function setupEventListeners() {
+    // Search functionality
+    document.getElementById('searchPayments').addEventListener('input', function(e) {
+        searchPayments(e.target.value);
+    });
+    
+    // Auto-apply filters on change
+    document.querySelectorAll('.filter-control').forEach(control => {
+        control.addEventListener('change', function() {
+            applyFilters();
+        });
+    });
+}
 
-// Initialize form
-document.addEventListener('DOMContentLoaded', function() {
-    const dateRange = document.getElementById('dateRange');
-    if (dateRange.value !== 'custom') {
-        document.querySelectorAll('#startDate, #endDate').forEach(field => field.disabled = true);
+function applyFilters() {
+    const filters = {
+        date_range: document.getElementById('dateRange').value,
+        payment_method: document.getElementById('paymentMethod').value,
+        status: document.getElementById('paymentStatus').value,
+        employee: document.getElementById('employee').value
+    };
+    
+    // Send AJAX request to update data
+    fetch('/business/{{ request.tenant.slug }}/payments/reports/filter/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(filters)
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateDashboard(data);
+    });
+}
+
+function updateDashboard(data) {
+    // Update stats
+    document.getElementById('totalRevenue').textContent = 'KES ' + data.total_revenue.toLocaleString();
+    document.getElementById('totalTransactions').textContent = data.total_transactions;
+    document.getElementById('averageTransaction').textContent = 'KES ' + data.average_transaction.toLocaleString();
+    document.getElementById('pendingPayments').textContent = data.pending_payments;
+    
+    // Update charts
+    revenueChart.data.labels = data.revenue_labels;
+    revenueChart.data.datasets[0].data = data.revenue_data;
+    revenueChart.update();
+    
+    methodsChart.data.labels = data.methods_labels;
+    methodsChart.data.datasets[0].data = data.methods_data;
+    methodsChart.update();
+    
+    // Update table
+    updatePaymentsTable(data.payments);
+}
+
+function updatePaymentsTable(payments) {
+    const tbody = document.getElementById('paymentsTableBody');
+    tbody.innerHTML = '';
+    
+    if (payments.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4">
+                    <i class="fas fa-receipt fa-2x text-muted mb-2"></i>
+                    <div>No payments found for the selected criteria</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    payments.forEach(payment => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><span class="text-primary font-weight-bold">${payment.payment_id}</span></td>
+            <td>
+                <div>${payment.created_at}</div>
+                <small class="text-muted">${payment.created_time}</small>
+            </td>
+            <td>
+                ${payment.customer ? `
+                    <div>${payment.customer_name}</div>
+                    <small class="text-muted">${payment.customer_phone || 'N/A'}</small>
+                ` : '<span class="text-muted">Walk-in Customer</span>'}
+            </td>
+            <td>
+                <span class="font-weight-bold">KES ${payment.amount}</span>
+                ${payment.processing_fee > 0 ? `<br><small class="text-muted">Fee: KES ${payment.processing_fee}</small>` : ''}
+            </td>
+            <td><span class="method-badge method-${payment.method_code}">${payment.method_name}</span></td>
+            <td><span class="status-badge status-${payment.status}">${payment.status_display}</span></td>
+            <td>
+                ${payment.processed_by ? `
+                    <div>${payment.processed_by}</div>
+                    <small class="text-muted">${payment.processor_role}</small>
+                ` : '<span class="text-muted">System</span>'}
+            </td>
+            <td>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                        Actions
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/payments/${payment.id}/">View Details</a></li>
+                        ${payment.status === 'completed' ? `
+                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/payments/${payment.id}/receipt/">Print Receipt</a></li>
+                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/payments/${payment.id}/refund/">Process Refund</a></li>
+                        ` : ''}
+                    </ul>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function searchPayments(query) {
+    const rows = document.querySelectorAll('#paymentsTableBody tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(query.toLowerCase())) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function changeChartPeriod(period) {
+    // Update active button
+    document.querySelectorAll('.chart-header button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Fetch new data for the period
+    fetch(`/business/{{ request.tenant.slug }}/payments/reports/chart-data/?period=${period}`)
+    .then(response => response.json())
+    .then(data => {
+        revenueChart.data.labels = data.labels;
+        revenueChart.data.datasets[0].data = data.data;
+        revenueChart.update();
+    });
+}
+
+function toggleExportMenu() {
+    const menu = document.getElementById('exportMenu');
+    menu.classList.toggle('show');
+}
+
+function exportReport(format) {
+    const filters = {
+        date_range: document.getElementById('dateRange').value,
+        payment_method: document.getElementById('paymentMethod').value,
+        status: document.getElementById('paymentStatus').value,
+        employee: document.getElementById('employee').value,
+        format: format
+    };
+    
+    // Create form and submit
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/business/{{ request.tenant.slug }}/payments/reports/export/';
+    
+    Object.keys(filters).forEach(key => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = filters[key];
+        form.appendChild(input);
+    });
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+    
+    // Hide menu
+    document.getElementById('exportMenu').classList.remove('show');
+}
+
+// Close export menu when clicking outside
+document.addEventListener('click', function(event) {
+    const exportDropdown = document.querySelector('.export-dropdown');
+    if (!exportDropdown.contains(event.target)) {
+        document.getElementById('exportMenu').classList.remove('show');
     }
 });
 </script>

@@ -1,0 +1,297 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Process Payment - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .payment-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border: none;
+    }
+    
+    .payment-header {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        border-radius: 12px 12px 0 0;
+        padding: 1.5rem;
+    }
+    
+    .form-floating .form-control,
+    .form-floating .form-select {
+        border-radius: 8px;
+        border: 2px solid #e9ecef;
+        min-height: 58px;
+    }
+    
+    .form-floating .form-control:focus,
+    .form-floating .form-select:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+    }
+    
+    .method-card {
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+    
+    .method-card:hover {
+        border-color: #007bff;
+        transform: translateY(-2px);
+    }
+    
+    .method-card.selected {
+        border-color: #007bff;
+        background: rgba(0,123,255,0.1);
+    }
+    
+    .method-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        margin: 0 auto 0.5rem;
+        color: white;
+    }
+    
+    .btn-process {
+        border-radius: 8px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+    }
+    
+    @media (max-width: 768px) {
+        .method-grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="payment-card">
+                <div class="payment-header">
+                    <h3 class="mb-1 fw-bold">
+                        <i class="fas fa-credit-card me-2"></i>Process Payment
+                    </h3>
+                    <p class="mb-0 opacity-75">{{ request.tenant.name }}</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="post" id="paymentForm">
+                        {% csrf_token %}
+                        
+                        <!-- Customer Section -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold mb-3">
+                                <i class="fas fa-user text-primary me-2"></i>Customer
+                            </h5>
+                            
+                            {% if service_order %}
+                                <div class="alert alert-info border-0">
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-primary text-white rounded me-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: 600;">
+                                            {{ service_order.customer.first_name|first }}{{ service_order.customer.last_name|first }}
+                                        </div>
+                                        <div>
+                                            <strong>{{ service_order.customer.display_name }}</strong><br>
+                                            <small class="text-muted">{{ service_order.customer.phone }} • Service Order: {{ service_order.order_number }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="customer_id" value="{{ service_order.customer.id }}">
+                            {% else %}
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="customerSearch" placeholder="Search customers..." autocomplete="off">
+                                            <label for="customerSearch">Search Customer (Name, Phone, ID)</label>
+                                        </div>
+                                        <input type="hidden" id="selectedCustomerId" name="customer_id">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-primary w-100 h-100" onclick="selectWalkIn()">
+                                            <i class="fas fa-walking me-2"></i>Walk-in Customer
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Amount Section -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold mb-3">
+                                <i class="fas fa-money-bill text-primary me-2"></i>Payment Details
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <input type="number" class="form-control" id="amount" name="amount" 
+                                               step="0.01" min="1" placeholder="0.00"
+                                               {% if service_order %}value="{{ service_order.total_amount }}"{% endif %} required>
+                                        <label for="amount">Amount (KES)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <select class="form-select" id="paymentType" name="payment_type">
+                                            <option value="service_payment" {% if service_order %}selected{% endif %}>Service Payment</option>
+                                            <option value="deposit">Deposit</option>
+                                            <option value="adjustment">Adjustment</option>
+                                        </select>
+                                        <label for="paymentType">Payment Type</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-floating mb-3">
+                                <textarea class="form-control" id="description" name="description" 
+                                          placeholder="Description" style="height: 80px;">{% if service_order %}Payment for service order {{ service_order.order_number }}{% endif %}</textarea>
+                                <label for="description">Description (Optional)</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Payment Method -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold mb-3">
+                                <i class="fas fa-credit-card text-primary me-2"></i>Payment Method
+                            </h5>
+                            
+                            <div class="row method-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                                {% for method in payment_methods %}
+                                {% if method.is_active %}
+                                <div class="method-card" onclick="selectMethod('{{ method.id }}', '{{ method.method_type }}')" 
+                                     data-method-id="{{ method.id }}" data-method-type="{{ method.method_type }}">
+                                    <div class="method-icon 
+                                        {% if method.method_type == 'mpesa' %}bg-success
+                                        {% elif method.method_type == 'cash' %}bg-warning
+                                        {% elif method.method_type == 'card' %}bg-info
+                                        {% else %}bg-secondary{% endif %}">
+                                        {% if method.method_type == 'mpesa' %}
+                                            <i class="fas fa-mobile-alt"></i>
+                                        {% elif method.method_type == 'cash' %}
+                                            <i class="fas fa-coins"></i>
+                                        {% elif method.method_type == 'card' %}
+                                            <i class="fas fa-credit-card"></i>
+                                        {% else %}
+                                            <i class="fas fa-money-bill"></i>
+                                        {% endif %}
+                                    </div>
+                                    <strong>{{ method.name }}</strong>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            
+                            <input type="hidden" id="selectedMethod" name="payment_method" required>
+                            
+                            <!-- M-Pesa Phone Input -->
+                            <div id="mpesaPhone" style="display: none;" class="mt-3">
+                                <div class="form-floating">
+                                    <input type="tel" class="form-control" name="mpesa_phone" placeholder="254712345678">
+                                    <label>M-Pesa Phone Number</label>
+                                </div>
+                            </div>
+                            
+                            <!-- Cash Input -->
+                            <div id="cashReceived" style="display: none;" class="mt-3">
+                                <div class="form-floating">
+                                    <input type="number" class="form-control" name="cash_received" step="0.01" placeholder="0.00">
+                                    <label>Cash Received (KES)</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="/business/{{ request.tenant.slug }}/payments/" class="btn btn-outline-secondary btn-process">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success btn-process">
+                                <i class="fas fa-check me-2"></i>Process Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Payment method selection
+function selectMethod(methodId, methodType) {
+    // Remove previous selection
+    document.querySelectorAll('.method-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Select current method
+    event.target.closest('.method-card').classList.add('selected');
+    document.getElementById('selectedMethod').value = methodId;
+    
+    // Hide all method inputs
+    document.getElementById('mpesaPhone').style.display = 'none';
+    document.getElementById('cashReceived').style.display = 'none';
+    
+    // Show relevant input
+    if (methodType === 'mpesa') {
+        document.getElementById('mpesaPhone').style.display = 'block';
+    } else if (methodType === 'cash') {
+        document.getElementById('cashReceived').style.display = 'block';
+    }
+}
+
+// Walk-in customer
+function selectWalkIn() {
+    document.getElementById('customerSearch').value = 'Walk-in Customer';
+    document.getElementById('selectedCustomerId').value = '';
+}
+
+// Customer search (basic implementation)
+document.getElementById('customerSearch')?.addEventListener('input', function() {
+    const query = this.value.trim();
+    if (query.length >= 2) {
+        // Implementation would fetch customers from server
+        // For now, just store the search value
+        if (query !== 'Walk-in Customer') {
+            // This would normally populate from AJAX search
+        }
+    }
+});
+
+// Form validation
+document.getElementById('paymentForm').addEventListener('submit', function(e) {
+    const amount = document.getElementById('amount').value;
+    const method = document.getElementById('selectedMethod').value;
+    
+    if (!amount || parseFloat(amount) < 1) {
+        e.preventDefault();
+        alert('Please enter a valid amount');
+        return;
+    }
+    
+    if (!method) {
+        e.preventDefault();
+        alert('Please select a payment method');
+        return;
+    }
+    
+    // Disable submit button to prevent double submission
+    e.target.querySelector('button[type="submit"]').disabled = true;
+});
+</script>
+{% endblock %}

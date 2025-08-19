@@ -1,181 +1,355 @@
 {% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}Payment Successful - {{ payment.payment_id }} - {{ block.super }}{% endblock %}
+{% block title %}Payment Successful - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <style>
-.success-container { max-width: 600px; margin: 2rem auto; text-align: center; }
-.success-icon { width: 100px; height: 100px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 2rem; }
-.success-icon i { font-size: 3rem; color: #16a34a; }
-.success-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 2rem; margin-bottom: 1.5rem; }
-.payment-details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin: 1rem 0; text-align: left; }
-.detail-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-.detail-row:last-child { margin-bottom: 0; }
-.status-badge { padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; text-transform: uppercase; font-size: 0.875rem; }
-.status-completed { background: #dcfce7; color: #166534; }
-.action-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .success-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 2rem 0;
+    }
+    
+    .success-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        overflow: hidden;
+        text-align: center;
+    }
+    
+    .success-header {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        padding: 3rem 2rem;
+        position: relative;
+    }
+    
+    .success-icon {
+        width: 120px;
+        height: 120px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        font-size: 4rem;
+        animation: successBounce 0.6s ease;
+    }
+    
+    .confetti {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: #fbbf24;
+        animation: confetti 3s ease-in-out infinite;
+    }
+    
+    .confetti:nth-child(1) { left: 10%; animation-delay: 0s; background: #ef4444; }
+    .confetti:nth-child(2) { left: 20%; animation-delay: 0.5s; background: #3b82f6; }
+    .confetti:nth-child(3) { left: 30%; animation-delay: 1s; background: #10b981; }
+    .confetti:nth-child(4) { left: 40%; animation-delay: 1.5s; background: #f59e0b; }
+    .confetti:nth-child(5) { left: 50%; animation-delay: 2s; background: #8b5cf6; }
+    .confetti:nth-child(6) { left: 60%; animation-delay: 0.7s; background: #ef4444; }
+    .confetti:nth-child(7) { left: 70%; animation-delay: 1.2s; background: #3b82f6; }
+    .confetti:nth-child(8) { left: 80%; animation-delay: 1.7s; background: #10b981; }
+    .confetti:nth-child(9) { left: 90%; animation-delay: 0.3s; background: #f59e0b; }
+    
+    @keyframes successBounce {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+    
+    @keyframes confetti {
+        0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+    
+    .success-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+    
+    .success-subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+    
+    .payment-summary {
+        padding: 2rem;
+        background: #f8fffe;
+        border-bottom: 1px solid #e6fffa;
+    }
+    
+    .summary-amount {
+        font-size: 3rem;
+        font-weight: 800;
+        color: #059669;
+        margin-bottom: 0.5rem;
+    }
+    
+    .summary-details {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .detail-row:last-child {
+        border-bottom: none;
+        font-weight: 600;
+        color: #059669;
+    }
+    
+    .action-buttons {
+        padding: 2rem;
+        background: #f9fafb;
+    }
+    
+    .btn-success-primary {
+        background: linear-gradient(135deg, #10b981, #059669);
+        border: none;
+        color: white;
+        padding: 0.75rem 2rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        margin: 0.5rem;
+    }
+    
+    .btn-success-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+    
+    .transaction-info {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        padding: 1rem;
+        margin: 1rem 0;
+        font-size: 0.9rem;
+    }
+    
+    .reference-code {
+        background: #1f2937;
+        color: #10b981;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        margin: 0.5rem 0;
+        display: inline-block;
+    }
+    
+    @media (max-width: 768px) {
+        .success-icon {
+            width: 100px;
+            height: 100px;
+            font-size: 3rem;
+        }
+        
+        .success-title {
+            font-size: 2rem;
+        }
+        
+        .summary-amount {
+            font-size: 2.5rem;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="success-container">
-    <div class="success-card">
-        <!-- Success Icon -->
-        <div class="success-icon">
-            <i class="fas fa-check-circle"></i>
-        </div>
-        
-        <!-- Success Message -->
-        <h2 class="text-success mb-3">Payment Successful!</h2>
-        <p class="text-muted mb-4">Your payment has been processed successfully.</p>
-        
-        <!-- Payment Details -->
-        <div class="payment-details">
-            <div class="detail-row">
-                <span>Payment ID:</span>
-                <strong>{{ payment.payment_id }}</strong>
+<div class="container-fluid px-4">
+    <div class="success-container">
+        <div class="success-card">
+            <!-- Animated Header -->
+            <div class="success-header">
+                <!-- Confetti Animation -->
+                <div class="confetti"></div>
+                <div class="confetti"></div>
+                <div class="confetti"></div>
+                <div class="confetti"></div>
+                <div class="confetti"></div>
+                <div class="confetti"></div>
+                <div class="confetti"></div>
+                <div class="confetti"></div>
+                <div class="confetti"></div>
+                
+                <div class="success-icon">
+                    <i class="fas fa-check"></i>
+                </div>
+                <h1 class="success-title">Payment Successful!</h1>
+                <p class="success-subtitle">Your payment has been processed successfully</p>
             </div>
-            <div class="detail-row">
-                <span>Amount:</span>
-                <strong class="text-success">KES {{ payment.amount|floatformat:2 }}</strong>
-            </div>
-            <div class="detail-row">
-                <span>Method:</span>
-                <span>{{ payment.payment_method.name }}</span>
-            </div>
-            <div class="detail-row">
-                <span>Date:</span>
-                <span>{{ payment.completed_at|date:"M d, Y H:i" }}</span>
-            </div>
-            {% if payment.transaction_id %}
-            <div class="detail-row">
-                <span>Transaction ID:</span>
-                <span>{{ payment.transaction_id }}</span>
-            </div>
-            {% endif %}
-            <div class="detail-row">
-                <span>Status:</span>
-                <span class="status-badge status-completed">{{ payment.get_status_display }}</span>
-            </div>
-        </div>
-        
-        <!-- Order Information -->
-        {% if payment.service_order %}
-        <div class="payment-details">
-            <h6 class="mb-3">Order Information</h6>
-            <div class="detail-row">
-                <span>Order Number:</span>
-                <strong>{{ payment.service_order.order_number }}</strong>
-            </div>
-            <div class="detail-row">
-                <span>Customer:</span>
-                <span>{{ payment.service_order.customer.display_name }}</span>
-            </div>
-            {% if payment.service_order.vehicle %}
-            <div class="detail-row">
-                <span>Vehicle:</span>
-                <span>{{ payment.service_order.vehicle.registration_number }}</span>
-            </div>
-            {% endif %}
-            <div class="detail-row">
-                <span>Order Total:</span>
-                <span>KES {{ payment.service_order.total_amount|floatformat:2 }}</span>
-            </div>
-            <div class="detail-row">
-                <span>Total Paid:</span>
-                <span class="text-success">KES {{ payment.service_order.paid_amount|floatformat:2 }}</span>
-            </div>
-            <div class="detail-row">
-                <span>Balance Due:</span>
-                <span class="{% if payment.service_order.balance_due > 0 %}text-warning{% else %}text-success{% endif %}">
-                    KES {{ payment.service_order.balance_due|floatformat:2 }}
-                </span>
-            </div>
-        </div>
-        {% endif %}
-        
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/" 
-               class="btn btn-primary btn-lg">
-                <i class="fas fa-receipt me-2"></i>View Receipt
-            </a>
             
-            <button onclick="window.print()" class="btn btn-outline-primary btn-lg">
-                <i class="fas fa-print me-2"></i>Print Receipt
-            </button>
+            <!-- Payment Amount -->
+            <div class="payment-summary">
+                <div class="summary-amount">KES {{ payment.amount|floatformat:2 }}</div>
+                <p class="text-muted mb-0">{{ payment.get_payment_type_display }}</p>
+            </div>
             
-            {% if payment.service_order %}
-            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ payment.service_order.id }}/" 
-               class="btn btn-outline-secondary btn-lg">
-                <i class="fas fa-eye me-2"></i>View Order
-            </a>
+            <!-- Payment Details -->
+            <div class="card-body p-4">
+                <div class="summary-details">
+                    <h5 class="fw-bold mb-3 text-start">
+                        <i class="fas fa-receipt text-success me-2"></i>Payment Details
+                    </h5>
+                    
+                    <div class="detail-row">
+                        <span>Payment ID:</span>
+                        <strong>{{ payment.payment_id }}</strong>
+                    </div>
+                    
+                    {% if payment.transaction_id %}
+                    <div class="detail-row">
+                        <span>Transaction ID:</span>
+                        <strong>{{ payment.transaction_id }}</strong>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="detail-row">
+                        <span>Payment Method:</span>
+                        <strong>{{ payment.payment_method.name }}</strong>
+                    </div>
+                    
+                    {% if payment.customer %}
+                    <div class="detail-row">
+                        <span>Customer:</span>
+                        <strong>{{ payment.customer.display_name }}</strong>
+                    </div>
+                    {% endif %}
+                    
+                    {% if payment.service_order %}
+                    <div class="detail-row">
+                        <span>Service Order:</span>
+                        <strong>{{ payment.service_order.order_number }}</strong>
+                    </div>
+                    {% endif %}
+                    
+                    {% if payment.processing_fee > 0 %}
+                    <div class="detail-row">
+                        <span>Processing Fee:</span>
+                        <strong>KES {{ payment.processing_fee|floatformat:2 }}</strong>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="detail-row">
+                        <span>Date & Time:</span>
+                        <strong>{{ payment.completed_at|date:"M d, Y H:i"|default:payment.created_at|date:"M d, Y H:i" }}</strong>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <span>Status:</span>
+                        <strong class="text-success">{{ payment.get_status_display }}</strong>
+                    </div>
+                </div>
+                
+                <!-- Transaction Reference -->
+                {% if payment.external_reference or payment.transaction_id %}
+                <div class="transaction-info">
+                    <div class="text-center">
+                        <small class="text-muted">Reference Number:</small><br>
+                        <div class="reference-code">
+                            {{ payment.external_reference|default:payment.transaction_id }}
+                        </div>
+                        <small class="text-muted">Save this reference for your records</small>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Customer Information -->
+                {% if payment.customer_phone or payment.customer_email %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    {% if payment.customer_phone %}
+                    A confirmation SMS has been sent to {{ payment.customer_phone }}.
+                    {% endif %}
+                    {% if payment.customer_email %}
+                    {% if payment.customer_phone %}Additionally, {% else %}{% endif %}
+                    A receipt has been sent to {{ payment.customer_email }}.
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
             
-            {% if payment.service_order.balance_due > 0 %}
-            <a href="/business/{{ request.tenant.slug }}/payments/partial/create/{{ payment.service_order.id }}/" 
-               class="btn btn-warning btn-lg">
-                <i class="fas fa-plus me-2"></i>Pay Remaining Balance
-            </a>
-            {% endif %}
-            {% endif %}
-            
-            <a href="/business/{{ request.tenant.slug }}/payments/" 
-               class="btn btn-outline-secondary btn-lg">
-                <i class="fas fa-list me-2"></i>All Payments
-            </a>
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/" 
+                   class="btn btn-success-primary btn-lg">
+                    <i class="fas fa-receipt me-2"></i>View Receipt
+                </a>
+                
+                {% if payment.service_order %}
+                <a href="/business/{{ request.tenant.slug }}/services/orders/{{ payment.service_order.id }}/" 
+                   class="btn btn-outline-primary btn-lg">
+                    <i class="fas fa-eye me-2"></i>View Service Order
+                </a>
+                {% endif %}
+                
+                <a href="/business/{{ request.tenant.slug }}/payments/process/" 
+                   class="btn btn-outline-secondary btn-lg">
+                    <i class="fas fa-plus me-2"></i>New Payment
+                </a>
+                
+                <div class="mt-3">
+                    <a href="/business/{{ request.tenant.slug }}/payments/" 
+                       class="btn btn-outline-dark">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Payments
+                    </a>
+                </div>
+            </div>
         </div>
-        
-        <!-- Next Steps -->
-        {% if payment.service_order and payment.service_order.balance_due > 0 %}
-        <div class="alert alert-warning mt-3">
-            <i class="fas fa-info-circle me-2"></i>
-            <strong>Partial Payment Complete:</strong> 
-            Remaining balance of KES {{ payment.service_order.balance_due|floatformat:2 }} can be paid later.
-        </div>
-        {% elif payment.service_order and payment.service_order.balance_due == 0 %}
-        <div class="alert alert-success mt-3">
-            <i class="fas fa-check-circle me-2"></i>
-            <strong>Payment Complete:</strong> 
-            Order is fully paid and ready for processing.
-        </div>
-        {% endif %}
     </div>
 </div>
 
-<!-- Auto-print script -->
 <script>
-// Auto-print if requested
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('print') === 'true') {
-    setTimeout(() => {
-        window.print();
-    }, 1000);
-}
-
-// Celebrate animation
-document.addEventListener('DOMContentLoaded', function() {
-    const icon = document.querySelector('.success-icon');
-    icon.style.animation = 'bounce 0.6s ease-in-out';
+// Auto-redirect after 30 seconds (optional)
+setTimeout(function() {
+    const redirectBtn = document.createElement('div');
+    redirectBtn.className = 'alert alert-info mt-3';
+    redirectBtn.innerHTML = `
+        <i class="fas fa-info-circle me-2"></i>
+        You will be redirected to the payments dashboard in <span id="countdown">10</span> seconds.
+        <button class="btn btn-sm btn-outline-primary ms-2" onclick="clearTimeout(autoRedirect)">Cancel</button>
+    `;
     
-    // Add confetti effect (optional)
-    if (typeof confetti !== 'undefined') {
-        confetti({
-            particleCount: 100,
-            spread: 70,
-            origin: { y: 0.6 }
-        });
-    }
-});
+    document.querySelector('.action-buttons').appendChild(redirectBtn);
+    
+    let timeLeft = 10;
+    const countdownElement = document.getElementById('countdown');
+    
+    const countdownTimer = setInterval(function() {
+        timeLeft--;
+        countdownElement.textContent = timeLeft;
+        
+        if (timeLeft <= 0) {
+            clearInterval(countdownTimer);
+            window.location.href = '/business/{{ request.tenant.slug }}/payments/';
+        }
+    }, 1000);
+    
+    window.autoRedirect = countdownTimer;
+}, 20000);
 
-// CSS animation
-const style = document.createElement('style');
-style.textContent = `
-@keyframes bounce {
-    0%, 60%, 100% { transform: translateY(0); }
-    30% { transform: translateY(-15px); }
+// Print receipt function
+function printReceipt() {
+    window.open('/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/?print=1', '_blank');
 }
-`;
-document.head.appendChild(style);
 </script>
 {% endblock %}

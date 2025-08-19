@@ -3,321 +3,841 @@
 
 {% block title %}Payment Methods - {{ block.super }}{% endblock %}
 
-{% block breadcrumbs %}
-{{ block.super }}
-<li class="breadcrumb-item">
-    <a href="/business/{{ request.tenant.slug }}/payments/">Payments</a>
-</li>
-<li class="breadcrumb-item active">Payment Methods</li>
+{% block extra_css %}
+<style>
+    .methods-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .method-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    
+    .method-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+    
+    .method-card.active {
+        border-color: #22c55e;
+        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    }
+    
+    .method-card.inactive {
+        opacity: 0.6;
+        background: #f8fafc;
+    }
+    
+    .method-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+    
+    .method-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .method-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+    
+    .method-icon.cash {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    }
+    
+    .method-icon.card {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    }
+    
+    .method-icon.mpesa {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    }
+    
+    .method-icon.bank {
+        background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+    }
+    
+    .method-details h5 {
+        margin: 0 0 0.25rem 0;
+        font-weight: 600;
+    }
+    
+    .method-details .method-description {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    .method-toggle {
+        position: relative;
+        width: 60px;
+        height: 30px;
+        background: #e5e7eb;
+        border-radius: 15px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    
+    .method-toggle.active {
+        background: #22c55e;
+    }
+    
+    .method-toggle::after {
+        content: '';
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        background: white;
+        border-radius: 50%;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .method-toggle.active::after {
+        transform: translateX(30px);
+    }
+    
+    .method-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #1f2937;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .method-config {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .config-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+    
+    .config-row:last-child {
+        margin-bottom: 0;
+    }
+    
+    .config-label {
+        font-weight: 500;
+        color: #374151;
+    }
+    
+    .config-value {
+        font-family: 'Courier New', monospace;
+        background: #f3f4f6;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+    }
+    
+    .add-method-card {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 2px dashed #cbd5e1;
+        border-radius: 15px;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .add-method-card:hover {
+        border-color: #3b82f6;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    }
+    
+    .add-method-icon {
+        font-size: 3rem;
+        color: #94a3b8;
+        margin-bottom: 1rem;
+    }
+    
+    .add-method-card:hover .add-method-icon {
+        color: #3b82f6;
+    }
+    
+    .btn-configure {
+        background: #6366f1;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        color: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-configure:hover {
+        background: #4f46e5;
+        transform: translateY(-1px);
+        color: white;
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-badge.active {
+        background: #dcfce7;
+        color: #166534;
+    }
+    
+    .status-badge.inactive {
+        background: #fef2f2;
+        color: #991b1b;
+    }
+    
+    .status-badge.testing {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .modal-header {
+        border-bottom: 2px solid #e5e7eb;
+        padding-bottom: 1rem;
+    }
+    
+    .modal-body {
+        padding: 1.5rem 0;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    .form-control {
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.75rem;
+        transition: border-color 0.3s ease;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .alert-info {
+        background: #dbeafe;
+        border: 1px solid #3b82f6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Page Header -->
-    <div class="col-12">
-        <div class="page-header">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="h3 mb-2">Payment Methods</h1>
-                    <p class="text-muted mb-0">Configure and manage available payment methods</p>
+<div class="container-fluid px-4">
+    <div class="methods-container">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1">
+                    <i class="fas fa-credit-card me-2"></i>Payment Methods
+                </h2>
+                <p class="text-muted">Manage your business payment methods and configurations</p>
+            </div>
+            <div>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMethodModal">
+                    <i class="fas fa-plus me-2"></i>Add Payment Method
+                </button>
+            </div>
+        </div>
+        
+        <!-- Payment Methods Grid -->
+        <div class="row">
+            {% for method in payment_methods %}
+            <div class="col-lg-6 col-xl-4">
+                <div class="method-card {% if method.is_active %}active{% else %}inactive{% endif %}">
+                    <div class="method-header">
+                        <div class="method-info">
+                            <div class="method-icon {{ method.code }}">
+                                {% if method.code == 'cash' %}
+                                    <i class="fas fa-money-bill-wave"></i>
+                                {% elif method.code == 'card' %}
+                                    <i class="fas fa-credit-card"></i>
+                                {% elif method.code == 'mpesa' %}
+                                    <i class="fas fa-mobile-alt"></i>
+                                {% elif method.code == 'bank_transfer' %}
+                                    <i class="fas fa-university"></i>
+                                {% else %}
+                                    <i class="fas fa-wallet"></i>
+                                {% endif %}
+                            </div>
+                            <div class="method-details">
+                                <h5>{{ method.name }}</h5>
+                                <div class="method-description">{{ method.description }}</div>
+                            </div>
+                        </div>
+                        <div class="method-toggle {% if method.is_active %}active{% endif %}" 
+                             data-method-id="{{ method.id }}" 
+                             onclick="toggleMethod(this)">
+                        </div>
+                    </div>
+                    
+                    <!-- Configuration -->
+                    {% if method.is_active %}
+                    <div class="method-config">
+                        {% if method.code == 'mpesa' %}
+                        <div class="config-row">
+                            <span class="config-label">Business Short Code:</span>
+                            <span class="config-value">{{ method.config.business_short_code|default:"Not Set" }}</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Consumer Key:</span>
+                            <span class="config-value">{{ method.config.consumer_key|truncatechars:20|default:"Not Set" }}</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Environment:</span>
+                            <span class="config-value">{{ method.config.environment|default:"sandbox"|title }}</span>
+                        </div>
+                        {% elif method.code == 'card' %}
+                        <div class="config-row">
+                            <span class="config-label">Processor:</span>
+                            <span class="config-value">{{ method.config.processor|default:"Not Set" }}</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Merchant ID:</span>
+                            <span class="config-value">{{ method.config.merchant_id|truncatechars:20|default:"Not Set" }}</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Processing Fee:</span>
+                            <span class="config-value">{{ method.config.processing_fee|default:"2.5" }}%</span>
+                        </div>
+                        {% elif method.code == 'cash' %}
+                        <div class="config-row">
+                            <span class="config-label">Till Number:</span>
+                            <span class="config-value">{{ method.config.till_number|default:"Not Set" }}</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Float Amount:</span>
+                            <span class="config-value">KES {{ method.config.float_amount|default:"0"|floatformat:0 }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <span class="status-badge {{ method.status|default:'inactive' }}">
+                                {{ method.get_status_display|default:"Inactive" }}
+                            </span>
+                            <button class="btn-configure" 
+                                    onclick="configureMethod('{{ method.id }}', '{{ method.code }}')">
+                                <i class="fas fa-cog me-1"></i>Configure
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Statistics -->
+                    <div class="method-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">{{ method.total_transactions|default:0 }}</div>
+                            <div class="stat-label">Transactions</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">KES {{ method.total_amount|default:0|floatformat:0 }}</div>
+                            <div class="stat-label">Total Amount</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">{{ method.success_rate|default:0 }}%</div>
+                            <div class="stat-label">Success Rate</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-4 text-md-end">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMethodModal">
-                        <i class="fas fa-plus me-2"></i>Add Method
+            </div>
+            {% empty %}
+            <!-- No methods message -->
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                    <h4>No Payment Methods Configured</h4>
+                    <p class="text-muted">Add your first payment method to start accepting payments</p>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMethodModal">
+                        <i class="fas fa-plus me-2"></i>Add Payment Method
                     </button>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- Active Payment Methods -->
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-credit-card me-2"></i>Active Payment Methods
-                    </h5>
-                    <span class="badge bg-success">{{ active_methods_count }} Active</span>
+            {% endfor %}
+            
+            <!-- Add Method Card -->
+            {% if payment_methods %}
+            <div class="col-lg-6 col-xl-4">
+                <div class="add-method-card" data-bs-toggle="modal" data-bs-target="#addMethodModal">
+                    <div class="add-method-icon">
+                        <i class="fas fa-plus-circle"></i>
+                    </div>
+                    <h5>Add New Method</h5>
+                    <p class="text-muted">Configure additional payment options</p>
                 </div>
             </div>
-            <div class="card-body">
-                {% if payment_methods %}
-                    <div class="row">
-                        {% for method in payment_methods %}
-                        <div class="col-md-6 mb-4">
-                            <div class="payment-method-card">
-                                <div class="method-header">
-                                    <div class="method-icon">
-                                        {% if method.type == 'cash' %}
-                                            <i class="fas fa-money-bill-wave text-success"></i>
-                                        {% elif method.type == 'mpesa' %}
-                                            <i class="fas fa-mobile-alt text-primary"></i>
-                                        {% elif method.type == 'card' %}
-                                            <i class="fas fa-credit-card text-info"></i>
-                                        {% elif method.type == 'bank' %}
-                                            <i class="fas fa-university text-warning"></i>
-                                        {% else %}
-                                            <i class="fas fa-wallet text-secondary"></i>
-                                        {% endif %}
-                                    </div>
-                                    <div class="method-info">
-                                        <h6 class="method-name">{{ method.name }}</h6>
-                                        <small class="text-muted">{{ method.get_type_display }}</small>
-                                    </div>
-                                    <div class="method-actions">
-                                        <div class="dropdown">
-                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <ul class="dropdown-menu">
-                                                <li><a class="dropdown-item" href="#" onclick="editMethod('{{ method.id }}')">
-                                                    <i class="fas fa-edit me-2"></i>Edit
-                                                </a></li>
-                                                <li><a class="dropdown-item" href="#" onclick="toggleMethod('{{ method.id }}')">
-                                                    {% if method.is_active %}
-                                                        <i class="fas fa-pause me-2"></i>Disable
-                                                    {% else %}
-                                                        <i class="fas fa-play me-2"></i>Enable
-                                                    {% endif %}
-                                                </a></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteMethod('{{ method.id }}')">
-                                                    <i class="fas fa-trash me-2"></i>Delete
-                                                </a></li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="method-details">
-                                    <div class="row">
-                                        <div class="col-6">
-                                            <small class="text-muted">Status</small>
-                                            <div>
-                                                {% if method.is_active %}
-                                                    <span class="badge bg-success">Active</span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">Inactive</span>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <small class="text-muted">Transaction Fee</small>
-                                            <div>{{ method.transaction_fee|default:"0.00" }}%</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">No Payment Methods Configured</h5>
-                        <p class="text-muted">Add your first payment method to start accepting payments</p>
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMethodModal">
-                            <i class="fas fa-plus me-2"></i>Add Payment Method
-                        </button>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Payment Method Stats -->
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-pie me-2"></i>Usage Statistics
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if method_stats %}
-                    {% for stat in method_stats %}
-                    <div class="stat-item mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">{{ stat.method_name }}</h6>
-                                <small class="text-muted">{{ stat.transaction_count }} transactions</small>
-                            </div>
-                            <div class="text-end">
-                                <div class="h6 mb-0">{{ stat.percentage }}%</div>
-                                <small class="text-muted">{{ stat.total_amount|floatformat:2 }}</small>
-                            </div>
-                        </div>
-                        <div class="progress mt-2" style="height: 4px;">
-                            <div class="progress-bar" role="progressbar" style="width: {{ stat.percentage }}%"></div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-chart-bar fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">No usage data available</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Quick Settings -->
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-cog me-2"></i>Quick Settings
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" id="autoReconcile" {% if settings.auto_reconcile %}checked{% endif %}>
-                    <label class="form-check-label" for="autoReconcile">
-                        Auto Reconciliation
-                    </label>
-                </div>
-                <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" id="sendReceipts" {% if settings.send_receipts %}checked{% endif %}>
-                    <label class="form-check-label" for="sendReceipts">
-                        Send Email Receipts
-                    </label>
-                </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="requireSignature" {% if settings.require_signature %}checked{% endif %}>
-                    <label class="form-check-label" for="requireSignature">
-                        Require Signature
-                    </label>
-                </div>
-            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
 <!-- Add Method Modal -->
-<div class="modal fade" id="addMethodModal" tabindex="-1" aria-labelledby="addMethodModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade" id="addMethodModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addMethodModalLabel">Add Payment Method</h5>
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>Add Payment Method
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="addMethodForm" method="post">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="methodName" class="form-label">Method Name</label>
-                        <input type="text" class="form-control" id="methodName" name="name" required>
+            <div class="modal-body">
+                <form id="addMethodForm" method="post">
+                    {% csrf_token %}
+                    
+                    <div class="alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Select a payment method type and configure its settings. You can enable/disable methods later.
                     </div>
-                    <div class="mb-3">
-                        <label for="methodType" class="form-label">Type</label>
-                        <select class="form-select" id="methodType" name="type" required>
-                            <option value="">Select type...</option>
-                            <option value="cash">Cash</option>
-                            <option value="mpesa">M-Pesa</option>
-                            <option value="card">Credit/Debit Card</option>
-                            <option value="bank">Bank Transfer</option>
-                            <option value="other">Other</option>
-                        </select>
+                    
+                    <!-- Method Type Selection -->
+                    <div class="form-group">
+                        <label class="form-label">Payment Method Type</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="method-type-option" data-type="cash">
+                                    <div class="method-icon cash">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                    </div>
+                                    <h6>Cash Payments</h6>
+                                    <p class="text-muted">Accept cash payments at your location</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="method-type-option" data-type="card">
+                                    <div class="method-icon card">
+                                        <i class="fas fa-credit-card"></i>
+                                    </div>
+                                    <h6>Card Payments</h6>
+                                    <p class="text-muted">Accept credit and debit card payments</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="method-type-option" data-type="mpesa">
+                                    <div class="method-icon mpesa">
+                                        <i class="fas fa-mobile-alt"></i>
+                                    </div>
+                                    <h6>M-Pesa</h6>
+                                    <p class="text-muted">Accept M-Pesa mobile money payments</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="method-type-option" data-type="bank_transfer">
+                                    <div class="method-icon bank">
+                                        <i class="fas fa-university"></i>
+                                    </div>
+                                    <h6>Bank Transfer</h6>
+                                    <p class="text-muted">Accept direct bank transfers</p>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="method_type" id="selectedMethodType">
                     </div>
-                    <div class="mb-3">
-                        <label for="transactionFee" class="form-label">Transaction Fee (%)</label>
-                        <input type="number" class="form-control" id="transactionFee" name="transaction_fee" step="0.01" min="0">
+                    
+                    <!-- Method Name -->
+                    <div class="form-group">
+                        <label class="form-label" for="methodName">Method Name</label>
+                        <input type="text" name="name" id="methodName" class="form-control" 
+                               placeholder="Enter a name for this payment method">
                     </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="isActive" name="is_active" checked>
-                        <label class="form-check-label" for="isActive">
-                            Active
-                        </label>
+                    
+                    <!-- Method Description -->
+                    <div class="form-group">
+                        <label class="form-label" for="methodDescription">Description</label>
+                        <textarea name="description" id="methodDescription" class="form-control" rows="2"
+                                  placeholder="Brief description of this payment method"></textarea>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Method</button>
-                </div>
-            </form>
+                    
+                    <!-- Configuration Fields (will be populated based on method type) -->
+                    <div id="methodConfigFields"></div>
+                    
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="addMethodForm" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>Add Method
+                </button>
+            </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_css %}
-<style>
-.payment-method-card {
-    border: 1px solid #e9ecef;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    height: 100%;
-    transition: box-shadow 0.15s ease-in-out;
-}
+<!-- Configure Method Modal -->
+<div class="modal fade" id="configureMethodModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-cog me-2"></i>Configure Payment Method
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="configureMethodForm" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="method_id" id="configureMethodId">
+                    
+                    <!-- Configuration fields will be loaded here -->
+                    <div id="configurationFields"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="configureMethodForm" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>Save Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
-.payment-method-card:hover {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-}
-
-.method-header {
-    display: flex;
-    align-items-center;
-    margin-bottom: 1rem;
-}
-
-.method-icon {
-    font-size: 1.5rem;
-    margin-right: 0.75rem;
-}
-
-.method-info {
-    flex: 1;
-}
-
-.method-name {
-    margin-bottom: 0.25rem;
-    font-weight: 600;
-}
-
-.method-details {
-    border-top: 1px solid #f8f9fa;
-    padding-top: 0.75rem;
-}
-
-.stat-item:last-child {
-    margin-bottom: 0 !important;
-}
-</style>
-{% endblock %}
-
-{% block extra_js %}
 <script>
-function editMethod(methodId) {
-    // Implementation for editing method
-    console.log('Edit method:', methodId);
-}
+let selectedMethodType = null;
 
-function toggleMethod(methodId) {
-    // Implementation for toggling method status
-    console.log('Toggle method:', methodId);
-}
-
-function deleteMethod(methodId) {
-    if (confirm('Are you sure you want to delete this payment method?')) {
-        // Implementation for deleting method
-        console.log('Delete method:', methodId);
-    }
-}
-
-// Handle form submission
-document.getElementById('addMethodForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    // Implementation for adding new method
-    console.log('Add new method');
-});
-
-// Handle settings changes
-document.querySelectorAll('.form-check-input').forEach(function(input) {
-    input.addEventListener('change', function() {
-        // Implementation for saving settings
-        console.log('Setting changed:', this.id, this.checked);
+// Method type selection
+document.querySelectorAll('.method-type-option').forEach(option => {
+    option.addEventListener('click', function() {
+        document.querySelectorAll('.method-type-option').forEach(opt => opt.classList.remove('selected'));
+        this.classList.add('selected');
+        
+        selectedMethodType = this.dataset.type;
+        document.getElementById('selectedMethodType').value = selectedMethodType;
+        
+        // Update method name placeholder
+        const nameInput = document.getElementById('methodName');
+        const names = {
+            'cash': 'Cash Payments',
+            'card': 'Card Payments',
+            'mpesa': 'M-Pesa',
+            'bank_transfer': 'Bank Transfer'
+        };
+        nameInput.value = names[selectedMethodType] || '';
+        
+        // Load configuration fields
+        loadConfigurationFields(selectedMethodType);
     });
 });
+
+function loadConfigurationFields(type) {
+    const container = document.getElementById('methodConfigFields');
+    let html = '';
+    
+    switch(type) {
+        case 'cash':
+            html = `
+                <div class="form-group">
+                    <label class="form-label">Till Number (Optional)</label>
+                    <input type="text" name="till_number" class="form-control" placeholder="Enter till number">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Float Amount</label>
+                    <input type="number" name="float_amount" class="form-control" placeholder="0.00" min="0" step="0.01">
+                </div>
+            `;
+            break;
+            
+        case 'card':
+            html = `
+                <div class="form-group">
+                    <label class="form-label">Payment Processor</label>
+                    <select name="processor" class="form-control">
+                        <option value="">Select Processor</option>
+                        <option value="stripe">Stripe</option>
+                        <option value="pesapal">PesaPal</option>
+                        <option value="flutterwave">Flutterwave</option>
+                        <option value="paypal">PayPal</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Merchant ID</label>
+                    <input type="text" name="merchant_id" class="form-control" placeholder="Enter merchant ID">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Processing Fee (%)</label>
+                    <input type="number" name="processing_fee" class="form-control" placeholder="2.5" min="0" max="10" step="0.1">
+                </div>
+            `;
+            break;
+            
+        case 'mpesa':
+            html = `
+                <div class="form-group">
+                    <label class="form-label">Business Short Code</label>
+                    <input type="text" name="business_short_code" class="form-control" placeholder="Enter business short code">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Consumer Key</label>
+                    <input type="text" name="consumer_key" class="form-control" placeholder="Enter consumer key">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Consumer Secret</label>
+                    <input type="password" name="consumer_secret" class="form-control" placeholder="Enter consumer secret">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Environment</label>
+                    <select name="environment" class="form-control">
+                        <option value="sandbox">Sandbox (Testing)</option>
+                        <option value="production">Production (Live)</option>
+                    </select>
+                </div>
+            `;
+            break;
+            
+        case 'bank_transfer':
+            html = `
+                <div class="form-group">
+                    <label class="form-label">Bank Name</label>
+                    <input type="text" name="bank_name" class="form-control" placeholder="Enter bank name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Account Number</label>
+                    <input type="text" name="account_number" class="form-control" placeholder="Enter account number">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Account Name</label>
+                    <input type="text" name="account_name" class="form-control" placeholder="Enter account holder name">
+                </div>
+            `;
+            break;
+    }
+    
+    container.innerHTML = html;
+}
+
+function toggleMethod(toggle) {
+    const methodId = toggle.dataset.methodId;
+    const isActive = toggle.classList.contains('active');
+    
+    // Send AJAX request to toggle method status
+    fetch('/business/{{ request.tenant.slug }}/payments/methods/toggle/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            method_id: methodId,
+            is_active: !isActive
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            toggle.classList.toggle('active');
+            const card = toggle.closest('.method-card');
+            card.classList.toggle('active');
+            card.classList.toggle('inactive');
+            
+            // Reload page to update configuration section
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+function configureMethod(methodId, methodCode) {
+    document.getElementById('configureMethodId').value = methodId;
+    
+    // Load current configuration
+    fetch(`/business/{{ request.tenant.slug }}/payments/methods/${methodId}/config/`)
+    .then(response => response.json())
+    .then(data => {
+        loadConfigurationForm(methodCode, data.config);
+        new bootstrap.Modal(document.getElementById('configureMethodModal')).show();
+    });
+}
+
+function loadConfigurationForm(methodCode, config = {}) {
+    const container = document.getElementById('configurationFields');
+    let html = '';
+    
+    // Similar to loadConfigurationFields but with current values
+    switch(methodCode) {
+        case 'cash':
+            html = `
+                <div class="form-group">
+                    <label class="form-label">Till Number</label>
+                    <input type="text" name="till_number" class="form-control" value="${config.till_number || ''}" placeholder="Enter till number">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Float Amount</label>
+                    <input type="number" name="float_amount" class="form-control" value="${config.float_amount || ''}" placeholder="0.00" min="0" step="0.01">
+                </div>
+            `;
+            break;
+            
+        case 'card':
+            html = `
+                <div class="form-group">
+                    <label class="form-label">Payment Processor</label>
+                    <select name="processor" class="form-control">
+                        <option value="">Select Processor</option>
+                        <option value="stripe" ${config.processor === 'stripe' ? 'selected' : ''}>Stripe</option>
+                        <option value="pesapal" ${config.processor === 'pesapal' ? 'selected' : ''}>PesaPal</option>
+                        <option value="flutterwave" ${config.processor === 'flutterwave' ? 'selected' : ''}>Flutterwave</option>
+                        <option value="paypal" ${config.processor === 'paypal' ? 'selected' : ''}>PayPal</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Merchant ID</label>
+                    <input type="text" name="merchant_id" class="form-control" value="${config.merchant_id || ''}" placeholder="Enter merchant ID">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <input type="password" name="api_key" class="form-control" value="${config.api_key || ''}" placeholder="Enter API key">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Processing Fee (%)</label>
+                    <input type="number" name="processing_fee" class="form-control" value="${config.processing_fee || '2.5'}" min="0" max="10" step="0.1">
+                </div>
+            `;
+            break;
+            
+        case 'mpesa':
+            html = `
+                <div class="form-group">
+                    <label class="form-label">Business Short Code</label>
+                    <input type="text" name="business_short_code" class="form-control" value="${config.business_short_code || ''}" placeholder="Enter business short code">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Consumer Key</label>
+                    <input type="text" name="consumer_key" class="form-control" value="${config.consumer_key || ''}" placeholder="Enter consumer key">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Consumer Secret</label>
+                    <input type="password" name="consumer_secret" class="form-control" value="${config.consumer_secret || ''}" placeholder="Enter consumer secret">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Passkey</label>
+                    <input type="password" name="passkey" class="form-control" value="${config.passkey || ''}" placeholder="Enter passkey">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Environment</label>
+                    <select name="environment" class="form-control">
+                        <option value="sandbox" ${config.environment === 'sandbox' ? 'selected' : ''}>Sandbox (Testing)</option>
+                        <option value="production" ${config.environment === 'production' ? 'selected' : ''}>Production (Live)</option>
+                    </select>
+                </div>
+            `;
+            break;
+            
+        case 'bank_transfer':
+            html = `
+                <div class="form-group">
+                    <label class="form-label">Bank Name</label>
+                    <input type="text" name="bank_name" class="form-control" value="${config.bank_name || ''}" placeholder="Enter bank name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Account Number</label>
+                    <input type="text" name="account_number" class="form-control" value="${config.account_number || ''}" placeholder="Enter account number">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Account Name</label>
+                    <input type="text" name="account_name" class="form-control" value="${config.account_name || ''}" placeholder="Enter account holder name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">SWIFT Code</label>
+                    <input type="text" name="swift_code" class="form-control" value="${config.swift_code || ''}" placeholder="Enter SWIFT code (optional)">
+                </div>
+            `;
+            break;
+    }
+    
+    container.innerHTML = html;
+}
+
+// Add CSS for method type selection
+const style = document.createElement('style');
+style.textContent = `
+    .method-type-option {
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 1rem;
+    }
+    
+    .method-type-option:hover {
+        border-color: #3b82f6;
+        background: #eff6ff;
+    }
+    
+    .method-type-option.selected {
+        border-color: #3b82f6;
+        background: #dbeafe;
+    }
+    
+    .method-type-option h6 {
+        margin: 0.5rem 0 0.25rem 0;
+    }
+    
+    .method-type-option p {
+        margin: 0;
+        font-size: 0.875rem;
+    }
+`;
+document.head.appendChild(style);
 </script>
 {% endblock %}

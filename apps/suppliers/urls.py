@@ -46,6 +46,7 @@ urlpatterns = [
     path('invoices/', views.InvoiceListView.as_view(), name='invoice_list'),
     path('invoices/create/', views.InvoiceCreateView.as_view(), name='invoice_create'),
     path('invoices/<uuid:pk>/', views.InvoiceDetailView.as_view(), name='invoice_detail'),
+    path('invoices/<uuid:pk>/edit/', views.InvoiceUpdateView.as_view(), name='invoice_edit'),
     path('invoices/<uuid:pk>/print/', views.invoice_print, name='invoice_print'),
     path('invoices/<uuid:pk>/pdf/', views.invoice_pdf, name='invoice_pdf'),
     path('invoices/<uuid:pk>/verify/', views.verify_invoice, name='invoice_verify'),
@@ -75,4 +76,6 @@ urlpatterns = [
     path('ajax/search-purchase-orders/', views.ajax_search_purchase_orders, name='ajax_search_purchase_orders'),
     path('ajax/purchase-order-details/', views.ajax_purchase_order_details, name='ajax_purchase_order_details'),
     path('ajax/supplier-details/', views.ajax_supplier_details, name='ajax_supplier_details'),
+    path('ajax/po-items/<uuid:po_id>/', views.get_purchase_order_items, name='ajax_get_po_items'),
+    path('ajax/inventory-items/', views.get_inventory_items, name='ajax_get_inventory_items'),
 ]

@@ -1,485 +1,362 @@
 {% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}M-Pesa Payment - {{ payment.payment_id }} - {{ block.super }}{% endblock %}
+{% block title %}M-Pesa Payment - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <style>
-.mpesa-container { max-width: 900px; margin: 0 auto; }
-.mpesa-header { background: #dcfce7; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid #16a34a; }
-.mpesa-form { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; }
-.summary-table { background: white; border: 1px solid #e5e7eb; border-radius: 8px; }
-.summary-table td, .summary-table th { padding: 0.75rem; border-bottom: 1px solid #f3f4f6; }
-.summary-table tr:last-child td { border-bottom: none; }
-.phone-input { font-size: 1.125rem; text-align: center; padding: 0.75rem; }
-.mpesa-logo { width: 60px; height: 60px; background: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: white; font-weight: 700; }
-.phone-prefix { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #6b7280; font-weight: 500; z-index: 2; }
-.phone-group { position: relative; }
-.phone-input-with-prefix { padding-left: 4rem; }
-.payment-mode-tabs { display: flex; margin-bottom: 1.5rem; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; }
-.payment-tab { flex: 1; padding: 0.75rem; background: #f8fafc; border: none; cursor: pointer; transition: all 0.2s; text-align: center; }
-.payment-tab.active { background: #16a34a; color: white; }
-.payment-tab:hover:not(.active) { background: #e5e7eb; }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
-.mpesa-code-input { font-family: monospace; font-size: 1.1rem; text-align: center; text-transform: uppercase; letter-spacing: 2px; }
-.quick-codes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
-.quick-code-btn { padding: 0.5rem; border: 1px solid #d1d5db; background: white; border-radius: 4px; cursor: pointer; font-size: 0.875rem; transition: all 0.2s; }
-.quick-code-btn:hover { background: #f3f4f6; }
-.paybill-info { background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
-.paybill-number { font-size: 1.5rem; font-weight: bold; color: #16a34a; text-align: center; font-family: monospace; letter-spacing: 3px; }
-.validation-success { color: #16a34a; }
-.validation-error { color: #dc2626; }
+    .mpesa-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    
+    .mpesa-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .mpesa-header {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .mpesa-logo {
+        width: 80px;
+        height: 80px;
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 2rem;
+        color: #10b981;
+    }
+    
+    .payment-summary {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dcfce7;
+    }
+    
+    .summary-item:last-child {
+        border-bottom: none;
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #059669;
+    }
+    
+    .phone-display {
+        background: #065f46;
+        color: white;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin: 1rem 0;
+        font-family: 'Courier New', monospace;
+    }
+    
+    .status-pending {
+        background: #fef3c7;
+        border: 1px solid #fbbf24;
+        color: #92400e;
+    }
+    
+    .status-processing {
+        background: #dbeafe;
+        border: 1px solid #3b82f6;
+        color: #1e40af;
+    }
+    
+    .status-completed {
+        background: #dcfce7;
+        border: 1px solid #10b981;
+        color: #059669;
+    }
+    
+    .status-failed {
+        background: #fee2e2;
+        border: 1px solid #ef4444;
+        color: #dc2626;
+    }
+    
+    .status-indicator {
+        padding: 1rem;
+        border-radius: 10px;
+        text-align: center;
+        margin: 1rem 0;
+        font-weight: 600;
+    }
+    
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #e5e7eb;
+        border-top: 4px solid #10b981;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .instructions {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    
+    .btn-mpesa {
+        background: linear-gradient(135deg, #10b981, #059669);
+        border: none;
+        color: white;
+        border-radius: 10px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-mpesa:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+    
+    .countdown {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #dc2626;
+        text-align: center;
+        margin: 1rem 0;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="mpesa-container">
-    <!-- Header -->
-    <div class="mpesa-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h4 class="mb-1">
-                    <i class="fas fa-mobile-alt text-success me-2"></i>
-                    M-Pesa Payment
-                </h4>
-                <p class="mb-0">Payment ID: {{ payment.payment_id }} • Amount: KES {{ payment.amount|floatformat:2 }}</p>
-            </div>
-            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back
-            </a>
-        </div>
-    </div>
-
-    <form method="post" id="mpesaForm">
-        {% csrf_token %}
-        
-        <div class="row">
-            <div class="col-lg-8">
-                <!-- M-Pesa Form -->
-                <div class="mpesa-form">
-                    <div class="text-center mb-4">
-                        <div class="mpesa-logo">M-PESA</div>
-                        <h5 class="text-success mb-2">Mobile Money Payment</h5>
-                        <p class="text-muted">Secure and instant mobile money transfer</p>
-                    </div>
-                    
-                    <!-- Payment Summary -->
-                    <table class="table summary-table mb-4">
-                        <tr>
-                            <td>Payment Amount:</td>
-                            <td><strong>KES {{ payment.amount|floatformat:2 }}</strong></td>
-                        </tr>
-                        {% if payment.processing_fee > 0 %}
-                        <tr>
-                            <td>Processing Fee:</td>
-                            <td>KES {{ payment.processing_fee|floatformat:2 }}</td>
-                        </tr>
-                        {% endif %}
-                        <tr class="table-success">
-                            <td><strong>Total to Pay:</strong></td>
-                            <td><strong>KES {{ payment.amount|floatformat:2 }}</strong></td>
-                        </tr>
-                    </table>
-                    
-                    <!-- Payment Mode Tabs -->
-                    <div class="payment-mode-tabs">
-                        <button type="button" class="payment-tab active" onclick="switchTab('stk')">
-                            <i class="fas fa-mobile-alt me-2"></i>STK Push
-                        </button>
-                        <button type="button" class="payment-tab" onclick="switchTab('code')">
-                            <i class="fas fa-keyboard me-2"></i>Transaction Code
-                        </button>
-                    </div>
-                    
-                    <!-- STK Push Tab -->
-                    <div id="stk-tab" class="tab-content active">
-                        <h6 class="mb-3"><i class="fas fa-mobile-alt text-success me-2"></i>Send STK Push Request</h6>
-                        <p class="text-muted small mb-3">We'll send a payment request directly to your phone</p>
-                        
-                        <div class="form-group">
-                            <label class="form-label">M-Pesa Phone Number</label>
-                            <div class="phone-group">
-                                <span class="phone-prefix">+254</span>
-                                <input type="tel" class="form-control phone-input phone-input-with-prefix" 
-                                       name="phone_number" id="phone_number" placeholder="712345678"
-                                       value="{% if payment.customer and payment.customer.phone %}{{ payment.customer.phone|slice:'4:' }}{% endif %}" 
-                                       maxlength="9" pattern="[0-9]*" oninput="validatePhone()" required>
-                            </div>
-                            <div id="phoneValidation" class="mt-1"></div>
-                        </div>
-                        <input type="hidden" name="payment_mode" value="stk">
-                    </div>
-                    
-                    <!-- Transaction Code Tab -->
-                    <div id="code-tab" class="tab-content">
-                        <h6 class="mb-3"><i class="fas fa-keyboard text-success me-2"></i>Enter M-Pesa Transaction Code</h6>
-                        <p class="text-muted small mb-3">
-                            If you have already sent money via M-Pesa, enter the transaction code received via SMS
-                        </p>
-                        
-                        <!-- Quick Code Examples -->
-                        <div class="quick-codes">
-                            <button type="button" class="quick-code-btn" onclick="setExampleCode('OEI2AK4J2R')">
-                                <i class="fas fa-copy me-1"></i> Example: OEI2AK4J2R
-                            </button>
-                            <button type="button" class="quick-code-btn" onclick="setExampleCode('NEI5BL7M3T')">
-                                <i class="fas fa-copy me-1"></i> Example: NEI5BL7M3T
-                            </button>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">M-Pesa Transaction Code</label>
-                            <input type="text" class="form-control mpesa-code-input" 
-                                   name="mpesa_code" id="mpesa_code" placeholder="OEI2AK4J2R"
-                                   maxlength="10" oninput="validateMpesaCode()">
-                            <div id="codeValidation" class="mt-1"></div>
-                            <small class="text-muted">10-character alphanumeric code from M-Pesa SMS</small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Your Phone Number</label>
-                            <div class="phone-group">
-                                <span class="phone-prefix">+254</span>
-                                <input type="tel" class="form-control phone-input phone-input-with-prefix" 
-                                       name="sender_phone" id="sender_phone" placeholder="712345678"
-                                       value="{% if payment.customer and payment.customer.phone %}{{ payment.customer.phone|slice:'4:' }}{% endif %}" 
-                                       maxlength="9" pattern="[0-9]*" oninput="validateSenderPhone()">
-                            </div>
-                            <small class="text-muted">Phone number that sent the M-Pesa payment</small>
-                        </div>
-                        
-                        <input type="hidden" name="payment_mode" value="code">
-                    </div>
+<div class="container-fluid px-4">
+    <div class="mpesa-container">
+        <div class="mpesa-card">
+            <!-- Header -->
+            <div class="mpesa-header">
+                <div class="mpesa-logo">
+                    <i class="fas fa-mobile-alt"></i>
                 </div>
+                <h2 class="mb-2">M-Pesa Payment</h2>
+                <p class="mb-0 opacity-90">{{ request.tenant.name }}</p>
             </div>
             
-            <div class="col-lg-4">
-                <!-- Transaction Details -->
-                <div class="mpesa-form">
-                    <h5 class="mb-3">Transaction Details</h5>
-                    <table class="table summary-table">
-                        <tr>
-                            <td>Payment ID:</td>
-                            <td><strong>{{ payment.payment_id }}</strong></td>
-                        </tr>
-                        <tr>
-                            <td>Customer:</td>
-                            <td>{{ payment.customer.display_name|default:"Walk-in Customer" }}</td>
-                        </tr>
-                        {% if payment.service_order %}
-                        <tr>
-                            <td>Service Order:</td>
-                            <td>{{ payment.service_order.order_number }}</td>
-                        </tr>
-                        {% endif %}
-                        <tr>
-                            <td>Amount:</td>
-                            <td><strong>KES {{ payment.amount|floatformat:2 }}</strong></td>
-                        </tr>
-                        <tr>
-                            <td>Method:</td>
-                            <td><span class="badge bg-success">M-Pesa</span></td>
-                        </tr>
-                        <tr>
-                            <td>Status:</td>
-                            <td><span class="badge bg-warning">{{ payment.get_status_display }}</span></td>
-                        </tr>
-                    </table>
-                    
-                    <!-- Quick Phone Selection -->
-                    {% if payment.customer.phone %}
-                    <div class="mb-3">
-                        <button type="button" class="btn btn-outline-success btn-sm w-100" 
-                                onclick="setPhone('{{ payment.customer.phone }}')">
-                            <i class="fas fa-user me-2"></i>Use Customer Phone
-                        </button>
+            <div class="card-body p-4">
+                <!-- Payment Summary -->
+                <div class="payment-summary">
+                    <h5 class="mb-3 text-center">
+                        <i class="fas fa-receipt text-success me-2"></i>Payment Details
+                    </h5>
+                    <div class="summary-item">
+                        <span>Payment ID:</span>
+                        <span>{{ payment.payment_id }}</span>
+                    </div>
+                    {% if payment.customer %}
+                    <div class="summary-item">
+                        <span>Customer:</span>
+                        <span>{{ payment.customer.display_name }}</span>
                     </div>
                     {% endif %}
-                    
-                    <!-- Action Buttons -->
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
-                            <i class="fas fa-mobile-alt me-2"></i>
-                            <span id="submitText">Send M-Pesa Request</span>
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
+                    {% if payment.service_order %}
+                    <div class="summary-item">
+                        <span>Service Order:</span>
+                        <span>{{ payment.service_order.order_number }}</span>
                     </div>
-                    
-                    <!-- Instructions -->
-                    <div class="mt-3 p-3 bg-light rounded">
-                        <h6 class="text-muted mb-2">
-                            <i class="fas fa-info-circle me-2"></i>Instructions
-                        </h6>
-                        <ul class="list-unstyled text-muted mb-0 small" id="instructionsList">
-                            <li>• Enter your M-Pesa number</li>
-                            <li>• Click "Send Request"</li>
-                            <li>• Check your phone for prompt</li>
-                            <li>• Enter your M-Pesa PIN</li>
-                        </ul>
+                    {% endif %}
+                    <div class="summary-item">
+                        <span>Amount:</span>
+                        <span>KES {{ payment.amount|floatformat:2 }}</span>
                     </div>
+                    {% if payment.processing_fee > 0 %}
+                    <div class="summary-item">
+                        <span>Processing Fee:</span>
+                        <span>KES {{ payment.processing_fee|floatformat:2 }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Total Amount:</span>
+                        <span>KES {{ payment.amount|add:payment.processing_fee|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Phone Number Display -->
+                <div class="phone-display">
+                    <i class="fas fa-mobile-alt me-2"></i>{{ payment.customer_phone }}
+                </div>
+                
+                <!-- Payment Status -->
+                <div class="status-indicator status-{{ payment.status }}">
+                    {% if payment.status == 'pending' %}
+                        <div class="spinner mb-2"></div>
+                        <div>Waiting for Payment Request...</div>
+                        <small>We're sending the payment request to your phone</small>
+                    {% elif payment.status == 'processing' %}
+                        <div class="spinner mb-2"></div>
+                        <div>Processing Payment...</div>
+                        <small>Please complete the payment on your phone</small>
+                    {% elif payment.status == 'completed' %}
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <div>Payment Successful!</div>
+                        <small>Transaction ID: {{ payment.transaction_id }}</small>
+                    {% elif payment.status == 'failed' %}
+                        <i class="fas fa-times-circle fa-2x mb-2"></i>
+                        <div>Payment Failed</div>
+                        <small>{{ payment.failure_reason|default:"Payment was not completed" }}</small>
+                    {% endif %}
+                </div>
+                
+                <!-- Instructions -->
+                {% if payment.status == 'pending' or payment.status == 'processing' %}
+                <div class="instructions">
+                    <h6 class="fw-bold mb-3">
+                        <i class="fas fa-info-circle text-primary me-2"></i>How to Complete Payment
+                    </h6>
+                    <ol class="mb-0">
+                        <li class="mb-2">You will receive a payment request on your phone</li>
+                        <li class="mb-2">Enter your M-Pesa PIN to confirm</li>
+                        <li class="mb-2">Wait for confirmation SMS</li>
+                        <li>Payment will be automatically verified</li>
+                    </ol>
+                </div>
+                
+                <!-- Countdown Timer -->
+                <div class="countdown" id="countdown">
+                    Payment expires in: <span id="timeRemaining">05:00</span>
+                </div>
+                {% endif %}
+                
+                <!-- Form for Processing -->
+                {% if payment.status == 'pending' %}
+                <form method="post" id="mpesaForm">
+                    {% csrf_token %}
                     
-                    <!-- Support Info -->
-                    <div class="mt-3 p-3 bg-info bg-opacity-10 rounded">
-                        <h6 class="text-info mb-2">
-                            <i class="fas fa-headset me-2"></i>Need Help?
-                        </h6>
-                        <div class="small text-muted">
-                            <div>Support: {{ request.tenant.phone|default:"+254 700 000 000" }}</div>
-                            <div>Available 24/7</div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <input type="tel" class="form-control" id="mpesaPhone" name="mpesa_phone" 
+                                       value="{{ payment.customer_phone }}" placeholder="254712345678" required>
+                                <label>M-Pesa Phone Number</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <input type="number" class="form-control" id="amount" name="amount" 
+                                       value="{{ payment.amount }}" readonly>
+                                <label>Amount (KES)</label>
+                            </div>
                         </div>
                     </div>
+                    
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-mpesa btn-lg">
+                            <i class="fas fa-paper-plane me-2"></i>Send Payment Request
+                        </button>
+                    </div>
+                </form>
+                {% endif %}
+                
+                <!-- Action Buttons -->
+                <div class="text-center mt-4">
+                    {% if payment.status == 'pending' or payment.status == 'processing' %}
+                    <button class="btn btn-outline-primary me-2" onclick="checkPaymentStatus()">
+                        <i class="fas fa-sync me-2"></i>Check Status
+                    </button>
+                    {% endif %}
+                    
+                    {% if payment.status == 'completed' %}
+                    <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/" 
+                       class="btn btn-success me-2">
+                        <i class="fas fa-receipt me-2"></i>View Receipt
+                    </a>
+                    {% endif %}
+                    
+                    <a href="/business/{{ request.tenant.slug }}/payments/" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Payments
+                    </a>
                 </div>
             </div>
         </div>
-    </form>
+    </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-let currentTab = 'stk';
+let countdownTimer;
+let timeRemaining = 300; // 5 minutes in seconds
 
-function switchTab(tab) {
-    // Update tab buttons
-    document.querySelectorAll('.payment-tab').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    
-    // Update tab content
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    document.getElementById(tab + '-tab').classList.add('active');
-    
-    // Update form behavior
-    currentTab = tab;
-    updateSubmitButton();
-    updateInstructions();
-    validateForm();
-}
-
-function updateInstructions() {
-    const instructionsList = document.getElementById('instructionsList');
-    
-    if (currentTab === 'stk') {
-        instructionsList.innerHTML = `
-            <li>• Enter your M-Pesa number</li>
-            <li>• Click "Send Request"</li>
-            <li>• Check your phone for prompt</li>
-            <li>• Enter your M-Pesa PIN</li>
-        `;
-    } else if (currentTab === 'code') {
-        instructionsList.innerHTML = `
-            <li>• Send money to our M-Pesa number</li>
-            <li>• Get transaction code from SMS</li>
-            <li>• Enter the code above</li>
-            <li>• Click "Verify Payment"</li>
-        `;
-    } else {
-        instructionsList.innerHTML = `
-            <li>• Send money to our M-Pesa number</li>
-            <li>• Get transaction code from SMS</li>
-            <li>• Enter the code above</li>
-            <li>• Click "Verify Payment"</li>
-        `;
-    }
-}
-
-function updateSubmitButton() {
-    const submitBtn = document.getElementById('submitBtn');
-    const submitText = document.getElementById('submitText');
-    
-    if (currentTab === 'stk') {
-        submitText.textContent = 'Send M-Pesa Request';
-        submitBtn.innerHTML = '<i class="fas fa-mobile-alt me-2"></i>' + submitText.textContent;
-    } else {
-        submitText.textContent = 'Verify M-Pesa Payment';
-        submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>' + submitText.textContent;
-    }
-}
-
-function validatePhone() {
-    const phoneInput = document.getElementById('phone_number');
-    const validation = document.getElementById('phoneValidation');
-    
-    let phoneNumber = phoneInput.value.replace(/\D/g, '');
-    
-    if (phoneNumber.startsWith('0')) {
-        phoneNumber = '254' + phoneNumber.substring(1);
-    } else if (!phoneNumber.startsWith('254') && phoneNumber.length > 0) {
-        phoneNumber = '254' + phoneNumber;
-    }
-    
-    if (phoneNumber.startsWith('254') && phoneNumber.length > 3) {
-        phoneInput.value = phoneNumber.substring(3);
-    }
-    
-    const isValid = /^254[17]\d{8}$/.test(phoneNumber);
-    
-    if (phoneInput.value.length === 0) {
-        validation.innerHTML = '';
-    } else if (isValid) {
-        validation.innerHTML = '<small class="validation-success"><i class="fas fa-check-circle me-1"></i>Valid phone number</small>';
-    } else {
-        validation.innerHTML = '<small class="validation-error"><i class="fas fa-times-circle me-1"></i>Enter valid Kenyan mobile number</small>';
-    }
-    
-    validateForm();
-}
-
-function validateMpesaCode() {
-    const codeInput = document.getElementById('mpesa_code');
-    const validation = document.getElementById('codeValidation');
-    
-    // Convert to uppercase and remove spaces
-    codeInput.value = codeInput.value.toUpperCase().replace(/\s/g, '');
-    
-    const code = codeInput.value;
-    const isValid = /^[A-Z0-9]{10}$/.test(code);
-    
-    if (code.length === 0) {
-        validation.innerHTML = '';
-    } else if (isValid) {
-        validation.innerHTML = '<small class="validation-success"><i class="fas fa-check-circle me-1"></i>Valid M-Pesa code format</small>';
-    } else {
-        validation.innerHTML = '<small class="validation-error"><i class="fas fa-times-circle me-1"></i>M-Pesa code should be 10 characters (letters and numbers)</small>';
-    }
-    
-    validateForm();
-}
-
-function validateSenderPhone() {
-    const phoneInput = document.getElementById('sender_phone');
-    let phoneNumber = phoneInput.value.replace(/\D/g, '');
-    
-    if (phoneNumber.startsWith('0')) {
-        phoneNumber = '254' + phoneNumber.substring(1);
-    } else if (!phoneNumber.startsWith('254') && phoneNumber.length > 0) {
-        phoneNumber = '254' + phoneNumber;
-    }
-    
-    if (phoneNumber.startsWith('254') && phoneNumber.length > 3) {
-        phoneInput.value = phoneNumber.substring(3);
-    }
-    
-    validateForm();
-}
-
-function validateForm() {
-    const submitBtn = document.getElementById('submitBtn');
-    let isValid = false;
-    
-    if (currentTab === 'stk') {
-        const phoneInput = document.getElementById('phone_number');
-        let phoneNumber = phoneInput.value.replace(/\D/g, '');
-        if (!phoneNumber.startsWith('254')) {
-            phoneNumber = '254' + phoneNumber;
+function startCountdown() {
+    countdownTimer = setInterval(function() {
+        timeRemaining--;
+        
+        const minutes = Math.floor(timeRemaining / 60);
+        const seconds = timeRemaining % 60;
+        
+        document.getElementById('timeRemaining').textContent = 
+            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        if (timeRemaining <= 0) {
+            clearInterval(countdownTimer);
+            document.getElementById('countdown').innerHTML = 
+                '<span class="text-danger">Payment request expired. Please try again.</span>';
         }
-        isValid = /^254[17]\d{8}$/.test(phoneNumber);
-    } else if (currentTab === 'code') {
-        const codeInput = document.getElementById('mpesa_code');
-        const senderPhoneInput = document.getElementById('sender_phone');
-        const codeValid = /^[A-Z0-9]{10}$/.test(codeInput.value);
-        const phoneValid = senderPhoneInput.value.length >= 9;
-        isValid = codeValid && phoneValid;
-    }
-    
-    submitBtn.disabled = !isValid;
+    }, 1000);
 }
 
-function setPhone(phone) {
-    let cleanPhone = phone.replace(/\D/g, '');
-    if (cleanPhone.startsWith('254')) {
-        cleanPhone = cleanPhone.substring(3);
-    } else if (cleanPhone.startsWith('0')) {
-        cleanPhone = cleanPhone.substring(1);
-    }
-    
-    // Set phone for all relevant inputs
-    const phoneNumber = document.getElementById('phone_number');
-    const senderPhone = document.getElementById('sender_phone');
-    
-    if (phoneNumber) phoneNumber.value = cleanPhone;
-    if (senderPhone) senderPhone.value = cleanPhone;
-    
-    validatePhone();
-    validateForm();
+function checkPaymentStatus() {
+    fetch(`/business/{{ request.tenant.slug }}/payments/ajax/{{ payment.payment_id }}/mpesa-status/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'completed') {
+                location.reload();
+            } else if (data.status === 'failed') {
+                clearInterval(countdownTimer);
+                location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Error checking payment status:', error);
+        });
 }
 
-function setExampleCode(code) {
-    document.getElementById('mpesa_code').value = code;
-    validateMpesaCode();
-}
-
-function resetForm() {
-    // Reset all inputs
-    const inputs = ['phone_number', 'mpesa_code', 'sender_phone'];
-    inputs.forEach(id => {
-        const input = document.getElementById(id);
-        if (input) input.value = '';
-    });
+// Auto-refresh status for pending/processing payments
+{% if payment.status == 'pending' or payment.status == 'processing' %}
+document.addEventListener('DOMContentLoaded', function() {
+    startCountdown();
     
-    // Reset validations
-    const validations = ['phoneValidation', 'codeValidation'];
-    validations.forEach(id => {
-        const validation = document.getElementById(id);
-        if (validation) validation.innerHTML = '';
-    });
-    
-    validateForm();
-}
+    // Check status every 10 seconds
+    setInterval(checkPaymentStatus, 10000);
+});
+{% endif %}
 
 // Form submission
-document.getElementById('mpesaForm').addEventListener('submit', function(e) {
-    const btn = document.getElementById('submitBtn');
-    if (btn.disabled) {
-        e.preventDefault();
-        return;
-    }
-    
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
-    btn.disabled = true;
-    
-    // Show different messages based on payment mode
-    let message = 'Processing payment...';
-    if (currentTab === 'stk') {
-        message = 'Sending STK push request...';
-    } else {
-        message = 'Verifying transaction code...';
-    }
-    
-    // You could show a toast notification here
-    console.log(message);
-});
-
-// Phone input restrictions
-document.addEventListener('DOMContentLoaded', function() {
-    const phoneInputs = ['phone_number', 'sender_phone'];
-    
-    phoneInputs.forEach(inputId => {
-        const input = document.getElementById(inputId);
-        if (input) {
-            input.addEventListener('input', function(e) {
-                this.value = this.value.replace(/\D/g, '');
-                if (this.value.length > 9) {
-                    this.value = this.value.substring(0, 9);
-                }
-                
-                if (inputId === 'phone_number') validatePhone();
-                else validateForm();
-            });
-        }
-    });
-    
-    // Auto-fill customer phone if available
-    {% if payment.customer.phone %}
-    setPhone('{{ payment.customer.phone }}');
-    {% endif %}
-    
-    // Initialize validation
-    validateForm();
-    updateInstructions();
+document.getElementById('mpesaForm')?.addEventListener('submit', function(e) {
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending Request...';
 });
 </script>
 {% endblock %}

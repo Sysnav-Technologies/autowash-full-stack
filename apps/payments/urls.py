@@ -14,6 +14,8 @@ urlpatterns = [
     
     # Reports & Management - specific URLs must come before generic patterns
     path('methods/', views.payment_methods_view, name='methods'),
+    path('methods/toggle/', views.toggle_payment_method, name='toggle_method'),
+    path('methods/<int:method_id>/config/', views.get_payment_method_config, name='method_config'),
     path('reports/', views.payment_reports_view, name='reports'),
     path('reconciliation/', views.reconciliation_view, name='reconciliation'),
     path('settings/', views.payment_settings_view, name='settings'),

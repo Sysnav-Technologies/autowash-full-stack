@@ -1,357 +1,647 @@
 {% extends 'base/base.html' %}
 {% load static %}
 
-{% block title %}Payments Dashboard - {{ block.super }}{% endblock %}
+{% block title %}Payment Dashboard - {{ block.super }}{% endblock %}
 
-{% block breadcrumbs %}
-{{ block.super }}
-<li class="breadcrumb-item active">Payments</li>
+{% block extra_css %}
+<style>
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        border: none;
+        height: 100%;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    }
+    
+    .stats-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        margin-bottom: 1rem;
+    }
+    
+    .stats-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        line-height: 1;
+    }
+    
+    .stats-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .stats-trend {
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+    }
+    
+    .bg-success-light { background: linear-gradient(135deg, #28a745, #20c997); color: white; }
+    .bg-primary-light { background: linear-gradient(135deg, #007bff, #6610f2); color: white; }
+    .bg-warning-light { background: linear-gradient(135deg, #ffc107, #fd7e14); color: white; }
+    .bg-info-light { background: linear-gradient(135deg, #17a2b8, #6f42c1); color: white; }
+    .bg-danger-light { background: linear-gradient(135deg, #dc3545, #e83e8c); color: white; }
+    
+    .main-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        border: none;
+        overflow: hidden;
+    }
+    
+    .main-card .card-header {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.25rem 1.5rem;
+    }
+    
+    .payments-table {
+        margin: 0;
+    }
+    
+    .payments-table thead th {
+        background: #f8f9fa;
+        border: none;
+        font-weight: 600;
+        color: #495057;
+        padding: 1rem;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .payments-table tbody td {
+        padding: 1rem;
+        border-color: #f1f3f4;
+        vertical-align: middle;
+    }
+    
+    .payments-table tbody tr {
+        transition: all 0.2s ease;
+    }
+    
+    .payments-table tbody tr:hover {
+        background-color: rgba(0,123,255,0.05);
+        transform: scale(1.001);
+    }
+    
+    .customer-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 14px;
+        margin-right: 12px;
+    }
+    
+    .payment-id {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .amount-display {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #28a745;
+    }
+    
+    .status-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 25px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .method-badge {
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    
+    .quick-actions {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        border: none;
+        margin-bottom: 1.5rem;
+    }
+    
+    .payment-methods-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        border: none;
+    }
+    
+    .method-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem 0;
+        border-bottom: 1px solid #f1f3f4;
+    }
+    
+    .method-item:last-child {
+        border-bottom: none;
+    }
+    
+    .method-icon {
+        width: 45px;
+        height: 45px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        font-size: 18px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #6c757d;
+    }
+    
+    .empty-state .empty-icon {
+        font-size: 5rem;
+        margin-bottom: 1.5rem;
+        opacity: 0.3;
+    }
+    
+    .action-btn {
+        border-radius: 10px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border: none;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    
+    .alert-modern {
+        border-radius: 12px;
+        border: none;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-header {
+            padding: 1.5rem;
+            text-align: center;
+        }
+        
+        .stats-card {
+            margin-bottom: 1rem;
+        }
+        
+        .stats-number {
+            font-size: 2rem;
+        }
+        
+        .payments-table {
+            font-size: 0.85rem;
+        }
+        
+        .customer-avatar {
+            width: 35px;
+            height: 35px;
+            font-size: 12px;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Page Header -->
-    <div class="col-12">
-        <div class="page-header">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="h3 mb-2">Payments Dashboard</h1>
-                    <p class="text-muted mb-0">Monitor and manage all payment transactions</p>
-                </div>
-                <div class="col-md-4 text-md-end">
-                    <a href="{% url 'payments:process' %}" class="btn btn-primary">
+<div class="container-fluid px-4">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h2 mb-2 fw-bold">
+                    <i class="fas fa-chart-line me-3"></i>Payment Dashboard
+                </h1>
+                <p class="mb-0 opacity-75">
+                    Real-time payment monitoring for <strong>{{ request.tenant.name }}</strong>
+                </p>
+                <small class="opacity-75">Last updated: {{ "now"|date:"F d, Y H:i" }}</small>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <div class="btn-group" role="group">
+                    <a href="/business/{{ request.tenant.slug }}/payments/process/" class="btn btn-light action-btn me-2">
                         <i class="fas fa-plus me-2"></i>New Payment
                     </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Today's Statistics -->
-<div class="row">
-    <div class="col-md-3 mb-4">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-money-bill-wave fa-2x opacity-75"></i>
-                    </div>
-                    <div class="flex-grow-1 ms-3">
-                        <h6 class="mb-1">Today's Revenue</h6>
-                        <h4 class="mb-0">KES {{ today_stats.total_amount|floatformat:0 }}</h4>
-                        <small class="opacity-75">{{ today_stats.total_count }} transactions</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3 mb-4">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-hand-holding-usd fa-2x opacity-75"></i>
-                    </div>
-                    <div class="flex-grow-1 ms-3">
-                        <h6 class="mb-1">Cash Payments</h6>
-                        <h4 class="mb-0">KES {{ today_stats.cash_amount|floatformat:0 }}</h4>
-                        <small class="opacity-75">Physical cash received</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3 mb-4">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-mobile-alt fa-2x opacity-75"></i>
-                    </div>
-                    <div class="flex-grow-1 ms-3">
-                        <h6 class="mb-1">M-Pesa Payments</h6>
-                        <h4 class="mb-0">KES {{ today_stats.mpesa_amount|floatformat:0 }}</h4>
-                        <small class="opacity-75">Mobile money</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3 mb-4">
-        <div class="card bg-warning text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-credit-card fa-2x opacity-75"></i>
-                    </div>
-                    <div class="flex-grow-1 ms-3">
-                        <h6 class="mb-1">Card Payments</h6>
-                        <h4 class="mb-0">KES {{ today_stats.card_amount|floatformat:0 }}</h4>
-                        <small class="opacity-75">Credit/Debit cards</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- Pending Payments -->
-    <div class="col-lg-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-clock me-2 text-warning"></i>Pending Payments
-                    </h5>
-                    <span class="badge bg-warning">{{ pending_payments|length }}</span>
-                </div>
-            </div>
-            <div class="card-body">
-                {% if pending_payments %}
-                    {% for payment in pending_payments %}
-                    <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
-                        <div class="flex-shrink-0">
-                            <div class="bg-warning rounded-circle p-2">
-                                <i class="fas fa-{{ payment.payment_method.icon|default:'credit-card' }} text-white"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="mb-1">
-                                <a href="{% url 'payments:detail' payment.payment_id %}" class="text-decoration-none">
-                                    {{ payment.payment_id }}
-                                </a>
-                            </h6>
-                            <div class="d-flex justify-content-between">
-                                <small class="text-muted">{{ payment.customer.display_name }}</small>
-                                <span class="fw-bold text-primary">KES {{ payment.amount }}</span>
-                            </div>
-                            <small class="text-muted">
-                                <i class="fas fa-clock me-1"></i>{{ payment.created_at|timesince }} ago
-                            </small>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <span class="badge bg-{{ payment.status|yesno:'success,warning' }}">
-                                {{ payment.get_status_display }}
-                            </span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center text-muted py-4">
-                        <i class="fas fa-check-circle fa-3x mb-3"></i>
-                        <p>No pending payments</p>
-                    </div>
-                {% endif %}
-                
-                {% if pending_payments %}
-                <div class="text-center mt-3">
-                    <a href="{% url 'payments:list' %}?status=pending" class="btn btn-outline-warning">
-                        View All Pending
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Transactions -->
-    <div class="col-lg-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-history me-2 text-success"></i>Recent Transactions
-                </h5>
-            </div>
-            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                {% if recent_payments %}
-                    {% for payment in recent_payments %}
-                    <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
-                        <div class="flex-shrink-0">
-                            <div class="bg-success rounded-circle p-2">
-                                <i class="fas fa-{{ payment.payment_method.icon|default:'credit-card' }} text-white"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="mb-1">
-                                <a href="{% url 'payments:detail' payment.payment_id %}" class="text-decoration-none">
-                                    {{ payment.payment_id }}
-                                </a>
-                            </h6>
-                            <div class="d-flex justify-content-between">
-                                <small class="text-muted">{{ payment.customer.display_name }}</small>
-                                <span class="fw-bold text-success">KES {{ payment.amount }}</span>
-                            </div>
-                            <small class="text-muted">
-                                <i class="fas fa-clock me-1"></i>{{ payment.completed_at|timesince }} ago
-                            </small>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <span class="badge bg-success">
-                                <i class="fas fa-check"></i>
-                            </span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center text-muted py-4">
-                        <i class="fas fa-credit-card fa-3x mb-3"></i>
-                        <p>No recent transactions</p>
-                    </div>
-                {% endif %}
-                
-                {% if recent_payments %}
-                <div class="text-center mt-3">
-                    <a href="{% url 'payments:list' %}" class="btn btn-outline-success">
-                        View All Payments
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Payment Methods Performance -->
-<div class="row">
-    <div class="col-12 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-pie me-2"></i>Payment Methods Performance (This Month)
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    {% for method in method_stats %}
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center p-3 border rounded">
-                            <div class="mb-2">
-                                <i class="fas fa-{{ method.icon|default:'credit-card' }} fa-2x" style="color: {{ method.color }}"></i>
-                            </div>
-                            <h6 class="mb-1">{{ method.name }}</h6>
-                            <h4 class="mb-0 text-primary">KES {{ method.this_month_amount|default:0|floatformat:0 }}</h4>
-                            <small class="text-muted">{{ method.this_month_count|default:0 }} transactions</small>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Quick Actions -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-bolt me-2"></i>Quick Actions
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <a href="{% url 'payments:process' %}" class="quick-action text-decoration-none">
-                            <div class="text-center">
-                                <i class="fas fa-plus fa-2x text-primary mb-2"></i>
-                                <h6>New Payment</h6>
-                                <small class="text-muted">Process a new payment</small>
-                            </div>
-                        </a>
-                    </div>
-                    
-                    <div class="col-md-3 mb-3">
-                        <a href="{% url 'payments:reconciliation' %}" class="quick-action text-decoration-none">
-                            <div class="text-center">
-                                <i class="fas fa-balance-scale fa-2x text-success mb-2"></i>
-                                <h6>Reconciliation</h6>
-                                <small class="text-muted">Reconcile payments</small>
-                            </div>
-                        </a>
-                    </div>
-                    
-                    <div class="col-md-3 mb-3">
-                        <a href="{% url 'payments:reports' %}" class="quick-action text-decoration-none">
-                            <div class="text-center">
-                                <i class="fas fa-chart-line fa-2x text-info mb-2"></i>
-                                <h6>Reports</h6>
-                                <small class="text-muted">View payment reports</small>
-                            </div>
-                        </a>
-                    </div>
-                    
-                    <div class="col-md-3 mb-3">
-                        <a href="{% url 'payments:methods' %}" class="quick-action text-decoration-none">
-                            <div class="text-center">
-                                <i class="fas fa-cogs fa-2x text-warning mb-2"></i>
-                                <h6>Settings</h6>
-                                <small class="text-muted">Payment methods</small>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% if failed_payments > 0 %}
-<!-- Failed Payments Alert -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="alert alert-warning">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
-                <div class="flex-grow-1">
-                    <h6 class="mb-1">Failed Payments Alert</h6>
-                    <p class="mb-0">{{ failed_payments }} payment{{ failed_payments|pluralize }} failed today. Please review and take necessary action.</p>
-                </div>
-                <div class="flex-shrink-0">
-                    <a href="{% url 'payments:list' %}?status=failed" class="btn btn-warning">
-                        Review Failed Payments
+                    <a href="/business/{{ request.tenant.slug }}/payments/reports/" class="btn btn-outline-light action-btn">
+                        <i class="fas fa-chart-bar me-2"></i>Reports
                     </a>
                 </div>
             </div>
         </div>
     </div>
-</div>
-{% endif %}
-{% endblock %}
 
-{% block extra_js %}
-<script>
-$(document).ready(function() {
-    // Auto-refresh payment data every 30 seconds
-    setInterval(function() {
-        $.get('{% url "payments:payment_summary" %}', function(data) {
-            // Update today's statistics (you can implement this)
-            console.log('Payment data refreshed');
-        });
-    }, 30000);
-    
-    // Real-time payment status updates
-    $('.payment-status').each(function() {
-        const paymentId = $(this).data('payment-id');
-        const status = $(this).data('status');
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-success-light">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="stats-number text-success">
+                    KES {{ today_stats.total_amount|floatformat:0|default:"0" }}
+                </div>
+                <div class="stats-label">Today's Revenue</div>
+                <div class="stats-trend text-success">
+                    <i class="fas fa-arrow-up me-1"></i>{{ today_stats.total_count|default:0 }} transactions
+                </div>
+            </div>
+        </div>
         
-        if (status === 'processing') {
-            // Check status every 5 seconds for processing payments
-            const checkStatus = setInterval(function() {
-                $.get(`/payments/ajax/payment-status/${paymentId}/`, function(data) {
-                    if (data.status !== 'processing') {
-                        location.reload(); // Reload to show updated status
-                        clearInterval(checkStatus);
-                    }
-                });
-            }, 5000);
-        }
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-primary-light">
+                    <i class="fas fa-mobile-alt"></i>
+                </div>
+                <div class="stats-number text-primary">
+                    KES {{ today_stats.mpesa_amount|floatformat:0|default:"0" }}
+                </div>
+                <div class="stats-label">M-Pesa Payments</div>
+                <div class="stats-trend text-primary">
+                    <i class="fas fa-mobile-alt me-1"></i>{{ mpesa_count|default:0 }} payments
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-warning-light">
+                    <i class="fas fa-coins"></i>
+                </div>
+                <div class="stats-number text-warning">
+                    KES {{ today_stats.cash_amount|floatformat:0|default:"0" }}
+                </div>
+                <div class="stats-label">Cash Payments</div>
+                <div class="stats-trend text-warning">
+                    <i class="fas fa-coins me-1"></i>{{ cash_count|default:0 }} payments
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-info-light">
+                    <i class="fas fa-credit-card"></i>
+                </div>
+                <div class="stats-number text-info">
+                    KES {{ today_stats.card_amount|floatformat:0|default:"0" }}
+                </div>
+                <div class="stats-label">Card Payments</div>
+                <div class="stats-trend text-info">
+                    <i class="fas fa-credit-card me-1"></i>{{ card_count|default:0 }} payments
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts Section -->
+    {% if failed_payments > 0 %}
+    <div class="alert alert-warning alert-modern d-flex align-items-center" role="alert">
+        <i class="fas fa-exclamation-triangle fa-lg me-3"></i>
+        <div class="flex-grow-1">
+            <strong>Action Required:</strong> {{ failed_payments }} failed payment{{ failed_payments|pluralize }} need attention today.
+        </div>
+        <a href="/business/{{ request.tenant.slug }}/payments/list/?status=failed" class="btn btn-outline-warning btn-sm">
+            View Failed Payments
+        </a>
+    </div>
+    {% endif %}
+
+    {% if pending_payments %}
+    <div class="alert alert-info alert-modern d-flex align-items-center" role="alert">
+        <i class="fas fa-clock fa-lg me-3"></i>
+        <div class="flex-grow-1">
+            <strong>Pending:</strong> {{ pending_payments|length }} payment{{ pending_payments|length|pluralize }} awaiting processing.
+        </div>
+        <a href="/business/{{ request.tenant.slug }}/payments/list/?status=pending" class="btn btn-outline-info btn-sm">
+            Review Pending
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Main Content Row -->
+    <div class="row">
+        <!-- Recent Payments Table -->
+        <div class="col-lg-8">
+            <div class="main-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold">
+                            <i class="fas fa-clock text-primary me-2"></i>Recent Payments
+                        </h5>
+                        <a href="/business/{{ request.tenant.slug }}/payments/list/" class="btn btn-outline-primary btn-sm action-btn">
+                            <i class="fas fa-external-link-alt me-1"></i>View All
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_payments %}
+                    <div class="table-responsive">
+                        <table class="table payments-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Payment ID</th>
+                                    <th>Customer</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Status</th>
+                                    <th>Time</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in recent_payments %}
+                                <tr>
+                                    <td>
+                                        <div class="payment-id">{{ payment.payment_id|default:"N/A" }}</div>
+                                        {% if payment.reference_number %}
+                                        <small class="text-muted">{{ payment.reference_number|truncatechars:15 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if payment.customer %}
+                                                <div class="customer-avatar bg-primary text-white">
+                                                    {{ payment.customer.first_name|first|default:"?" }}{{ payment.customer.last_name|first|default:"" }}
+                                                </div>
+                                                <div>
+                                                    <div class="fw-medium">{{ payment.customer.display_name|default:"Unknown Customer" }}</div>
+                                                    {% if payment.customer.phone %}
+                                                    <small class="text-muted">{{ payment.customer.phone }}</small>
+                                                    {% endif %}
+                                                </div>
+                                            {% elif payment.service_order.customer %}
+                                                <div class="customer-avatar bg-success text-white">
+                                                    {{ payment.service_order.customer.first_name|first|default:"?" }}{{ payment.service_order.customer.last_name|first|default:"" }}
+                                                </div>
+                                                <div>
+                                                    <div class="fw-medium">{{ payment.service_order.customer.display_name|default:"Unknown Customer" }}</div>
+                                                    {% if payment.service_order.customer.phone %}
+                                                    <small class="text-muted">{{ payment.service_order.customer.phone }}</small>
+                                                    {% endif %}
+                                                </div>
+                                            {% else %}
+                                                <div class="customer-avatar bg-secondary text-white">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-medium text-muted">Walk-in Customer</div>
+                                                    {% if payment.customer_phone %}
+                                                    <small class="text-muted">{{ payment.customer_phone }}</small>
+                                                    {% endif %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="amount-display">KES {{ payment.amount|floatformat:2|default:"0.00" }}</div>
+                                        {% if payment.processing_fee > 0 %}
+                                        <small class="text-muted">Fee: KES {{ payment.processing_fee|floatformat:2 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if payment.payment_method.method_type == 'mpesa' %}
+                                            <span class="method-badge bg-success text-white">
+                                                <i class="fas fa-mobile-alt"></i>M-Pesa
+                                            </span>
+                                        {% elif payment.payment_method.method_type == 'cash' %}
+                                            <span class="method-badge bg-warning text-white">
+                                                <i class="fas fa-coins"></i>Cash
+                                            </span>
+                                        {% elif payment.payment_method.method_type == 'card' %}
+                                            <span class="method-badge bg-info text-white">
+                                                <i class="fas fa-credit-card"></i>Card
+                                            </span>
+                                        {% else %}
+                                            <span class="method-badge bg-secondary text-white">
+                                                <i class="fas fa-money-bill"></i>{{ payment.payment_method.name|default:"Other" }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if payment.status == 'completed' %}
+                                            <span class="status-badge bg-success text-white">
+                                                <i class="fas fa-check-circle me-1"></i>Completed
+                                            </span>
+                                        {% elif payment.status == 'verified' %}
+                                            <span class="status-badge bg-primary text-white">
+                                                <i class="fas fa-shield-check me-1"></i>Verified
+                                            </span>
+                                        {% elif payment.status == 'pending' %}
+                                            <span class="status-badge bg-warning text-white">
+                                                <i class="fas fa-clock me-1"></i>Pending
+                                            </span>
+                                        {% elif payment.status == 'processing' %}
+                                            <span class="status-badge bg-info text-white">
+                                                <i class="fas fa-spinner me-1"></i>Processing
+                                            </span>
+                                        {% elif payment.status == 'failed' %}
+                                            <span class="status-badge bg-danger text-white">
+                                                <i class="fas fa-times-circle me-1"></i>Failed
+                                            </span>
+                                        {% else %}
+                                            <span class="status-badge bg-secondary text-white">
+                                                {{ payment.status|title|default:"Unknown" }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="fw-medium">{{ payment.created_at|date:"H:i"|default:"--:--" }}</div>
+                                        <small class="text-muted">{{ payment.created_at|date:"M d"|default:"--" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/" 
+                                               class="btn btn-outline-primary btn-sm" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if payment.status == 'completed' or payment.status == 'verified' %}
+                                            <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/" 
+                                               class="btn btn-outline-success btn-sm" title="Receipt">
+                                                <i class="fas fa-receipt"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-credit-card empty-icon"></i>
+                        <h4 class="mb-3">No payments yet</h4>
+                        <p class="text-muted mb-4">Start processing payments to see transaction data here</p>
+                        <a href="/business/{{ request.tenant.slug }}/payments/process/" class="btn btn-success action-btn">
+                            <i class="fas fa-plus me-2"></i>Process First Payment
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <div class="card-header">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-bolt text-primary me-2"></i>Quick Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <a href="/business/{{ request.tenant.slug }}/payments/process/" class="btn btn-success action-btn">
+                            <i class="fas fa-credit-card me-2"></i>Process Payment
+                        </a>
+                        <a href="/business/{{ request.tenant.slug }}/payments/reconciliation/" class="btn btn-outline-warning action-btn">
+                            <i class="fas fa-balance-scale me-2"></i>Daily Reconciliation
+                        </a>
+                        <a href="/business/{{ request.tenant.slug }}/payments/methods/" class="btn btn-outline-info action-btn">
+                            <i class="fas fa-cogs me-2"></i>Payment Methods
+                        </a>
+                        <a href="/business/{{ request.tenant.slug }}/payments/refunds/" class="btn btn-outline-secondary action-btn">
+                            <i class="fas fa-undo me-2"></i>Process Refund
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Methods -->
+            <div class="payment-methods-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold">
+                            <i class="fas fa-check-circle text-primary me-2"></i>Payment Methods
+                        </h6>
+                        <span class="badge bg-primary">{{ payment_methods|length|default:0 }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if payment_methods %}
+                        {% for method in payment_methods %}
+                        <div class="method-item">
+                            <div class="method-icon {% if method.method_type == 'mpesa' %}bg-success-light{% elif method.method_type == 'cash' %}bg-warning-light{% elif method.method_type == 'card' %}bg-info-light{% else %}bg-secondary-light{% endif %}">
+                                {% if method.method_type == 'mpesa' %}
+                                    <i class="fas fa-mobile-alt"></i>
+                                {% elif method.method_type == 'cash' %}
+                                    <i class="fas fa-coins"></i>
+                                {% elif method.method_type == 'card' %}
+                                    <i class="fas fa-credit-card"></i>
+                                {% else %}
+                                    <i class="fas fa-money-bill"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-medium">{{ method.name|default:"Unnamed Method" }}</div>
+                                <small class="text-muted">{{ method.get_method_type_display|default:"Unknown Type" }}</small>
+                            </div>
+                            <div>
+                                {% if method.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        <div class="mt-3">
+                            <a href="/business/{{ request.tenant.slug }}/payments/methods/" class="btn btn-outline-primary btn-sm w-100 action-btn">
+                                <i class="fas fa-cogs me-1"></i>Manage Methods
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-exclamation-triangle text-warning fa-2x mb-3"></i>
+                            <h6 class="text-muted">No Payment Methods</h6>
+                            <p class="text-muted small mb-3">Configure payment methods to start accepting payments</p>
+                            <a href="/business/{{ request.tenant.slug }}/payments/methods/create/" class="btn btn-primary btn-sm action-btn">
+                                <i class="fas fa-plus me-1"></i>Add Method
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto refresh every 30 seconds if there are pending payments
+    {% if pending_payments %}
+    setTimeout(function() {
+        window.location.reload();
+    }, 30000);
+    {% endif %}
+    
+    // Add loading states to action buttons
+    document.querySelectorAll('.action-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const spinner = document.createElement('i');
+            spinner.className = 'fas fa-spinner fa-spin me-1';
+            this.insertBefore(spinner, this.firstChild);
+            this.classList.add('disabled');
+        });
     });
+    
+    // Initialize tooltips if Bootstrap is available
+    if (typeof bootstrap !== 'undefined') {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
 });
 </script>
 {% endblock %}

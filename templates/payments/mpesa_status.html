@@ -1,0 +1,305 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payment Status - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-container {
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    
+    .status-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        text-align: center;
+        padding: 3rem 2rem;
+    }
+    
+    .status-icon {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 2rem;
+        font-size: 3rem;
+        color: white;
+    }
+    
+    .status-completed .status-icon {
+        background: linear-gradient(135deg, #10b981, #059669);
+        animation: bounce 0.5s ease;
+    }
+    
+    .status-pending .status-icon {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        animation: pulse 2s infinite;
+    }
+    
+    .status-failed .status-icon {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        animation: shake 0.5s ease;
+    }
+    
+    .status-processing .status-icon {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        animation: spin 2s linear infinite;
+    }
+    
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    .status-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+    
+    .status-completed .status-title { color: #059669; }
+    .status-pending .status-title { color: #d97706; }
+    .status-failed .status-title { color: #dc2626; }
+    .status-processing .status-title { color: #1d4ed8; }
+    
+    .status-description {
+        color: #6b7280;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+    
+    .payment-details {
+        background: #f9fafb;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+        text-align: left;
+    }
+    
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    
+    .auto-refresh {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        font-size: 0.9rem;
+        color: #1e40af;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="status-container">
+        <div class="status-card status-{{ payment.status }}">
+            <div class="status-icon">
+                {% if payment.status == 'completed' %}
+                    <i class="fas fa-check"></i>
+                {% elif payment.status == 'pending' %}
+                    <i class="fas fa-clock"></i>
+                {% elif payment.status == 'processing' %}
+                    <i class="fas fa-sync"></i>
+                {% elif payment.status == 'failed' %}
+                    <i class="fas fa-times"></i>
+                {% else %}
+                    <i class="fas fa-question"></i>
+                {% endif %}
+            </div>
+            
+            <h1 class="status-title">
+                {% if payment.status == 'completed' %}
+                    Payment Successful!
+                {% elif payment.status == 'pending' %}
+                    Payment Pending
+                {% elif payment.status == 'processing' %}
+                    Processing Payment
+                {% elif payment.status == 'failed' %}
+                    Payment Failed
+                {% else %}
+                    Payment Status Unknown
+                {% endif %}
+            </h1>
+            
+            <p class="status-description">
+                {% if payment.status == 'completed' %}
+                    Your payment has been successfully processed and confirmed.
+                {% elif payment.status == 'pending' %}
+                    Your payment request has been sent. Please check your phone and enter your M-Pesa PIN.
+                {% elif payment.status == 'processing' %}
+                    We're processing your payment. This may take a few moments.
+                {% elif payment.status == 'failed' %}
+                    {% if payment.failure_reason %}
+                        {{ payment.failure_reason }}
+                    {% else %}
+                        Your payment could not be completed. Please try again.
+                    {% endif %}
+                {% else %}
+                    We're checking the status of your payment.
+                {% endif %}
+            </p>
+            
+            <!-- Auto-refresh notice for pending/processing -->
+            {% if payment.status == 'pending' or payment.status == 'processing' %}
+            <div class="auto-refresh">
+                <i class="fas fa-sync fa-spin me-2"></i>
+                This page will automatically refresh when your payment status changes.
+            </div>
+            {% endif %}
+            
+            <!-- Payment Details -->
+            <div class="payment-details">
+                <h6 class="fw-bold mb-3">Payment Details</h6>
+                <div class="detail-item">
+                    <span>Payment ID:</span>
+                    <strong>{{ payment.payment_id }}</strong>
+                </div>
+                {% if payment.customer %}
+                <div class="detail-item">
+                    <span>Customer:</span>
+                    <strong>{{ payment.customer.display_name }}</strong>
+                </div>
+                {% endif %}
+                {% if payment.customer_phone %}
+                <div class="detail-item">
+                    <span>Phone Number:</span>
+                    <strong>{{ payment.customer_phone }}</strong>
+                </div>
+                {% endif %}
+                <div class="detail-item">
+                    <span>Amount:</span>
+                    <strong>KES {{ payment.amount|floatformat:2 }}</strong>
+                </div>
+                {% if payment.processing_fee > 0 %}
+                <div class="detail-item">
+                    <span>Processing Fee:</span>
+                    <strong>KES {{ payment.processing_fee|floatformat:2 }}</strong>
+                </div>
+                {% endif %}
+                {% if payment.transaction_id %}
+                <div class="detail-item">
+                    <span>Transaction ID:</span>
+                    <strong>{{ payment.transaction_id }}</strong>
+                </div>
+                {% endif %}
+                <div class="detail-item">
+                    <span>Date & Time:</span>
+                    <strong>{{ payment.created_at|date:"M d, Y H:i" }}</strong>
+                </div>
+                {% if payment.completed_at %}
+                <div class="detail-item">
+                    <span>Completed At:</span>
+                    <strong>{{ payment.completed_at|date:"M d, Y H:i" }}</strong>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="mt-4">
+                {% if payment.status == 'completed' %}
+                    <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/" 
+                       class="btn btn-success btn-lg me-2">
+                        <i class="fas fa-receipt me-2"></i>View Receipt
+                    </a>
+                {% endif %}
+                
+                {% if payment.status == 'failed' %}
+                    <a href="/business/{{ request.tenant.slug }}/payments/process/" 
+                       class="btn btn-primary btn-lg me-2">
+                        <i class="fas fa-redo me-2"></i>Try Again
+                    </a>
+                {% endif %}
+                
+                {% if payment.status == 'pending' or payment.status == 'processing' %}
+                    <button class="btn btn-outline-primary btn-lg me-2" onclick="checkStatus()">
+                        <i class="fas fa-sync me-2"></i>Refresh Status
+                    </button>
+                {% endif %}
+                
+                <a href="/business/{{ request.tenant.slug }}/payments/" class="btn btn-outline-secondary btn-lg">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Payments
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function checkStatus() {
+    const btn = document.querySelector('.btn-outline-primary');
+    const originalContent = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Checking...';
+    
+    fetch(`/business/{{ request.tenant.slug }}/payments/ajax/{{ payment.payment_id }}/mpesa-status/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== '{{ payment.status }}') {
+                // Status changed, reload page
+                location.reload();
+            } else {
+                // Status unchanged, restore button
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        })
+        .catch(error => {
+            console.error('Error checking status:', error);
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        });
+}
+
+// Auto-refresh for pending/processing payments
+{% if payment.status == 'pending' or payment.status == 'processing' %}
+document.addEventListener('DOMContentLoaded', function() {
+    // Check status every 15 seconds
+    setInterval(function() {
+        fetch(`/business/{{ request.tenant.slug }}/payments/ajax/{{ payment.payment_id }}/mpesa-status/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== '{{ payment.status }}') {
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Auto-refresh error:', error);
+            });
+    }, 15000);
+});
+{% endif %}
+</script>
+{% endblock %}
