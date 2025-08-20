@@ -191,10 +191,18 @@ class TenantDatabaseManager:
         default_db = settings.DATABASES['default']
         
         try:
+            print(f"Starting database creation for tenant: {tenant.name}")
+            
+            # Always use main database credentials for simplicity and reliability
+            tenant.database_user = default_db['USER']
+            tenant.database_password = default_db['PASSWORD']
+            tenant.save()
+            print(f"Updated tenant to use main database credentials")
+            
             # Connect to MySQL server (without database name to create it)
             connection = pymysql.connect(
                 host=tenant.database_host,
-                user=default_db['USER'],  # Use admin user to create database
+                user=default_db['USER'],
                 password=default_db['PASSWORD'],
                 port=tenant.database_port
             )
@@ -204,13 +212,6 @@ class TenantDatabaseManager:
             # Create database
             cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{tenant.database_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
             print(f"Database {tenant.database_name} created successfully")
-            
-            # Create database user if specified and different from default
-            if tenant.database_user != default_db['USER']:
-                cursor.execute(f"CREATE USER IF NOT EXISTS '{tenant.database_user}'@'%' IDENTIFIED BY '{tenant.database_password}'")
-                cursor.execute(f"GRANT ALL PRIVILEGES ON `{tenant.database_name}`.* TO '{tenant.database_user}'@'%'")
-                cursor.execute("FLUSH PRIVILEGES")
-                print(f"Database user {tenant.database_user} created and granted privileges")
             
             cursor.close()
             connection.close()
@@ -222,35 +223,18 @@ class TenantDatabaseManager:
             
             # Run migrations for tenant database
             print(f"Running migrations for tenant database...")
-            call_command('migrate', database=f"tenant_{tenant.id}", verbosity=1)
-            print(f"Migrations completed successfully")
+            try:
+                call_command('migrate', database=f"tenant_{tenant.id}", verbosity=1)
+                print(f"Migrations completed successfully")
+            except Exception as migration_error:
+                print(f"Migration error: {migration_error}")
+                # Try to re-add to settings and retry
+                TenantDatabaseManager.add_tenant_to_settings(tenant)
+                call_command('migrate', database=f"tenant_{tenant.id}", verbosity=1)
+                print(f"Migrations completed successfully on retry")
             
             return True
             
-        except Exception as e:
-            if "Access denied" in str(e):
-                print(f"Database access denied. Trying with same credentials as main database...")
-                # If access denied, try using the same credentials as main database
-                try:
-                    # Set tenant to use same credentials as main database
-                    tenant.database_user = default_db['USER']
-                    tenant.database_password = default_db['PASSWORD']
-                    tenant.save()
-                    
-                    # Add tenant database to settings with corrected credentials
-                    TenantDatabaseManager.add_tenant_to_settings(tenant)
-                    
-                    # Run migrations
-                    call_command('migrate', database=f"tenant_{tenant.id}", verbosity=1)
-                    print(f"Tenant database setup completed with main database credentials")
-                    return True
-                    
-                except Exception as e2:
-                    print(f"Failed even with main database credentials: {e2}")
-                    return False
-            else:
-                print(f"Database error: {e}")
-                return False
         except Exception as e:
             print(f"Error creating database for tenant {tenant.name}: {e}")
             import traceback

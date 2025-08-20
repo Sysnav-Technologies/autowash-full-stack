@@ -1300,31 +1300,23 @@ def setup_tenant_after_approval(business, approving_admin):
         # Step 2: Create TenantSettings record
         print("Creating tenant settings...")
         try:
-            # Don't use tenant_context here to avoid cache issues
             from apps.core.tenant_models import TenantSettings
-            from django.db import connections
+            from apps.core.database_router import tenant_context
             
-            # Get the tenant database connection
-            tenant_db = f"tenant_{business.id}"
-            
-            # Create TenantSettings directly in tenant database
-            with connections[tenant_db].cursor() as cursor:
-                # Check if TenantSettings record exists
-                cursor.execute(
-                    "SELECT COUNT(*) FROM core_tenantsettings WHERE tenant_id = %s",
-                    [str(business.id)]
+            # Use tenant context to ensure proper database routing
+            with tenant_context(business):
+                tenant_settings, created = TenantSettings.objects.get_or_create(
+                    tenant_id=business.id,
+                    defaults={
+                        'sms_notifications': True,
+                        'email_notifications': True,
+                        'enable_online_booking': True,
+                        'primary_color': '#007bff',
+                        'secondary_color': '#6c757d'
+                    }
                 )
-                exists = cursor.fetchone()[0] > 0
                 
-                if not exists:
-                    cursor.execute("""
-                        INSERT INTO core_tenantsettings 
-                        (tenant_id, sms_notifications, email_notifications, enable_online_booking, 
-                         primary_color, secondary_color) 
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, [
-                        str(business.id), True, True, True, '#007bff', '#6c757d'
-                    ])
+                if created:
                     print("TenantSettings created")
                 else:
                     print("TenantSettings already exists")
