@@ -1,0 +1,275 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Payment Settings - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-form {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 30px;
+    }
+    
+    .form-section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+    }
+    
+    .section-title {
+        color: #333;
+        margin-bottom: 15px;
+        font-weight: 600;
+    }
+    
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .payment-method {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .payment-method.enabled {
+        border-color: #28a745;
+        background-color: #f8fff9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb bg-transparent p-0 m-0">
+                <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/business/settings/">Settings</a></li>
+                <li class="breadcrumb-item active">Payment Settings</li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-credit-card mr-2"></i>Payment Settings
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <form method="post" class="settings-form">
+            {% csrf_token %}
+            
+            <!-- Tax Settings -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-calculator mr-2"></i>Tax Configuration
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.default_tax_rate.id_for_label }}">Default Tax Rate (%)</label>
+                            {{ form.default_tax_rate }}
+                            <small class="help-text">Applied to all services unless overridden</small>
+                            {% if form.default_tax_rate.errors %}
+                                <div class="invalid-feedback d-block">{{ form.default_tax_rate.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.tax_number.id_for_label }}">Tax Number/VAT ID</label>
+                            {{ form.tax_number }}
+                            <small class="help-text">Your business tax identification number</small>
+                            {% if form.tax_number.errors %}
+                                <div class="invalid-feedback d-block">{{ form.tax_number.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-check">
+                    {{ form.tax_inclusive_pricing }}
+                    <label class="form-check-label" for="{{ form.tax_inclusive_pricing.id_for_label }}">
+                        Tax Inclusive Pricing
+                    </label>
+                    <small class="help-text d-block">When enabled, displayed prices include tax</small>
+                </div>
+            </div>
+
+            <!-- Payment Methods -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-money-bill-wave mr-2"></i>Accepted Payment Methods
+                </h5>
+                
+                <div class="payment-method {% if form.accept_cash.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.accept_cash }}
+                        <label class="form-check-label ml-2" for="{{ form.accept_cash.id_for_label }}">
+                            <i class="fas fa-money-bill-alt mr-2"></i>Cash Payments
+                        </label>
+                    </div>
+                    <small class="help-text">Accept cash payments at point of service</small>
+                </div>
+                
+                <div class="payment-method {% if form.accept_mpesa.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.accept_mpesa }}
+                        <label class="form-check-label ml-2" for="{{ form.accept_mpesa.id_for_label }}">
+                            <i class="fas fa-mobile-alt mr-2"></i>M-Pesa
+                        </label>
+                    </div>
+                    <small class="help-text">Accept M-Pesa mobile money payments</small>
+                </div>
+                
+                <div class="payment-method {% if form.accept_card.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.accept_card }}
+                        <label class="form-check-label ml-2" for="{{ form.accept_card.id_for_label }}">
+                            <i class="fas fa-credit-card mr-2"></i>Card Payments
+                        </label>
+                    </div>
+                    <small class="help-text">Accept credit and debit card payments</small>
+                </div>
+                
+                <div class="payment-method {% if form.accept_bank_transfer.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.accept_bank_transfer }}
+                        <label class="form-check-label ml-2" for="{{ form.accept_bank_transfer.id_for_label }}">
+                            <i class="fas fa-university mr-2"></i>Bank Transfer
+                        </label>
+                    </div>
+                    <small class="help-text">Accept direct bank transfers</small>
+                </div>
+            </div>
+
+            <!-- Invoice Settings -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-file-invoice mr-2"></i>Invoice & Receipt Settings
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.invoice_prefix.id_for_label }}">Invoice Number Prefix</label>
+                            {{ form.invoice_prefix }}
+                            <small class="help-text">e.g., "INV" for INV-001</small>
+                            {% if form.invoice_prefix.errors %}
+                                <div class="invalid-feedback d-block">{{ form.invoice_prefix.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.receipt_prefix.id_for_label }}">Receipt Number Prefix</label>
+                            {{ form.receipt_prefix }}
+                            <small class="help-text">e.g., "REC" for REC-001</small>
+                            {% if form.receipt_prefix.errors %}
+                                <div class="invalid-feedback d-block">{{ form.receipt_prefix.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-check mb-3">
+                    {{ form.auto_generate_invoices }}
+                    <label class="form-check-label" for="{{ form.auto_generate_invoices.id_for_label }}">
+                        Auto-generate invoices for completed services
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    {{ form.auto_send_receipts }}
+                    <label class="form-check-label" for="{{ form.auto_send_receipts.id_for_label }}">
+                        Automatically send receipts to customers
+                    </label>
+                </div>
+            </div>
+
+            <!-- Late Payment Settings -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-clock mr-2"></i>Payment Terms
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.payment_due_days.id_for_label }}">Payment Due (Days)</label>
+                            {{ form.payment_due_days }}
+                            <small class="help-text">Days after service completion</small>
+                            {% if form.payment_due_days.errors %}
+                                <div class="invalid-feedback d-block">{{ form.payment_due_days.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.late_fee_percentage.id_for_label }}">Late Fee (%)</label>
+                            {{ form.late_fee_percentage }}
+                            <small class="help-text">Percentage charged for overdue payments</small>
+                            {% if form.late_fee_percentage.errors %}
+                                <div class="invalid-feedback d-block">{{ form.late_fee_percentage.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="/business/{{ request.tenant.slug }}/business/settings/" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-1"></i>Back to Settings
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-1"></i>Save Payment Settings
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-info mr-2"></i>Payment Configuration Help</h6>
+            </div>
+            <div class="card-body">
+                <h6>Tax Settings</h6>
+                <p class="small text-muted">Configure your business tax rate and identification for proper invoicing and compliance.</p>
+                
+                <h6>Payment Methods</h6>
+                <p class="small text-muted">Enable the payment methods you accept. This affects customer checkout options.</p>
+                
+                <h6>Invoice Numbering</h6>
+                <p class="small text-muted">Customize how your invoices and receipts are numbered for your business records.</p>
+                
+                <h6>Payment Terms</h6>
+                <p class="small text-muted">Set when payments are due and any late fees for overdue accounts.</p>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-chart-bar mr-2"></i>Payment Summary</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Tax Rate:</strong><br>{{ tenant_settings.default_tax_rate }}%</p>
+                <p><strong>Payment Due:</strong><br>{{ tenant_settings.payment_due_days }} days</p>
+                <p><strong>Late Fee:</strong><br>{{ tenant_settings.late_fee_percentage }}%</p>
+                <p><strong>Methods Enabled:</strong><br>
+                {% if tenant_settings.accept_cash %}Cash, {% endif %}
+                {% if tenant_settings.accept_mpesa %}M-Pesa, {% endif %}
+                {% if tenant_settings.accept_card %}Card, {% endif %}
+                {% if tenant_settings.accept_bank_transfer %}Bank Transfer{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

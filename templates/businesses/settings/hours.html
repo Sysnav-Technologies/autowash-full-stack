@@ -1,0 +1,492 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Business Hours - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-form {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 30px;
+    }
+    
+    .day-row {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 10px;
+        transition: all 0.2s ease;
+    }
+    
+    .day-row.closed {
+        background-color: #f8f9fa;
+        opacity: 0.7;
+    }
+    
+    .day-row.open {
+        border-color: #28a745;
+        background-color: #f8fff9;
+    }
+    
+    .day-label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .time-inputs {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .time-input {
+        flex: 1;
+    }
+    
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .hours-summary {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb bg-transparent p-0 m-0">
+                <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/business/settings/">Settings</a></li>
+                <li class="breadcrumb-item active">Business Hours</li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-clock mr-2"></i>Business Hours
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <form method="post" class="settings-form">
+            {% csrf_token %}
+            
+            <div class="hours-summary">
+                <h6><i class="fas fa-info-circle mr-2"></i>Current Operating Hours</h6>
+                <p class="small text-muted mb-0">Set your business operating hours. Customers can only book services during these times.</p>
+            </div>
+            
+            <!-- Monday -->
+            <div class="day-row" data-day="monday">
+                <div class="row align-items-center">
+                    <div class="col-md-2">
+                        <div class="day-label">Monday</div>
+                        <div class="form-check">
+                            {{ form.monday_open }}
+                            <label class="form-check-label small" for="{{ form.monday_open.id_for_label }}">
+                                Open
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <div class="time-inputs">
+                            <div class="time-input">
+                                <label class="small">Opening Time</label>
+                                {{ form.monday_start }}
+                                {% if form.monday_start.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.monday_start.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <span class="mx-2 mt-3">to</span>
+                            <div class="time-input">
+                                <label class="small">Closing Time</label>
+                                {{ form.monday_end }}
+                                {% if form.monday_end.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.monday_end.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tuesday -->
+            <div class="day-row" data-day="tuesday">
+                <div class="row align-items-center">
+                    <div class="col-md-2">
+                        <div class="day-label">Tuesday</div>
+                        <div class="form-check">
+                            {{ form.tuesday_open }}
+                            <label class="form-check-label small" for="{{ form.tuesday_open.id_for_label }}">
+                                Open
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <div class="time-inputs">
+                            <div class="time-input">
+                                <label class="small">Opening Time</label>
+                                {{ form.tuesday_start }}
+                                {% if form.tuesday_start.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.tuesday_start.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <span class="mx-2 mt-3">to</span>
+                            <div class="time-input">
+                                <label class="small">Closing Time</label>
+                                {{ form.tuesday_end }}
+                                {% if form.tuesday_end.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.tuesday_end.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wednesday -->
+            <div class="day-row" data-day="wednesday">
+                <div class="row align-items-center">
+                    <div class="col-md-2">
+                        <div class="day-label">Wednesday</div>
+                        <div class="form-check">
+                            {{ form.wednesday_open }}
+                            <label class="form-check-label small" for="{{ form.wednesday_open.id_for_label }}">
+                                Open
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <div class="time-inputs">
+                            <div class="time-input">
+                                <label class="small">Opening Time</label>
+                                {{ form.wednesday_start }}
+                                {% if form.wednesday_start.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.wednesday_start.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <span class="mx-2 mt-3">to</span>
+                            <div class="time-input">
+                                <label class="small">Closing Time</label>
+                                {{ form.wednesday_end }}
+                                {% if form.wednesday_end.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.wednesday_end.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Thursday -->
+            <div class="day-row" data-day="thursday">
+                <div class="row align-items-center">
+                    <div class="col-md-2">
+                        <div class="day-label">Thursday</div>
+                        <div class="form-check">
+                            {{ form.thursday_open }}
+                            <label class="form-check-label small" for="{{ form.thursday_open.id_for_label }}">
+                                Open
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <div class="time-inputs">
+                            <div class="time-input">
+                                <label class="small">Opening Time</label>
+                                {{ form.thursday_start }}
+                                {% if form.thursday_start.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.thursday_start.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <span class="mx-2 mt-3">to</span>
+                            <div class="time-input">
+                                <label class="small">Closing Time</label>
+                                {{ form.thursday_end }}
+                                {% if form.thursday_end.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.thursday_end.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Friday -->
+            <div class="day-row" data-day="friday">
+                <div class="row align-items-center">
+                    <div class="col-md-2">
+                        <div class="day-label">Friday</div>
+                        <div class="form-check">
+                            {{ form.friday_open }}
+                            <label class="form-check-label small" for="{{ form.friday_open.id_for_label }}">
+                                Open
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <div class="time-inputs">
+                            <div class="time-input">
+                                <label class="small">Opening Time</label>
+                                {{ form.friday_start }}
+                                {% if form.friday_start.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.friday_start.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <span class="mx-2 mt-3">to</span>
+                            <div class="time-input">
+                                <label class="small">Closing Time</label>
+                                {{ form.friday_end }}
+                                {% if form.friday_end.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.friday_end.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Saturday -->
+            <div class="day-row" data-day="saturday">
+                <div class="row align-items-center">
+                    <div class="col-md-2">
+                        <div class="day-label">Saturday</div>
+                        <div class="form-check">
+                            {{ form.saturday_open }}
+                            <label class="form-check-label small" for="{{ form.saturday_open.id_for_label }}">
+                                Open
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <div class="time-inputs">
+                            <div class="time-input">
+                                <label class="small">Opening Time</label>
+                                {{ form.saturday_start }}
+                                {% if form.saturday_start.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.saturday_start.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <span class="mx-2 mt-3">to</span>
+                            <div class="time-input">
+                                <label class="small">Closing Time</label>
+                                {{ form.saturday_end }}
+                                {% if form.saturday_end.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.saturday_end.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sunday -->
+            <div class="day-row" data-day="sunday">
+                <div class="row align-items-center">
+                    <div class="col-md-2">
+                        <div class="day-label">Sunday</div>
+                        <div class="form-check">
+                            {{ form.sunday_open }}
+                            <label class="form-check-label small" for="{{ form.sunday_open.id_for_label }}">
+                                Open
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <div class="time-inputs">
+                            <div class="time-input">
+                                <label class="small">Opening Time</label>
+                                {{ form.sunday_start }}
+                                {% if form.sunday_start.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.sunday_start.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <span class="mx-2 mt-3">to</span>
+                            <div class="time-input">
+                                <label class="small">Closing Time</label>
+                                {{ form.sunday_end }}
+                                {% if form.sunday_end.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.sunday_end.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h6>Quick Actions</h6>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setWeekdayHours()">
+                        Set Weekday Hours (9-5)
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setWeekendHours()">
+                        Set Weekend Hours (10-4)
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="closeAllDays()">
+                        Close All Days
+                    </button>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <a href="/business/{{ request.tenant.slug }}/business/settings/" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-1"></i>Back to Settings
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-1"></i>Save Business Hours
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-info mr-2"></i>Business Hours Help</h6>
+            </div>
+            <div class="card-body">
+                <h6>Operating Hours</h6>
+                <p class="small text-muted">These hours determine when customers can book services and when your business appears as "open" on your website.</p>
+                
+                <h6>Closed Days</h6>
+                <p class="small text-muted">Uncheck "Open" for days when your business is closed. No bookings will be allowed on closed days.</p>
+                
+                <h6>24-Hour Format</h6>
+                <p class="small text-muted">Times are displayed in 24-hour format (e.g., 14:00 for 2:00 PM).</p>
+                
+                <h6>Customer Booking</h6>
+                <p class="small text-muted">Customers can only book appointments during your operating hours, considering service duration and buffer time.</p>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-calendar-week mr-2"></i>Current Schedule</h6>
+            </div>
+            <div class="card-body">
+                <div class="small">
+                    <p><strong>Monday:</strong> {% if tenant_settings.monday_open %}{{ tenant_settings.monday_start }} - {{ tenant_settings.monday_end }}{% else %}Closed{% endif %}</p>
+                    <p><strong>Tuesday:</strong> {% if tenant_settings.tuesday_open %}{{ tenant_settings.tuesday_start }} - {{ tenant_settings.tuesday_end }}{% else %}Closed{% endif %}</p>
+                    <p><strong>Wednesday:</strong> {% if tenant_settings.wednesday_open %}{{ tenant_settings.wednesday_start }} - {{ tenant_settings.wednesday_end }}{% else %}Closed{% endif %}</p>
+                    <p><strong>Thursday:</strong> {% if tenant_settings.thursday_open %}{{ tenant_settings.thursday_start }} - {{ tenant_settings.thursday_end }}{% else %}Closed{% endif %}</p>
+                    <p><strong>Friday:</strong> {% if tenant_settings.friday_open %}{{ tenant_settings.friday_start }} - {{ tenant_settings.friday_end }}{% else %}Closed{% endif %}</p>
+                    <p><strong>Saturday:</strong> {% if tenant_settings.saturday_open %}{{ tenant_settings.saturday_start }} - {{ tenant_settings.saturday_end }}{% else %}Closed{% endif %}</p>
+                    <p class="mb-0"><strong>Sunday:</strong> {% if tenant_settings.sunday_open %}{{ tenant_settings.sunday_start }} - {{ tenant_settings.sunday_end }}{% else %}Closed{% endif %}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-lightbulb mr-2"></i>Tips</h6>
+            </div>
+            <div class="card-body">
+                <ul class="small text-muted">
+                    <li>Consider your peak hours and staff availability</li>
+                    <li>Allow buffer time for service completion</li>
+                    <li>Weekend hours may differ from weekday hours</li>
+                    <li>Update hours for holidays and special occasions</li>
+                    <li>Consistent hours help build customer expectations</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update day row styling based on open/closed state
+    function updateDayRowStyles() {
+        document.querySelectorAll('.day-row').forEach(function(row) {
+            const day = row.dataset.day;
+            const openCheckbox = row.querySelector(`input[name="${day}_open"]`);
+            const timeInputs = row.querySelectorAll('input[type="time"]');
+            
+            if (openCheckbox && openCheckbox.checked) {
+                row.classList.remove('closed');
+                row.classList.add('open');
+                timeInputs.forEach(input => input.disabled = false);
+            } else {
+                row.classList.remove('open');
+                row.classList.add('closed');
+                timeInputs.forEach(input => input.disabled = true);
+            }
+        });
+    }
+    
+    // Initial styling
+    updateDayRowStyles();
+    
+    // Listen for checkbox changes
+    document.querySelectorAll('input[type="checkbox"]').forEach(function(checkbox) {
+        checkbox.addEventListener('change', updateDayRowStyles);
+    });
+});
+
+// Quick action functions
+function setWeekdayHours() {
+    const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+    weekdays.forEach(day => {
+        const openCheckbox = document.querySelector(`input[name="${day}_open"]`);
+        const startTime = document.querySelector(`input[name="${day}_start"]`);
+        const endTime = document.querySelector(`input[name="${day}_end"]`);
+        
+        if (openCheckbox) openCheckbox.checked = true;
+        if (startTime) startTime.value = '09:00';
+        if (endTime) endTime.value = '17:00';
+    });
+    updateDayRowStyles();
+}
+
+function setWeekendHours() {
+    const weekends = ['saturday', 'sunday'];
+    weekends.forEach(day => {
+        const openCheckbox = document.querySelector(`input[name="${day}_open"]`);
+        const startTime = document.querySelector(`input[name="${day}_start"]`);
+        const endTime = document.querySelector(`input[name="${day}_end"]`);
+        
+        if (openCheckbox) openCheckbox.checked = true;
+        if (startTime) startTime.value = '10:00';
+        if (endTime) endTime.value = '16:00';
+    });
+    updateDayRowStyles();
+}
+
+function closeAllDays() {
+    const allDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    allDays.forEach(day => {
+        const openCheckbox = document.querySelector(`input[name="${day}_open"]`);
+        if (openCheckbox) openCheckbox.checked = false;
+    });
+    updateDayRowStyles();
+}
+
+function updateDayRowStyles() {
+    document.querySelectorAll('.day-row').forEach(function(row) {
+        const day = row.dataset.day;
+        const openCheckbox = row.querySelector(`input[name="${day}_open"]`);
+        const timeInputs = row.querySelectorAll('input[type="time"]');
+        
+        if (openCheckbox && openCheckbox.checked) {
+            row.classList.remove('closed');
+            row.classList.add('open');
+            timeInputs.forEach(input => input.disabled = false);
+        } else {
+            row.classList.remove('open');
+            row.classList.add('closed');
+            timeInputs.forEach(input => input.disabled = true);
+        }
+    });
+}
+</script>
+{% endblock %}

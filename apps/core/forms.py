@@ -1,0 +1,320 @@
+from django import forms
+from django.core.validators import EmailValidator
+from apps.core.tenant_models import TenantSettings
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Submit, Row, Column, Field, HTML, Div, Fieldset
+from crispy_forms.bootstrap import FormActions
+
+
+class TenantSettingsForm(forms.ModelForm):
+    """Form for tenant settings"""
+    
+    class Meta:
+        model = TenantSettings
+        fields = [
+            # Basic Business Settings
+            'business_name', 'tagline', 'default_currency', 'timezone',
+            
+            # Contact Settings
+            'contact_phone', 'contact_email', 'contact_address', 'website_url',
+            
+            # Social Media
+            'facebook_url', 'instagram_url', 'twitter_url',
+            
+            # Branding
+            'primary_color', 'secondary_color', 'logo_url',
+        ]
+        
+        widgets = {
+            'business_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Your Business Name'
+            }),
+            'tagline': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Your business tagline or slogan'
+            }),
+            'default_currency': forms.Select(attrs={'class': 'form-select'}),
+            'timezone': forms.Select(attrs={'class': 'form-select'}),
+            'contact_phone': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '+254712345678'
+            }),
+            'contact_email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'contact@yourbusiness.com'
+            }),
+            'contact_address': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Your business address'
+            }),
+            'website_url': forms.URLInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'https://yourwebsite.com'
+            }),
+            'facebook_url': forms.URLInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'https://facebook.com/yourpage'
+            }),
+            'instagram_url': forms.URLInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'https://instagram.com/yourprofile'
+            }),
+            'twitter_url': forms.URLInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'https://twitter.com/yourprofile'
+            }),
+            'primary_color': forms.TextInput(attrs={
+                'class': 'form-control',
+                'type': 'color'
+            }),
+            'secondary_color': forms.TextInput(attrs={
+                'class': 'form-control',
+                'type': 'color'
+            }),
+            'logo_url': forms.URLInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'https://yourlogo.com/logo.png'
+            }),
+        }
+
+
+class NotificationSettingsForm(forms.ModelForm):
+    """Form for notification settings"""
+    
+    class Meta:
+        model = TenantSettings
+        fields = [
+            # General Notification Settings
+            'sms_notifications', 'email_notifications', 'whatsapp_notifications',
+            
+            # Customer Notifications
+            'customer_booking_confirmations', 'customer_payment_receipts',
+            'customer_service_reminders', 'customer_marketing_messages',
+            
+            # Staff Notifications
+            'staff_new_bookings', 'staff_payment_alerts', 'staff_daily_summaries',
+        ]
+        
+        widgets = {
+            'sms_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'email_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'whatsapp_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'customer_booking_confirmations': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'customer_payment_receipts': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'customer_service_reminders': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'customer_marketing_messages': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'staff_new_bookings': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'staff_payment_alerts': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'staff_daily_summaries': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class PaymentSettingsForm(forms.ModelForm):
+    """Form for payment settings"""
+    
+    class Meta:
+        model = TenantSettings
+        fields = [
+            'auto_payment_confirmation', 'require_payment_before_service',
+            'default_tax_rate', 'mpesa_auto_confirm',
+        ]
+        
+        widgets = {
+            'auto_payment_confirmation': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'require_payment_before_service': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'mpesa_auto_confirm': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'default_tax_rate': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'max': '100',
+                'step': '0.01',
+                'placeholder': '16.00'
+            }),
+        }
+
+
+class ServiceSettingsForm(forms.ModelForm):
+    """Form for service settings"""
+    
+    class Meta:
+        model = TenantSettings
+        fields = [
+            'auto_assign_services', 'require_service_confirmation', 'service_buffer_time',
+        ]
+        
+        widgets = {
+            'auto_assign_services': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'require_service_confirmation': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'service_buffer_time': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'max': '120',
+                'placeholder': '15'
+            }),
+        }
+
+
+class FeatureSettingsForm(forms.ModelForm):
+    """Form for feature flags"""
+    
+    class Meta:
+        model = TenantSettings
+        fields = [
+            'enable_loyalty_program', 'enable_online_booking', 'enable_mobile_app',
+            'enable_pos_integration', 'enable_inventory_tracking', 'enable_employee_attendance',
+        ]
+        
+        widgets = {
+            'enable_loyalty_program': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'enable_online_booking': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'enable_mobile_app': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'enable_pos_integration': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'enable_inventory_tracking': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'enable_employee_attendance': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class BackupSettingsForm(forms.ModelForm):
+    """Form for backup settings"""
+    
+    class Meta:
+        model = TenantSettings
+        fields = [
+            'auto_backup_enabled', 'backup_frequency', 'backup_retention_days',
+            'backup_email_notifications', 'backup_to_email', 'backup_to_cloud',
+        ]
+        
+        widgets = {
+            'auto_backup_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'backup_frequency': forms.Select(attrs={'class': 'form-select'}),
+            'backup_retention_days': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'max': '365',
+                'placeholder': '30'
+            }),
+            'backup_email_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'backup_to_email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'backup@yourbusiness.com'
+            }),
+            'backup_to_cloud': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class BusinessHoursForm(forms.ModelForm):
+    """Form for business hours"""
+    
+    class Meta:
+        model = TenantSettings
+        fields = [
+            'monday_open', 'monday_close',
+            'tuesday_open', 'tuesday_close',
+            'wednesday_open', 'wednesday_close',
+            'thursday_open', 'thursday_close',
+            'friday_open', 'friday_close',
+            'saturday_open', 'saturday_close',
+            'sunday_open', 'sunday_close',
+        ]
+        
+        widgets = {
+            'monday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'monday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'tuesday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'tuesday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'wednesday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'wednesday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'thursday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'thursday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'friday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'friday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'saturday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'saturday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'sunday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'sunday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+        }
+
+
+class CreateBackupForm(forms.Form):
+    """Form for creating a backup"""
+    backup_type = forms.ChoiceField(
+        choices=[
+            ('full', 'Full Backup'),
+            ('partial', 'Partial Backup'),
+        ],
+        widget=forms.RadioSelect(),
+        initial='full'
+    )
+    
+    backup_format = forms.ChoiceField(
+        choices=[
+            ('sql', 'SQL Database Dump'),
+            ('json', 'JSON Export'),
+            ('excel', 'Excel Spreadsheet'),
+            ('csv', 'CSV Files'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        initial='sql'
+    )
+    
+    # For partial backups
+    include_customers = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    include_services = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    include_payments = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    include_employees = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    include_inventory = forms.BooleanField(
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    
+    # Email backup
+    email_backup = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    email_address = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'your@email.com'
+        })
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        email_backup = cleaned_data.get('email_backup')
+        email_address = cleaned_data.get('email_address')
+        
+        if email_backup and not email_address:
+            raise forms.ValidationError("Email address is required when email backup is enabled.")
+        
+        # For partial backups, at least one table must be selected
+        backup_type = cleaned_data.get('backup_type')
+        if backup_type == 'partial':
+            partial_fields = [
+                'include_customers', 'include_services', 'include_payments',
+                'include_employees', 'include_inventory'
+            ]
+            if not any(cleaned_data.get(field) for field in partial_fields):
+                raise forms.ValidationError("For partial backups, you must select at least one data type to include.")
+        
+        return cleaned_data

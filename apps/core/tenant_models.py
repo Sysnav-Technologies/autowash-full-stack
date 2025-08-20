@@ -227,25 +227,212 @@ class TenantSettings(models.Model):
     """Settings specific to each tenant"""
     tenant_id = models.UUIDField(unique=True, help_text="ID of the tenant this settings belongs to")
     
-    # Notification settings
-    sms_notifications = models.BooleanField(default=True)
-    email_notifications = models.BooleanField(default=True)
+    # Basic Business Settings
+    business_name = models.CharField(max_length=200, blank=True)
+    tagline = models.CharField(max_length=500, blank=True, help_text="Business tagline or slogan")
+    default_currency = models.CharField(max_length=3, default='KES', choices=[
+        ('KES', 'Kenyan Shilling'),
+        ('USD', 'US Dollar'),
+        ('EUR', 'Euro'),
+        ('GBP', 'British Pound'),
+    ])
+    timezone = models.CharField(max_length=50, default='Africa/Nairobi')
     
-    # Feature flags
+    # Notification Settings
+    sms_notifications = models.BooleanField(default=True, help_text="Send SMS notifications to customers")
+    email_notifications = models.BooleanField(default=True, help_text="Send email notifications")
+    whatsapp_notifications = models.BooleanField(default=False, help_text="Send WhatsApp notifications")
+    
+    # Customer Notifications
+    customer_booking_confirmations = models.BooleanField(default=True)
+    customer_payment_receipts = models.BooleanField(default=True)
+    customer_service_reminders = models.BooleanField(default=True)
+    customer_marketing_messages = models.BooleanField(default=False)
+    
+    # Staff Notifications
+    staff_new_bookings = models.BooleanField(default=True)
+    staff_payment_alerts = models.BooleanField(default=True)
+    staff_daily_summaries = models.BooleanField(default=True)
+    
+    # Feature Flags
     enable_loyalty_program = models.BooleanField(default=False)
     enable_online_booking = models.BooleanField(default=True)
     enable_mobile_app = models.BooleanField(default=False)
+    enable_pos_integration = models.BooleanField(default=False)
+    enable_inventory_tracking = models.BooleanField(default=True)
+    enable_employee_attendance = models.BooleanField(default=True)
+    
+    # Payment Settings
+    auto_payment_confirmation = models.BooleanField(default=True)
+    require_payment_before_service = models.BooleanField(default=False)
+    default_tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    mpesa_auto_confirm = models.BooleanField(default=True)
+    
+    # Service Settings
+    auto_assign_services = models.BooleanField(default=False)
+    require_service_confirmation = models.BooleanField(default=True)
+    service_buffer_time = models.IntegerField(default=15, help_text="Buffer time between services in minutes")
+    
+    # Backup Settings
+    auto_backup_enabled = models.BooleanField(default=True)
+    backup_frequency = models.CharField(max_length=20, default='weekly', choices=[
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+    ])
+    backup_retention_days = models.IntegerField(default=30)
+    backup_email_notifications = models.BooleanField(default=True)
+    backup_to_email = models.EmailField(blank=True, help_text="Email address to send backups to")
+    backup_to_cloud = models.BooleanField(default=False)
     
     # Branding
     primary_color = models.CharField(max_length=7, default='#007bff')
     secondary_color = models.CharField(max_length=7, default='#6c757d')
+    logo_url = models.URLField(blank=True)
+    
+    # Business Hours
+    monday_open = models.TimeField(null=True, blank=True)
+    monday_close = models.TimeField(null=True, blank=True)
+    tuesday_open = models.TimeField(null=True, blank=True)
+    tuesday_close = models.TimeField(null=True, blank=True)
+    wednesday_open = models.TimeField(null=True, blank=True)
+    wednesday_close = models.TimeField(null=True, blank=True)
+    thursday_open = models.TimeField(null=True, blank=True)
+    thursday_close = models.TimeField(null=True, blank=True)
+    friday_open = models.TimeField(null=True, blank=True)
+    friday_close = models.TimeField(null=True, blank=True)
+    saturday_open = models.TimeField(null=True, blank=True)
+    saturday_close = models.TimeField(null=True, blank=True)
+    sunday_open = models.TimeField(null=True, blank=True)
+    sunday_close = models.TimeField(null=True, blank=True)
+    
+    # Contact Settings
+    contact_phone = models.CharField(max_length=20, blank=True)
+    contact_email = models.EmailField(blank=True)
+    contact_address = models.TextField(blank=True)
+    website_url = models.URLField(blank=True)
+    
+    # Social Media
+    facebook_url = models.URLField(blank=True)
+    instagram_url = models.URLField(blank=True)
+    twitter_url = models.URLField(blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         verbose_name = "Tenant Settings"
         verbose_name_plural = "Tenant Settings"
     
     def __str__(self):
-        return f"Settings for tenant {self.tenant_id}"
+        return f"Settings for {self.business_name or self.tenant_id}"
+    
+    def is_open_now(self):
+        """Check if business is currently open"""
+        from datetime import datetime
+        import pytz
+        
+        try:
+            tz = pytz.timezone(self.timezone)
+            now = datetime.now(tz)
+            current_day = now.strftime('%A').lower()
+            current_time = now.time()
+            
+            open_field = f"{current_day}_open"
+            close_field = f"{current_day}_close"
+            
+            open_time = getattr(self, open_field)
+            close_time = getattr(self, close_field)
+            
+            if open_time and close_time:
+                return open_time <= current_time <= close_time
+            return False
+        except:
+            return False
+
+
+class TenantBackup(models.Model):
+    """Model to track tenant database backups"""
+    tenant_id = models.UUIDField(help_text="ID of the tenant this backup belongs to")
+    backup_id = models.CharField(max_length=100, unique=True)
+    
+    # Backup details
+    backup_type = models.CharField(max_length=20, choices=[
+        ('full', 'Full Backup'),
+        ('partial', 'Partial Backup'),
+        ('scheduled', 'Scheduled Backup'),
+    ], default='full')
+    
+    backup_format = models.CharField(max_length=10, choices=[
+        ('sql', 'SQL Dump'),
+        ('json', 'JSON Export'),
+        ('excel', 'Excel Export'),
+        ('csv', 'CSV Export'),
+    ], default='sql')
+    
+    # File information
+    file_name = models.CharField(max_length=255)
+    file_path = models.CharField(max_length=500)
+    file_size = models.BigIntegerField(default=0, help_text="File size in bytes")
+    
+    # Backup content
+    included_tables = models.JSONField(default=list, help_text="List of tables included in backup")
+    record_counts = models.JSONField(default=dict, help_text="Number of records per table")
+    
+    # Status
+    status = models.CharField(max_length=20, choices=[
+        ('creating', 'Creating'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('expired', 'Expired'),
+    ], default='creating')
+    
+    error_message = models.TextField(blank=True)
+    
+    # Sharing options
+    emailed_to = models.EmailField(blank=True, help_text="Email address backup was sent to")
+    cloud_storage_url = models.URLField(blank=True, help_text="Cloud storage download URL")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    
+    # User who created the backup
+    created_by_user_id = models.IntegerField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = "Tenant Backup"
+        verbose_name_plural = "Tenant Backups"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Backup {self.backup_id} for tenant {self.tenant_id}"
+    
+    @property
+    def file_size_formatted(self):
+        """Return formatted file size"""
+        if self.file_size == 0:
+            return "0 B"
+        
+        size = float(self.file_size)
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} TB"
+    
+    def is_expired(self):
+        """Check if backup has expired"""
+        if not self.expires_at:
+            return False
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+    
+    def get_download_url(self):
+        """Get the download URL for this backup"""
+        return f"/api/backups/{self.backup_id}/download/"
 
 
 # Base models for tenant databases

@@ -1000,9 +1000,10 @@ def business_register_view(request):
                     db_name = f"autowash_{clean_subdomain}"
                     business.database_name = db_name[:63]  # MySQL max db name length
                     
-                    # Set database credentials (you can customize these)
-                    business.database_user = f"user_{business.database_name}"
-                    business.database_password = str(uuid.uuid4())[:12]  # Generate random password
+                    # Use main database credentials for all tenants (simpler and more reliable)
+                    default_db = settings.DATABASES['default']
+                    business.database_user = default_db['USER']
+                    business.database_password = default_db['PASSWORD']
                     
                     print(f"About to save business: {business.name}")
                     print(f"Subdomain: {business.subdomain}")
