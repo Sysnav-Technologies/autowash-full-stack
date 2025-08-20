@@ -6,6 +6,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
+from django.utils import timezone as django_timezone
 from phonenumber_field.modelfields import PhoneNumberField
 from apps.core.models import TimeStampedModel, Address, ContactInfo
 import uuid
@@ -318,7 +319,7 @@ class TenantSettings(models.Model):
     twitter_url = models.URLField(blank=True)
     
     # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=django_timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
