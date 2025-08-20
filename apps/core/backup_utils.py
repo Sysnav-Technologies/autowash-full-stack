@@ -349,9 +349,6 @@ class TenantBackupManager:
                 except:
                     pass
             
-            # Get the backup password for email context
-            backup_password = self._get_business_owner_password()
-            
             context = {
                 'backup': backup,
                 'user_name': user_name,
@@ -360,8 +357,7 @@ class TenantBackupManager:
                 'business_phone': self.tenant.phone,
                 'app_name': getattr(settings, 'APP_NAME', 'Autowash'),
                 'current_year': timezone.now().year,
-                'is_password_protected': True,
-                'backup_password': backup_password,
+                'is_password_protected': False,  # No password protection
             }
             
             # Render email content
@@ -385,104 +381,15 @@ class TenantBackupManager:
             # Attach HTML version
             email.attach_alternative(html_message, "text/html")
             
-            # Attach backup file with password protection
+            # Attach backup file directly (no password protection)
             if backup.file_path and os.path.exists(backup.file_path):
-                # Create password-protected zip file
-                protected_file_path = self._create_password_protected_backup(backup)
-                if protected_file_path and os.path.exists(protected_file_path):
-                    email.attach_file(protected_file_path)
-                    # Clean up the temporary protected file after sending
-                    try:
-                        os.remove(protected_file_path)
-                    except:
-                        pass
-                else:
-                    # Fallback to original file if protection fails
-                    email.attach_file(backup.file_path)
+                email.attach_file(backup.file_path)
             
             email.send()
             
         except Exception as e:
             print(f"Error sending backup email: {e}")
             raise
-    
-    def _create_password_protected_backup(self, backup):
-        """Create a password-protected zip file containing the backup using pyminizip"""
-        try:
-            import pyminizip
-            
-            # Get business owner's password
-            password = self._get_business_owner_password()
-            if not password:
-                print("Warning: Could not retrieve business owner password for backup protection")
-                return None
-            
-            # Create temporary protected file path
-            backup_dir = os.path.dirname(backup.file_path)
-            protected_filename = f"protected_{backup.backup_id}.zip"
-            protected_file_path = os.path.join(backup_dir, protected_filename)
-            
-            # Create password-protected zip file using pyminizip (AES encryption)
-            compression_level = 5  # 0-9, 5 is good balance of speed/compression
-            pyminizip.compress(
-                backup.file_path,           # Source file path
-                None,                       # Path prefix in zip (None = use just filename)
-                protected_file_path,        # Destination zip file path
-                password,                   # Password for encryption
-                compression_level           # Compression level
-            )
-            
-            return protected_file_path
-            
-        except ImportError:
-            print("Warning: pyminizip not available, falling back to standard zipfile")
-            return self._create_fallback_protected_backup(backup)
-        except Exception as e:
-            print(f"Error creating password-protected backup with pyminizip: {e}")
-            return self._create_fallback_protected_backup(backup)
-    
-    def _create_fallback_protected_backup(self, backup):
-        """Fallback method using standard zipfile (less secure but still better than nothing)"""
-        try:
-            import zipfile
-            
-            password = self._get_business_owner_password()
-            if not password:
-                return None
-            
-            backup_dir = os.path.dirname(backup.file_path)
-            protected_filename = f"protected_{backup.backup_id}.zip"
-            protected_file_path = os.path.join(backup_dir, protected_filename)
-            
-            with zipfile.ZipFile(protected_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                zipf.setpassword(password.encode('utf-8'))
-                zipf.write(backup.file_path, os.path.basename(backup.file_path))
-            
-            return protected_file_path
-            
-        except Exception as e:
-            print(f"Error creating fallback protected backup: {e}")
-            return None
-    
-    def _get_business_owner_password(self):
-        """Generate a consistent password for backup protection based on business info"""
-        try:
-            # Create a deterministic password based on business information
-            # This ensures the password is consistent and known to the business owner
-            import hashlib
-            
-            # Use business ID + business name as the basis for password
-            password_source = f"{self.tenant.id}_{self.tenant.slug}"
-            password_hash = hashlib.sha256(password_source.encode()).hexdigest()
-            
-            # Create a human-readable password format: first 4 chars + last 4 chars
-            password = f"{password_hash[:4]}{password_hash[-4:]}"
-            
-            return password.upper()  # Return in uppercase for easier typing
-            
-        except Exception as e:
-            print(f"Error generating backup password: {e}")
-            return None
     
     def get_backup_download_response(self, backup_id):
         """Get HTTP response for downloading backup"""
