@@ -12,16 +12,15 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.conf import settings
 from apps.core.decorators import employee_required, owner_required, ajax_required
-from apps.core.utils import (
-    send_test_sms, send_test_email, validate_business_settings,
-    create_system_backup_data, export_data_to_format, generate_backup_filename,
-    calculate_backup_size_estimate, format_file_size
+from apps.core.tenant_models import TenantSettings, TenantBackup
+from apps.core.forms import (
+    TenantSettingsForm, NotificationSettingsForm, PaymentSettingsForm,
+    ServiceSettingsForm, FeatureSettingsForm, BackupSettingsForm,
+    BusinessHoursForm, CreateBackupForm
 )
+from apps.core.backup_utils import TenantBackupManager, get_selected_tables
+from apps.core.database_router import tenant_context
 from .models import BusinessAlert, QuickAction
-from .forms import (
-    BusinessSettingsForm, ServiceSettingsForm, PaymentSettingsForm,
-    NotificationSettingsForm, IntegrationSettingsForm, SecuritySettingsForm
-)
 
 @login_required
 @employee_required(['owner'])
@@ -29,26 +28,31 @@ def settings_overview(request):
     """Settings overview/dashboard"""
     business = request.business
     
-    # Validate business settings
-    validation = validate_business_settings(business)
+    # Get or create tenant settings
+    with tenant_context(business):
+        tenant_settings, created = TenantSettings.objects.get_or_create(
+            tenant_id=business.id,
+            defaults={
+                'business_name': business.name,
+                'default_currency': 'KES',
+                'timezone': 'Africa/Nairobi',
+            }
+        )
     
     # Get settings status
     settings_status = {
-        'business_complete': validation['is_complete'],
-        'payment_configured': bool(
-            hasattr(business, 'default_tax_rate') and business.default_tax_rate is not None
-        ),
-        'notifications_enabled': True,  # Default enabled
-        'integrations_active': 0,
-        'backup_enabled': getattr(business, 'auto_backup_enabled', False),
-        'security_configured': True,  # Basic security always enabled
+        'business_complete': bool(tenant_settings.business_name and tenant_settings.contact_email),
+        'payment_configured': tenant_settings.default_tax_rate > 0,
+        'notifications_enabled': tenant_settings.email_notifications,
+        'backup_enabled': tenant_settings.auto_backup_enabled,
+        'hours_configured': bool(tenant_settings.monday_open),
     }
     
     # Recent activities
     recent_activities = [
         {
-            'action': 'Business profile updated',
-            'timestamp': business.updated_at,
+            'action': 'Settings updated',
+            'timestamp': tenant_settings.updated_at,
             'user': 'System',
         }
     ]
@@ -85,10 +89,10 @@ def settings_overview(request):
     
     context = {
         'business': business,
+        'tenant_settings': tenant_settings,
         'settings_status': settings_status,
         'recent_activities': recent_activities,
         'quick_actions': quick_actions,
-        'validation_results': validation,
         'title': 'Settings Overview'
     }
     

@@ -5,733 +5,479 @@
 
 {% block extra_css %}
 <style>
-.settings-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
-    color: white;
-    padding: 2rem;
-    margin-bottom: 2rem;
-}
-
-.settings-nav {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e5e7eb;
-    margin-bottom: 2rem;
-    overflow: hidden;
-}
-
-.settings-nav .nav-pills {
-    padding: 0;
-    margin: 0;
-}
-
-.settings-nav .nav-link {
-    color: #6b7280;
-    border: none;
-    padding: 1rem 1.5rem;
-    border-radius: 0;
-    transition: all 0.3s ease;
-    border-right: 1px solid #e5e7eb;
-}
-
-.settings-nav .nav-link:last-child {
-    border-right: none;
-}
-
-.settings-nav .nav-link.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.settings-nav .nav-link:hover:not(.active) {
-    background: #f9fafb;
-    color: #374151;
-}
-
-.backup-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.backup-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.backup-type-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    color: white;
-    margin-right: 1rem;
-}
-
-.backup-history-item {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 0.5rem;
-}
-
-.backup-progress {
-    width: 100%;
-    height: 8px;
-    background: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-    margin: 1rem 0;
-}
-
-.backup-progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #10b981, #059669);
-    width: 0%;
-    transition: width 0.3s ease;
-}
-
-.export-option {
-    background: white;
-    border: 2px dashed #d1d5db;
-    border-radius: 12px;
-    padding: 2rem;
-    text-align: center;
-    margin-bottom: 1rem;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.export-option:hover {
-    border-color: #3b82f6;
-    background: #f0f9ff;
-}
-
-.export-option.selected {
-    border-color: #3b82f6;
-    background: #f0f9ff;
-    border-style: solid;
-}
-
-@media (max-width: 768px) {
-    .settings-nav .nav-pills {
-        flex-direction: column;
+    .settings-form {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 30px;
     }
     
-    .settings-nav .nav-link {
-        border-right: none;
-        border-bottom: 1px solid #e5e7eb;
+    .form-section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
     }
     
-    .settings-nav .nav-link:last-child {
+    .form-section:last-child {
         border-bottom: none;
     }
-}
+    
+    .section-title {
+        color: #333;
+        margin-bottom: 15px;
+        font-weight: 600;
+    }
+    
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .backup-item {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+        transition: all 0.2s ease;
+    }
+    
+    .backup-item:hover {
+        border-color: #007bff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .backup-status {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-completed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-processing {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-failed {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .create-backup-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .format-option {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .format-option:hover {
+        border-color: #007bff;
+    }
+    
+    .format-option.selected {
+        border-color: #007bff;
+        background-color: #e3f2fd;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Header -->
-    <div class="settings-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h1 class="h3 mb-2">Backup & Export</h1>
-                <p class="mb-0 opacity-75">Protect your business data with regular backups</p>
-            </div>
-            <div>
-                <a href="{% url 'businesses:settings_overview' %}" class="btn btn-light">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Overview
-                </a>
-            </div>
-        </div>
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb bg-transparent p-0 m-0">
+                <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/business/settings/">Settings</a></li>
+                <li class="breadcrumb-item active">Backup & Export</li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-download mr-2"></i>Backup & Export
+        </h1>
     </div>
+</div>
 
-    <!-- Settings Navigation -->
-    <div class="settings-nav">
-        <ul class="nav nav-pills">
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'businesses:business_settings' %}">
-                    <i class="fas fa-building me-2"></i>Business Profile
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'businesses:service_settings' %}">
-                    <i class="fas fa-car me-2"></i>Services
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'businesses:payment_settings' %}">
-                    <i class="fas fa-credit-card me-2"></i>Payments
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'businesses:notification_settings' %}">
-                    <i class="fas fa-bell me-2"></i>Notifications
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link active" href="{% url 'businesses:backup_settings' %}">
-                    <i class="fas fa-download me-2"></i>Backup
-                </a>
-            </li>
-        </ul>
-    </div>
-
-    <div class="row">
-        <!-- Create Backup Section -->
-        <div class="col-lg-8">
-            <div class="settings-form-card">
-                <div class="settings-form-header">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h4 class="mb-1">Create Backup</h4>
-                            <p class="text-muted mb-0">Export your business data for safekeeping</p>
-                        </div>
-                        <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
-                            <i class="fas fa-arrow-left me-2"></i>Back to Overview
-                        </a>
-                    </div>
-                </div>
-
-                <div class="settings-form-body">
-                    <!-- Backup Types -->
-                    <div class="form-section">
-                        <div class="form-section-title">
-                            <i class="fas fa-database text-primary"></i>
-                            Backup Types
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="backup-card" onclick="selectBackupType('full')">
-                                    <div class="d-flex align-items-center">
-                                        <div class="backup-type-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                                            <i class="fas fa-database"></i>
-                                        </div>
-                                        <div>
-                                            <h6 class="mb-1">Full Backup</h6>
-                                            <small class="text-muted">Complete business data export</small>
-                                        </div>
-                                    </div>
-                                    <div class="mt-3">
-                                        <ul class="list-unstyled mb-0 small text-muted">
-                                            <li><i class="fas fa-check text-success me-2"></i>Customer records</li>
-                                            <li><i class="fas fa-check text-success me-2"></i>Service history</li>
-                                            <li><i class="fas fa-check text-success me-2"></i>Payment records</li>
-                                            <li><i class="fas fa-check text-success me-2"></i>Employee data</li>
-                                            <li><i class="fas fa-check text-success me-2"></i>Settings & configurations</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="backup-card" onclick="selectBackupType('partial')">
-                                    <div class="d-flex align-items-center">
-                                        <div class="backup-type-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                                            <i class="fas fa-file-export"></i>
-                                        </div>
-                                        <div>
-                                            <h6 class="mb-1">Selective Backup</h6>
-                                            <small class="text-muted">Choose specific data to export</small>
-                                        </div>
-                                    </div>
-                                    <div class="mt-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="customers" checked>
-                                            <label class="form-check-label small" for="customers">Customers</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="services" checked>
-                                            <label class="form-check-label small" for="services">Services</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="payments">
-                                            <label class="form-check-label small" for="payments">Payments</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Export Options -->
-                    <div class="form-section">
-                        <div class="form-section-title">
-                            <i class="fas fa-file-download text-primary"></i>
-                            Export Format
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="export-option" onclick="selectExportFormat('json')">
-                                    <i class="fas fa-code fa-2x text-primary mb-2"></i>
-                                    <h6>JSON Format</h6>
-                                    <small class="text-muted">Machine-readable format for imports</small>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="export-option selected" onclick="selectExportFormat('excel')">
-                                    <i class="fas fa-file-excel fa-2x text-success mb-2"></i>
-                                    <h6>Excel Format</h6>
-                                    <small class="text-muted">Spreadsheet format for analysis</small>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="export-option" onclick="selectExportFormat('csv')">
-                                    <i class="fas fa-file-csv fa-2x text-info mb-2"></i>
-                                    <h6>CSV Format</h6>
-                                    <small class="text-muted">Simple comma-separated values</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Backup Progress (hidden initially) -->
-                    <div class="form-section" id="backup-progress-section" style="display: none;">
-                        <div class="form-section-title">
-                            <i class="fas fa-spinner fa-spin text-primary"></i>
-                            Creating Backup...
-                        </div>
-                        
-                        <div class="backup-progress">
-                            <div class="backup-progress-bar" id="progress-bar"></div>
-                        </div>
-                        
-                        <div class="text-center">
-                            <div id="progress-text">Initializing backup...</div>
-                            <small class="text-muted" id="progress-details">Please wait while we prepare your data</small>
-                        </div>
-                    </div>
-
-                    <!-- Create Backup Button -->
-                    <div class="text-center">
-                        <button type="button" class="btn btn-primary btn-lg" onclick="createBackup()">
-                            <i class="fas fa-download me-2"></i>
-                            Create Backup
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Backup History Sidebar -->
-        <div class="col-lg-4">
-            <div class="settings-form-card">
-                <div class="settings-form-header">
-                    <h5 class="mb-0">Backup History</h5>
-                    <small class="text-muted">Recent backups and exports</small>
-                </div>
-                
-                <div class="settings-form-body">
-                    {% if recent_backups %}
-                    {% for backup in recent_backups %}
-                    <div class="backup-history-item">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div>
-                                <h6 class="mb-1">{{ backup.type|title }} Backup</h6>
-                                <small class="text-muted">{{ backup.created_at|date:"M d, Y H:i" }}</small>
-                            </div>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                    <i class="fas fa-ellipsis-h"></i>
-                                </button>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="{{ backup.download_url }}">
-                                        <i class="fas fa-download me-2"></i>Download
-                                    </a></li>
-                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteBackup('{{ backup.id }}')">
-                                        <i class="fas fa-trash me-2"></i>Delete
-                                    </a></li>
-                                </ul>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-between text-muted small">
-                            <span><i class="fas fa-file-archive me-1"></i>{{ backup.size }}</span>
-                            <span><i class="fas fa-check-circle text-success me-1"></i>Complete</span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-history fa-3x text-muted mb-3"></i>
-                        <h6 class="text-muted">No Backups Yet</h6>
-                        <p class="text-muted small">Create your first backup to see it here</p>
-                    </div>
-                    {% endif %}
-                    
-                    <!-- Auto-backup Settings -->
-                    <div class="mt-4 pt-4 border-top">
-                        <h6 class="mb-3">Auto-Backup Settings</h6>
-                        
-                        <div class="form-check form-switch mb-3">
-                            <input class="form-check-input" type="checkbox" id="autoBackupEnabled">
-                            <label class="form-check-label" for="autoBackupEnabled">
-                                Enable Auto-Backup
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Create New Backup -->
+        <div class="create-backup-section">
+            <h5><i class="fas fa-plus mr-2"></i>Create New Backup</h5>
+            <p class="text-muted">Create a backup of your business data for safekeeping or migration.</p>
+            
+            <form id="createBackupForm">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <label>Backup Type</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="backup_type" id="full_backup" value="full" checked>
+                            <label class="form-check-label" for="full_backup">
+                                <strong>Full Backup</strong><br>
+                                <small class="text-muted">All business data including customers, services, payments, etc.</small>
                             </label>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label small">Backup Frequency</label>
-                            <select class="form-select form-select-sm">
-                                <option value="daily">Daily</option>
-                                <option value="weekly" selected>Weekly</option>
-                                <option value="monthly">Monthly</option>
-                            </select>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="backup_type" id="partial_backup" value="partial">
+                            <label class="form-check-label" for="partial_backup">
+                                <strong>Partial Backup</strong><br>
+                                <small class="text-muted">Select specific data tables to backup</small>
+                            </label>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label small">Retention Period</label>
-                            <select class="form-select form-select-sm">
-                                <option value="30">30 days</option>
-                                <option value="60" selected>60 days</option>
-                                <option value="90">90 days</option>
-                                <option value="180">6 months</option>
-                            </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label>Export Format</label>
+                        <div class="format-option" data-format="sql">
+                            <input type="radio" name="backup_format" value="sql" checked>
+                            <strong>SQL Database</strong><br>
+                            <small class="text-muted">Raw database backup for migration</small>
                         </div>
-                        
-                        <button type="button" class="btn btn-outline-primary btn-sm w-100">
-                            <i class="fas fa-save me-2"></i>Save Auto-Backup Settings
+                        <div class="format-option" data-format="json">
+                            <input type="radio" name="backup_format" value="json">
+                            <strong>JSON Export</strong><br>
+                            <small class="text-muted">Structured data for analysis</small>
+                        </div>
+                        <div class="format-option" data-format="excel">
+                            <input type="radio" name="backup_format" value="excel">
+                            <strong>Excel Spreadsheet</strong><br>
+                            <small class="text-muted">Easy viewing and editing</small>
+                        </div>
+                        <div class="format-option" data-format="csv">
+                            <input type="radio" name="backup_format" value="csv">
+                            <strong>CSV Files</strong><br>
+                            <small class="text-muted">Comma-separated values</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Partial Backup Options (hidden by default) -->
+                <div id="partialOptions" style="display: none;">
+                    <h6>Select Data to Backup:</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="tables" value="customers" id="table_customers" checked>
+                                <label class="form-check-label" for="table_customers">Customers</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="tables" value="services" id="table_services" checked>
+                                <label class="form-check-label" for="table_services">Services</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="tables" value="bookings" id="table_bookings" checked>
+                                <label class="form-check-label" for="table_bookings">Bookings</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="tables" value="payments" id="table_payments" checked>
+                                <label class="form-check-label" for="table_payments">Payments</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="tables" value="inventory" id="table_inventory">
+                                <label class="form-check-label" for="table_inventory">Inventory</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="tables" value="employees" id="table_employees">
+                                <label class="form-check-label" for="table_employees">Employees</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Email Options -->
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" name="email_backup" id="email_backup">
+                    <label class="form-check-label" for="email_backup">
+                        Email backup to me
+                    </label>
+                </div>
+                <div id="emailOptions" style="display: none;" class="mt-2">
+                    <input type="email" class="form-control" name="email_address" placeholder="Enter email address">
+                </div>
+                
+                <button type="submit" class="btn btn-primary mt-3">
+                    <i class="fas fa-download mr-1"></i>Create Backup
+                </button>
+            </form>
+        </div>
+
+        <!-- Backup Settings -->
+        <form method="post" class="settings-form">
+            {% csrf_token %}
+            <input type="hidden" name="backup_settings" value="1">
+            
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-cog mr-2"></i>Automatic Backup Settings
+                </h5>
+                
+                <div class="form-check mb-3">
+                    {{ form.auto_backup_enabled }}
+                    <label class="form-check-label" for="{{ form.auto_backup_enabled.id_for_label }}">
+                        Enable Automatic Backups
+                    </label>
+                    <small class="help-text d-block">Automatically create backups on a regular schedule</small>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.backup_frequency.id_for_label }}">Backup Frequency</label>
+                            {{ form.backup_frequency }}
+                            <small class="help-text">How often to create automatic backups</small>
+                            {% if form.backup_frequency.errors %}
+                                <div class="invalid-feedback d-block">{{ form.backup_frequency.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.backup_retention_days.id_for_label }}">Retention Period (Days)</label>
+                            {{ form.backup_retention_days }}
+                            <small class="help-text">How long to keep automatic backups</small>
+                            {% if form.backup_retention_days.errors %}
+                                <div class="invalid-feedback d-block">{{ form.backup_retention_days.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="{{ form.backup_email.id_for_label }}">Backup Notification Email</label>
+                    {{ form.backup_email }}
+                    <small class="help-text">Email address to notify when automatic backups complete</small>
+                    {% if form.backup_email.errors %}
+                        <div class="invalid-feedback d-block">{{ form.backup_email.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="/business/{{ request.tenant.slug }}/business/settings/" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-1"></i>Back to Settings
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-1"></i>Save Backup Settings
+                </button>
+            </div>
+        </form>
+
+        <!-- Recent Backups -->
+        <div class="settings-form mt-4">
+            <h5><i class="fas fa-history mr-2"></i>Recent Backups</h5>
+            {% for backup in recent_backups %}
+            <div class="backup-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-2">
+                            <strong>{{ backup.backup_type|title }} Backup</strong>
+                            <span class="backup-status status-{{ backup.status }} ml-2">{{ backup.status }}</span>
+                        </div>
+                        <div class="small text-muted">
+                            <i class="fas fa-file-archive mr-1"></i>{{ backup.file_size_formatted }}
+                            <i class="fas fa-calendar ml-3 mr-1"></i>{{ backup.created_at|date:"M d, Y H:i" }}
+                            <i class="fas fa-file-code ml-3 mr-1"></i>{{ backup.backup_format|upper }}
+                        </div>
+                    </div>
+                    <div class="ml-3">
+                        {% if backup.status == 'completed' %}
+                        <a href="/business/{{ request.tenant.slug }}/business/settings/api/backup/{{ backup.backup_id }}/download/" class="btn btn-sm btn-outline-primary" title="Download backup">
+                            <i class="fas fa-download"></i>
+                        </a>
+                        <button class="btn btn-sm btn-outline-danger ml-2" onclick="deleteBackup('{{ backup.backup_id }}')" title="Delete backup">
+                            <i class="fas fa-trash"></i>
                         </button>
+                        {% elif backup.status == 'processing' %}
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="sr-only">Processing...</span>
+                        </div>
+                        {% else %}
+                        <span class="text-danger">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
-            
-            <!-- Data Usage Info -->
-            <div class="settings-form-card mt-3">
-                <div class="settings-form-header">
-                    <h6 class="mb-0">Storage Usage</h6>
-                </div>
+            {% empty %}
+            <div class="text-center py-4">
+                <i class="fas fa-archive text-muted" style="font-size: 3rem;"></i>
+                <p class="text-muted mt-2">No backups created yet</p>
+                <p class="small text-muted">Create your first backup using the form above</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-info mr-2"></i>Backup Information</h6>
+            </div>
+            <div class="card-body">
+                <h6>Backup Types</h6>
+                <p class="small text-muted"><strong>Full:</strong> Complete business data backup</p>
+                <p class="small text-muted"><strong>Partial:</strong> Selected data only</p>
                 
-                <div class="settings-form-body">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <small>Customers</small>
-                            <small>2.3 MB</small>
-                        </div>
-                        <div class="progress" style="height: 4px;">
-                            <div class="progress-bar bg-primary" style="width: 35%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <small>Services</small>
-                            <small>1.8 MB</small>
-                        </div>
-                        <div class="progress" style="height: 4px;">
-                            <div class="progress-bar bg-success" style="width: 28%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <small>Payments</small>
-                            <small>3.1 MB</small>
-                        </div>
-                        <div class="progress" style="height: 4px;">
-                            <div class="progress-bar bg-info" style="width: 47%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <small>Media Files</small>
-                            <small>12.5 MB</small>
-                        </div>
-                        <div class="progress" style="height: 4px;">
-                            <div class="progress-bar bg-warning" style="width: 78%"></div>
-                        </div>
-                    </div>
-                    
-                    <hr>
-                    
-                    <div class="d-flex justify-content-between">
-                        <strong>Total Usage</strong>
-                        <strong>19.7 MB</strong>
-                    </div>
-                    
-                    <div class="text-muted small mt-2">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Estimated backup size: ~15 MB compressed
-                    </div>
-                </div>
+                <h6>Export Formats</h6>
+                <p class="small text-muted"><strong>SQL:</strong> Direct database backup for migration</p>
+                <p class="small text-muted"><strong>JSON:</strong> Structured data format</p>
+                <p class="small text-muted"><strong>Excel:</strong> Spreadsheet format for analysis</p>
+                <p class="small text-muted"><strong>CSV:</strong> Simple comma-separated format</p>
+                
+                <h6>Data Security</h6>
+                <p class="small text-muted">All backups are encrypted and securely stored. Download links expire after 24 hours.</p>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-shield-alt mr-2"></i>Backup Status</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Auto Backup:</strong> {% if tenant_settings.auto_backup_enabled %}<span class="text-success">Enabled</span>{% else %}<span class="text-muted">Disabled</span>{% endif %}</p>
+                <p><strong>Frequency:</strong> {{ tenant_settings.backup_frequency|title }}</p>
+                <p><strong>Retention:</strong> {{ tenant_settings.backup_retention_days }} days</p>
+                <p><strong>Total Backups:</strong> {{ recent_backups|length }}</p>
+                {% if recent_backups %}
+                <p><strong>Last Backup:</strong><br>{{ recent_backups.0.created_at|date:"M d, Y" }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-lightbulb mr-2"></i>Best Practices</h6>
+            </div>
+            <div class="card-body">
+                <ul class="small text-muted">
+                    <li>Enable automatic backups for data protection</li>
+                    <li>Download important backups to external storage</li>
+                    <li>Test backup restoration periodically</li>
+                    <li>Use SQL format for complete system migration</li>
+                    <li>Use Excel/CSV for data analysis and reporting</li>
+                </ul>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-let selectedBackupType = 'full';
-let selectedExportFormat = 'excel';
-
-function selectBackupType(type) {
-    selectedBackupType = type;
-    
-    // Update UI to show selection
-    document.querySelectorAll('.backup-card').forEach(card => {
-        card.classList.remove('selected');
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle backup type selection
+    document.querySelectorAll('input[name="backup_type"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            const partialOptions = document.getElementById('partialOptions');
+            if (this.value === 'partial') {
+                partialOptions.style.display = 'block';
+            } else {
+                partialOptions.style.display = 'none';
+            }
+        });
     });
     
-    event.currentTarget.classList.add('selected');
-}
-
-function selectExportFormat(format) {
-    selectedExportFormat = format;
-    
-    // Update UI to show selection
-    document.querySelectorAll('.export-option').forEach(option => {
-        option.classList.remove('selected');
+    // Handle email backup option
+    document.getElementById('email_backup').addEventListener('change', function() {
+        const emailOptions = document.getElementById('emailOptions');
+        emailOptions.style.display = this.checked ? 'block' : 'none';
     });
     
-    event.currentTarget.classList.add('selected');
-}
+    // Handle format selection styling
+    document.querySelectorAll('.format-option').forEach(function(option) {
+        option.addEventListener('click', function() {
+            document.querySelectorAll('.format-option').forEach(opt => opt.classList.remove('selected'));
+            this.classList.add('selected');
+            const radio = this.querySelector('input[type="radio"]');
+            if (radio) radio.checked = true;
+        });
+    });
+    
+    // Handle backup creation form
+    document.getElementById('createBackupForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        createBackup();
+    });
+});
 
 function createBackup() {
-    // Show progress section
-    document.getElementById('backup-progress-section').style.display = 'block';
+    const form = document.getElementById('createBackupForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
     
-    // Disable create button
-    const createBtn = event.target;
-    createBtn.disabled = true;
-    createBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating...';
-    
-    // Simulate backup progress
-    let progress = 0;
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
-    const progressDetails = document.getElementById('progress-details');
-    
-    const steps = [
-        { progress: 20, text: 'Collecting customer data...', details: 'Exporting customer records and contact information' },
-        { progress: 40, text: 'Processing service records...', details: 'Gathering service history and order details' },
-        { progress: 60, text: 'Compiling payment data...', details: 'Including payment records and transaction history' },
-        { progress: 80, text: 'Packaging files...', details: 'Compressing and formatting export file' },
-        { progress: 100, text: 'Backup complete!', details: 'Your backup is ready for download' }
-    ];
-    
-    let currentStep = 0;
-    
-    const updateProgress = () => {
-        if (currentStep < steps.length) {
-            const step = steps[currentStep];
-            progressBar.style.width = step.progress + '%';
-            progressText.textContent = step.text;
-            progressDetails.textContent = step.details;
-            currentStep++;
-            
-            setTimeout(updateProgress, 1500);
-        } else {
-            // Backup complete
-            setTimeout(() => {
-                // Make actual AJAX call to create backup
-                fetch(`/business/{{ request.business.slug }}/settings/api/backup/create/`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        backup_type: selectedBackupType,
-                        export_format: selectedExportFormat,
-                        selected_data: getSelectedData()
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showToast('Backup created successfully!', 'success');
-                        
-                        // Create download link
-                        const downloadBtn = document.createElement('a');
-                        downloadBtn.href = `/business/{{ request.business.slug }}/settings/api/backup/download/${data.backup_id}/`;
-                        downloadBtn.className = 'btn btn-success btn-lg';
-                        downloadBtn.innerHTML = '<i class="fas fa-download me-2"></i>Download Backup';
-                        downloadBtn.download = `backup_{{ business.slug }}_${new Date().toISOString().split('T')[0]}.${selectedExportFormat}`;
-                        
-                        // Replace progress section with download button
-                        document.getElementById('backup-progress-section').innerHTML = `
-                            <div class="text-center">
-                                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
-                                <h5>Backup Created Successfully!</h5>
-                                <p class="text-muted mb-3">Size: ${data.size} | Format: ${selectedExportFormat.toUpperCase()}</p>
-                            </div>
-                        `;
-                        document.getElementById('backup-progress-section').appendChild(downloadBtn);
-                        
-                        // Reset create button
-                        createBtn.disabled = false;
-                        createBtn.innerHTML = '<i class="fas fa-download me-2"></i>Create Another Backup';
-                        
-                        // Auto-download
-                        setTimeout(() => {
-                            downloadBtn.click();
-                        }, 1000);
-                        
-                    } else {
-                        showToast('Error creating backup: ' + data.message, 'error');
-                        resetBackupForm();
-                    }
-                })
-                .catch(error => {
-                    showToast('Error creating backup', 'error');
-                    resetBackupForm();
-                });
-            }, 1000);
-        }
-    };
-    
-    updateProgress();
-}
-
-function getSelectedData() {
-    if (selectedBackupType === 'partial') {
-        const selected = [];
-        if (document.getElementById('customers').checked) selected.push('customers');
-        if (document.getElementById('services').checked) selected.push('services');
-        if (document.getElementById('payments').checked) selected.push('payments');
-        return selected;
+    // Collect selected tables for partial backup
+    if (data.backup_type === 'partial') {
+        const selectedTables = Array.from(document.querySelectorAll('input[name="tables"]:checked'))
+            .map(cb => cb.value);
+        data.selected_tables = selectedTables;
     }
-    return ['all'];
-}
-
-function resetBackupForm() {
-    document.getElementById('backup-progress-section').style.display = 'none';
-    const createBtn = document.querySelector('button[onclick="createBackup()"]');
-    createBtn.disabled = false;
-    createBtn.innerHTML = '<i class="fas fa-download me-2"></i>Create Backup';
+    
+    // Show loading state
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Creating Backup...';
+    submitBtn.disabled = true;
+    
+    fetch('/business/{{ request.tenant.slug }}/business/settings/api/backup/create/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Backup created successfully! Size: ' + data.size);
+            location.reload(); // Refresh to show new backup
+        } else {
+            alert('Error creating backup: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error creating backup: ' + error.message);
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
 }
 
 function deleteBackup(backupId) {
     if (confirm('Are you sure you want to delete this backup? This action cannot be undone.')) {
-        fetch(`/business/{{ request.business.slug }}/settings/api/backup/delete/${backupId}/`, {
-            method: 'DELETE',
+        fetch(`/business/{{ request.tenant.slug }}/business/settings/api/backup/${backupId}/delete/`, {
+            method: 'POST',
             headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             }
         })
-        .then(response => {
-            if (response.ok) {
-                showToast('Backup deleted successfully', 'success');
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
                 location.reload();
             } else {
-                showToast('Error deleting backup', 'error');
+                alert('Error deleting backup: ' + data.error);
             }
         })
         .catch(error => {
-            showToast('Error deleting backup', 'error');
+            alert('Error deleting backup: ' + error.message);
         });
     }
 }
-
-function showToast(message, type) {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <div class="toast-content">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
-            <span>${message}</span>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    // Add toast styles if not already present
-    if (!document.querySelector('style[data-toast-styles]')) {
-        const style = document.createElement('style');
-        style.setAttribute('data-toast-styles', 'true');
-        style.textContent = `
-            .toast {
-                position: fixed;
-                top: 2rem;
-                right: 2rem;
-                background: white;
-                border: 1px solid #e5e7eb;
-                border-radius: 8px;
-                padding: 1rem;
-                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-                z-index: 9999;
-                min-width: 300px;
-                animation: slideInRight 0.3s ease-out;
-            }
-            .toast.toast-success { border-left: 4px solid #10b981; }
-            .toast.toast-error { border-left: 4px solid #ef4444; }
-            .toast-content { display: flex; align-items: center; gap: 0.75rem; }
-            .toast-close {
-                position: absolute;
-                top: 0.5rem;
-                right: 0.5rem;
-                background: none;
-                border: none;
-                color: #6b7280;
-                cursor: pointer;
-                padding: 0.25rem;
-                border-radius: 4px;
-            }
-            @keyframes slideInRight {
-                from { opacity: 0; transform: translateX(100%); }
-                to { opacity: 1; transform: translateX(0); }
-            }
-            .backup-card.selected {
-                border-color: #3b82f6;
-                background: #f0f9ff;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-        }
-    }, 5000);
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-// Auto-backup settings
-document.addEventListener('DOMContentLoaded', function() {
-    const autoBackupToggle = document.getElementById('autoBackupEnabled');
-    if (autoBackupToggle) {
-        autoBackupToggle.addEventListener('change', function() {
-            const dependentInputs = document.querySelectorAll('#autoBackupEnabled ~ div select');
-            dependentInputs.forEach(input => {
-                input.disabled = !this.checked;
-            });
-        });
-    }
-});
 </script>
 {% endblock %}

@@ -1,0 +1,383 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Feature Settings - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-form {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 30px;
+    }
+    
+    .form-section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+    }
+    
+    .section-title {
+        color: #333;
+        margin-bottom: 15px;
+        font-weight: 600;
+    }
+    
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .feature-toggle {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+        transition: all 0.2s ease;
+    }
+    
+    .feature-toggle.enabled {
+        border-color: #28a745;
+        background-color: #f8fff9;
+    }
+    
+    .feature-toggle:hover {
+        border-color: #007bff;
+    }
+    
+    .feature-icon {
+        font-size: 1.2em;
+        margin-right: 10px;
+        width: 20px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb bg-transparent p-0 m-0">
+                <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/business/settings/">Settings</a></li>
+                <li class="breadcrumb-item active">Features</li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-toggle-on mr-2"></i>Feature Settings
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <form method="post" class="settings-form">
+            {% csrf_token %}
+            
+            <!-- Customer Management Features -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-users mr-2"></i>Customer Management
+                </h5>
+                
+                <div class="feature-toggle {% if form.enable_customer_portal.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_customer_portal }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_customer_portal.id_for_label }}">
+                            <i class="fas fa-user-circle feature-icon"></i>Customer Portal
+                        </label>
+                    </div>
+                    <small class="help-text">Allow customers to view bookings, history, and manage their profile online</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_loyalty_program.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_loyalty_program }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_loyalty_program.id_for_label }}">
+                            <i class="fas fa-heart feature-icon"></i>Loyalty Program
+                        </label>
+                    </div>
+                    <small class="help-text">Track customer loyalty points and reward repeat customers</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_referral_system.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_referral_system }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_referral_system.id_for_label }}">
+                            <i class="fas fa-share-alt feature-icon"></i>Referral System
+                        </label>
+                    </div>
+                    <small class="help-text">Allow customers to refer friends and earn rewards</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_customer_feedback.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_customer_feedback }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_customer_feedback.id_for_label }}">
+                            <i class="fas fa-comment-dots feature-icon"></i>Customer Feedback
+                        </label>
+                    </div>
+                    <small class="help-text">Collect and manage customer feedback and reviews</small>
+                </div>
+            </div>
+
+            <!-- Inventory & Stock Management -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-boxes mr-2"></i>Inventory Management
+                </h5>
+                
+                <div class="feature-toggle {% if form.enable_inventory_tracking.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_inventory_tracking }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_inventory_tracking.id_for_label }}">
+                            <i class="fas fa-warehouse feature-icon"></i>Inventory Tracking
+                        </label>
+                    </div>
+                    <small class="help-text">Track stock levels, usage, and automatically deduct inventory</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_supplier_management.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_supplier_management }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_supplier_management.id_for_label }}">
+                            <i class="fas fa-truck feature-icon"></i>Supplier Management
+                        </label>
+                    </div>
+                    <small class="help-text">Manage suppliers, purchase orders, and restocking</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_low_stock_alerts.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_low_stock_alerts }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_low_stock_alerts.id_for_label }}">
+                            <i class="fas fa-exclamation-triangle feature-icon"></i>Low Stock Alerts
+                        </label>
+                    </div>
+                    <small class="help-text">Automatic alerts when inventory items are running low</small>
+                </div>
+            </div>
+
+            <!-- Financial Features -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-chart-line mr-2"></i>Financial Management
+                </h5>
+                
+                <div class="feature-toggle {% if form.enable_expense_tracking.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_expense_tracking }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_expense_tracking.id_for_label }}">
+                            <i class="fas fa-receipt feature-icon"></i>Expense Tracking
+                        </label>
+                    </div>
+                    <small class="help-text">Track business expenses and categorize costs</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_financial_reports.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_financial_reports }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_financial_reports.id_for_label }}">
+                            <i class="fas fa-chart-bar feature-icon"></i>Financial Reports
+                        </label>
+                    </div>
+                    <small class="help-text">Generate profit/loss, cash flow, and tax reports</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_multi_currency.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_multi_currency }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_multi_currency.id_for_label }}">
+                            <i class="fas fa-coins feature-icon"></i>Multi-Currency Support
+                        </label>
+                    </div>
+                    <small class="help-text">Accept and display prices in multiple currencies</small>
+                </div>
+            </div>
+
+            <!-- Marketing & Communications -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-bullhorn mr-2"></i>Marketing & Communications
+                </h5>
+                
+                <div class="feature-toggle {% if form.enable_email_marketing.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_email_marketing }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_email_marketing.id_for_label }}">
+                            <i class="fas fa-envelope-open feature-icon"></i>Email Marketing
+                        </label>
+                    </div>
+                    <small class="help-text">Send promotional emails and newsletters to customers</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_sms_marketing.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_sms_marketing }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_sms_marketing.id_for_label }}">
+                            <i class="fas fa-sms feature-icon"></i>SMS Marketing
+                        </label>
+                    </div>
+                    <small class="help-text">Send promotional SMS messages to customers</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_social_integration.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_social_integration }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_social_integration.id_for_label }}">
+                            <i class="fas fa-share-square feature-icon"></i>Social Media Integration
+                        </label>
+                    </div>
+                    <small class="help-text">Connect with social media platforms for marketing</small>
+                </div>
+            </div>
+
+            <!-- Advanced Features -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-rocket mr-2"></i>Advanced Features
+                </h5>
+                
+                <div class="feature-toggle {% if form.enable_api_access.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_api_access }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_api_access.id_for_label }}">
+                            <i class="fas fa-code feature-icon"></i>API Access
+                        </label>
+                    </div>
+                    <small class="help-text">Enable API access for third-party integrations</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_mobile_app.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_mobile_app }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_mobile_app.id_for_label }}">
+                            <i class="fas fa-mobile-alt feature-icon"></i>Mobile App
+                        </label>
+                    </div>
+                    <small class="help-text">Enable mobile app access for customers and staff</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_analytics.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_analytics }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_analytics.id_for_label }}">
+                            <i class="fas fa-chart-pie feature-icon"></i>Advanced Analytics
+                        </label>
+                    </div>
+                    <small class="help-text">Detailed business analytics and insights</small>
+                </div>
+                
+                <div class="feature-toggle {% if form.enable_webhooks.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center">
+                        {{ form.enable_webhooks }}
+                        <label class="form-check-label ml-2" for="{{ form.enable_webhooks.id_for_label }}">
+                            <i class="fas fa-link feature-icon"></i>Webhooks
+                        </label>
+                    </div>
+                    <small class="help-text">Send real-time data to external systems</small>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="/business/{{ request.tenant.slug }}/business/settings/" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-1"></i>Back to Settings
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-1"></i>Save Feature Settings
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-info mr-2"></i>Feature Configuration Help</h6>
+            </div>
+            <div class="card-body">
+                <h6>Customer Features</h6>
+                <p class="small text-muted">Customer portal and loyalty programs help improve customer retention and satisfaction.</p>
+                
+                <h6>Inventory Management</h6>
+                <p class="small text-muted">Enable inventory tracking to monitor usage and prevent stockouts.</p>
+                
+                <h6>Financial Tools</h6>
+                <p class="small text-muted">Expense tracking and financial reports help with business planning and tax preparation.</p>
+                
+                <h6>Marketing Features</h6>
+                <p class="small text-muted">Email and SMS marketing help you stay connected with customers and drive repeat business.</p>
+                
+                <h6>Advanced Features</h6>
+                <p class="small text-muted">API access and webhooks enable integration with external systems and automation.</p>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-check-circle mr-2"></i>Enabled Features</h6>
+            </div>
+            <div class="card-body">
+                <div class="small">
+                    {% if tenant_settings.enable_customer_portal %}<span class="badge badge-success mb-1">Customer Portal</span>{% endif %}
+                    {% if tenant_settings.enable_loyalty_program %}<span class="badge badge-success mb-1">Loyalty Program</span>{% endif %}
+                    {% if tenant_settings.enable_inventory_tracking %}<span class="badge badge-success mb-1">Inventory Tracking</span>{% endif %}
+                    {% if tenant_settings.enable_expense_tracking %}<span class="badge badge-success mb-1">Expense Tracking</span>{% endif %}
+                    {% if tenant_settings.enable_email_marketing %}<span class="badge badge-success mb-1">Email Marketing</span>{% endif %}
+                    {% if tenant_settings.enable_api_access %}<span class="badge badge-success mb-1">API Access</span>{% endif %}
+                    
+                    {% comment %}
+                    {% if not tenant_settings.enable_customer_portal and not tenant_settings.enable_loyalty_program and not tenant_settings.enable_inventory_tracking and not tenant_settings.enable_expense_tracking and not tenant_settings.enable_email_marketing and not tenant_settings.enable_api_access %}
+                    <p class="text-muted mb-0">No advanced features enabled</p>
+                    {% endif %}
+                    {% endcomment %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-lightbulb mr-2"></i>Feature Recommendations</h6>
+            </div>
+            <div class="card-body">
+                <ul class="small text-muted">
+                    <li>Start with Customer Portal and Loyalty Program for better customer engagement</li>
+                    <li>Enable Inventory Tracking if you sell products or use supplies</li>
+                    <li>Use Email Marketing to send promotions and reminders</li>
+                    <li>Enable Financial Reports for better business insights</li>
+                    <li>Consider API access if you need third-party integrations</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update visual state of feature toggles
+    function updateFeatureToggles() {
+        document.querySelectorAll('.feature-toggle').forEach(function(toggle) {
+            const checkbox = toggle.querySelector('input[type="checkbox"]');
+            if (checkbox && checkbox.checked) {
+                toggle.classList.add('enabled');
+            } else {
+                toggle.classList.remove('enabled');
+            }
+        });
+    }
+    
+    // Initial update
+    updateFeatureToggles();
+    
+    // Update on change
+    document.querySelectorAll('input[type="checkbox"]').forEach(function(checkbox) {
+        checkbox.addEventListener('change', updateFeatureToggles);
+    });
+});
+</script>
+{% endblock %}

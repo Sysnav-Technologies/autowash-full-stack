@@ -1001,7 +1001,6 @@ def business_register_view(request):
                     business.database_name = db_name[:63]  # MySQL max db name length
                     
                     # Use main database credentials for all tenants (simpler and more reliable)
-                    from django.conf import settings
                     default_db = settings.DATABASES['default']
                     business.database_user = default_db['USER']
                     business.database_password = default_db['PASSWORD']

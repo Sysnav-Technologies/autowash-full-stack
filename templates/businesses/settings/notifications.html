@@ -4,622 +4,352 @@
 {% block title %}Notification Settings - {{ business.name }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/settings.css' %}">
 <style>
-.notification-channel {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    transition: all 0.3s ease;
-}
-
-.notification-channel:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.channel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-}
-
-.channel-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    color: white;
-    margin-right: 1rem;
-}
-
-.test-button {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    border: none;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    transition: all 0.3s ease;
-}
-
-.test-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-    color: white;
-}
-
-.notification-type {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 0.5rem;
-}
-
-.notification-type:last-child {
-    margin-bottom: 0;
-}
-
-.type-header {
-    display: flex;
-    align-items: center;
-    justify-content: between;
-    margin-bottom: 0.5rem;
-}
-
-.type-title {
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 0;
-}
-
-.type-description {
-    color: #6b7280;
-    font-size: 0.875rem;
-    margin: 0;
-}
-
-.channel-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.status-indicator {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-}
-
-.status-indicator.active {
-    background-color: #10b981;
-}
-
-.status-indicator.inactive {
-    background-color: #ef4444;
-}
-
-.status-indicator.testing {
-    background-color: #f59e0b;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-.notification-preview {
-    background: #f0f9ff;
-    border: 1px solid #0ea5e9;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-top: 1rem;
-}
-
-.preview-message {
-    font-family: monospace;
-    color: #0369a1;
-    margin: 0;
-}
+    .settings-form {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 30px;
+    }
+    
+    .form-section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+    }
+    
+    .section-title {
+        color: #333;
+        margin-bottom: 15px;
+        font-weight: 600;
+    }
+    
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .notification-option {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+        transition: all 0.2s ease;
+    }
+    
+    .notification-option.enabled {
+        border-color: #28a745;
+        background-color: #f8fff9;
+    }
+    
+    .notification-option:hover {
+        border-color: #007bff;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Settings Navigation -->
-    <div class="settings-nav">
-        <ul class="nav nav-pills" role="tablist">
-            <li class="nav-item" role="presentation">
-                <a class="nav-link" href="{% url 'businesses:business_settings' %}">
-                    <i class="fas fa-building me-2"></i>Business Profile
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link" href="{% url 'businesses:service_settings' %}">
-                    <i class="fas fa-tools me-2"></i>Services
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link" href="{% url 'businesses:payment_settings' %}">
-                    <i class="fas fa-credit-card me-2"></i>Payments
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link active" href="{% url 'businesses:notification_settings' %}">
-                    <i class="fas fa-bell me-2"></i>Notifications
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link" href="{% url 'businesses:integration_settings' %}">
-                    <i class="fas fa-plug me-2"></i>Integrations
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link" href="{% url 'businesses:backup_settings' %}">
-                    <i class="fas fa-download me-2"></i>Backup
-                </a>
-            </li>
-        </ul>
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb bg-transparent p-0 m-0">
+                <li class="breadcrumb-item"><a href="/business/{{ request.tenant.slug }}/business/settings/">Settings</a></li>
+                <li class="breadcrumb-item active">Notifications</li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-bell mr-2"></i>Notification Settings
+        </h1>
     </div>
+</div>
 
-    <!-- Settings Form -->
-    <form method="post" class="settings-form">
-        {% csrf_token %}
-        
-        <div class="settings-form-card">
-            <!-- Header -->
-            <div class="settings-form-header">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h4 class="mb-1">Notification Settings</h4>
-                        <p class="text-muted mb-0">Configure how your business communicates with customers</p>
-                    </div>
-                    <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>Back to Overview
-                    </a>
-                </div>
-            </div>
-
-            <!-- Form Body -->
-            <div class="settings-form-body">
-                <!-- General Settings Section -->
-                <div class="form-section">
-                    <div class="form-section-title">
-                        <i class="fas fa-cog text-primary"></i>
-                        General Settings
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="{{ form.notification_sender_name.id_for_label }}" class="form-label">
-                                    Sender Name
-                                </label>
-                                {{ form.notification_sender_name }}
-                                <div class="form-text">Name displayed as sender in notifications</div>
-                                {% if form.notification_sender_name.errors %}
-                                    <div class="text-danger small mt-1">{{ form.notification_sender_name.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                    </div>
-                </div>
-
-                <!-- Notification Types -->
-                <div class="form-section">
-                    <div class="form-section-title">
-                        <i class="fas fa-list text-primary"></i>
-                        Notification Types
-                        <small class="text-muted ms-2">Choose which events trigger notifications</small>
-                    </div>
-                    
-                    <div class="notification-type">
-                        <div class="type-header">
-                            <div class="form-check form-switch">
-                                {{ form.send_booking_confirmations }}
-                                <label class="form-check-label" for="{{ form.send_booking_confirmations.id_for_label }}">
-                                    <span class="type-title">Booking Confirmations</span>
+<div class="row">
+    <div class="col-lg-8">
+        <form method="post" class="settings-form">
+            {% csrf_token %}
+            
+            <!-- General Notification Settings -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-toggle-on mr-2"></i>General Notification Settings
+                </h5>
+                
+                <div class="notification-option {% if form.email_notifications.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="form-check">
+                                {{ form.email_notifications }}
+                                <label class="form-check-label" for="{{ form.email_notifications.id_for_label }}">
+                                    <i class="fas fa-envelope mr-2"></i>Email Notifications
                                 </label>
                             </div>
-                        </div>
-                        <p class="type-description">Send confirmation when a new service is booked</p>
-                        {% if form.send_booking_confirmations.errors %}
-                            <div class="text-danger small">{{ form.send_booking_confirmations.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="notification-type">
-                        <div class="type-header">
-                            <div class="form-check form-switch">
-                                {{ form.send_service_updates }}
-                                <label class="form-check-label" for="{{ form.send_service_updates.id_for_label }}">
-                                    <span class="type-title">Service Status Updates</span>
-                                </label>
-                            </div>
-                        </div>
-                        <p class="type-description">Notify customers when service status changes (started, completed, etc.)</p>
-                        {% if form.send_service_updates.errors %}
-                            <div class="text-danger small">{{ form.send_service_updates.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="notification-type">
-                        <div class="type-header">
-                            <div class="form-check form-switch">
-                                {{ form.send_payment_confirmations }}
-                                <label class="form-check-label" for="{{ form.send_payment_confirmations.id_for_label }}">
-                                    <span class="type-title">Payment Confirmations</span>
-                                </label>
-                            </div>
-                        </div>
-                        <p class="type-description">Send receipt and payment confirmation messages</p>
-                        {% if form.send_payment_confirmations.errors %}
-                            <div class="text-danger small">{{ form.send_payment_confirmations.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="notification-type">
-                        <div class="type-header">
-                            <div class="form-check form-switch">
-                                {{ form.send_reminder_notifications }}
-                                <label class="form-check-label" for="{{ form.send_reminder_notifications.id_for_label }}">
-                                    <span class="type-title">Appointment Reminders</span>
-                                </label>
-                            </div>
-                        </div>
-                        <p class="type-description">Send reminders before scheduled appointments</p>
-                        {% if form.send_reminder_notifications.errors %}
-                            <div class="text-danger small">{{ form.send_reminder_notifications.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- Message Preview -->
-                <div class="form-section">
-                    <div class="form-section-title">
-                        <i class="fas fa-eye text-primary"></i>
-                        Message Preview
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>SMS Preview</h6>
-                            <div class="notification-preview">
-                                <div class="preview-message" id="sms-preview">
-                                    Hi John, your car wash service has been confirmed for today at 2:00 PM. Order #ORD001. - AutoWash Pro
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <h6>Email Preview</h6>
-                            <div class="notification-preview">
-                                <div class="preview-message" id="email-preview">
-                                    <strong>Subject:</strong> Service Confirmation - Order #ORD001<br>
-                                    <strong>Body:</strong> Dear John, your car wash service has been confirmed for today at 2:00 PM. We'll notify you when we start working on your vehicle...
-                                </div>
-                            </div>
+                            <small class="help-text">Send email notifications to customers and staff</small>
                         </div>
                     </div>
-                </div>
-
-                <!-- Notification Statistics -->
-                <div class="form-section">
-                    <div class="form-section-title">
-                        <i class="fas fa-chart-bar text-primary"></i>
-                        Notification Statistics (Last 30 Days)
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <div class="h4 text-primary mb-1">1,247</div>
-                                <small class="text-muted">SMS Sent</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <div class="h4 text-success mb-1">98.5%</div>
-                                <small class="text-muted">Delivery Rate</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <div class="h4 text-info mb-1">452</div>
-                                <small class="text-muted">Emails Sent</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <div class="h4 text-warning mb-1">KES 890</div>
-                                <small class="text-muted">SMS Costs</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Save Actions -->
-            <div class="save-actions">
-                <div class="text-muted">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Changes will affect all future notifications
                 </div>
                 
-                <div class="d-flex gap-2">
-                    <a href="{% url 'businesses:settings_overview' %}" class="btn btn-outline-secondary">
-                        Cancel
-                    </a>
-                    <button type="submit" class="btn btn-save">
-                        <i class="fas fa-save me-2"></i>
-                        Save Notification Settings
-                    </button>
+                <div class="notification-option {% if form.sms_notifications.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="form-check">
+                                {{ form.sms_notifications }}
+                                <label class="form-check-label" for="{{ form.sms_notifications.id_for_label }}">
+                                    <i class="fas fa-sms mr-2"></i>SMS Notifications
+                                </label>
+                            </div>
+                            <small class="help-text">Send SMS messages to customers and staff</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="notification-option {% if form.push_notifications.value %}enabled{% endif %}">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="form-check">
+                                {{ form.push_notifications }}
+                                <label class="form-check-label" for="{{ form.push_notifications.id_for_label }}">
+                                    <i class="fas fa-mobile-alt mr-2"></i>Push Notifications
+                                </label>
+                            </div>
+                            <small class="help-text">Send push notifications through mobile app</small>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Customer Notifications -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-users mr-2"></i>Customer Notifications
+                </h5>
+                
+                <div class="notification-option {% if form.notify_booking_confirmation.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.notify_booking_confirmation }}
+                        <label class="form-check-label" for="{{ form.notify_booking_confirmation.id_for_label }}">
+                            Booking Confirmation
+                        </label>
+                    </div>
+                    <small class="help-text">Notify customers when their booking is confirmed</small>
+                </div>
+                
+                <div class="notification-option {% if form.notify_service_reminder.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.notify_service_reminder }}
+                        <label class="form-check-label" for="{{ form.notify_service_reminder.id_for_label }}">
+                            Service Reminders
+                        </label>
+                    </div>
+                    <small class="help-text">Send reminders before scheduled appointments</small>
+                </div>
+                
+                <div class="notification-option {% if form.notify_service_complete.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.notify_service_complete }}
+                        <label class="form-check-label" for="{{ form.notify_service_complete.id_for_label }}">
+                            Service Completion
+                        </label>
+                    </div>
+                    <small class="help-text">Notify customers when service is completed</small>
+                </div>
+                
+                <div class="notification-option {% if form.auto_payment_confirmation.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.auto_payment_confirmation }}
+                        <label class="form-check-label" for="{{ form.auto_payment_confirmation.id_for_label }}">
+                            Payment Confirmations
+                        </label>
+                    </div>
+                    <small class="help-text">Send automatic payment confirmation receipts</small>
+                </div>
+                
+                <div class="notification-option {% if form.notify_loyalty_rewards.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.notify_loyalty_rewards }}
+                        <label class="form-check-label" for="{{ form.notify_loyalty_rewards.id_for_label }}">
+                            Loyalty Rewards
+                        </label>
+                    </div>
+                    <small class="help-text">Notify customers about loyalty points and rewards</small>
+                </div>
+            </div>
+
+            <!-- Staff Notifications -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-user-tie mr-2"></i>Staff Notifications
+                </h5>
+                
+                <div class="notification-option {% if form.notify_new_booking.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.notify_new_booking }}
+                        <label class="form-check-label" for="{{ form.notify_new_booking.id_for_label }}">
+                            New Bookings
+                        </label>
+                    </div>
+                    <small class="help-text">Alert staff when new bookings are made</small>
+                </div>
+                
+                <div class="notification-option {% if form.notify_booking_changes.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.notify_booking_changes }}
+                        <label class="form-check-label" for="{{ form.notify_booking_changes.id_for_label }}">
+                            Booking Changes
+                        </label>
+                    </div>
+                    <small class="help-text">Notify staff of booking modifications or cancellations</small>
+                </div>
+                
+                <div class="notification-option {% if form.notify_low_stock.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.notify_low_stock }}
+                        <label class="form-check-label" for="{{ form.notify_low_stock.id_for_label }}">
+                            Low Stock Alerts
+                        </label>
+                    </div>
+                    <small class="help-text">Alert when inventory items are running low</small>
+                </div>
+                
+                <div class="notification-option {% if form.notify_overdue_payments.value %}enabled{% endif %}">
+                    <div class="form-check">
+                        {{ form.notify_overdue_payments }}
+                        <label class="form-check-label" for="{{ form.notify_overdue_payments.id_for_label }}">
+                            Overdue Payments
+                        </label>
+                    </div>
+                    <small class="help-text">Alert about overdue customer payments</small>
+                </div>
+            </div>
+
+            <!-- Notification Timing -->
+            <div class="form-section">
+                <h5 class="section-title">
+                    <i class="fas fa-clock mr-2"></i>Notification Timing
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.reminder_hours_before.id_for_label }}">Send Reminders (Hours Before)</label>
+                            {{ form.reminder_hours_before }}
+                            <small class="help-text">How many hours before appointment to send reminder</small>
+                            {% if form.reminder_hours_before.errors %}
+                                <div class="invalid-feedback d-block">{{ form.reminder_hours_before.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.low_stock_threshold.id_for_label }}">Low Stock Threshold</label>
+                            {{ form.low_stock_threshold }}
+                            <small class="help-text">Alert when stock falls below this number</small>
+                            {% if form.low_stock_threshold.errors %}
+                                <div class="invalid-feedback d-block">{{ form.low_stock_threshold.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="/business/{{ request.tenant.slug }}/business/settings/" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-1"></i>Back to Settings
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-1"></i>Save Notification Settings
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-info mr-2"></i>Notification Help</h6>
+            </div>
+            <div class="card-body">
+                <h6>Email Notifications</h6>
+                <p class="small text-muted">Requires email configuration in system settings. Emails are sent from your business email.</p>
+                
+                <h6>SMS Notifications</h6>
+                <p class="small text-muted">Requires SMS gateway setup. Charges may apply based on your SMS provider.</p>
+                
+                <h6>Customer Preferences</h6>
+                <p class="small text-muted">Customers can opt out of specific notifications in their profile settings.</p>
+                
+                <h6>Staff Alerts</h6>
+                <p class="small text-muted">Staff notifications help keep your team informed about important business events.</p>
+            </div>
         </div>
-    </form>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-chart-pie mr-2"></i>Notification Status</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Email:</strong> {% if tenant_settings.email_notifications %}<span class="text-success">Enabled</span>{% else %}<span class="text-muted">Disabled</span>{% endif %}</p>
+                <p><strong>SMS:</strong> {% if tenant_settings.sms_notifications %}<span class="text-success">Enabled</span>{% else %}<span class="text-muted">Disabled</span>{% endif %}</p>
+                <p><strong>Push:</strong> {% if tenant_settings.push_notifications %}<span class="text-success">Enabled</span>{% else %}<span class="text-muted">Disabled</span>{% endif %}</p>
+                <p><strong>Reminder Timing:</strong><br>{{ tenant_settings.reminder_hours_before }} hours before</p>
+                <p><strong>Low Stock Alert:</strong><br>Below {{ tenant_settings.low_stock_threshold }} items</p>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="m-0"><i class="fas fa-test-tube mr-2"></i>Test Notifications</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted">Send test notifications to verify your setup is working correctly.</p>
+                <button type="button" class="btn btn-sm btn-outline-primary btn-block" onclick="sendTestEmail()">
+                    <i class="fas fa-envelope mr-1"></i>Send Test Email
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-success btn-block mt-2" onclick="sendTestSMS()">
+                    <i class="fas fa-sms mr-1"></i>Send Test SMS
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
+function sendTestEmail() {
+    // TODO: Implement test email functionality
+    alert('Test email feature will be implemented soon.');
+}
+
+function sendTestSMS() {
+    // TODO: Implement test SMS functionality
+    alert('Test SMS feature will be implemented soon.');
+}
+
+// Enable/disable notification sections based on main toggles
 document.addEventListener('DOMContentLoaded', function() {
-    // Update status indicators based on form state
-    updateStatusIndicators();
+    const emailToggle = document.getElementById('{{ form.email_notifications.id_for_label }}');
+    const smsToggle = document.getElementById('{{ form.sms_notifications.id_for_label }}');
     
-    // Listen for changes to update status
-    const smsEnabled = document.getElementById('{{ form.sms_notifications_enabled.id_for_label }}');
-    const emailEnabled = document.getElementById('{{ form.email_notifications_enabled.id_for_label }}');
-    
-    if (smsEnabled) {
-        smsEnabled.addEventListener('change', updateStatusIndicators);
+    function updateNotificationOptions() {
+        // Add visual feedback for enabled/disabled sections
+        document.querySelectorAll('.notification-option').forEach(function(option) {
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            if (checkbox && checkbox.checked) {
+                option.classList.add('enabled');
+            } else {
+                option.classList.remove('enabled');
+            }
+        });
     }
     
-    if (emailEnabled) {
-        emailEnabled.addEventListener('change', updateStatusIndicators);
-    }
+    // Initial update
+    updateNotificationOptions();
     
-    // Update message previews when sender name changes
-    const senderNameInput = document.getElementById('{{ form.notification_sender_name.id_for_label }}');
-    const smsSignatureInput = document.getElementById('{{ form.sms_signature.id_for_label }}');
-    
-    if (senderNameInput) {
-        senderNameInput.addEventListener('input', updatePreviews);
-    }
-    
-    if (smsSignatureInput) {
-        smsSignatureInput.addEventListener('input', updatePreviews);
-    }
-    
-    // Initial preview update
-    updatePreviews();
+    // Update on change
+    document.querySelectorAll('input[type="checkbox"]').forEach(function(checkbox) {
+        checkbox.addEventListener('change', updateNotificationOptions);
+    });
 });
-
-function updateStatusIndicators() {
-    const smsEnabled = document.getElementById('{{ form.sms_notifications_enabled.id_for_label }}');
-    const emailEnabled = document.getElementById('{{ form.email_notifications_enabled.id_for_label }}');
-    const smsStatus = document.getElementById('sms-status');
-    const emailStatus = document.getElementById('email-status');
-    
-    if (smsStatus) {
-        smsStatus.className = `status-indicator ${smsEnabled && smsEnabled.checked ? 'active' : 'inactive'}`;
-    }
-    
-    if (emailStatus) {
-        emailStatus.className = `status-indicator ${emailEnabled && emailEnabled.checked ? 'active' : 'inactive'}`;
-    }
-}
-
-function updatePreviews() {
-    const senderName = document.getElementById('{{ form.notification_sender_name.id_for_label }}')?.value || 'AutoWash Pro';
-    const smsSignature = document.getElementById('{{ form.sms_signature.id_for_label }}')?.value || '';
-    
-    // Update SMS preview
-    const smsPreview = document.getElementById('sms-preview');
-    if (smsPreview) {
-        const signature = smsSignature ? ` - ${smsSignature}` : ` - ${senderName}`;
-        smsPreview.textContent = `Hi John, your car wash service has been confirmed for today at 2:00 PM. Order #ORD001.${signature}`;
-    }
-    
-    // Update email preview
-    const emailPreview = document.getElementById('email-preview');
-    if (emailPreview) {
-        emailPreview.innerHTML = `
-            <strong>Subject:</strong> Service Confirmation - Order #ORD001<br>
-            <strong>From:</strong> ${senderName}<br>
-            <strong>Body:</strong> Dear John, your car wash service has been confirmed for today at 2:00 PM. We'll notify you when we start working on your vehicle...
-        `;
-    }
-}
-
-function testSMS() {
-    const button = event.target.closest('.test-button');
-    const originalText = button.innerHTML;
-    
-    // Update button state
-    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...';
-    button.disabled = true;
-    
-    // Update status indicator
-    const smsStatus = document.getElementById('sms-status');
-    if (smsStatus) {
-        smsStatus.className = 'status-indicator testing';
-    }
-    
-    // Make AJAX request
-    fetch(`/business/{{ request.business.slug }}/settings/api/test-sms/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            phone: '{{ business.phone }}',
-            message: 'Test SMS from {{ business.name }}. Your SMS notifications are working correctly!'
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showToast('Test SMS sent successfully!', 'success');
-            if (smsStatus) {
-                smsStatus.className = 'status-indicator active';
-            }
-        } else {
-            showToast('Failed to send test SMS: ' + data.message, 'error');
-            if (smsStatus) {
-                smsStatus.className = 'status-indicator inactive';
-            }
-        }
-    })
-    .catch(error => {
-        showToast('Error sending test SMS', 'error');
-        if (smsStatus) {
-            smsStatus.className = 'status-indicator inactive';
-        }
-    })
-    .finally(() => {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    });
-}
-
-function testEmail() {
-    const button = event.target.closest('.test-button');
-    const originalText = button.innerHTML;
-    
-    // Update button state
-    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...';
-    button.disabled = true;
-    
-    // Update status indicator
-    const emailStatus = document.getElementById('email-status');
-    if (emailStatus) {
-        emailStatus.className = 'status-indicator testing';
-    }
-    
-    // Make AJAX request
-    fetch(`/business/{{ request.business.slug }}/settings/api/test-email/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            email: '{{ business.email }}',
-            subject: 'Test Email from {{ business.name }}',
-            message: 'Your email notifications are working correctly!'
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showToast('Test email sent successfully!', 'success');
-            if (emailStatus) {
-                emailStatus.className = 'status-indicator active';
-            }
-        } else {
-            showToast('Failed to send test email: ' + data.message, 'error');
-            if (emailStatus) {
-                emailStatus.className = 'status-indicator inactive';
-            }
-        }
-    })
-    .catch(error => {
-        showToast('Error sending test email', 'error');
-        if (emailStatus) {
-            emailStatus.className = 'status-indicator inactive';
-        }
-    })
-    .finally(() => {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    });
-}
-
-function showToast(message, type) {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <div class="toast-content">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
-            <span>${message}</span>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    // Add toast styles if not already present
-    if (!document.querySelector('style[data-toast-styles]')) {
-        const style = document.createElement('style');
-        style.setAttribute('data-toast-styles', 'true');
-        style.textContent = `
-            .toast {
-                position: fixed;
-                top: 2rem;
-                right: 2rem;
-                background: white;
-                border: 1px solid #e5e7eb;
-                border-radius: 8px;
-                padding: 1rem;
-                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-                z-index: 9999;
-                min-width: 300px;
-                animation: slideInRight 0.3s ease-out;
-            }
-            .toast.toast-success { border-left: 4px solid #10b981; }
-            .toast.toast-error { border-left: 4px solid #ef4444; }
-            .toast-content { display: flex; align-items: center; gap: 0.75rem; }
-            .toast-close {
-                position: absolute;
-                top: 0.5rem;
-                right: 0.5rem;
-                background: none;
-                border: none;
-                color: #6b7280;
-                cursor: pointer;
-                padding: 0.25rem;
-                border-radius: 4px;
-            }
-            @keyframes slideInRight {
-                from { opacity: 0; transform: translateX(100%); }
-                to { opacity: 1; transform: translateX(0); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-        }
-    }, 5000);
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
 </script>
 {% endblock %}
-                  
