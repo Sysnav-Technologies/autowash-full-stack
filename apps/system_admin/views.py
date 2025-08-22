@@ -2402,3 +2402,407 @@ def send_bulk_notification(request):
     
     messages.success(request, f'Bulk notification sent: {success_count} successful, {failed_count} failed')
     return redirect('system_admin:notification_management')
+
+
+# ===================== PAYMENT GATEWAY MANAGEMENT =====================
+
+@user_passes_test(lambda u: u.is_superuser)
+def gateway_management(request):
+    """System admin view for managing payment gateways across all tenants"""
+    from .gateway_forms import TenantGatewaySearchForm
+    
+    # Handle search and filtering
+    search_form = TenantGatewaySearchForm(request.GET)
+    
+    # Get all tenants and their gateway configurations
+    tenants = Tenant.objects.filter(is_active=True).order_by('name')
+    tenant_gateways = []
+    
+    for tenant in tenants:
+        try:
+            with tenant_context(tenant):
+                from apps.payments.models import PaymentGateway
+                gateways = PaymentGateway.objects.all()
+                
+                for gateway in gateways:
+                    tenant_gateways.append({
+                        'tenant': tenant,
+                        'gateway': gateway,
+                        'status': 'Active' if gateway.is_active else 'Inactive',
+                        'environment': 'Production' if gateway.is_live else 'Sandbox'
+                    })
+        except Exception as e:
+            # Tenant database might not exist or have issues
+            tenant_gateways.append({
+                'tenant': tenant,
+                'gateway': None,
+                'status': 'Error',
+                'environment': 'N/A',
+                'error': str(e)
+            })
+    
+    # Apply filters
+    if search_form.is_valid():
+        search_query = search_form.cleaned_data.get('search')
+        gateway_type = search_form.cleaned_data.get('gateway_type')
+        status = search_form.cleaned_data.get('status')
+        environment = search_form.cleaned_data.get('environment')
+        
+        if search_query:
+            tenant_gateways = [
+                tg for tg in tenant_gateways 
+                if (search_query.lower() in tg['tenant'].name.lower() or
+                    (tg['gateway'] and search_query.lower() in tg['gateway'].name.lower()) or
+                    (tg['gateway'] and tg['gateway'].shortcode and search_query in tg['gateway'].shortcode))
+            ]
+        
+        if gateway_type:
+            tenant_gateways = [
+                tg for tg in tenant_gateways 
+                if tg['gateway'] and tg['gateway'].gateway_type == gateway_type
+            ]
+        
+        if status:
+            if status == 'active':
+                tenant_gateways = [tg for tg in tenant_gateways if tg['status'] == 'Active']
+            elif status == 'inactive':
+                tenant_gateways = [tg for tg in tenant_gateways if tg['status'] == 'Inactive']
+        
+        if environment:
+            if environment == 'live':
+                tenant_gateways = [tg for tg in tenant_gateways if tg['environment'] == 'Production']
+            elif environment == 'sandbox':
+                tenant_gateways = [tg for tg in tenant_gateways if tg['environment'] == 'Sandbox']
+    
+    # Pagination
+    paginator = Paginator(tenant_gateways, 25)
+    page = request.GET.get('page')
+    gateway_page = paginator.get_page(page)
+    
+    # Statistics
+    stats = {
+        'total_tenants': tenants.count(),
+        'total_gateways': len([tg for tg in tenant_gateways if tg['gateway']]),
+        'active_gateways': len([tg for tg in tenant_gateways if tg['status'] == 'Active']),
+        'mpesa_gateways': len([tg for tg in tenant_gateways if tg['gateway'] and tg['gateway'].gateway_type == 'mpesa']),
+    }
+    
+    context = {
+        'tenant_gateways': gateway_page,
+        'search_form': search_form,
+        'stats': stats,
+        'title': 'Payment Gateway Management'
+    }
+    
+    return render(request, 'system_admin/gateway_management.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def setup_tenant_mpesa(request, tenant_id=None):
+    """Setup M-Pesa gateway for a specific tenant"""
+    from .gateway_forms import TenantMPesaGatewayForm
+    
+    tenant = None
+    gateway = None
+    
+    if tenant_id:
+        tenant = get_object_or_404(Tenant, id=tenant_id, is_active=True)
+        # Check if gateway already exists
+        try:
+            with tenant_context(tenant):
+                from apps.payments.models import PaymentGateway
+                gateway = PaymentGateway.objects.filter(gateway_type='mpesa').first()
+        except Exception:
+            gateway = None
+    
+    if request.method == 'POST':
+        form = TenantMPesaGatewayForm(request.POST, instance=gateway, tenant=tenant)
+        if form.is_valid():
+            try:
+                # Get the tenant from form if not provided in URL
+                selected_tenant = tenant or form.cleaned_data.get('tenant')
+                
+                if not selected_tenant:
+                    messages.error(request, 'Please select a tenant.')
+                    return render(request, 'system_admin/setup_tenant_mpesa.html', {
+                        'form': form,
+                        'tenant': tenant,
+                        'gateway': gateway,
+                        'is_new': gateway is None,
+                        'title': 'Setup M-Pesa Gateway - Select Tenant'
+                    })
+                
+                # Save the gateway in the tenant's database
+                with tenant_context(selected_tenant):
+                    # Set gateway properties
+                    gateway_instance = form.save(commit=False)
+                    gateway_instance.gateway_type = 'mpesa'
+                    
+                    # Set API URL based on environment
+                    if gateway_instance.is_live:
+                        gateway_instance.api_url = 'https://api.safaricom.co.ke'
+                    else:
+                        gateway_instance.api_url = 'https://sandbox.safaricom.co.ke'
+                    
+                    # Set API credentials
+                    gateway_instance.api_key = gateway_instance.consumer_key
+                    gateway_instance.api_secret = gateway_instance.consumer_secret
+                    
+                    gateway_instance.save()
+                    
+                    # Create or update M-Pesa payment method
+                    from apps.payments.models import PaymentMethod
+                    method, created = PaymentMethod.objects.get_or_create(
+                        method_type='mpesa',
+                        defaults={
+                            'name': 'M-Pesa',
+                            'description': 'Pay using M-Pesa mobile money',
+                            'is_active': gateway_instance.is_active,
+                            'is_online': True,
+                            'requires_verification': True,
+                            'processing_fee_percentage': 1.5,  # Default M-Pesa fee
+                            'minimum_amount': 1,
+                            'maximum_amount': 70000,  # M-Pesa transaction limit
+                            'icon': 'fas fa-mobile-alt',
+                            'color': '#00A651',  # M-Pesa green
+                            'display_order': 1
+                        }
+                    )
+                    
+                    if not created:
+                        # Update existing method
+                        method.is_active = gateway_instance.is_active
+                        method.save()
+                
+                messages.success(
+                    request, 
+                    f'M-Pesa gateway configured successfully for {selected_tenant.name}!'
+                )
+                return redirect('system_admin:gateway_management')
+                
+            except Exception as e:
+                messages.error(request, f'Error saving M-Pesa configuration: {str(e)}')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = TenantMPesaGatewayForm(instance=gateway, tenant=tenant)
+    
+    context = {
+        'form': form,
+        'tenant': tenant,
+        'gateway': gateway,
+        'is_new': gateway is None,
+        'title': f'Setup M-Pesa Gateway - {tenant.name if tenant else "Select Tenant"}'
+    }
+    
+    return render(request, 'system_admin/setup_tenant_mpesa.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def bulk_setup_mpesa(request):
+    """Bulk setup M-Pesa gateway for multiple tenants"""
+    from .gateway_forms import BulkGatewaySetupForm
+    
+    if request.method == 'POST':
+        form = BulkGatewaySetupForm(request.POST)
+        if form.is_valid():
+            try:
+                tenants = form.cleaned_data['tenants']
+                consumer_key = form.cleaned_data['consumer_key']
+                consumer_secret = form.cleaned_data['consumer_secret']
+                is_live = form.cleaned_data['is_live']
+                webhook_base_url = form.cleaned_data['webhook_base_url'].rstrip('/')
+                
+                success_count = 0
+                failed_count = 0
+                
+                for tenant in tenants:
+                    try:
+                        with tenant_context(tenant):
+                            from apps.payments.models import PaymentGateway, PaymentMethod
+                            
+                            # Check if gateway already exists
+                            gateway = PaymentGateway.objects.filter(gateway_type='mpesa').first()
+                            
+                            if gateway:
+                                # Update existing
+                                gateway.consumer_key = consumer_key
+                                gateway.consumer_secret = consumer_secret
+                                gateway.is_live = is_live
+                                gateway.api_key = consumer_key
+                                gateway.api_secret = consumer_secret
+                                gateway.api_url = 'https://api.safaricom.co.ke' if is_live else 'https://sandbox.safaricom.co.ke'
+                                gateway.webhook_url = f"{webhook_base_url}/business/{tenant.slug}/payments/webhook/mpesa/"
+                                gateway.save()
+                            else:
+                                # Create new
+                                gateway = PaymentGateway.objects.create(
+                                    name='M-Pesa Daraja',
+                                    gateway_type='mpesa',
+                                    is_active=True,
+                                    is_live=is_live,
+                                    consumer_key=consumer_key,
+                                    consumer_secret=consumer_secret,
+                                    api_key=consumer_key,
+                                    api_secret=consumer_secret,
+                                    api_url='https://api.safaricom.co.ke' if is_live else 'https://sandbox.safaricom.co.ke',
+                                    webhook_url=f"{webhook_base_url}/business/{tenant.slug}/payments/webhook/mpesa/",
+                                )
+                            
+                            # Create or update payment method
+                            method, created = PaymentMethod.objects.get_or_create(
+                                method_type='mpesa',
+                                defaults={
+                                    'name': 'M-Pesa',
+                                    'description': 'Pay using M-Pesa mobile money',
+                                    'is_active': True,
+                                    'is_online': True,
+                                    'requires_verification': True,
+                                    'processing_fee_percentage': 1.5,
+                                    'minimum_amount': 1,
+                                    'maximum_amount': 70000,
+                                    'icon': 'fas fa-mobile-alt',
+                                    'color': '#00A651',
+                                    'display_order': 1
+                                }
+                            )
+                            
+                            if not created:
+                                method.is_active = True
+                                method.save()
+                            
+                            success_count += 1
+                            
+                    except Exception as e:
+                        failed_count += 1
+                        messages.warning(request, f'Failed to setup M-Pesa for {tenant.name}: {str(e)}')
+                
+                messages.success(
+                    request, 
+                    f'Bulk M-Pesa setup completed: {success_count} successful, {failed_count} failed'
+                )
+                return redirect('system_admin:gateway_management')
+                
+            except Exception as e:
+                messages.error(request, f'Error during bulk setup: {str(e)}')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = BulkGatewaySetupForm()
+    
+    context = {
+        'form': form,
+        'title': 'Bulk M-Pesa Gateway Setup'
+    }
+    
+    return render(request, 'system_admin/bulk_setup_mpesa.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+@require_http_methods(["POST"])
+def test_tenant_mpesa_connection(request):
+    """Test M-Pesa connection for tenant configuration"""
+    try:
+        import json
+        
+        data = json.loads(request.body)
+        consumer_key = data.get('consumer_key')
+        consumer_secret = data.get('consumer_secret')
+        is_live = data.get('is_live', False)
+        
+        if not consumer_key or not consumer_secret:
+            return JsonResponse({
+                'success': False,
+                'message': 'Consumer key and secret are required'
+            })
+        
+        # Test authentication
+        import base64
+        import requests
+        
+        api_url = 'https://api.safaricom.co.ke' if is_live else 'https://sandbox.safaricom.co.ke'
+        
+        credentials = base64.b64encode(
+            f"{consumer_key}:{consumer_secret}".encode()
+        ).decode()
+        
+        response = requests.get(
+            f"{api_url}/oauth/v1/generate?grant_type=client_credentials",
+            headers={
+                'Authorization': f'Basic {credentials}',
+                'Content-Type': 'application/json'
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            return JsonResponse({
+                'success': True,
+                'message': 'Connection successful! M-Pesa credentials are valid.',
+                'environment': 'Production' if is_live else 'Sandbox'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Authentication failed. Please check your credentials.'
+            })
+            
+    except requests.RequestException:
+        return JsonResponse({
+            'success': False,
+            'message': 'Could not connect to M-Pesa API. Please check your internet connection.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error testing connection: {str(e)}'
+        })
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def delete_tenant_gateway(request, tenant_id, gateway_id):
+    """Delete a payment gateway for a tenant"""
+    tenant = get_object_or_404(Tenant, id=tenant_id, is_active=True)
+    
+    try:
+        with tenant_context(tenant):
+            from apps.payments.models import PaymentGateway
+            gateway = get_object_or_404(PaymentGateway, id=gateway_id)
+            
+            gateway_name = gateway.name
+            gateway_type = gateway.get_gateway_type_display()
+            
+            gateway.delete()
+            
+            messages.success(
+                request, 
+                f'{gateway_type} gateway "{gateway_name}" deleted successfully for {tenant.name}'
+            )
+    except Exception as e:
+        messages.error(request, f'Error deleting gateway: {str(e)}')
+    
+    return redirect('system_admin:gateway_management')
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def toggle_tenant_gateway(request, tenant_id, gateway_id):
+    """Toggle payment gateway active status for a tenant"""
+    tenant = get_object_or_404(Tenant, id=tenant_id, is_active=True)
+    
+    try:
+        with tenant_context(tenant):
+            from apps.payments.models import PaymentGateway
+            gateway = get_object_or_404(PaymentGateway, id=gateway_id)
+            
+            gateway.is_active = not gateway.is_active
+            gateway.save()
+            
+            status = 'activated' if gateway.is_active else 'deactivated'
+            messages.success(
+                request, 
+                f'{gateway.get_gateway_type_display()} gateway {status} for {tenant.name}'
+            )
+    except Exception as e:
+        messages.error(request, f'Error updating gateway status: {str(e)}')
+    
+    return redirect('system_admin:gateway_management')

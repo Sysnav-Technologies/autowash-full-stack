@@ -60,6 +60,15 @@ urlpatterns = [
     # Analytics
     path('analytics/', views.system_analytics, name='analytics'),
     
+    # Payment Gateway Management
+    path('gateways/', views.gateway_management, name='gateway_management'),
+    path('gateways/setup-mpesa/', views.setup_tenant_mpesa, name='setup_tenant_mpesa'),
+    path('gateways/setup-mpesa/<uuid:tenant_id>/', views.setup_tenant_mpesa, name='setup_tenant_mpesa_for_tenant'),
+    path('gateways/bulk-setup-mpesa/', views.bulk_setup_mpesa, name='bulk_setup_mpesa'),
+    path('gateways/test-mpesa-connection/', views.test_tenant_mpesa_connection, name='test_tenant_mpesa_connection'),
+    path('gateways/<uuid:tenant_id>/<uuid:gateway_id>/delete/', views.delete_tenant_gateway, name='delete_tenant_gateway'),
+    path('gateways/<uuid:tenant_id>/<uuid:gateway_id>/toggle/', views.toggle_tenant_gateway, name='toggle_tenant_gateway'),
+    
     # Settings & Tools
     path('settings/', views.system_settings, name='system_settings'),
     path('export/', views.export_data, name='export_data'),

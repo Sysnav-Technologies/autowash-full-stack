@@ -415,7 +415,8 @@ if not RENDER and not CPANEL:
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
     MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
     MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
-    MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='http://localhost:8000/api/mpesa/callback/')
+    # Use a test callback URL for development that Safaricom accepts
+    MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://httpbin.org/post')
 else:
     MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='production')
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')

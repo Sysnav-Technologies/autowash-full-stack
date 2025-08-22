@@ -19,6 +19,9 @@ urlpatterns = [
     path('reports/', views.payment_reports_view, name='reports'),
     path('reconciliation/', views.reconciliation_view, name='reconciliation'),
     path('settings/', views.payment_settings_view, name='settings'),
+    path('setup-mpesa/', views.setup_mpesa_gateway_view, name='setup_mpesa'),
+    path('configure-mpesa-method/', views.configure_mpesa_method_view, name='configure_mpesa_method'),
+    path('test-mpesa-connection/', views.test_mpesa_connection, name='test_mpesa_connection'),
     path('export/', views.export_payments_csv, name='export_csv'),
     
     # Partial Payments - Fixed URLs

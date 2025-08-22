@@ -773,13 +773,16 @@ def process_mpesa_payment_view(request, payment_id):
     payment = get_object_or_404(Payment, payment_id=payment_id)
     
     if request.method == 'POST':
+        logger.info(f"M-Pesa payment POST request for {payment_id}, data: {request.POST}")
         form = MPesaPaymentForm(request.POST)
         if form.is_valid():
             phone_number = form.cleaned_data['phone_number']
+            logger.info(f"Form valid, phone: {phone_number}")
             
             # Validate phone number
             is_valid, formatted_phone = validate_mpesa_phone(phone_number)
             if not is_valid:
+                logger.error(f"Phone validation failed: {formatted_phone}")
                 messages.error(request, formatted_phone)
                 return render(request, 'payments/process_mpesa.html', {
                     'payment': payment,
@@ -788,6 +791,7 @@ def process_mpesa_payment_view(request, payment_id):
                 })
             
             try:
+                logger.info(f"Initializing M-Pesa service for payment {payment_id}")
                 # Initialize M-Pesa service
                 mpesa_service = MPesaService()
                 
@@ -799,6 +803,8 @@ def process_mpesa_payment_view(request, payment_id):
                     description=f"Payment for {payment.description}"
                 )
                 
+                logger.info(f"M-Pesa service result: success={success}, result={result}")
+                
                 if success:
                     messages.success(request, result['customer_message'])
                     return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/status/')
@@ -807,7 +813,10 @@ def process_mpesa_payment_view(request, payment_id):
                     
             except Exception as e:
                 messages.error(request, f'Error initiating M-Pesa payment: {str(e)}')
-                logger.error(f"M-Pesa payment error for {payment_id}: {e}")
+                logger.error(f"M-Pesa payment error for {payment_id}: {e}", exc_info=True)
+        else:
+            logger.error(f"Form validation failed: {form.errors}")
+            messages.error(request, f'Form validation failed: {form.errors}')
     else:
         # Pre-fill with customer phone if available
         initial_phone = ''
@@ -839,7 +848,6 @@ def mpesa_payment_status_view(request, payment_id):
 
 @login_required
 @employee_required()
-@ajax_required
 def check_mpesa_status_ajax(request, payment_id):
     """AJAX endpoint to check M-Pesa payment status"""
     try:
@@ -1192,13 +1200,151 @@ def payment_settings_view(request):
     gateways = PaymentGateway.objects.all()
     payment_methods = PaymentMethod.objects.all().order_by('display_order')
     
+    # Get M-Pesa gateway for this tenant
+    mpesa_gateway = PaymentGateway.objects.filter(gateway_type='mpesa').first()
+    
     context = {
         'gateways': gateways,
         'payment_methods': payment_methods,
+        'mpesa_gateway': mpesa_gateway,
         'title': 'Payment Settings'
     }
     
     return render(request, 'payments/settings.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def setup_mpesa_gateway_view(request):
+    """Setup or configure M-Pesa payment gateway for tenant"""
+    # Get existing M-Pesa gateway or create new one
+    mpesa_gateway = PaymentGateway.objects.filter(gateway_type='mpesa').first()
+    
+    if request.method == 'POST':
+        from .gateway_forms import MPesaGatewayForm
+        
+        form = MPesaGatewayForm(request.POST, instance=mpesa_gateway)
+        if form.is_valid():
+            try:
+                gateway = form.save()
+                messages.success(
+                    request, 
+                    'M-Pesa gateway configured successfully! You can now accept M-Pesa payments.'
+                )
+                
+                # Redirect to payment settings
+                return redirect('payments:settings')
+                
+            except Exception as e:
+                messages.error(request, f'Error saving M-Pesa configuration: {str(e)}')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        from .gateway_forms import MPesaGatewayForm
+        form = MPesaGatewayForm(instance=mpesa_gateway)
+    
+    # Get payment method for M-Pesa
+    mpesa_method = PaymentMethod.objects.filter(method_type='mpesa').first()
+    
+    context = {
+        'form': form,
+        'mpesa_gateway': mpesa_gateway,
+        'mpesa_method': mpesa_method,
+        'is_new': mpesa_gateway is None,
+        'title': 'Setup M-Pesa Gateway'
+    }
+    
+    return render(request, 'payments/setup_mpesa.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+@require_POST
+def test_mpesa_connection(request):
+    """Test M-Pesa connection with provided credentials"""
+    try:
+        import json
+        
+        data = json.loads(request.body)
+        consumer_key = data.get('consumer_key')
+        consumer_secret = data.get('consumer_secret')
+        is_live = data.get('is_live', False)
+        
+        if not consumer_key or not consumer_secret:
+            return JsonResponse({
+                'success': False,
+                'message': 'Consumer key and secret are required'
+            })
+        
+        # Test authentication
+        import base64
+        import requests
+        
+        api_url = 'https://api.safaricom.co.ke' if is_live else 'https://sandbox.safaricom.co.ke'
+        
+        credentials = base64.b64encode(
+            f"{consumer_key}:{consumer_secret}".encode()
+        ).decode()
+        
+        response = requests.get(
+            f"{api_url}/oauth/v1/generate?grant_type=client_credentials",
+            headers={
+                'Authorization': f'Basic {credentials}',
+                'Content-Type': 'application/json'
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            return JsonResponse({
+                'success': True,
+                'message': 'Connection successful! Your M-Pesa credentials are valid.'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Authentication failed. Please check your credentials.'
+            })
+            
+    except requests.RequestException:
+        return JsonResponse({
+            'success': False,
+            'message': 'Could not connect to M-Pesa API. Please check your internet connection.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error testing connection: {str(e)}'
+        })
+
+@login_required
+@employee_required(['owner', 'manager'])
+def configure_mpesa_method_view(request):
+    """Configure M-Pesa payment method settings"""
+    mpesa_method = PaymentMethod.objects.filter(method_type='mpesa').first()
+    
+    if request.method == 'POST':
+        from .gateway_forms import PaymentMethodConfigForm
+        
+        form = PaymentMethodConfigForm(request.POST, instance=mpesa_method)
+        if form.is_valid():
+            try:
+                form.save()
+                messages.success(request, 'M-Pesa payment method configured successfully!')
+                return redirect('payments:settings')
+            except Exception as e:
+                messages.error(request, f'Error saving configuration: {str(e)}')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        from .gateway_forms import PaymentMethodConfigForm
+        form = PaymentMethodConfigForm(instance=mpesa_method)
+    
+    context = {
+        'form': form,
+        'method': mpesa_method,
+        'title': 'Configure M-Pesa Method'
+    }
+    
+    return render(request, 'payments/configure_method.html', context)
 
 @login_required
 @employee_required()
