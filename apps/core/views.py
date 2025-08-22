@@ -85,16 +85,23 @@ def health_check(request):
         }
         overall_status = "⚠️ DEGRADED"
     
-    # 4. Cache Test
+    # 4. Cache Test (with error handling)
     try:
         cache_key = f"health_check_{datetime.datetime.now().timestamp()}"
-        cache.set(cache_key, "test_value", 30)
-        cache_value = cache.get(cache_key)
-        if cache_value == "test_value":
-            cache_status = "✅ Working"
-            cache.delete(cache_key)
-        else:
-            cache_status = "❌ Not working"
+        try:
+            cache.set(cache_key, "test_value", 30)
+            cache_value = cache.get(cache_key)
+            if cache_value == "test_value":
+                cache_status = "✅ Working"
+                try:
+                    cache.delete(cache_key)
+                except Exception:
+                    pass  # Ignore delete errors
+            else:
+                cache_status = "❌ Not working"
+                overall_status = "⚠️ DEGRADED"
+        except Exception as e:
+            cache_status = f"❌ Cache error: {str(e)}"
             overall_status = "⚠️ DEGRADED"
             
         cache_backend = settings.CACHES['default']['BACKEND']
