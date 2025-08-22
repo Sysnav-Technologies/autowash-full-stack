@@ -22,14 +22,18 @@ class TenantDatabaseRouter:
         cls._local.tenant = tenant
         
         # Cache tenant database config for performance using default cache
+        # NOTE: Always use the main database cache, NOT tenant-specific cache
         if tenant:
             try:
+                # Explicitly use the main cache backend to avoid tenant database confusion
                 from django.core.cache import caches
-                default_cache = caches['default']
+                # Force use of default cache which should be on main database or Redis
+                main_cache = caches['default']
                 cache_key = f"tenant_db_config_{tenant.id}"
-                default_cache.set(cache_key, tenant.database_config, 300)  # Cache for 5 minutes
+                main_cache.set(cache_key, tenant.database_config, 300)  # Cache for 5 minutes
             except Exception as e:
-                # If cache fails, continue without caching
+                # If cache fails, continue without caching (non-critical feature)
+                # This prevents the "django_cache_table doesn't exist" errors
                 print(f"Warning: Failed to cache tenant config: {e}")
                 pass
     
@@ -83,6 +87,12 @@ class TenantDatabaseRouter:
     
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         """Determine if migration should run on this database"""
+        
+        # CRITICAL: Cache table should ONLY exist in main database
+        if getattr(hints.get('model'), '_meta', None):
+            table_name = hints['model']._meta.db_table
+            if table_name == 'django_cache_table':
+                return db == 'default'
         
         # Special handling for core app - some models in shared, some in tenant
         if app_label == 'core':

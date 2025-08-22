@@ -310,9 +310,11 @@ if redis_url and redis_url != '' and 'redis://' in redis_url:
         }
     }
 else:
+    # Use custom cache backend that always uses main database
+    # This prevents cache errors in multi-tenant environments
     CACHES = {
         'default': {
-            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'BACKEND': 'apps.core.cache_backend.MainDatabaseCache',
             'LOCATION': 'django_cache_table',
         }
     }
