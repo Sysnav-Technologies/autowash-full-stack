@@ -40,6 +40,11 @@ def root_redirect(request):
         print(f"User not authenticated, redirecting to public")
         return HttpResponseRedirect('/public/')
     
+    # Check if user is superuser - redirect to system admin
+    if request.user.is_superuser:
+        print(f"Superuser detected, redirecting to system admin")
+        return HttpResponseRedirect('/system-admin/')
+    
     try:
         if request.user.is_authenticated:
             try:
