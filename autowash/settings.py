@@ -44,6 +44,7 @@ elif CPANEL:
     if cpanel_domain:
         ALLOWED_HOSTS.append(cpanel_domain)
 
+# Shared apps configuration
 SHARED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
