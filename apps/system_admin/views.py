@@ -1289,15 +1289,8 @@ def setup_tenant_after_approval(business, approving_admin):
         
         print(f"Tenant database created: {business.database_name}")
         
-        # Step 1.5: Create cache table if using database cache
-        print("Creating cache table...")
-        try:
-            from django.core.management import call_command
-            call_command('createcachetable', database=f"tenant_{business.id}", verbosity=0)
-            print("Cache table created successfully")
-        except Exception as e:
-            print(f"Warning: Failed to create cache table: {e}")
-            # Continue anyway, cache is not critical
+        # NOTE: Cache table is global, not per-tenant. Skip creating cache table per tenant.
+        print("Skipping cache table creation - cache is global and shared across tenants")
         
         # Step 2: Create TenantSettings record
         print("Creating tenant settings...")
