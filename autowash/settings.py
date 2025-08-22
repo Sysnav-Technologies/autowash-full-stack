@@ -310,12 +310,18 @@ if redis_url and redis_url != '' and 'redis://' in redis_url:
         }
     }
 else:
-    # Use custom cache backend that always uses main database
-    # This prevents cache errors in multi-tenant environments
+    # Production-ready database cache using main database
+    # Custom backend ensures cache table is always accessed from main database
     CACHES = {
         'default': {
-            'BACKEND': 'apps.core.cache_backend.MainDatabaseCache',
+            'BACKEND': 'apps.core.production_cache.ProductionDatabaseCache',
             'LOCATION': 'django_cache_table',
+            'KEY_PREFIX': 'autowash_cache',
+            'TIMEOUT': 300,  # 5 minutes default
+            'OPTIONS': {
+                'MAX_ENTRIES': 10000,
+                'CULL_FREQUENCY': 4,
+            }
         }
     }
 

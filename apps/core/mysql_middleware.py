@@ -10,6 +10,9 @@ from django.core.cache import cache
 from apps.core.tenant_models import Tenant
 from apps.core.database_router import TenantDatabaseRouter, TenantDatabaseManager
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MySQLTenantMiddleware(MiddlewareMixin):
@@ -88,15 +91,24 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         if hostname.endswith(f'.{main_domain}'):
             subdomain = hostname.replace(f'.{main_domain}', '')
             
-            # Use cache for performance
+            # Use cache for performance (with error handling)
             cache_key = f"tenant_subdomain_{subdomain}"
-            tenant = cache.get(cache_key)
+            tenant = None
+            try:
+                tenant = cache.get(cache_key)
+            except Exception as e:
+                logger.warning(f"Cache get failed for subdomain {subdomain}: {e}")
+                # Continue without cache
             
             if tenant is None:
                 try:
                     tenant = Tenant.objects.get_by_subdomain(subdomain)
                     if tenant:
-                        cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
+                        try:
+                            cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
+                        except Exception as e:
+                            logger.warning(f"Cache set failed for subdomain {subdomain}: {e}")
+                            # Continue without caching
                 except Exception:
                     tenant = None
             
@@ -113,14 +125,23 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         if match:
             tenant_slug = match.group(1)
             
-            # Use cache for performance
+            # Use cache for performance (with error handling)
             cache_key = f"tenant_slug_{tenant_slug}"
-            tenant = cache.get(cache_key)
+            tenant = None
+            try:
+                tenant = cache.get(cache_key)
+            except Exception as e:
+                logger.warning(f"Cache get failed for slug {tenant_slug}: {e}")
+                # Continue without cache
             
             if tenant is None:
                 try:
                     tenant = Tenant.objects.get(slug=tenant_slug, is_active=True)
-                    cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
+                    try:
+                        cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
+                    except Exception as e:
+                        logger.warning(f"Cache set failed for slug {tenant_slug}: {e}")
+                        # Continue without caching
                 except Tenant.DoesNotExist:
                     tenant = None
             
@@ -133,15 +154,24 @@ class MySQLTenantMiddleware(MiddlewareMixin):
     
     def _resolve_from_custom_domain(self, hostname):
         """Resolve tenant from custom domain"""
-        # Use cache for performance
+        # Use cache for performance (with error handling)
         cache_key = f"tenant_domain_{hostname}"
-        tenant = cache.get(cache_key)
+        tenant = None
+        try:
+            tenant = cache.get(cache_key)
+        except Exception as e:
+            logger.warning(f"Cache get failed for domain {hostname}: {e}")
+            # Continue without cache
         
         if tenant is None:
             try:
                 tenant = Tenant.objects.get_by_domain(hostname)
                 if tenant:
-                    cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
+                    try:
+                        cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
+                    except Exception as e:
+                        logger.warning(f"Cache set failed for domain {hostname}: {e}")
+                        # Continue without caching
             except Exception:
                 tenant = None
         

@@ -41,7 +41,14 @@ class MPesaAPI:
     def get_access_token(self):
         """Get OAuth access token with caching"""
         cache_key = f"mpesa_access_token_{self.gateway.id}"
-        token_data = cache.get(cache_key)
+        
+        # Try to get from cache with error handling
+        token_data = None
+        try:
+            token_data = cache.get(cache_key)
+        except Exception as e:
+            logger.warning(f"Cache get failed for M-Pesa token: {e}")
+            # Continue without cache
         
         if token_data and token_data.get('expires_at') > timezone.now():
             return token_data['token']
@@ -77,12 +84,16 @@ class MPesaAPI:
             access_token = data['access_token']
             expires_in = int(data.get('expires_in', 3600))
             
-            # Cache token with expiry
+            # Cache token with expiry (with error handling)
             expires_at = timezone.now() + timedelta(seconds=expires_in - 60)
-            cache.set(cache_key, {
-                'token': access_token,
-                'expires_at': expires_at
-            }, expires_in - 60)
+            try:
+                cache.set(cache_key, {
+                    'token': access_token,
+                    'expires_at': expires_at
+                }, expires_in - 60)
+            except Exception as e:
+                logger.warning(f"Cache set failed for M-Pesa token: {e}")
+                # Continue without caching
             
             return access_token
             
