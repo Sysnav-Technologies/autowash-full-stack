@@ -1109,6 +1109,7 @@ def create_user(request):
             
             # Set additional fields
             user.is_staff = bool(request.POST.get('is_staff'))
+            user.is_superuser = bool(request.POST.get('is_superuser'))
             user.is_active = bool(request.POST.get('is_active', True))
             user.save()
             
@@ -1142,6 +1143,7 @@ def edit_user(request, user_id):
             user.first_name = request.POST.get('first_name', '')
             user.last_name = request.POST.get('last_name', '')
             user.is_staff = bool(request.POST.get('is_staff'))
+            user.is_superuser = bool(request.POST.get('is_superuser'))
             user.is_active = bool(request.POST.get('is_active'))
             
             # Update password if provided
