@@ -1,0 +1,544 @@
+{% extends 'system_admin/base.html' %}
+{% load static %}
+
+{% block title %}Setup M-Pesa Gateway - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mpesa-header {
+        background: linear-gradient(135deg, #00A651 0%, #008B42 100%);
+        color: white;
+        border-radius: 0.5rem 0.5rem 0 0;
+        padding: 1.5rem;
+    }
+    
+    .form-section {
+        background-color: #f8f9fc;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .connection-test {
+        border: 1px solid #e3e6f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .test-result {
+        padding: 0.75rem;
+        border-radius: 0.25rem;
+        margin-top: 0.5rem;
+        display: none;
+    }
+    
+    .test-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .test-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .test-loading {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+    }
+    
+    .step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+    }
+    
+    .step:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 15px;
+        right: -50%;
+        width: 100%;
+        height: 2px;
+        background-color: #e3e6f0;
+        z-index: 1;
+    }
+    
+    .step.active::after {
+        background-color: #4e73df;
+    }
+    
+    .step-circle {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: #e3e6f0;
+        color: #5a5c69;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 0.5rem;
+        position: relative;
+        z-index: 2;
+        font-weight: bold;
+    }
+    
+    .step.active .step-circle {
+        background-color: #4e73df;
+        color: white;
+    }
+    
+    .step.completed .step-circle {
+        background-color: #1cc88a;
+        color: white;
+    }
+    
+    .environment-switch {
+        background-color: white;
+        border: 1px solid #e3e6f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .env-option {
+        border: 2px solid #e3e6f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .env-option:hover {
+        border-color: #4e73df;
+    }
+    
+    .env-option.selected {
+        border-color: #4e73df;
+        background-color: #f8f9fc;
+    }
+    
+    .env-sandbox {
+        border-left: 4px solid #28a745;
+    }
+    
+    .env-production {
+        border-left: 4px solid #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-mobile-alt mr-2"></i>Setup M-Pesa Gateway
+            </h1>
+            {% if tenant %}
+                <p class="mb-0 text-muted">Configure M-Pesa payment gateway for {{ tenant.name }}</p>
+            {% endif %}
+        </div>
+        <a href="{% url 'system_admin:gateway_management' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Gateways
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- M-Pesa Setup Card -->
+            <div class="card shadow">
+                <div class="mpesa-header">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h4 class="mb-1">
+                                <i class="fas fa-mobile-alt mr-2"></i>M-Pesa Daraja Configuration
+                            </h4>
+                            <p class="mb-0 opacity-75">
+                                {% if is_new %}
+                                    Set up M-Pesa payment gateway for accepting mobile money payments
+                                {% else %}
+                                    Update M-Pesa payment gateway configuration
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <img src="{% static 'img/mpesa-logo.png' %}" alt="M-Pesa" style="height: 40px;" 
+                                 onerror="this.style.display='none'">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-triangle mr-2"></i>Please correct the following errors:</h6>
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <div>{{ field }}: {{ error }}</div>
+                                {% endfor %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <form method="post" id="mpesaSetupForm">
+                        {% csrf_token %}
+                        
+                        <!-- Tenant Selection -->
+                        {% if not tenant or not tenant.id %}
+                        <div class="form-section">
+                            <h6 class="mb-3"><i class="fas fa-building mr-2"></i>Select Tenant</h6>
+                            <div class="form-group">
+                                {{ form.tenant.label_tag }}
+                                {{ form.tenant }}
+                                {% if form.tenant.help_text %}
+                                    <small class="form-text text-muted">{{ form.tenant.help_text }}</small>
+                                {% endif %}
+                                {% if form.tenant.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.tenant.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                            <input type="hidden" name="tenant" value="{{ tenant.id }}">
+                            <div class="form-section">
+                                <h6 class="mb-3"><i class="fas fa-building mr-2"></i>Selected Tenant</h6>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    Configuring M-Pesa gateway for: <strong>{{ tenant.name }}</strong>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Gateway Basic Settings -->
+                        <div class="form-section">
+                            <h6 class="mb-3"><i class="fas fa-cog mr-2"></i>Basic Configuration</h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.name.label_tag }}
+                                        {{ form.name }}
+                                        {% if form.name.help_text %}
+                                            <small class="form-text text-muted">{{ form.name.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <div class="form-check form-switch">
+                                            {{ form.is_active }}
+                                            {{ form.is_active.label_tag }}
+                                        </div>
+                                        {% if form.is_active.help_text %}
+                                            <small class="form-text text-muted">{{ form.is_active.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Environment Selection -->
+                        <div class="form-section">
+                            <h6 class="mb-3"><i class="fas fa-globe mr-2"></i>Environment</h6>
+                            
+                            <div class="environment-switch">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="env-option env-sandbox" id="sandboxOption">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="is_live" value="False" 
+                                                       id="sandbox" {% if not form.is_live.value %}checked{% endif %}>
+                                                <label class="form-check-label" for="sandbox">
+                                                    <strong>Sandbox (Testing)</strong>
+                                                    <div class="small text-muted">Use for development and testing</div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="env-option env-production" id="productionOption">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="is_live" value="True" 
+                                                       id="production" {% if form.is_live.value %}checked{% endif %}>
+                                                <label class="form-check-label" for="production">
+                                                    <strong>Production (Live)</strong>
+                                                    <div class="small text-muted">Use for real transactions</div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- M-Pesa Credentials -->
+                        <div class="form-section">
+                            <h6 class="mb-3"><i class="fas fa-key mr-2"></i>M-Pesa Credentials</h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.consumer_key.label_tag }}
+                                        {{ form.consumer_key }}
+                                        {% if form.consumer_key.help_text %}
+                                            <small class="form-text text-muted">{{ form.consumer_key.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.consumer_secret.label_tag }}
+                                        {{ form.consumer_secret }}
+                                        {% if form.consumer_secret.help_text %}
+                                            <small class="form-text text-muted">{{ form.consumer_secret.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.shortcode.label_tag }}
+                                        {{ form.shortcode }}
+                                        {% if form.shortcode.help_text %}
+                                            <small class="form-text text-muted">{{ form.shortcode.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.passkey.label_tag }}
+                                        {{ form.passkey }}
+                                        {% if form.passkey.help_text %}
+                                            <small class="form-text text-muted">{{ form.passkey.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Webhook Configuration -->
+                        <div class="form-section">
+                            <h6 class="mb-3"><i class="fas fa-link mr-2"></i>Webhook Configuration</h6>
+                            
+                            <div class="form-group">
+                                {{ form.webhook_url.label_tag }}
+                                {{ form.webhook_url }}
+                                {% if form.webhook_url.help_text %}
+                                    <small class="form-text text-muted">{{ form.webhook_url.help_text }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Connection Test -->
+                        <div class="connection-test">
+                            <h6 class="mb-3"><i class="fas fa-plug mr-2"></i>Test Connection</h6>
+                            
+                            <div class="form-check mb-3">
+                                {{ form.test_connection }}
+                                {{ form.test_connection.label_tag }}
+                                {% if form.test_connection.help_text %}
+                                    <small class="form-text text-muted">{{ form.test_connection.help_text }}</small>
+                                {% endif %}
+                            </div>
+                            
+                            <button type="button" class="btn btn-outline-primary" id="testConnectionBtn">
+                                <i class="fas fa-plug mr-2"></i>Test Connection Now
+                            </button>
+                            
+                            <div id="testResult" class="test-result"></div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a href="{% url 'system_admin:gateway_management' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times mr-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save mr-2"></i>
+                                {% if is_new %}Setup Gateway{% else %}Update Gateway{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Help & Instructions -->
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-info-circle mr-2"></i>Setup Instructions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6 class="font-weight-bold">1. Safaricom Daraja Account</h6>
+                        <p class="small text-muted">
+                            Create an account at <a href="https://developer.safaricom.co.ke" target="_blank">developer.safaricom.co.ke</a>
+                            and create a new app to get your credentials.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6 class="font-weight-bold">2. Get Credentials</h6>
+                        <ul class="small text-muted">
+                            <li>Consumer Key</li>
+                            <li>Consumer Secret</li>
+                            <li>Business Shortcode</li>
+                            <li>Lipa Na M-Pesa Online Passkey</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6 class="font-weight-bold">3. Webhook URL</h6>
+                        <p class="small text-muted">
+                            Configure this URL in your Safaricom Daraja app:
+                            <br>
+                            <code>https://yourdomain.com/business/{{tenant.slug}}/payments/webhook/mpesa/</code>
+                        </p>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <small>
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Always test in sandbox environment before going live.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Status -->
+            {% if gateway %}
+            <div class="card shadow mt-4">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-chart-line mr-2"></i>Current Status
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Status:</span>
+                        <span class="badge badge-{% if gateway.is_active %}success{% else %}secondary{% endif %}">
+                            {% if gateway.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Environment:</span>
+                        <span class="badge badge-{% if gateway.is_live %}danger{% else %}success{% endif %}">
+                            {% if gateway.is_live %}Production{% else %}Sandbox{% endif %}
+                        </span>
+                    </div>
+                    {% if gateway.shortcode %}
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Shortcode:</span>
+                        <code>{{ gateway.shortcode }}</code>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Environment option selection
+    $('.env-option').click(function() {
+        $('.env-option').removeClass('selected');
+        $(this).addClass('selected');
+        $(this).find('input[type="radio"]').prop('checked', true);
+    });
+    
+    // Set initial selection
+    $('input[name="is_live"]:checked').closest('.env-option').addClass('selected');
+    
+    // Test connection
+    $('#testConnectionBtn').click(function() {
+        const btn = $(this);
+        const result = $('#testResult');
+        
+        // Get form data
+        const consumerKey = $('#id_consumer_key').val();
+        const consumerSecret = $('#id_consumer_secret').val();
+        const isLive = $('input[name="is_live"]:checked').val() === 'True';
+        
+        if (!consumerKey || !consumerSecret) {
+            result.removeClass('test-success test-loading').addClass('test-error').show();
+            result.html('<i class="fas fa-times mr-2"></i>Please enter Consumer Key and Consumer Secret first.');
+            return;
+        }
+        
+        // Show loading
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-2"></i>Testing...');
+        result.removeClass('test-success test-error').addClass('test-loading').show();
+        result.html('<i class="fas fa-spinner fa-spin mr-2"></i>Testing connection to M-Pesa API...');
+        
+        // Make request
+        $.ajax({
+            url: '{% url "system_admin:test_tenant_mpesa_connection" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+                'Content-Type': 'application/json'
+            },
+            data: JSON.stringify({
+                consumer_key: consumerKey,
+                consumer_secret: consumerSecret,
+                is_live: isLive
+            }),
+            success: function(response) {
+                if (response.success) {
+                    result.removeClass('test-loading test-error').addClass('test-success');
+                    result.html('<i class="fas fa-check mr-2"></i>' + response.message + 
+                              ' <small>(' + response.environment + ')</small>');
+                } else {
+                    result.removeClass('test-loading test-success').addClass('test-error');
+                    result.html('<i class="fas fa-times mr-2"></i>' + response.message);
+                }
+            },
+            error: function() {
+                result.removeClass('test-loading test-success').addClass('test-error');
+                result.html('<i class="fas fa-times mr-2"></i>Error testing connection. Please try again.');
+            },
+            complete: function() {
+                btn.prop('disabled', false).html('<i class="fas fa-plug mr-2"></i>Test Connection Now');
+            }
+        });
+    });
+    
+    // Auto-generate webhook URL when tenant is selected
+    $('#id_tenant').change(function() {
+        const tenantOption = $(this).find('option:selected');
+        if (tenantOption.val()) {
+            const tenantSlug = tenantOption.text().toLowerCase().replace(/[^a-z0-9]/g, '-');
+            const baseUrl = window.location.origin;
+            const webhookUrl = baseUrl + '/business/' + tenantSlug + '/payments/webhook/mpesa/';
+            $('#id_webhook_url').val(webhookUrl);
+        }
+    });
+});
+</script>
+{% endblock %}

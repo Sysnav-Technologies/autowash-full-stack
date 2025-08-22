@@ -258,7 +258,7 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <div class="form-floating">
-                                <input type="tel" class="form-control" id="mpesaPhone" name="mpesa_phone" 
+                                <input type="tel" class="form-control" id="mpesaPhone" name="phone_number" 
                                        value="{{ payment.customer_phone }}" placeholder="254712345678" required>
                                 <label>M-Pesa Phone Number</label>
                             </div>
@@ -327,8 +327,21 @@ function startCountdown() {
 }
 
 function checkPaymentStatus() {
-    fetch(`/business/{{ request.tenant.slug }}/payments/ajax/{{ payment.payment_id }}/mpesa-status/`)
-        .then(response => response.json())
+    fetch(`/business/{{ request.tenant.slug }}/payments/ajax/{{ payment.payment_id }}/mpesa-status/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.status === 'completed') {
                 location.reload();
@@ -354,9 +367,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Form submission
 document.getElementById('mpesaForm')?.addEventListener('submit', function(e) {
+    console.log('Form submission started');
     const submitBtn = e.target.querySelector('button[type="submit"]');
+    const phoneInput = e.target.querySelector('input[name="phone_number"]');
+    
+    // Basic validation
+    if (!phoneInput.value.trim()) {
+        e.preventDefault();
+        alert('Please enter a phone number');
+        return false;
+    }
+    
+    // Update button state
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending Request...';
+    
+    // Log form data for debugging
+    const formData = new FormData(e.target);
+    console.log('Form data:', Object.fromEntries(formData));
 });
 </script>
 {% endblock %}

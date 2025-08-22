@@ -1,0 +1,472 @@
+{% extends 'system_admin/base.html' %}
+{% load static %}
+
+{% block title %}Bulk M-Pesa Setup - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bulk-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 0.5rem 0.5rem 0 0;
+        padding: 1.5rem;
+    }
+    
+    .tenant-selection {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e3e6f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+    }
+    
+    .tenant-item {
+        border: 1px solid #e3e6f0;
+        border-radius: 0.25rem;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .tenant-item:hover {
+        background-color: #f8f9fc;
+        border-color: #4e73df;
+    }
+    
+    .tenant-item input:checked + label .tenant-card {
+        background-color: #e3f2fd;
+        border-color: #4e73df;
+    }
+    
+    .progress-container {
+        display: none;
+        margin-top: 1rem;
+    }
+    
+    .setup-preview {
+        background-color: #f8f9fc;
+        border: 1px solid #e3e6f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .credential-preview {
+        background-color: white;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        padding: 0.75rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+    }
+    
+    .warning-box {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-users mr-2"></i>Bulk M-Pesa Gateway Setup
+            </h1>
+            <p class="mb-0 text-muted">Configure M-Pesa payment gateway for multiple tenants at once</p>
+        </div>
+        <a href="{% url 'system_admin:gateway_management' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Gateways
+        </a>
+    </div>
+
+    <!-- Warning Box -->
+    <div class="warning-box">
+        <div class="d-flex align-items-start">
+            <i class="fas fa-exclamation-triangle text-warning mr-3 mt-1"></i>
+            <div>
+                <h6 class="font-weight-bold text-warning mb-2">Important Notice</h6>
+                <p class="mb-2">
+                    This will configure the same M-Pesa credentials for all selected tenants. 
+                    Make sure you have the proper authorization to do this.
+                </p>
+                <ul class="mb-0 small">
+                    <li>All selected tenants will share the same Consumer Key and Consumer Secret</li>
+                    <li>Existing M-Pesa gateways will be updated with new credentials</li>
+                    <li>Webhook URLs will be automatically generated for each tenant</li>
+                    <li>This action cannot be undone</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Bulk Setup Form -->
+            <div class="card shadow">
+                <div class="bulk-header">
+                    <h4 class="mb-1">
+                        <i class="fas fa-mobile-alt mr-2"></i>Bulk M-Pesa Configuration
+                    </h4>
+                    <p class="mb-0 opacity-75">
+                        Set up M-Pesa payment gateway for multiple tenants using shared credentials
+                    </p>
+                </div>
+
+                <div class="card-body">
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-triangle mr-2"></i>Please correct the following errors:</h6>
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <div>{{ field }}: {{ error }}</div>
+                                {% endfor %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <form method="post" id="bulkSetupForm">
+                        {% csrf_token %}
+                        
+                        <!-- Step 1: Tenant Selection -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                <span class="badge badge-primary mr-2">1</span>
+                                Select Tenants
+                            </h6>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted">
+                                    Select the tenants you want to configure M-Pesa for:
+                                </span>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllTenants">
+                                        Select All
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="selectNoneTenants">
+                                        Select None
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="tenant-selection">
+                                {% for choice in form.tenants %}
+                                    <div class="tenant-item">
+                                        <div class="form-check">
+                                            {{ choice.tag }}
+                                            <label class="form-check-label w-100" for="{{ choice.id_for_label }}">
+                                                <div class="tenant-card d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong>{{ choice.choice_label }}</strong>
+                                                        <div class="small text-muted">
+                                                            Business ID: {{ choice.choice_value }}
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <span class="badge badge-info">Active</span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="mt-2">
+                                <span class="text-muted">
+                                    <span id="selectedCount">0</span> tenant(s) selected
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: M-Pesa Credentials -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                <span class="badge badge-primary mr-2">2</span>
+                                M-Pesa Credentials
+                            </h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.consumer_key.label_tag }}
+                                        {{ form.consumer_key }}
+                                        {% if form.consumer_key.help_text %}
+                                            <small class="form-text text-muted">{{ form.consumer_key.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.consumer_secret.label_tag }}
+                                        {{ form.consumer_secret }}
+                                        {% if form.consumer_secret.help_text %}
+                                            <small class="form-text text-muted">{{ form.consumer_secret.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Environment & Webhook -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                <span class="badge badge-primary mr-2">3</span>
+                                Environment & Webhook
+                            </h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <div class="form-check">
+                                            {{ form.is_live }}
+                                            {{ form.is_live.label_tag }}
+                                        </div>
+                                        {% if form.is_live.help_text %}
+                                            <small class="form-text text-muted">{{ form.is_live.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.webhook_base_url.label_tag }}
+                                        {{ form.webhook_base_url }}
+                                        {% if form.webhook_base_url.help_text %}
+                                            <small class="form-text text-muted">{{ form.webhook_base_url.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Setup Preview -->
+                        <div class="setup-preview" id="setupPreview" style="display: none;">
+                            <h6 class="mb-3">
+                                <i class="fas fa-eye mr-2"></i>Setup Preview
+                            </h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="small font-weight-bold text-muted">Selected Tenants:</label>
+                                        <div id="previewTenants" class="credential-preview">
+                                            No tenants selected
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="small font-weight-bold text-muted">Environment:</label>
+                                        <div id="previewEnvironment" class="credential-preview">
+                                            Sandbox
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="small font-weight-bold text-muted">Webhook URL Pattern:</label>
+                                <div id="previewWebhook" class="credential-preview">
+                                    {webhook_base_url}/business/{tenant_slug}/payments/webhook/mpesa/
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Container -->
+                        <div class="progress-container" id="progressContainer">
+                            <h6 class="mb-3">
+                                <i class="fas fa-cogs mr-2"></i>Setup Progress
+                            </h6>
+                            <div class="progress mb-2">
+                                <div class="progress-bar" role="progressbar" style="width: 0%" id="progressBar"></div>
+                            </div>
+                            <div id="progressText" class="text-muted small">Preparing setup...</div>
+                            <div id="progressResults" class="mt-3"></div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a href="{% url 'system_admin:gateway_management' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times mr-2"></i>Cancel
+                            </a>
+                            <button type="button" class="btn btn-info mr-2" id="previewSetup">
+                                <i class="fas fa-eye mr-2"></i>Preview Setup
+                            </button>
+                            <button type="submit" class="btn btn-danger" id="submitBtn">
+                                <i class="fas fa-bolt mr-2"></i>Start Bulk Setup
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Help & Information -->
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-info-circle mr-2"></i>Bulk Setup Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6 class="font-weight-bold">What happens during bulk setup?</h6>
+                        <ul class="small text-muted">
+                            <li>Creates or updates M-Pesa gateway for each selected tenant</li>
+                            <li>Configures shared Consumer Key and Consumer Secret</li>
+                            <li>Sets up individual webhook URLs for each tenant</li>
+                            <li>Creates M-Pesa payment method if it doesn't exist</li>
+                            <li>Activates M-Pesa payments for all selected tenants</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6 class="font-weight-bold">Prerequisites</h6>
+                        <ul class="small text-muted">
+                            <li>Valid Safaricom Daraja account</li>
+                            <li>Consumer Key and Consumer Secret</li>
+                            <li>Proper authorization for all selected tenants</li>
+                            <li>Webhook base URL should be accessible</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="fas fa-lightbulb mr-2"></i>
+                            <strong>Tip:</strong> Use preview to check your setup before executing.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card shadow mt-4">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-bolt mr-2"></i>Quick Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'system_admin:setup_tenant_mpesa' %}" class="btn btn-outline-primary btn-block mb-2">
+                        <i class="fas fa-plus mr-2"></i>Setup Single Tenant
+                    </a>
+                    <a href="{% url 'system_admin:gateway_management' %}" class="btn btn-outline-secondary btn-block">
+                        <i class="fas fa-list mr-2"></i>View All Gateways
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Count selected tenants
+    function updateSelectedCount() {
+        const selected = $('input[name="tenants"]:checked').length;
+        $('#selectedCount').text(selected);
+        
+        // Show/hide preview based on selection
+        if (selected > 0) {
+            $('#setupPreview').show();
+            updatePreview();
+        } else {
+            $('#setupPreview').hide();
+        }
+    }
+    
+    // Update preview
+    function updatePreview() {
+        const selectedTenants = [];
+        $('input[name="tenants"]:checked').each(function() {
+            const label = $(this).next('label').find('strong').text();
+            selectedTenants.push(label);
+        });
+        
+        const environment = $('#id_is_live').is(':checked') ? 'Production (Live)' : 'Sandbox (Testing)';
+        const webhookBase = $('#id_webhook_base_url').val() || '{webhook_base_url}';
+        
+        $('#previewTenants').text(selectedTenants.length + ' tenant(s): ' + selectedTenants.join(', '));
+        $('#previewEnvironment').text(environment);
+        $('#previewWebhook').text(webhookBase + '/business/{tenant_slug}/payments/webhook/mpesa/');
+    }
+    
+    // Event listeners
+    $('input[name="tenants"]').change(updateSelectedCount);
+    $('#id_is_live, #id_webhook_base_url').on('change input', updatePreview);
+    
+    // Select all/none buttons
+    $('#selectAllTenants').click(function() {
+        $('input[name="tenants"]').prop('checked', true);
+        updateSelectedCount();
+    });
+    
+    $('#selectNoneTenants').click(function() {
+        $('input[name="tenants"]').prop('checked', false);
+        updateSelectedCount();
+    });
+    
+    // Preview button
+    $('#previewSetup').click(function() {
+        updatePreview();
+        if ($('input[name="tenants"]:checked').length === 0) {
+            alert('Please select at least one tenant.');
+            return;
+        }
+        $('#setupPreview').show();
+    });
+    
+    // Form submission with progress
+    $('#bulkSetupForm').submit(function(e) {
+        const selectedCount = $('input[name="tenants"]:checked').length;
+        
+        if (selectedCount === 0) {
+            e.preventDefault();
+            alert('Please select at least one tenant.');
+            return;
+        }
+        
+        if (!$('#id_consumer_key').val() || !$('#id_consumer_secret').val()) {
+            e.preventDefault();
+            alert('Please enter Consumer Key and Consumer Secret.');
+            return;
+        }
+        
+        if (!confirm(`Are you sure you want to setup M-Pesa gateway for ${selectedCount} tenant(s)? This action cannot be undone.`)) {
+            e.preventDefault();
+            return;
+        }
+        
+        // Show progress
+        $('#progressContainer').show();
+        $('#submitBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-2"></i>Setting up...');
+        
+        // Simulate progress (actual progress would come from server)
+        let progress = 0;
+        const progressInterval = setInterval(function() {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            
+            $('#progressBar').css('width', progress + '%');
+            $('#progressText').text(`Setting up gateways... ${Math.round(progress)}%`);
+        }, 500);
+        
+        // Clear interval after form is actually submitted
+        setTimeout(function() {
+            clearInterval(progressInterval);
+        }, 10000);
+    });
+    
+    // Initial count
+    updateSelectedCount();
+});
+</script>
+{% endblock %}

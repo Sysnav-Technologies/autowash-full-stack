@@ -48,6 +48,11 @@ class MPesaAPI:
         
         url = f"{self.base_url}/oauth/v1/generate?grant_type=client_credentials"
         
+        # Debug logging
+        logger.info(f"Requesting M-Pesa token from: {url}")
+        logger.info(f"Using consumer key: {self.consumer_key[:10]}..." if self.consumer_key else "No consumer key")
+        logger.info(f"Gateway ID: {self.gateway.id}, Environment: {'Live' if self.gateway.is_live else 'Sandbox'}")
+        
         # Create authorization header
         auth_string = f"{self.consumer_key}:{self.consumer_secret}"
         auth_bytes = auth_string.encode('ascii')
@@ -59,7 +64,13 @@ class MPesaAPI:
         }
         
         try:
+            logger.info(f"Making auth request with headers: {dict((k, v[:20] + '...' if k == 'Authorization' else v) for k, v in headers.items())}")
             response = requests.get(url, headers=headers, timeout=30)
+            
+            logger.info(f"Auth response status: {response.status_code}")
+            if response.status_code != 200:
+                logger.error(f"Auth response body: {response.text}")
+            
             response.raise_for_status()
             
             data = response.json()
@@ -120,12 +131,20 @@ class MPesaAPI:
             }
             
             logger.info(f"Initiating STK Push for {phone_number}, Amount: {amount}")
+            logger.info(f"STK Push URL: {url}")
+            logger.info(f"STK Push payload: {payload}")
+            logger.info(f"STK Push headers: {dict((k, v[:20] + '...' if k == 'Authorization' else v) for k, v in headers.items())}")
             
             response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
+            logger.info(f"STK Push response status: {response.status_code}")
+            logger.info(f"STK Push response headers: {dict(response.headers)}")
+            logger.info(f"STK Push response body: {response.text}")
+            
             response.raise_for_status()
             
             result = response.json()
-            logger.info(f"STK Push Response: {result}")
+            logger.info(f"STK Push Response parsed: {result}")
             
             return result
             
@@ -344,8 +363,8 @@ class MPesaService:
                 phone_number=self.api.format_phone_number(phone_number)
             )
             
-            # Prepare callback URL
-            callback_url = f"{settings.MPESA_CALLBACK_URL}?payment_id={payment_id}"
+            # Prepare callback URL from gateway webhook_url
+            callback_url = f"{self.api.gateway.webhook_url}?payment_id={payment_id}" if self.api.gateway.webhook_url else f"{settings.MPESA_CALLBACK_URL}?payment_id={payment_id}"
             
             # Initiate STK push
             response = self.api.initiate_stk_push(
