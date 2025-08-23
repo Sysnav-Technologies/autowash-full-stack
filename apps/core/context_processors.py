@@ -370,3 +370,17 @@ def subscription_flow_context(request):
             })
     
     return context
+
+
+def sidebar_context(request):
+    """Add sidebar context to templates"""
+    context = {}
+    
+    # Add sidebar-specific context if needed
+    if hasattr(request, 'tenant') and request.tenant:
+        context.update({
+            'sidebar_collapsed': False,
+            'sidebar_modules': [],
+        })
+    
+    return context
