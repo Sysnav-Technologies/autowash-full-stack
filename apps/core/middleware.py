@@ -73,6 +73,8 @@ class BusinessStatusMiddleware:
             '/auth/logout/',
             '/auth/register/',
             '/auth/verify-email/',
+            '/auth/email-verification-sent/',
+            '/auth/email-verification-success/',
             '/auth/password-reset/',
             '/auth/business/register/',
             '/auth/verification-pending/',
@@ -98,7 +100,11 @@ class BusinessStatusMiddleware:
         # Check if user owns a business
         business = request.user.owned_tenants.first()
         
-        if business:
+        if not business:
+            # User doesn't have a business yet, redirect to business registration
+            if not self.is_exempt_path(request.path) and request.path != '/auth/business/register/':
+                return redirect('/auth/business/register/')
+        else:
             # Check the business authentication flow
             if not self.is_business_ready(business) and not self.is_exempt_path(request.path):
                 # Redirect to appropriate step in the flow

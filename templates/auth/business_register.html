@@ -13,22 +13,22 @@
                         <div class="auth-brand mb-3">
                             <span class="brand-text">AUTOWASH</span>
                         </div>
-                        <h2 class="auth-title">Register Your Business</h2>
-                        <p class="auth-subtitle">Start managing your car care business with our comprehensive system</p>
+                        <h2 class="auth-title">Setup Your Business</h2>
+                        <p class="auth-subtitle">Complete your business profile to start managing your car wash</p>
                     </div>
 
                     <div class="auth-body">
                         <!-- Progress Steps -->
-                        <div class="d-flex justify-content-center align-items-center mb-3">
+                        <div class="d-flex justify-content-center align-items-center mb-4">
                             <div class="text-center">
-                                <div class="step-circle active mb-1">
-                                    <i class="fas fa-user"></i>
+                                <div class="step-circle completed mb-1">
+                                    <i class="fas fa-check"></i>
                                 </div>
                                 <div class="small text-muted">Account</div>
                             </div>
                             <div class="border-top flex-grow-1 mx-3"></div>
                             <div class="text-center">
-                                <div class="step-circle inactive mb-1">
+                                <div class="step-circle active mb-1">
                                     <i class="fas fa-building"></i>
                                 </div>
                                 <div class="small text-muted">Business</div>
@@ -36,14 +36,14 @@
                             <div class="border-top flex-grow-1 mx-3"></div>
                             <div class="text-center">
                                 <div class="step-circle inactive mb-1">
-                                    <i class="fas fa-check"></i>
+                                    <i class="fas fa-rocket"></i>
                                 </div>
-                                <div class="small text-muted">Complete</div>
+                                <div class="small text-muted">Launch</div>
                             </div>
                         </div>
 
                         <!-- Registration Form -->
-                        <form method="post" enctype="multipart/form-data" id="businessRegistrationForm">
+                        <form method="post" id="businessRegistrationForm">
                             {% csrf_token %}
 
                             <!-- Business Information -->
@@ -51,6 +51,9 @@
                                 <label for="id_name" class="form-label">Business Name</label>
                                 <input type="text" class="form-control" id="id_name" name="name" 
                                        placeholder="Enter your business name" required>
+                                {% if form.name.errors %}
+                                    <div class="form-error">{{ form.name.errors.0 }}</div>
+                                {% endif %}
                             </div>
 
                             <div class="form-group">
@@ -61,51 +64,76 @@
                                     <option value="detailing">Car Detailing</option>
                                     <option value="full_service">Full Service</option>
                                 </select>
+                                {% if form.business_type.errors %}
+                                    <div class="form-error">{{ form.business_type.errors.0 }}</div>
+                                {% endif %}
                             </div>
 
                             <div class="form-group">
                                 <label for="id_phone" class="form-label">Business Phone</label>
-                                <input type="tel" class="form-control" id="id_phone" name="phone" 
-                                       placeholder="+254712345678" required>
+                                <div class="input-group">
+                                    <span class="input-group-text">+254</span>
+                                    <input type="tel" class="form-control" id="id_phone" name="phone" 
+                                           placeholder="712345678" required>
+                                </div>
+                                <small class="form-text text-muted">Enter phone number without country code</small>
+                                {% if form.phone.errors %}
+                                    <div class="form-error">{{ form.phone.errors.0 }}</div>
+                                {% endif %}
                             </div>
 
                             <div class="form-group">
                                 <label for="id_email" class="form-label">Business Email</label>
                                 <input type="email" class="form-control" id="id_email" name="email" 
                                        placeholder="business@example.com" required>
+                                {% if form.email.errors %}
+                                    <div class="form-error">{{ form.email.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Account Password Section -->
+                            <hr class="my-4">
+                            <h6 class="text-muted mb-3">Set Your Account Password</h6>
+                            
+                            <div class="form-group">
+                                <label for="id_account_password" class="form-label">Account Password</label>
+                                <div class="position-relative">
+                                    <input type="password" class="form-control" id="id_account_password" name="account_password" 
+                                           placeholder="Create your account password" required autocomplete="new-password">
+                                    <button class="toggle-password" type="button" id="toggleAccountPassword1" title="Toggle password visibility">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">This will be your login password</small>
+                                {% if form.account_password.errors %}
+                                    <div class="form-error">{{ form.account_password.errors.0 }}</div>
+                                {% endif %}
                             </div>
 
                             <div class="form-group">
-                                <label for="id_description" class="form-label">Business Description</label>
-                                <textarea class="form-control" id="id_description" name="description" rows="3" 
-                                          placeholder="Brief description of your business (optional)"></textarea>
+                                <label for="id_account_password_confirm" class="form-label">Confirm Account Password</label>
+                                <div class="position-relative">
+                                    <input type="password" class="form-control" id="id_account_password_confirm" name="account_password_confirm" 
+                                           placeholder="Confirm account password" required autocomplete="new-password">
+                                    <button class="toggle-password" type="button" id="toggleAccountPassword2" title="Toggle password visibility">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                {% if form.account_password_confirm.errors %}
+                                    <div class="form-error">{{ form.account_password_confirm.errors.0 }}</div>
+                                {% endif %}
                             </div>
 
-                            <div class="form-group">
-                                <label for="id_location" class="form-label">Business Location</label>
-                                <input type="text" class="form-control" id="id_location" name="location" 
-                                       placeholder="Enter your business address" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="id_website" class="form-label">Website (Optional)</label>
-                                <input type="url" class="form-control" id="id_website" name="website" 
-                                       placeholder="https://yourwebsite.com">
-                            </div>
-
-                            <!-- Terms and Conditions -->
                             <div class="form-check mb-3">
-                                <!-- Hidden input to ensure field is always submitted -->
-                                <input type="hidden" name="terms_agreement" value="false">
-                                <input class="form-check-input" type="checkbox" id="id_terms_agreement" name="terms_agreement" value="true" required>
-                                <label class="form-check-label" for="id_terms_agreement">
-                                    I agree to the <a href="{% url 'serve_legal_document' 'terms-of-service' %}" target="_blank" class="text-decoration-none">Terms of Service</a> 
-                                    and <a href="{% url 'serve_legal_document' 'privacy-policy' %}" target="_blank" class="text-decoration-none">Privacy Policy</a>
+                                <input class="form-check-input" type="checkbox" id="terms" name="terms" required>
+                                <label class="form-check-label" for="terms">
+                                    I agree to the <a href="{% url 'serve_legal_document' 'terms-of-service' %}" target="_blank" class="text-primary">Terms of Service</a> 
+                                    and <a href="{% url 'serve_legal_document' 'privacy-policy' %}" target="_blank" class="text-primary">Privacy Policy</a>
                                 </label>
                             </div>
 
                             <button type="submit" class="btn btn-auth btn-purple mb-3">
-                                <i class="fas fa-building me-2"></i>Register Business
+                                <i class="fas fa-rocket me-2"></i>Launch My Business
                             </button>
                         </form>
 
@@ -121,8 +149,8 @@
                 <!-- Help Section -->
                 <div class="text-center mt-4">
                     <div class="d-flex justify-content-center gap-3 text-muted">
-                        <span><i class="fas fa-shield-alt me-1"></i> Secure Registration</span>
-                        <span><i class="fas fa-clock me-1"></i> 5 Minutes Setup</span>
+                        <span><i class="fas fa-shield-alt me-1"></i> Secure Setup</span>
+                        <span><i class="fas fa-clock me-1"></i> 2 Minutes</span>
                         <span><i class="fas fa-support me-1"></i> 24/7 Support</span>
                     </div>
                 </div>
@@ -133,10 +161,36 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Password toggle functionality
+    function setupPasswordToggle(toggleId, passwordId) {
+        const toggleButton = document.getElementById(toggleId);
+        const passwordInput = document.getElementById(passwordId);
+        
+        if (toggleButton && passwordInput) {
+            const toggleIcon = toggleButton.querySelector('i');
+            
+            toggleButton.addEventListener('click', function() {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    toggleIcon.classList.remove('fa-eye');
+                    toggleIcon.classList.add('fa-eye-slash');
+                } else {
+                    passwordInput.type = 'password';
+                    toggleIcon.classList.remove('fa-eye-slash');
+                    toggleIcon.classList.add('fa-eye');
+                }
+            });
+        }
+    }
+    
+    // Setup password toggles
+    setupPasswordToggle('toggleAccountPassword1', 'id_account_password');
+    setupPasswordToggle('toggleAccountPassword2', 'id_account_password_confirm');
+    
     // Form validation and submission
     const form = document.getElementById('businessRegistrationForm');
     form.addEventListener('submit', function(e) {
-        const termsCheckbox = document.getElementById('id_terms_agreement');
+        const termsCheckbox = document.getElementById('terms');
         if (!termsCheckbox.checked) {
             e.preventDefault();
             alert('Please accept the Terms of Service and Privacy Policy.');
@@ -147,25 +201,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const originalText = submitBtn.innerHTML;
         
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registering Business...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Setting up your business...';
         
+        // Re-enable button after 5 seconds if form doesn't submit (for error cases)
         setTimeout(() => {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
+            if (submitBtn.disabled) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
         }, 5000);
     });
 
-    // Real-time validation
+    // Simple real-time validation
     const inputs = document.querySelectorAll('.form-control');
     inputs.forEach(input => {
         input.addEventListener('blur', function() {
             validateField(this);
-        });
-
-        input.addEventListener('input', function() {
-            if (this.classList.contains('is-invalid')) {
-                validateField(this);
-            }
         });
     });
 
@@ -180,6 +231,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (field.type === 'email' && value !== '') {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             isValid = emailRegex.test(value);
+        }
+        
+        // Password confirmation validation
+        if (field.name === 'account_password_confirm') {
+            const passwordField = document.getElementById('id_account_password');
+            if (passwordField && passwordField.value !== value) {
+                isValid = false;
+            }
         }
         
         if (isValid) {

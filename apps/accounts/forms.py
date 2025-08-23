@@ -13,57 +13,48 @@ from django.utils.text import slugify
 import re
 import os
 
-class UserRegistrationForm(UserCreationForm):
-    """Enhanced user registration form"""
-    first_name = forms.CharField(
-        max_length=30,
-        required=True,
-        widget=forms.TextInput(attrs={'placeholder': 'First Name', 'class': 'form-control'})
-    )
-    last_name = forms.CharField(
-        max_length=30,
-        required=True,
-        widget=forms.TextInput(attrs={'placeholder': 'Last Name', 'class': 'form-control'})
-    )
+class UserRegistrationForm(forms.ModelForm):
+    """Simplified user registration form - no password required initially"""
     email = forms.EmailField(
         required=True,
-        widget=forms.EmailInput(attrs={'placeholder': 'Email Address', 'class': 'form-control'})
+        widget=forms.EmailInput(attrs={
+            'placeholder': 'your@email.com', 
+            'class': 'form-control',
+            'autocomplete': 'email'
+        })
     )
     phone = PhoneNumberField(
-        required=False,
-        widget=forms.TextInput(attrs={'placeholder': '+254712345678', 'class': 'form-control'})
+        required=True,
+        widget=forms.TextInput(attrs={
+            'placeholder': '+254712345678', 
+            'class': 'form-control',
+            'autocomplete': 'tel'
+        })
     )
     
     class Meta:
         model = User
-        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')
+        fields = ('username', 'email')
         widgets = {
-            'username': forms.TextInput(attrs={'placeholder': 'Username', 'class': 'form-control'}),
+            'username': forms.TextInput(attrs={
+                'placeholder': 'Choose username', 
+                'class': 'form-control',
+                'autocomplete': 'username'
+            }),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Add CSS classes to password fields
-        self.fields['password1'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Password'})
-        self.fields['password2'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Confirm Password'})
+        
+        # Remove help texts for smoother UX
+        self.fields['username'].help_text = None
         
         self.helper = FormHelper()
         self.helper.form_method = 'post'
         self.helper.layout = Layout(
-            Row(
-                Column('first_name', css_class='form-group col-md-6 mb-3'),
-                Column('last_name', css_class='form-group col-md-6 mb-3'),
-            ),
-            Row(
-                Column('username', css_class='form-group col-md-6 mb-3'),
-                Column('email', css_class='form-group col-md-6 mb-3'),
-            ),
+            Field('username', css_class='mb-3'),
+            Field('email', css_class='mb-3'),
             Field('phone', css_class='mb-3'),
-            Row(
-                Column('password1', css_class='form-group col-md-6 mb-3'),
-                Column('password2', css_class='form-group col-md-6 mb-3'),
-            ),
-            HTML('<div class="form-check mb-3"><input class="form-check-input" type="checkbox" required id="terms"><label class="form-check-label" for="terms">I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a></label></div>'),
             FormActions(
                 Submit('submit', 'Create Account', css_class='btn btn-primary btn-lg w-100')
             )
@@ -149,69 +140,48 @@ class UserProfileForm(forms.ModelForm):
         return profile
 
 class BusinessRegistrationForm(forms.ModelForm):
-    """Business registration form - updated to use Tenant model"""
+    """Business registration form with account password setup"""
     
-    # Add custom location field since address fields are separate
-    location = forms.CharField(
-        max_length=200,
+    # Add account password field (since it wasn't set during registration)
+    account_password = forms.CharField(
+        max_length=128,
         required=True,
+        widget=forms.PasswordInput(attrs={
+            'placeholder': 'Create your account password',
+            'class': 'form-control',
+            'autocomplete': 'new-password'
+        }),
+        help_text='This will be your login password'
+    )
+    
+    account_password_confirm = forms.CharField(
+        max_length=128,
+        required=True,
+        widget=forms.PasswordInput(attrs={
+            'placeholder': 'Confirm account password',
+            'class': 'form-control',
+            'autocomplete': 'new-password'
+        })
+    )
+    
+    # Override phone field to use PhoneNumberField
+    phone = PhoneNumberField(
+        region='KE',  # Kenya region
         widget=forms.TextInput(attrs={
-            'placeholder': 'Business location/address',
+            'placeholder': '712345678',
             'class': 'form-control'
-        }),
-        help_text='Enter your business address or location'
-    )
-    
-    # Add website field for the template
-    website = forms.URLField(
-        max_length=200,
-        required=False,
-        widget=forms.URLInput(attrs={
-            'placeholder': 'https://yourwebsite.com',
-            'class': 'form-control'
-        }),
-        help_text='Your business website (optional)'
-    )
-    
-    # Add terms agreement field
-    terms_agreement = forms.BooleanField(
-        required=True,
-        widget=forms.CheckboxInput(attrs={
-            'class': 'form-check-input'
-        }),
-        label='I agree to the Terms of Service and Privacy Policy',
-        help_text='You must agree to the terms to register your business'
+        })
     )
     
     class Meta:
         model = Tenant
-        # Exclude fields we don't want in the form - subdomain will be auto-generated
-        exclude = [
-            'subdomain', 'database_name', 'database_user', 'database_password', 'owner', 'slug', 
-            'custom_domain', 'database_host', 'database_port', 'registration_number', 'tax_number', 
-            'timezone', 'currency', 'language', 'opening_time', 'closing_time', 'is_active', 
-            'is_verified', 'is_approved', 'approved_by', 'approved_at', 'rejection_reason', 
-            'subscription', 'max_employees', 'max_customers', 'logo', 'created_at', 'updated_at',
-            'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
-            'id', 'created_by_id', 'updated_by_id',
-            # Additional fields from migration 0003 - these should use model defaults
-            'api_key', 'auto_backup_enabled', 'auto_payment_confirmation', 'default_tax_rate', 'last_backup_date'
-        ]
+        fields = ['name', 'business_type', 'phone', 'email']
         widgets = {
             'name': forms.TextInput(attrs={
                 'placeholder': 'Your Business Name', 
                 'class': 'form-control',
             }),
             'business_type': forms.Select(attrs={'class': 'form-select'}),
-            'description': forms.Textarea(attrs={
-                'rows': 3,
-                'placeholder': 'Brief description of your business (optional)',
-                'class': 'form-control'
-            }),
-            'phone': forms.TextInput(attrs={
-                'placeholder': '+254712345678',
-                'class': 'form-control'
-            }),
             'email': forms.EmailInput(attrs={
                 'placeholder': 'business@email.com',
                 'class': 'form-control'
@@ -221,16 +191,9 @@ class BusinessRegistrationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Make required fields
-        self.fields['name'].required = True
-        self.fields['business_type'].required = True
-        self.fields['phone'].required = True
-        self.fields['email'].required = True
-        self.fields['location'].required = True
-        
-        # Optional fields
-        self.fields['description'].required = False
-        self.fields['website'].required = False
+        # Make all fields required
+        for field_name in self.fields:
+            self.fields[field_name].required = True
         
         # Set up crispy forms layout
         self.helper = FormHelper()
@@ -238,18 +201,15 @@ class BusinessRegistrationForm(forms.ModelForm):
         self.helper.layout = Layout(
             Field('name', css_class='mb-3'),
             Field('business_type', css_class='mb-3'),
-            Field('description', css_class='mb-3'),
-            Field('location', css_class='mb-3'),
-            Field('website', css_class='mb-3'),
             Row(
                 Column('phone', css_class='form-group col-md-6 mb-3'),
                 Column('email', css_class='form-group col-md-6 mb-3'),
             ),
-            HTML('<div class="form-check mb-4">'),
-            Field('terms_agreement'),
-            HTML('</div>'),
+            HTML('<hr class="my-4"><h6 class="text-muted mb-3">Set Your Account Password</h6>'),
+            Field('account_password', css_class='mb-3'),
+            Field('account_password_confirm', css_class='mb-3'),
             FormActions(
-                Submit('submit', 'Register Business', css_class='btn btn-primary btn-lg w-100')
+                Submit('submit', 'Complete Registration', css_class='btn btn-primary btn-lg w-100')
             )
         )
     
@@ -257,18 +217,26 @@ class BusinessRegistrationForm(forms.ModelForm):
         name = self.cleaned_data.get('name')
         if not name:
             raise ValidationError("Business name is required.")
-        
-        # Check for duplicate tenant names
-        if Tenant.objects.filter(name__iexact=name).exists():
-            raise ValidationError("A business with this name already exists.")
-        
+        # Relaxed validation - just check if name is too similar, not exact match
         return name
     
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and Tenant.objects.filter(email__iexact=email).exists():
-            raise ValidationError("A business with this email already exists.")
+        # Relaxed validation - allow same email for different businesses
         return email
+    
+    def clean_account_password(self):
+        password = self.cleaned_data.get('account_password')
+        if password and len(password) < 6:
+            raise ValidationError("Account password must be at least 6 characters.")
+        return password
+    
+    def clean_account_password_confirm(self):
+        password = self.cleaned_data.get('account_password')
+        password_confirm = self.cleaned_data.get('account_password_confirm')
+        if password and password_confirm and password != password_confirm:
+            raise ValidationError("Account passwords don't match.")
+        return password_confirm
     
     def clean(self):
         """Auto-generate subdomain from business name"""
@@ -296,7 +264,7 @@ class BusinessRegistrationForm(forms.ModelForm):
         return cleaned_data
         
     def save(self, commit=True):
-        """Save the tenant and handle custom fields"""
+        """Save the tenant and handle auto-generated fields"""
         tenant = super().save(commit=False)
         
         # Set the auto-generated subdomain
@@ -304,18 +272,9 @@ class BusinessRegistrationForm(forms.ModelForm):
         if subdomain:
             tenant.subdomain = subdomain
         
-        # Handle location - store in address_line_1
-        location = self.cleaned_data.get('location')
-        if location:
-            tenant.address_line_1 = location
-        
-        # Handle website - store in description for now since there's no website field in model
-        website = self.cleaned_data.get('website')
-        if website:
-            if tenant.description:
-                tenant.description = f"{tenant.description}\nWebsite: {website}"
-            else:
-                tenant.description = f"Website: {website}"
+        # Set default values for other fields
+        if not tenant.description:
+            tenant.description = f"{tenant.name} - {tenant.get_business_type_display()}"
         
         if commit:
             tenant.save()

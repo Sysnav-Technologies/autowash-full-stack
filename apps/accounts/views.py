@@ -65,7 +65,7 @@ class LandingView(TemplateView):
         return context
 
 def register_view(request):
-    """User registration view with enhanced email verification"""
+    """Simplified user registration view - only essential fields"""
     if request.user.is_authenticated:
         return redirect('accounts:dashboard_redirect')
     
@@ -78,7 +78,7 @@ def register_view(request):
                     user.is_active = False  # User will be activated after email verification
                     user.save()
                     
-                    # Create user profile
+                    # Create user profile with phone
                     UserProfile.objects.create(
                         user=user,
                         phone=form.cleaned_data.get('phone'),
@@ -89,7 +89,7 @@ def register_view(request):
                     
                     messages.success(
                         request, 
-                        'Account created successfully! Please check your email to verify your account.'
+                        'Account created! Please check your email and click the verification link to continue.'
                     )
                     return redirect('accounts:email_verification_sent')
                         
@@ -462,10 +462,11 @@ def login_view(request):
     return render(request, 'auth/login.html')
 
 def verify_email(request, uidb64, token):
-    """Email verification view"""
+    """Email verification view with automatic login and redirect to business registration"""
     from django.contrib.auth.tokens import default_token_generator
     from django.utils.http import urlsafe_base64_decode
     from django.utils.encoding import force_str
+    from django.contrib.auth import login
     
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
@@ -478,11 +479,22 @@ def verify_email(request, uidb64, token):
             user.is_active = True
             user.save()
             
-            messages.success(request, 'Your email has been verified successfully! Welcome to Autowash.')
-            return redirect('accounts:email_verification_success')
+            # Automatically log the user in
+            login(request, user)
+            
+            messages.success(request, 'Email verified successfully! Now let\'s set up your business.')
+            # Redirect directly to business registration
+            return redirect('accounts:business_register')
         else:
-            messages.info(request, 'Your email is already verified.')
-            return redirect('accounts:login')
+            # User already verified, check if they have a business
+            login(request, user)
+            business = user.owned_tenants.first()
+            if business:
+                messages.info(request, 'Welcome back!')
+                return redirect('accounts:dashboard_redirect')
+            else:
+                messages.info(request, 'Your email is already verified. Let\'s complete your business setup.')
+                return redirect('accounts:business_register')
     else:
         messages.error(request, 'The verification link is invalid or has expired.')
         return redirect('accounts:login')
@@ -946,21 +958,16 @@ def dashboard_redirect(request):
 
 @login_required
 def business_register_view(request):
-    """
-    Business registration view with multi-environment support
-    Supports Local, Render, and cPanel environments
-    NO schema/employee creation during registration - only after admin approval
-    """
+    """Streamlined business registration view for authenticated users"""
     
     # Detect current environment
     environment = get_current_environment()
     
     print(f"\n" + "="*50)
-    print(f"BUSINESS REGISTER VIEW CALLED - PATH-BASED ROUTING")
+    print(f"STREAMLINED BUSINESS REGISTER VIEW")
     print(f"Request method: {request.method}")
     print(f"User: {request.user}")
     print(f"Environment: {environment.upper()}")
-    print(f"Debug mode: {'ON' if settings.DEBUG else 'OFF'}")
     print(f"="*50)
     
     # Check if user already owns a business
@@ -969,17 +976,17 @@ def business_register_view(request):
     
     if existing_businesses.exists():
         business = existing_businesses.first()
-        if business.is_verified:
+        if business.is_verified and business.is_approved:
             messages.info(request, 'You already have a verified business.')
             return redirect(f'/business/{business.slug}/')
         else:
-            messages.info(request, 'Your business registration is pending verification.')
-            return redirect('/auth/verification-pending/')
+            messages.info(request, 'Your business registration is being processed.')
+            return redirect('/subscriptions/select/')
     
     if request.method == 'POST':
         print("\n" + "="*30 + " POST REQUEST " + "="*30)
         
-        form = BusinessRegistrationForm(request.POST, request.FILES)
+        form = BusinessRegistrationForm(request.POST)
         print(f"Form is valid: {form.is_valid()}")
         
         if form.is_valid():
@@ -991,27 +998,32 @@ def business_register_view(request):
                     # Set the owner
                     business.owner = request.user
                     
-                    # The subdomain is already set by the form's clean() method
-                    
-                    # Create database name for tenant based on subdomain, always with autowash_ prefix
+                    # Create database name for tenant based on subdomain
                     clean_subdomain = re.sub(r'[^a-z0-9]', '', business.subdomain.lower())
                     if not clean_subdomain or not clean_subdomain[0].isalpha():
                         clean_subdomain = 'biz' + clean_subdomain
                     db_name = f"autowash_{clean_subdomain}"
                     business.database_name = db_name[:63]  # MySQL max db name length
                     
-                    # Use main database credentials for all tenants (simpler and more reliable)
+                    # Use main database credentials
                     default_db = settings.DATABASES['default']
                     business.database_user = default_db['USER']
                     business.database_password = default_db['PASSWORD']
                     
+                    # Store business password securely (hashed)
+                    business_password = form.cleaned_data.get('business_password')
+                    if business_password:
+                        from django.contrib.auth.hashers import make_password
+                        # Store the business password in a custom field or related model
+                        # For now, we'll store it in the description field temporarily
+                        # In production, you should create a proper field for this
+                        business.api_key = make_password(business_password)
+                    
                     print(f"About to save business: {business.name}")
                     print(f"Subdomain: {business.subdomain}")
                     print(f"Database name: {business.database_name}")
-                    print(f"Business slug: {business.slug}")
-                    print(f"Environment: {environment}")
                     
-                    # Check for conflicts
+                    # Check for conflicts and handle
                     original_subdomain = business.subdomain
                     original_database_name = business.database_name
                     counter = 1
@@ -1020,21 +1032,17 @@ def business_register_view(request):
                         business.subdomain = f"{original_subdomain}{counter}"
                         business.database_name = f"{original_database_name}{counter}"
                         counter += 1
-                        print(f"Conflict found, trying: {business.subdomain}")
                     
-                    # Set approval status
-                    business.is_active = False  # Needs admin approval
+                    # Set initial status - needs admin approval
+                    business.is_active = False
                     business.is_verified = False
                     business.is_approved = False
                     business.save()
                     print(f"Business saved successfully! ID: {business.id}")
                     
-                    # Create domain record for path-based routing (environment-specific)
-                    print("Creating domain record for path-based routing...")
+                    # Create domain record for path-based routing
+                    print("Creating domain record...")
                     domain_name = get_domain_for_environment(business.subdomain, environment)
-                    print(f"Domain name for {environment}: {domain_name}")
-
-                    # Create domain but note that database doesn't exist yet
                     domain = Domain.objects.create(
                         domain=domain_name,
                         tenant=business,
@@ -1042,17 +1050,15 @@ def business_register_view(request):
                     )
                     print(f"Domain record created: {domain.domain}")
                     
-                    # Create business verification record with approved terms
+                    # Create business verification record
                     print("Creating business verification...")
                     BusinessVerification.objects.create(
                         business=business, 
                         status='pending',
-                        notes='Business registered with terms agreement - no documents uploaded',
+                        notes='Business registered - awaiting admin approval',
                         submitted_at=timezone.now()
                     )
                     
-                    # IMPORTANT: NO database creation here!
-                    # That will be done by admin during approval process
                     print("Business registration complete - waiting for admin approval")
                     
                     # Send business registration confirmation email
@@ -1060,14 +1066,12 @@ def business_register_view(request):
                     email_sent = send_business_registration_email(request, business)
                     if email_sent:
                         print("Business registration email sent successfully")
-                    else:
-                        print("Failed to send business registration email")
                     
-                    # Environment-specific success message
+                    # Success message and redirect to subscription selection
                     success_message = f"Business '{business.name}' registered successfully! Please select a subscription plan to continue."
                     messages.success(request, success_message)
                     
-                    # Redirect to subscription selection instead of verification pending
+                    # Redirect to subscription selection
                     return redirect('/subscriptions/select/')
                 
             except Exception as e:
@@ -1076,7 +1080,6 @@ def business_register_view(request):
                 import traceback
                 traceback.print_exc()
                 
-                # Environment-specific error handling
                 error_message = get_error_message(str(e), environment)
                 messages.error(request, error_message)
         else:
@@ -1089,7 +1092,7 @@ def business_register_view(request):
     # Add environment context to template
     context = {
         'form': form,
-        **get_environment_context()  # This adds all environment info to template
+        **get_environment_context()
     }
     
     return render(request, 'auth/business_register.html', context)
