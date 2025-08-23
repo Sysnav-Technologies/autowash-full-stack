@@ -1,0 +1,84 @@
+{% extends 'emails/base.html' %}
+
+{% block content %}
+<div class="greeting">
+    Hello {{ user.first_name|default:user.username }}!
+</div>
+
+<div class="message">
+    You requested to sign in to your Autowash account. Use the verification code below to complete your login.
+</div>
+
+<div class="alert alert-info">
+    <strong>Secure Login Request</strong><br>
+    We received a request to sign in to your account. Please use the verification code below to access your account securely.
+</div>
+
+<div class="otp-container" style="text-align: center; margin: 32px 0;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px; display: inline-block;">
+        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Your Login Code</div>
+        <div style="font-size: 36px; font-weight: 700; letter-spacing: 8px; font-family: monospace;">{{ otp_code }}</div>
+        <div style="font-size: 12px; opacity: 0.8; margin-top: 8px;">Valid for {{ expires_in_minutes }} minutes</div>
+    </div>
+</div>
+
+<div class="info-card">
+    <div class="info-card-header">
+        🔐 Login Details
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Email Address</span>
+        <span class="info-value">{{ user.email }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Login Code</span>
+        <span class="info-value" style="font-family: monospace; font-weight: 600;">{{ otp_code }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Expires In</span>
+        <span class="info-value">{{ expires_in_minutes }} minutes</span>
+    </div>
+</div>
+
+<div class="text-center">
+    <a href="{{ verification_url }}" class="btn">Complete Login</a>
+</div>
+
+<div class="message">
+    <strong>Quick Login Steps:</strong>
+</div>
+
+<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 16px 0;">
+    <ol style="margin: 0; padding-left: 20px; color: #555;">
+        <li style="margin-bottom: 8px;">Click the "Complete Login" button above (recommended)</li>
+        <li style="margin-bottom: 8px;">Or visit the login verification page manually</li>
+        <li style="margin-bottom: 8px;">Enter your 6-digit code: <strong style="font-family: monospace;">{{ otp_code }}</strong></li>
+        <li>Click "Verify & Sign In" to access your account</li>
+    </ol>
+</div>
+
+<div class="message">
+    If the button doesn't work, copy and paste this link into your browser:
+</div>
+
+<div style="background: #f8f9fa; padding: 16px; border-radius: 8px; word-break: break-all; font-family: monospace; font-size: 14px; margin: 16px 0;">
+    {{ verification_url }}
+</div>
+
+<div class="alert alert-warning">
+    <strong>Security Notice</strong><br>
+    This login code will expire in {{ expires_in_minutes }} minutes. If you didn't request this login, please ignore this email and contact our support team immediately.
+</div>
+
+<div class="message">
+    <strong>Need Help?</strong><br>
+    If you're having trouble signing in or didn't request this login code, please contact our support team for assistance.
+</div>
+
+<div class="text-center">
+    <a href="mailto:support@autowash.co.ke" class="btn btn-secondary">Contact Support</a>
+</div>
+{% endblock %}

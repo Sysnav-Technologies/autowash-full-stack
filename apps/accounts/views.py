@@ -21,11 +21,12 @@ from django.contrib.sites.models import Site
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.utils import timezone
+from datetime import timedelta
 import uuid
 from django.conf import settings
 from apps.core.decorators import ajax_required
 from apps.core.management.environment import get_current_environment, get_domain_for_environment, get_environment_context, get_error_message, get_success_message
-from .models import UserProfile, Business, BusinessSettings, BusinessVerification, Domain
+from .models import UserProfile, Business, BusinessSettings, BusinessVerification, Domain, EmailOTP
 from .forms import (
     UserRegistrationForm, UserProfileForm, BusinessRegistrationForm,
     BusinessSettingsForm, BusinessVerificationForm
@@ -84,14 +85,18 @@ def register_view(request):
                         phone=form.cleaned_data.get('phone'),
                     )
                     
-                    # Send email verification
-                    send_verification_email(request, user)
+                    # Send OTP instead of verification email
+                    success = send_otp_email(request, user)
                     
-                    messages.success(
-                        request, 
-                        'Account created! Please check your email and click the verification link to continue.'
-                    )
-                    return redirect('accounts:email_verification_sent')
+                    if success:
+                        messages.success(
+                            request, 
+                            'Account created! Please check your email for the verification code.'
+                        )
+                        return redirect('accounts:verify_otp')
+                    else:
+                        messages.error(request, 'Account created but failed to send verification email. Please contact support.')
+                        return redirect('accounts:verify_otp')
                         
             except Exception as e:
                 messages.error(request, f'Registration failed: {str(e)}')
@@ -99,6 +104,95 @@ def register_view(request):
         form = UserRegistrationForm()
     
     return render(request, 'auth/register.html', {'form': form})
+
+def send_otp_email(request, user):
+    """Send OTP verification email"""
+    try:
+        # Generate OTP
+        otp = EmailOTP.generate_otp(user, user.email, purpose='registration')
+        
+        # Build verification URL with email parameter
+        verification_url = request.build_absolute_uri(
+            reverse('accounts:verify_otp') + f'?email={user.email}'
+        )
+        
+        # Get current site
+        current_site = Site.objects.get_current()
+        
+        # Prepare email context
+        email_context = {
+            'user': user,
+            'otp_code': otp.otp_code,
+            'verification_url': verification_url,
+            'current_site': current_site,
+            'protocol': 'https' if request.is_secure() else 'http',
+            'expires_in_minutes': 10,
+        }
+        
+        # Render email templates
+        subject = render_to_string('account/email/otp_verification_subject.txt', email_context).strip()
+        html_message = render_to_string('account/email/otp_verification_message.html', email_context)
+        text_message = render_to_string('account/email/otp_verification_message.txt', email_context)
+        
+        # Send email
+        send_mail(
+            subject=subject,
+            message=text_message,
+            html_message=html_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error sending OTP email: {e}")
+        return False
+
+
+def send_login_otp_email(request, user, otp_code):
+    """Send login OTP email"""
+    try:
+        # Build verification URL with email parameter
+        verification_url = request.build_absolute_uri(
+            reverse('accounts:verify_login_otp') + f'?email={user.email}'
+        )
+        
+        # Get current site
+        current_site = Site.objects.get_current()
+        
+        # Prepare email context
+        email_context = {
+            'user': user,
+            'otp_code': otp_code,
+            'verification_url': verification_url,
+            'current_site': current_site,
+            'protocol': 'https' if request.is_secure() else 'http',
+            'expires_in_minutes': 10,
+        }
+        
+        # Render email templates
+        subject = render_to_string('account/email/login_otp_subject.txt', email_context).strip()
+        html_message = render_to_string('account/email/login_otp_message.html', email_context)
+        text_message = render_to_string('account/email/login_otp_message.txt', email_context)
+        
+        # Send email
+        send_mail(
+            subject=subject,
+            message=text_message,
+            html_message=html_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error sending login OTP email: {e}")
+        return False
+
 
 def send_verification_email(request, user):
     """Send email verification using custom templates"""
@@ -455,7 +549,16 @@ def login_view(request):
                 next_url = request.GET.get('next', 'accounts:dashboard_redirect')
                 return redirect(next_url)
             else:
-                messages.error(request, 'Your account is not activated. Please check your email for verification instructions.')
+                # User exists but email is not verified - redirect to verification page
+                messages.warning(request, 'Your email address is not verified. We\'ve sent you a verification email.')
+                
+                # Automatically resend verification email
+                try:
+                    send_verification_email(request, user)
+                except Exception as e:
+                    print(f"Failed to send verification email: {e}")
+                
+                return redirect('accounts:email_verification_sent')
         else:
             messages.error(request, 'Invalid credentials. Please try again.')
     
@@ -498,6 +601,304 @@ def verify_email(request, uidb64, token):
     else:
         messages.error(request, 'The verification link is invalid or has expired.')
         return redirect('accounts:login')
+
+def verify_otp(request):
+    """OTP verification view - supports both form submission and URL parameters"""
+    if request.user.is_authenticated and request.user.is_active:
+        return redirect('accounts:dashboard_redirect')
+    
+    # Check if email is provided via URL parameter
+    email_from_url = request.GET.get('email', '').strip()
+    
+    # If no email provided and it's a GET request, redirect to registration
+    if not email_from_url and request.method == 'GET':
+        messages.info(request, 'Please complete the registration process first.')
+        return redirect('accounts:register')
+    
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip()
+        otp_code = request.POST.get('otp_code', '').strip()
+        
+        if not email:
+            messages.error(request, 'Email address is required. Please ensure you accessed this page from the registration flow.')
+            return render(request, 'auth/verify_otp.html', {'email': email_from_url or ''})
+        
+        if not otp_code:
+            messages.error(request, 'Please enter the 6-digit verification code.')
+            return render(request, 'auth/verify_otp.html', {'email': email})
+        
+        if len(otp_code) != 6 or not otp_code.isdigit():
+            messages.error(request, 'Please enter a valid 6-digit verification code.')
+            return render(request, 'auth/verify_otp.html', {'email': email})
+        
+        try:
+            # Find user by email
+            user = User.objects.get(email=email)
+            
+            # Find valid OTP
+            otp = EmailOTP.objects.filter(
+                user=user,
+                email=email,
+                otp_code=otp_code,
+                purpose='registration',
+                is_used=False
+            ).first()
+            
+            if otp and otp.is_valid():
+                # Mark OTP as used
+                otp.mark_as_used()
+                
+                # Activate user
+                user.is_active = True
+                user.save()
+                
+                # Automatically log the user in
+                from django.contrib.auth import login
+                login(request, user)
+                
+                messages.success(request, 'Email verified successfully! Now let\'s set up your business.')
+                return redirect('accounts:business_register')
+            else:
+                if otp and not otp.is_valid():
+                    messages.error(request, 'Verification code has expired. Please request a new one.')
+                else:
+                    messages.error(request, 'Invalid verification code. Please check your email and try again.')
+                
+        except User.DoesNotExist:
+            messages.error(request, 'No account found with this email address.')
+        except Exception as e:
+            messages.error(request, 'Verification failed. Please try again.')
+    
+    # Pass email to template if provided via URL
+    context = {
+        'email': email_from_url or ''
+    }
+    
+    return render(request, 'auth/verify_otp.html', context)
+
+def resend_otp(request):
+    """Resend OTP verification code"""
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip()
+        
+        if not email:
+            messages.error(request, 'Please provide your email address.')
+            return redirect('accounts:verify_otp')
+        
+        try:
+            user = User.objects.get(email=email, is_active=False)
+            
+            # Check if we can send a new OTP (rate limiting)
+            recent_otp = EmailOTP.objects.filter(
+                user=user,
+                email=email,
+                purpose='registration',
+                created_at__gte=timezone.now() - timedelta(minutes=1)
+            ).first()
+            
+            if recent_otp:
+                messages.warning(request, 'Please wait at least 1 minute before requesting a new code.')
+                return redirect('accounts:verify_otp')
+            
+            # Send new OTP
+            success = send_otp_email(request, user)
+            
+            if success:
+                messages.success(request, 'New verification code sent to your email.')
+            else:
+                messages.error(request, 'Failed to send verification code. Please try again.')
+                
+        except User.DoesNotExist:
+            messages.error(request, 'No pending account found with this email address.')
+        except Exception as e:
+            messages.error(request, 'Failed to send verification code. Please try again.')
+    
+    return redirect('accounts:verify_otp')
+
+def email_login_view(request):
+    """Email-based OTP login - step 1: enter email"""
+    if request.user.is_authenticated:
+        return redirect('accounts:dashboard_redirect')
+    
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip().lower()
+        
+        if not email:
+            messages.error(request, 'Please provide your email address.')
+            return render(request, 'auth/email_login.html')
+        
+        try:
+            user = User.objects.get(email=email)
+            
+            if not user.is_active:
+                # User exists but email is not verified - redirect to verification page
+                messages.warning(request, 'Your email address is not verified. We\'ve sent you a verification email.')
+                
+                # Automatically resend verification email
+                try:
+                    send_verification_email(request, user)
+                except Exception as e:
+                    print(f"Failed to send verification email: {e}")
+                
+                return redirect('accounts:email_verification_sent')
+            
+            # Check rate limiting - don't allow more than 1 OTP per minute
+            recent_otp = EmailOTP.objects.filter(
+                user=user,
+                email=email,
+                purpose='login',
+                created_at__gte=timezone.now() - timedelta(minutes=1)
+            ).first()
+            
+            if recent_otp:
+                messages.warning(request, 'Please wait at least 1 minute before requesting a new login code.')
+                return render(request, 'auth/email_login.html')
+            
+            # Generate and send login OTP
+            otp = EmailOTP.generate_otp(user, email, purpose='login', expires_in_minutes=10)
+            success = send_login_otp_email(request, user, otp.otp_code)
+            
+            if success:
+                messages.success(request, f'Login code sent to {email}. Please check your email.')
+                return redirect(reverse('accounts:verify_login_otp') + f'?email={email}')
+            else:
+                messages.error(request, 'Failed to send login code. Please try again.')
+                return render(request, 'auth/email_login.html')
+                
+        except User.DoesNotExist:
+            messages.error(request, 'No account found with this email address.')
+            return render(request, 'auth/email_login.html')
+        except Exception as e:
+            messages.error(request, 'Failed to send login code. Please try again.')
+            return render(request, 'auth/email_login.html')
+    
+    return render(request, 'auth/email_login.html')
+
+def verify_login_otp(request):
+    """Email-based OTP login - step 2: verify OTP and login"""
+    if request.user.is_authenticated:
+        return redirect('accounts:dashboard_redirect')
+    
+    email = request.GET.get('email', '')
+    
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip().lower()
+        otp_code = request.POST.get('otp_code', '').strip()
+        
+        if not email or not otp_code:
+            messages.error(request, 'Please provide both email and verification code.')
+            return render(request, 'auth/verify_login_otp.html', {'email': email})
+        
+        if len(otp_code) != 6 or not otp_code.isdigit():
+            messages.error(request, 'Please enter a valid 6-digit verification code.')
+            return render(request, 'auth/verify_login_otp.html', {'email': email})
+        
+        try:
+            user = User.objects.get(email=email, is_active=True)
+            
+            # Find valid OTP
+            valid_otp = EmailOTP.objects.filter(
+                user=user,
+                email=email,
+                otp_code=otp_code,
+                purpose='login',
+                is_used=False,
+                expires_at__gt=timezone.now()
+            ).first()
+            
+            if valid_otp:
+                # Mark OTP as used
+                valid_otp.is_used = True
+                valid_otp.save()
+                
+                # Log the user in
+                from django.contrib.auth import login
+                login(request, user)
+                
+                messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
+                
+                # Send login notification email (async)
+                try:
+                    from threading import Thread
+                    email_thread = Thread(
+                        target=send_login_notification_email,
+                        args=(request, user)
+                    )
+                    email_thread.daemon = True
+                    email_thread.start()
+                except Exception as e:
+                    print(f"Failed to start login notification email thread: {e}")
+                
+                # Redirect to next URL or dashboard
+                next_url = request.GET.get('next', 'accounts:dashboard_redirect')
+                return redirect(next_url)
+            else:
+                # Check if OTP exists but is expired/used
+                expired_otp = EmailOTP.objects.filter(
+                    user=user,
+                    email=email,
+                    otp_code=otp_code,
+                    purpose='login'
+                ).first()
+                
+                if expired_otp:
+                    if expired_otp.is_used:
+                        messages.error(request, 'This verification code has already been used.')
+                    else:
+                        messages.error(request, 'This verification code has expired. Please request a new one.')
+                else:
+                    messages.error(request, 'Invalid verification code. Please try again.')
+                
+                return render(request, 'auth/verify_login_otp.html', {'email': email})
+                
+        except User.DoesNotExist:
+            messages.error(request, 'No active account found with this email address.')
+            return render(request, 'auth/verify_login_otp.html', {'email': email})
+        except Exception as e:
+            messages.error(request, 'Login failed. Please try again.')
+            return render(request, 'auth/verify_login_otp.html', {'email': email})
+    
+    return render(request, 'auth/verify_login_otp.html', {'email': email})
+
+def resend_login_otp(request):
+    """Resend login OTP code"""
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip().lower()
+        
+        if not email:
+            messages.error(request, 'Please provide your email address.')
+            return redirect('accounts:email_login')
+        
+        try:
+            user = User.objects.get(email=email, is_active=True)
+            
+            # Check rate limiting
+            recent_otp = EmailOTP.objects.filter(
+                user=user,
+                email=email,
+                purpose='login',
+                created_at__gte=timezone.now() - timedelta(minutes=1)
+            ).first()
+            
+            if recent_otp:
+                messages.warning(request, 'Please wait at least 1 minute before requesting a new code.')
+                return redirect(reverse('accounts:verify_login_otp') + f'?email={email}')
+            
+            # Generate and send new login OTP
+            otp = EmailOTP.generate_otp(user, email, purpose='login', expires_in_minutes=10)
+            success = send_login_otp_email(request, user, otp.otp_code)
+            
+            if success:
+                messages.success(request, 'New login code sent to your email.')
+            else:
+                messages.error(request, 'Failed to send login code. Please try again.')
+                
+        except User.DoesNotExist:
+            messages.error(request, 'No active account found with this email address.')
+        except Exception as e:
+            messages.error(request, 'Failed to send login code. Please try again.')
+    
+    return redirect(reverse('accounts:verify_login_otp') + f'?email={email}')
 
 # Password Reset view with enhanced templates
 def password_reset_view(request):
@@ -1010,14 +1411,16 @@ def business_register_view(request):
                     business.database_user = default_db['USER']
                     business.database_password = default_db['PASSWORD']
                     
-                    # Store business password securely (hashed)
-                    business_password = form.cleaned_data.get('business_password')
-                    if business_password:
-                        from django.contrib.auth.hashers import make_password
-                        # Store the business password in a custom field or related model
-                        # For now, we'll store it in the description field temporarily
-                        # In production, you should create a proper field for this
-                        business.api_key = make_password(business_password)
+                    # Set account password for the user (since it wasn't set during registration)
+                    account_password = form.cleaned_data.get('account_password')
+                    if account_password:
+                        request.user.set_password(account_password)
+                        request.user.save()
+                        print(f"Account password set for user: {request.user.username}")
+                        
+                        # Re-authenticate the user with new password
+                        from django.contrib.auth import update_session_auth_hash
+                        update_session_auth_hash(request, request.user)
                     
                     print(f"About to save business: {business.name}")
                     print(f"Subdomain: {business.subdomain}")

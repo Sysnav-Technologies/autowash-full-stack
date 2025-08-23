@@ -5,8 +5,12 @@ from django.core.validators import RegexValidator
 from phonenumber_field.modelfields import PhoneNumberField
 from apps.core.models import TimeStampedModel, Address, ContactInfo
 from apps.core.utils import upload_to_path
+from django.utils import timezone
+from datetime import timedelta
 import uuid
 import os
+import random
+import string
 
 class UserProfile(TimeStampedModel):
     """Extended user profile"""
@@ -36,6 +40,73 @@ class UserProfile(TimeStampedModel):
     class Meta:
         verbose_name = "User Profile"
         verbose_name_plural = "User Profiles"
+
+
+class EmailOTP(TimeStampedModel):
+    """OTP model for email verification"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='email_otps')
+    email = models.EmailField()
+    otp_code = models.CharField(max_length=6)
+    purpose = models.CharField(
+        max_length=20,
+        choices=[
+            ('registration', 'Registration'),
+            ('login', 'Login'),
+            ('password_reset', 'Password Reset'),
+            ('email_change', 'Email Change'),
+        ],
+        default='registration'
+    )
+    is_used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    
+    class Meta:
+        verbose_name = "Email OTP"
+        verbose_name_plural = "Email OTPs"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"OTP for {self.email} - {self.otp_code}"
+    
+    @classmethod
+    def generate_otp(cls, user, email, purpose='registration', expires_in_minutes=10):
+        """Generate a new OTP for user"""
+        # Generate 6-digit OTP
+        otp_code = ''.join(random.choices(string.digits, k=6))
+        
+        # Set expiration time
+        expires_at = timezone.now() + timedelta(minutes=expires_in_minutes)
+        
+        # Invalidate any existing OTPs for this user and purpose
+        cls.objects.filter(
+            user=user, 
+            purpose=purpose, 
+            is_used=False,
+            expires_at__gt=timezone.now()
+        ).update(is_used=True)
+        
+        # Create new OTP
+        otp = cls.objects.create(
+            user=user,
+            email=email,
+            otp_code=otp_code,
+            purpose=purpose,
+            expires_at=expires_at
+        )
+        
+        return otp
+    
+    def is_valid(self):
+        """Check if OTP is still valid"""
+        return (
+            not self.is_used and 
+            timezone.now() <= self.expires_at
+        )
+    
+    def mark_as_used(self):
+        """Mark OTP as used"""
+        self.is_used = True
+        self.save(update_fields=['is_used'])
 
 
 # Import the new Tenant model as Business for backward compatibility

@@ -8,9 +8,16 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    
+    # Email-based login
+    path('email-login/', views.email_login_view, name='email_login'),
+    path('verify-login-otp/', views.verify_login_otp, name='verify_login_otp'),
+    path('resend-login-otp/', views.resend_login_otp, name='resend_login_otp'),
 
     # Email verification
     path('verify-email/<str:uidb64>/<str:token>/', views.verify_email, name='verify_email'),
+    path('verify-otp/', views.verify_otp, name='verify_otp'),
+    path('resend-otp/', views.resend_otp, name='resend_otp'),
     path('resend-verification/', views.resend_verification_email, name='resend_verification'),
     path('email-verification-sent/', views.email_verification_sent, name='email_verification_sent'),
     path('email-verification-success/', views.email_verification_success_view, name='email_verification_success'),

@@ -1,0 +1,124 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Sign In with Email - Autowash{% endblock %}
+
+{% block public_content %}
+<section class="auth-section min-vh-100 d-flex align-items-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-5 col-md-7">
+                <div class="auth-card" data-aos="fade-up">
+                    <div class="auth-header text-center">
+                        <div class="auth-brand mb-3">
+                            <span class="brand-text">AUTOWASH</span>
+                        </div>
+                        <h2 class="auth-title">Sign In with Email</h2>
+                        <p class="auth-subtitle">Enter your email address and we'll send you a verification code</p>
+                    </div>
+
+                    <div class="auth-body">
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        <!-- Email Login Form -->
+                        <form method="post" id="emailLoginForm">
+                            {% csrf_token %}
+                            
+                            <div class="form-group">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       placeholder="Enter your email address" 
+                                       value="{{ form.email.value|default:'' }}" required>
+                                {% if form.email.errors %}
+                                    <div class="form-error">{{ form.email.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <button type="submit" class="btn btn-auth btn-purple mb-3" id="submitBtn">
+                                <i class="fas fa-paper-plane me-2"></i>Send Verification Code
+                            </button>
+                        </form>
+
+                        <!-- Alternative Login Options -->
+                        <div class="position-relative text-center mb-3">
+                            <hr class="my-0">
+                            <span class="auth-divider-text">or</span>
+                        </div>
+
+                        <a href="{% url 'accounts:login' %}" class="btn btn-outline-secondary w-100 mb-3">
+                            <i class="fas fa-key me-2"></i>Sign in with Password
+                        </a>
+
+                        <!-- Sign Up Link -->
+                        <div class="text-center">
+                            <p class="mb-0">Don't have an account? 
+                                <a href="{% url 'accounts:register' %}" class="text-decoration-none">Sign up</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Help Link -->
+                <div class="text-center mt-4">
+                    <p class="text-muted">
+                        Need help? <a href="mailto:hello@autowash.co.ke" class="text-decoration-none">Contact Support</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation and submission
+    const emailLoginForm = document.getElementById('emailLoginForm');
+    emailLoginForm.addEventListener('submit', function(e) {
+        const submitBtn = document.getElementById('submitBtn');
+        const originalText = submitBtn.innerHTML;
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+        
+        // Re-enable button after 5 seconds in case of issues
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }, 5000);
+    });
+
+    // Real-time validation
+    const emailInput = document.getElementById('email');
+    emailInput.addEventListener('blur', function() {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(this.value.trim())) {
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+        } else {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        }
+    });
+
+    emailInput.addEventListener('input', function() {
+        if (this.classList.contains('is-invalid')) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (emailRegex.test(this.value.trim())) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            }
+        }
+    });
+
+    // Auto-focus email input
+    emailInput.focus();
+});
+</script>
+{% endblock %}

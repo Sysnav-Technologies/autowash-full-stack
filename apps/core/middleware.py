@@ -73,6 +73,8 @@ class BusinessStatusMiddleware:
             '/auth/logout/',
             '/auth/register/',
             '/auth/verify-email/',
+            '/auth/verify-otp/',
+            '/auth/resend-otp/',
             '/auth/email-verification-sent/',
             '/auth/email-verification-success/',
             '/auth/password-reset/',

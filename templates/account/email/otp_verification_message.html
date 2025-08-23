@@ -1,0 +1,84 @@
+{% extends 'emails/base.html' %}
+
+{% block content %}
+<div class="greeting">
+    Hello {{ user.first_name|default:user.username }}!
+</div>
+
+<div class="message">
+    Your email verification code for Autowash is ready. Please use the code below to verify your account.
+</div>
+
+<div class="alert alert-info">
+    <strong>Email Verification Required</strong><br>
+    To complete your account setup and access all features, please verify your email address using the verification code below.
+</div>
+
+<div class="otp-container" style="text-align: center; margin: 32px 0;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px; display: inline-block;">
+        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Your Verification Code</div>
+        <div style="font-size: 36px; font-weight: 700; letter-spacing: 8px; font-family: monospace;">{{ otp_code }}</div>
+        <div style="font-size: 12px; opacity: 0.8; margin-top: 8px;">Valid for {{ expires_in_minutes }} minutes</div>
+    </div>
+</div>
+
+<div class="info-card">
+    <div class="info-card-header">
+        📧 Verification Details
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Email Address</span>
+        <span class="info-value">{{ user.email }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Verification Code</span>
+        <span class="info-value" style="font-family: monospace; font-weight: 600;">{{ otp_code }}</span>
+    </div>
+    
+    <div class="info-row">
+        <span class="info-label">Expires In</span>
+        <span class="info-value">{{ expires_in_minutes }} minutes</span>
+    </div>
+</div>
+
+<div class="text-center">
+    <a href="{{ verification_url }}" class="btn">Verify Email Address</a>
+</div>
+
+<div class="message">
+    <strong>Quick Verification Steps:</strong>
+</div>
+
+<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 16px 0;">
+    <ol style="margin: 0; padding-left: 20px; color: #555;">
+        <li style="margin-bottom: 8px;">Click the "Verify Email Address" button above (recommended)</li>
+        <li style="margin-bottom: 8px;">Or visit the verification page manually</li>
+        <li style="margin-bottom: 8px;">Enter your 6-digit code: <strong style="font-family: monospace;">{{ otp_code }}</strong></li>
+        <li>Click "Verify" to complete your registration</li>
+    </ol>
+</div>
+
+<div class="message">
+    If the button doesn't work, copy and paste this link into your browser:
+</div>
+
+<div style="background: #f8f9fa; padding: 16px; border-radius: 8px; word-break: break-all; font-family: monospace; font-size: 14px; margin: 16px 0;">
+    {{ verification_url }}
+</div>
+
+<div class="alert alert-warning">
+    <strong>Security Notice</strong><br>
+    This verification code will expire in {{ expires_in_minutes }} minutes. If you didn't request this verification, please ignore this email and your email address will not be verified.
+</div>
+
+<div class="message">
+    <strong>What's Next?</strong><br>
+    After verification, you'll be automatically logged in and redirected to set up your business profile. You'll then be able to start your 7-day free trial of Autowash.
+</div>
+
+<div class="text-center">
+    <a href="mailto:support@autowash.co.ke" class="btn btn-secondary">Need Help?</a>
+</div>
+{% endblock %}
