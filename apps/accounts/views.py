@@ -863,9 +863,26 @@ def verify_login_otp(request):
 def resend_login_otp(request):
     """Resend login OTP code"""
     if request.method == 'POST':
-        email = request.POST.get('email', '').strip().lower()
+        # Handle both form data and JSON requests
+        if request.content_type == 'application/json':
+            import json
+            try:
+                data = json.loads(request.body)
+                email = data.get('email', '').strip().lower()
+            except json.JSONDecodeError:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid JSON data.'
+                }, status=400)
+        else:
+            email = request.POST.get('email', '').strip().lower()
         
         if not email:
+            if request.content_type == 'application/json' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Please provide your email address.'
+                }, status=400)
             messages.error(request, 'Please provide your email address.')
             return redirect('accounts:email_login')
         
@@ -881,6 +898,11 @@ def resend_login_otp(request):
             ).first()
             
             if recent_otp:
+                if request.content_type == 'application/json' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Please wait at least 1 minute before requesting a new code.'
+                    }, status=429)
                 messages.warning(request, 'Please wait at least 1 minute before requesting a new code.')
                 return redirect(reverse('accounts:verify_login_otp') + f'?email={email}')
             
@@ -889,15 +911,40 @@ def resend_login_otp(request):
             success = send_login_otp_email(request, user, otp.otp_code)
             
             if success:
+                if request.content_type == 'application/json' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'New login code sent to your email.'
+                    })
                 messages.success(request, 'New login code sent to your email.')
             else:
+                if request.content_type == 'application/json' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Failed to send login code. Please try again.'
+                    }, status=500)
                 messages.error(request, 'Failed to send login code. Please try again.')
                 
         except User.DoesNotExist:
+            if request.content_type == 'application/json' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'No active account found with this email address.'
+                }, status=404)
             messages.error(request, 'No active account found with this email address.')
         except Exception as e:
+            if request.content_type == 'application/json' or request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Failed to send login code. Please try again.'
+                }, status=500)
             messages.error(request, 'Failed to send login code. Please try again.')
     
+    # For non-AJAX requests or GET requests
+    if request.method == 'GET':
+        email = request.GET.get('email', '')
+    else:
+        email = request.POST.get('email', '') if request.content_type != 'application/json' else ''
     return redirect(reverse('accounts:verify_login_otp') + f'?email={email}')
 
 # Password Reset view with enhanced templates

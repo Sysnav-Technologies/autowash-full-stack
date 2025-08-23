@@ -254,6 +254,7 @@ TEMPLATES = [
                 'apps.core.context_processors.performance_context',
                 'apps.core.context_processors.verification_context',
                 'apps.core.context_processors.subscription_flow_context',
+                'apps.core.context_processors.sidebar_context',
             ],
         },
     },
