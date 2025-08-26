@@ -1118,7 +1118,7 @@ def service_delete_view(request, pk):
     if request.method == 'POST':
         service.delete()  # Soft delete
         messages.success(request, f'Service "{service.name}" deleted successfully!')
-    return redirect(get_business_url(request, 'services:list'))
+        return redirect(get_business_url(request, 'services:list'))
     
     context = {
         'service': service,
@@ -1190,7 +1190,7 @@ def cancel_service(request, order_id):
     
     if not order.can_be_cancelled:
         messages.error(request, 'This order cannot be cancelled.')
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     cancellation_reason = request.POST.get('reason', '')
     
@@ -1221,7 +1221,7 @@ def pause_service(request, order_id):
     
     if order.status != 'in_progress':
         messages.error(request, 'Service is not in progress.')
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     # Record pause time in internal notes
     order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
@@ -1251,7 +1251,7 @@ def resume_service(request, order_id):
     
     if order.status != 'in_progress':
         messages.error(request, 'Service is not paused.')
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     # Record resume time in internal notes
     order.internal_notes += f"\nResumed by {request.employee.full_name} at {timezone.now()}"

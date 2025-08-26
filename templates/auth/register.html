@@ -1,10 +1,49 @@
 {% extends 'base/base.html' %}
 {% load static %}
+{% load crispy_forms_tags %}
 
 {% block title %}Get Started - Autowash{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+<link rel="stylesheet" href="{% static 'css/phone-widget.css' %}">
+<style>
+/* Terms checkbox validation styling */
+.form-check.was-validated .form-check-input:invalid,
+.form-check .form-check-input.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+.form-check.was-validated .form-check-input:valid,
+.form-check .form-check-input.is-valid {
+    border-color: #198754;
+}
+
+.form-check .invalid-feedback {
+    display: none;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #dc3545;
+}
+
+.form-check .invalid-feedback.d-block,
+.form-check.was-validated .invalid-feedback {
+    display: block !important;
+}
+
+/* Better checkbox focus state */
+.form-check-input:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Highlight required asterisk */
+.text-danger {
+    color: #dc3545 !important;
+    font-weight: bold;
+}
+</style>
 {% endblock %}
 
 {% block public_content %}
@@ -22,47 +61,85 @@
                     </div>
 
                     <div class="auth-body">
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" title="Close alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
                         <!-- Registration Form -->
-                        <form method="post" id="registrationForm">
+                        <form method="post" id="registrationForm" novalidate>
                             {% csrf_token %}
                             
-                            <div class="form-group">
-                                <label for="username" class="form-label">Username</label>
-                                <input type="text" class="form-control" id="username" name="username" 
-                                       placeholder="Choose a username" required autocomplete="username">
-                                {% if form.username.errors %}
-                                    <div class="form-error">{{ form.username.errors.0 }}</div>
+                            <!-- Full Name Field -->
+                            <div class="form-group mb-3">
+                                <label for="{{ form.full_name.id_for_label }}" class="form-label">
+                                    Full Name
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.full_name }}
+                                {% if form.full_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.full_name.errors %}{{ error }}{% endfor %}
+                                    </div>
                                 {% endif %}
                             </div>
 
-                            <div class="form-group">
-                                <label for="email" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" id="email" name="email" 
-                                       placeholder="your@email.com" required autocomplete="email">
+                            <!-- Email Field -->
+                            <div class="form-group mb-3">
+                                <label for="{{ form.email.id_for_label }}" class="form-label">
+                                    Email Address
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.email }}
                                 {% if form.email.errors %}
-                                    <div class="form-error">{{ form.email.errors.0 }}</div>
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.email.errors %}{{ error }}{% endfor %}
+                                    </div>
                                 {% endif %}
                             </div>
 
-                            <div class="form-group">
-                                <label for="phone" class="form-label">Phone Number</label>
-                                <input type="tel" class="form-control" id="phone" name="phone" 
-                                       placeholder="+254712345678" required autocomplete="tel">
+                            <!-- Phone Number Field with Country Code -->
+                            <div class="form-group mb-3">
+                                <label for="{{ form.phone.id_for_label }}" class="form-label">
+                                    Phone Number
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="phone-input-container">
+                                    {{ form.phone }}
+                                </div>
+                                <small class="form-text text-muted">Select country code and enter your phone number</small>
                                 {% if form.phone.errors %}
-                                    <div class="form-error">{{ form.phone.errors.0 }}</div>
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.phone.errors %}{{ error }}{% endfor %}
+                                    </div>
                                 {% endif %}
                             </div>
 
+                            <!-- Terms and Conditions -->
                             <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="terms" name="terms" required>
+                                {{ form.terms }}
                                 <label class="form-check-label" for="terms">
                                     I agree to the <a href="{% url 'serve_legal_document' 'terms-of-service' %}" target="_blank" class="text-primary">Terms of Service</a> 
                                     and <a href="{% url 'serve_legal_document' 'privacy-policy' %}" target="_blank" class="text-primary">Privacy Policy</a>
+                                    <span class="text-danger">*</span>
                                 </label>
+                                {% if form.terms.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.terms.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="invalid-feedback">
+                                        You must agree to the terms and conditions.
+                                    </div>
+                                {% endif %}
                             </div>
 
-                            <button type="submit" class="btn btn-auth btn-purple mb-3">
-                                Create Account
+                            <button type="submit" class="btn btn-auth btn-purple w-100 mb-3">
+                                <i class="fas fa-user-plus me-2"></i>Create Account
                             </button>
                         </form>
 
@@ -108,43 +185,119 @@
                         <span><i class="fas fa-check me-1"></i> Cancel anytime</span>
                     </div>
                 </div>
+
+                <!-- Help Link -->
+                <div class="text-center mt-3">
+                    <p class="text-muted">
+                        Need help? <a href="https://autowash.co.ke" target="_blank" rel="noopener" class="text-decoration-none">Contact Support</a>
+                    </p>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
+{% block extra_js %}
+<script src="{% static 'js/phone-widget.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Form validation and submission
     const registrationForm = document.getElementById('registrationForm');
+    const submitBtn = registrationForm.querySelector('button[type="submit"]');
+    const termsCheckbox = document.getElementById('terms');
+    
+    // Form submission handler
     registrationForm.addEventListener('submit', function(e) {
-        const termsCheckbox = document.getElementById('terms');
+        // Check terms checkbox first
         if (!termsCheckbox.checked) {
             e.preventDefault();
-            alert('Please accept the Terms of Service and Privacy Policy.');
+            termsCheckbox.classList.add('is-invalid');
+            termsCheckbox.parentElement.classList.add('was-validated');
+            
+            // Show error message
+            const errorDiv = termsCheckbox.parentElement.querySelector('.invalid-feedback');
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+            }
+            
+            // Scroll to terms checkbox
+            termsCheckbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        } else {
+            termsCheckbox.classList.remove('is-invalid');
+            termsCheckbox.parentElement.classList.remove('was-validated');
+            
+            // Hide error message
+            const errorDiv = termsCheckbox.parentElement.querySelector('.invalid-feedback');
+            if (errorDiv && !errorDiv.classList.contains('d-block')) {
+                errorDiv.style.display = 'none';
+            }
+        }
+        
+        // Validate required fields
+        const requiredFields = this.querySelectorAll('input[required], select[required]');
+        let hasErrors = false;
+        
+        requiredFields.forEach(field => {
+            if (!field.value.trim() && field.type !== 'checkbox') {
+                field.classList.add('is-invalid');
+                hasErrors = true;
+            } else if (field.type !== 'checkbox') {
+                field.classList.remove('is-invalid');
+            }
+        });
+        
+        if (hasErrors) {
+            e.preventDefault();
             return;
         }
 
-        const submitBtn = this.querySelector('button[type="submit"]');
+        // Disable submit button and show loading state
         const originalText = submitBtn.innerHTML;
-        
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating Account...';
         
+        // Re-enable button after timeout (in case of errors)
         setTimeout(() => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
-        }, 5000);
+        }, 10000);
     });
 
-    // Real-time validation
-    const inputs = document.querySelectorAll('.form-control');
-    inputs.forEach(input => {
-        input.addEventListener('blur', function() {
+    // Terms checkbox validation
+    termsCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            this.classList.remove('is-invalid');
+            this.parentElement.classList.remove('was-validated');
+            
+            // Hide error message
+            const errorDiv = this.parentElement.querySelector('.invalid-feedback');
+            if (errorDiv && !errorDiv.classList.contains('d-block')) {
+                errorDiv.style.display = 'none';
+            }
+        } else {
+            // If unchecked, show warning
+            this.classList.add('is-invalid');
+            this.parentElement.classList.add('was-validated');
+            
+            // Show error message
+            const errorDiv = this.parentElement.querySelector('.invalid-feedback');
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+            }
+        }
+    });
+
+    // Real-time field validation
+    const formFields = document.querySelectorAll('.form-control, .form-select');
+    formFields.forEach(field => {
+        // Validation on blur
+        field.addEventListener('blur', function() {
             validateField(this);
         });
 
-        input.addEventListener('input', function() {
+        // Clear invalid state on input
+        field.addEventListener('input', function() {
             if (this.classList.contains('is-invalid')) {
                 validateField(this);
             }
@@ -155,15 +308,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const value = field.value.trim();
         let isValid = true;
         
+        // Required field validation
         if (field.hasAttribute('required') && value === '') {
             isValid = false;
         }
         
+        // Email validation
         if (field.type === 'email' && value !== '') {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             isValid = emailRegex.test(value);
         }
         
+        // Phone validation (basic)
+        if (field.name === 'phone_1' && value !== '') {
+            const phoneRegex = /^\d{7,15}$/;
+            isValid = phoneRegex.test(value);
+        }
+        
+        // Update field appearance
         if (isValid) {
             field.classList.remove('is-invalid');
             field.classList.add('is-valid');
@@ -172,6 +334,25 @@ document.addEventListener('DOMContentLoaded', function() {
             field.classList.add('is-invalid');
         }
     }
+
+    // Auto-populate names when full_name contains spaces
+    const fullNameField = document.querySelector('input[name="full_name"]');
+    const firstNameField = document.querySelector('input[name="first_name"]');
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    
+    if (fullNameField && firstNameField && lastNameField) {
+        fullNameField.addEventListener('blur', function() {
+            const fullName = this.value.trim();
+            if (fullName.includes(' ') && !firstNameField.value && !lastNameField.value) {
+                const nameParts = fullName.split(' ');
+                if (nameParts.length >= 2) {
+                    firstNameField.value = nameParts[0];
+                    lastNameField.value = nameParts.slice(1).join(' ');
+                }
+            }
+        });
+    }
 });
 </script>
+{% endblock %}
 {% endblock %}

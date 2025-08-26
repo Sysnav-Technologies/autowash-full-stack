@@ -66,7 +66,7 @@ class LandingView(TemplateView):
         return context
 
 def register_view(request):
-    """Simplified user registration view - only essential fields"""
+    """Enhanced user registration view with flexible validation"""
     if request.user.is_authenticated:
         return redirect('accounts:dashboard_redirect')
     
@@ -77,6 +77,13 @@ def register_view(request):
                 with transaction.atomic():
                     user = form.save(commit=False)
                     user.is_active = False  # User will be activated after email verification
+                    
+                    # Set first_name and last_name if provided
+                    if form.cleaned_data.get('first_name'):
+                        user.first_name = form.cleaned_data['first_name']
+                    if form.cleaned_data.get('last_name'):
+                        user.last_name = form.cleaned_data['last_name']
+                    
                     user.save()
                     
                     # Create user profile with phone
@@ -93,13 +100,24 @@ def register_view(request):
                             request, 
                             'Account created! Please check your email for the verification code.'
                         )
-                        return redirect('accounts:verify_otp')
+                        # Include email parameter in redirect
+                        return redirect(f"{reverse('accounts:verify_otp')}?email={user.email}")
                     else:
                         messages.error(request, 'Account created but failed to send verification email. Please contact support.')
-                        return redirect('accounts:verify_otp')
+                        # Include email parameter even if sending failed
+                        return redirect(f"{reverse('accounts:verify_otp')}?email={user.email}")
                         
             except Exception as e:
                 messages.error(request, f'Registration failed: {str(e)}')
+        else:
+            # More user-friendly error handling
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if field == '__all__':
+                        messages.error(request, error)
+                    else:
+                        field_label = form.fields[field].label or field.replace('_', ' ').title()
+                        messages.error(request, f"{field_label}: {error}")
     else:
         form = UserRegistrationForm()
     
@@ -549,16 +567,19 @@ def login_view(request):
                 next_url = request.GET.get('next', 'accounts:dashboard_redirect')
                 return redirect(next_url)
             else:
-                # User exists but email is not verified - redirect to verification page
-                messages.warning(request, 'Your email address is not verified. We\'ve sent you a verification email.')
+                # User exists but email is not verified - redirect to OTP verification
+                messages.warning(request, 'Your email address is not verified. Please check your email for the verification code.')
                 
-                # Automatically resend verification email
+                # Automatically resend OTP verification email
                 try:
-                    send_verification_email(request, user)
+                    send_otp_email(request, user)
+                    messages.info(request, 'A new verification code has been sent to your email.')
                 except Exception as e:
-                    print(f"Failed to send verification email: {e}")
+                    print(f"Failed to send OTP email: {e}")
+                    messages.error(request, 'Failed to send verification code. Please try again.')
                 
-                return redirect('accounts:email_verification_sent')
+                # Redirect to OTP verification with email parameter
+                return redirect(f"{reverse('accounts:verify_otp')}?email={user.email}")
         else:
             messages.error(request, 'Invalid credentials. Please try again.')
     
@@ -731,16 +752,19 @@ def email_login_view(request):
             user = User.objects.get(email=email)
             
             if not user.is_active:
-                # User exists but email is not verified - redirect to verification page
-                messages.warning(request, 'Your email address is not verified. We\'ve sent you a verification email.')
+                # User exists but email is not verified - redirect to OTP verification
+                messages.warning(request, 'Your email address is not verified. Please check your email for the verification code.')
                 
-                # Automatically resend verification email
+                # Automatically resend OTP verification email
                 try:
-                    send_verification_email(request, user)
+                    send_otp_email(request, user)
+                    messages.info(request, 'A new verification code has been sent to your email.')
                 except Exception as e:
-                    print(f"Failed to send verification email: {e}")
+                    print(f"Failed to send OTP email: {e}")
+                    messages.error(request, 'Failed to send verification code. Please try again.')
                 
-                return redirect('accounts:email_verification_sent')
+                # Redirect to OTP verification with email parameter
+                return redirect(f"{reverse('accounts:verify_otp')}?email={user.email}")
             
             # Check rate limiting - don't allow more than 1 OTP per minute
             recent_otp = EmailOTP.objects.filter(
@@ -1104,15 +1128,20 @@ def email_verification_sent(request):
 
 
 def resend_verification_email(request):
-    """Resend email verification"""
+    """Resend email verification using OTP"""
     if request.method == 'POST':
         if request.user.is_authenticated and not request.user.is_active:
-            send_verification_email(request, request.user)
-            messages.success(request, 'Verification email has been resent. Please check your inbox.')
+            try:
+                send_otp_email(request, request.user)
+                messages.success(request, 'A new verification code has been sent to your email.')
+                return redirect(f"{reverse('accounts:verify_otp')}?email={request.user.email}")
+            except Exception as e:
+                print(f"Failed to send OTP email: {e}")
+                messages.error(request, 'Failed to send verification code. Please try again.')
         else:
             messages.error(request, 'Unable to resend verification email.')
     
-    return redirect('accounts:email_verification_sent')
+    return redirect('accounts:verify_otp')
 
 
 def email_verification_success_view(request):
@@ -1133,7 +1162,14 @@ def dashboard_redirect(request):
     # First check if user email is verified
     if not request.user.is_active:
         messages.warning(request, 'Please verify your email address first.')
-        return redirect('accounts:email_verification_sent')
+        # Send OTP and redirect to verification
+        try:
+            send_otp_email(request, request.user)
+            messages.info(request, 'A verification code has been sent to your email.')
+        except Exception as e:
+            print(f"Failed to send OTP email: {e}")
+        
+        return redirect(f"{reverse('accounts:verify_otp')}?email={request.user.email}")
     
     # Check if user owns a business
     business = request.user.owned_tenants.first()

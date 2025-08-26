@@ -8,53 +8,133 @@ from crispy_forms.bootstrap import FormActions
 from phonenumber_field.formfields import PhoneNumberField
 from .models import UserProfile, Business, BusinessSettings, BusinessVerification
 from apps.core.tenant_models import Tenant
+from apps.core.fields import EnhancedPhoneNumberField, FlexibleUsernameField, FlexibleEmailField
+from apps.core.widgets import PhoneNumberWidget
 from django.utils import timezone
 from django.utils.text import slugify
 import re
 import os
+import random
+import string
 
 class UserRegistrationForm(forms.ModelForm):
-    """Simplified user registration form - no password required initially"""
-    email = forms.EmailField(
+    """Enhanced user registration form with auto-generated username"""
+    
+    # Full name field - user enters their actual name
+    full_name = forms.CharField(
+        max_length=150,
+        required=True,
+        label='Full Name',
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Enter your full name', 
+            'class': 'form-control',
+            'autocomplete': 'name'
+        }),
+        help_text='Enter your full name (e.g., John Smith). We\'ll create a unique username for you automatically.'
+    )
+    
+    def generate_username(self, full_name):
+        """Generate a unique username with 'autowash' + name letters + random characters"""
+        # Clean the full name - remove spaces and special characters, keep only letters
+        clean_name = re.sub(r'[^a-zA-Z]', '', full_name.lower())
+        
+        # Take first 3-4 letters from the name (or all if name is short)
+        name_part = clean_name[:4] if len(clean_name) >= 4 else clean_name
+        
+        # Generate random suffix (4 characters)
+        random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
+        
+        # Create base username: autowash + name_part + random_suffix
+        base_username = f"autowash{name_part}{random_suffix}"
+        
+        # Ensure uniqueness by checking if username exists
+        username = base_username
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            # If exists, add a number
+            username = f"{base_username}{counter}"
+            counter += 1
+            
+        return username
+    
+    # Use flexible email field
+    email = FlexibleEmailField(
         required=True,
         widget=forms.EmailInput(attrs={
             'placeholder': 'your@email.com', 
             'class': 'form-control',
             'autocomplete': 'email'
+        }),
+        help_text='We\'ll send you a verification code at this email address.'
+    )
+    
+    # Use enhanced phone number field with country code selection
+    phone = EnhancedPhoneNumberField(
+        required=True,
+        widget=PhoneNumberWidget(),
+        help_text='Select your country code and enter your phone number.'
+    )
+    
+    # Optional fields for better user experience
+    first_name = forms.CharField(
+        max_length=30, 
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'First name (optional)', 
+            'class': 'form-control',
+            'autocomplete': 'given-name'
+        }),
+        help_text='Optional: If you prefer to keep names separate.'
+    )
+    
+    last_name = forms.CharField(
+        max_length=30, 
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Last name (optional)', 
+            'class': 'form-control',
+            'autocomplete': 'family-name'
         })
     )
-    phone = PhoneNumberField(
+    
+    # Terms and conditions agreement
+    terms = forms.BooleanField(
         required=True,
-        widget=forms.TextInput(attrs={
-            'placeholder': '+254712345678', 
-            'class': 'form-control',
-            'autocomplete': 'tel'
-        })
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'terms'
+        }),
+        error_messages={
+            'required': 'You must agree to the Terms of Service and Privacy Policy to create an account.'
+        }
     )
     
     class Meta:
         model = User
-        fields = ('username', 'email')
-        widgets = {
-            'username': forms.TextInput(attrs={
-                'placeholder': 'Choose username', 
-                'class': 'form-control',
-                'autocomplete': 'username'
-            }),
-        }
+        fields = ('email', 'first_name', 'last_name')  # Remove username from fields
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Remove help texts for smoother UX
-        self.fields['username'].help_text = None
-        
+        # Make form more user-friendly
         self.helper = FormHelper()
         self.helper.form_method = 'post'
         self.helper.layout = Layout(
-            Field('username', css_class='mb-3'),
+            HTML('<div class="mb-3"><small class="text-muted">All fields marked with * are required</small></div>'),
+            Field('full_name', css_class='mb-3'),
             Field('email', css_class='mb-3'),
             Field('phone', css_class='mb-3'),
+            Row(
+                Column(Field('first_name'), css_class='col-md-6'),
+                Column(Field('last_name'), css_class='col-md-6'),
+                css_class='mb-3'
+            ),
+            Div(
+                Field('terms', css_class='form-check-input'),
+                HTML('<label class="form-check-label" for="terms">I agree to the <a href="/terms/" target="_blank">Terms of Service</a> and <a href="/privacy/" target="_blank">Privacy Policy</a></label>'),
+                css_class='form-check mb-3'
+            ),
+            HTML('<div class="mb-3"><small class="text-muted">A unique username will be created for you automatically using "autowash" plus letters from your name.</small></div>'),
             FormActions(
                 Submit('submit', 'Create Account', css_class='btn btn-primary btn-lg w-100')
             )
@@ -63,14 +143,100 @@ class UserRegistrationForm(forms.ModelForm):
     def clean_email(self):
         email = self.cleaned_data['email']
         if User.objects.filter(email=email).exists():
-            raise ValidationError("Email address already exists.")
+            raise ValidationError("An account with this email address already exists.")
         return email
+    
+    def clean_full_name(self):
+        full_name = self.cleaned_data['full_name']
+        
+        # Basic validation
+        if not full_name:
+            raise ValidationError("Full name is required.")
+        
+        # Trim whitespace
+        full_name = full_name.strip()
+        
+        # Ensure it's not just spaces
+        if not full_name:
+            raise ValidationError('Full name cannot be empty or just spaces.')
+        
+        # Check length
+        if len(full_name) < 2:
+            raise ValidationError('Full name must be at least 2 characters long.')
+        
+        if len(full_name) > 150:
+            raise ValidationError('Full name cannot be longer than 150 characters.')
+        
+        # Should contain at least some letters
+        if not re.search(r'[a-zA-Z]', full_name):
+            raise ValidationError('Full name must contain at least some letters.')
+        
+        return full_name
+    
+    def clean_terms(self):
+        terms = self.cleaned_data.get('terms')
+        if not terms:
+            raise ValidationError('You must agree to the Terms of Service and Privacy Policy to create an account.')
+        return terms
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get('phone')
+        if phone:
+            # Check if phone number is already registered
+            from .models import UserProfile
+            if UserProfile.objects.filter(phone=phone).exists():
+                raise ValidationError("An account with this phone number already exists.")
+        return phone
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        full_name = cleaned_data.get('full_name')
+        first_name = cleaned_data.get('first_name')
+        last_name = cleaned_data.get('last_name')
+        
+        # Auto-populate first_name and last_name from full_name if not provided
+        if full_name and full_name.strip():
+            name_parts = full_name.strip().split()
+            
+            # If first_name and last_name are not provided, extract from full_name
+            if not first_name and not last_name and len(name_parts) >= 1:
+                cleaned_data['first_name'] = name_parts[0]
+                if len(name_parts) > 1:
+                    cleaned_data['last_name'] = ' '.join(name_parts[1:])
+                else:
+                    # If only one name provided, use it as first name
+                    cleaned_data['last_name'] = ''
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        # Create user instance but don't save yet
+        user = super().save(commit=False)
+        
+        # Generate username from full_name
+        full_name = self.cleaned_data.get('full_name')
+        if full_name:
+            user.username = self.generate_username(full_name)
+        
+        if commit:
+            user.save()
+            
+            # Create user profile with phone number
+            phone = self.cleaned_data.get('phone')
+            if phone:
+                from .models import UserProfile
+                UserProfile.objects.get_or_create(
+                    user=user,
+                    defaults={'phone': phone}
+                )
+            
+        return user
 
 class UserProfileForm(forms.ModelForm):
     """User profile form - aligned with UserProfile model"""
     first_name = forms.CharField(max_length=30, required=True)
     last_name = forms.CharField(max_length=30, required=True)
-    email = forms.EmailField(required=True)
+    email = FlexibleEmailField(required=True)
     
     class Meta:
         model = UserProfile
@@ -86,6 +252,9 @@ class UserProfileForm(forms.ModelForm):
             'timezone': forms.TextInput(attrs={'class': 'form-control'}),
             'avatar': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
+        field_classes = {
+            'phone': EnhancedPhoneNumberField,
+        }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -94,9 +263,8 @@ class UserProfileForm(forms.ModelForm):
             self.fields['last_name'].initial = self.instance.user.last_name
             self.fields['email'].initial = self.instance.user.email
         
-        # Update widget attributes for phone field
-        if hasattr(self.fields['phone'], 'widget'):
-            self.fields['phone'].widget.attrs.update({'class': 'form-control'})
+        # Use enhanced phone number widget
+        self.fields['phone'].widget = PhoneNumberWidget()
         
         self.helper = FormHelper()
         self.helper.layout = Layout(
