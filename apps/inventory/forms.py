@@ -109,6 +109,66 @@ class InventoryItemForm(forms.ModelForm):
         except ImportError:
             self.fields['primary_supplier'].widget = forms.HiddenInput()
         
+        # Add Bootstrap classes to all form fields
+        bootstrap_classes = {
+            'name': 'form-control',
+            'description': 'form-control',
+            'category': 'form-select',
+            'item_type': 'form-select', 
+            'sku': 'form-control',
+            'barcode': 'form-control',
+            'unit': 'form-select',
+            'weight': 'form-control',
+            'dimensions': 'form-control',
+            'current_stock': 'form-control',
+            'minimum_stock_level': 'form-control',
+            'maximum_stock_level': 'form-control',
+            'reorder_point': 'form-control',
+            'reorder_quantity': 'form-control',
+            'unit_cost': 'form-control',
+            'selling_price': 'form-control',
+            'primary_supplier': 'form-select',
+            'storage_location': 'form-control',
+            'storage_requirements': 'form-control',
+            'shelf_life_days': 'form-control',
+            'image': 'form-control',
+            'is_taxable': 'form-check-input',
+            'track_serial_numbers': 'form-check-input',
+            'track_expiry': 'form-check-input',
+            'quality_check_required': 'form-check-input',
+            'is_active': 'form-check-input',
+        }
+        
+        # Apply CSS classes to all fields
+        for field_name, css_class in bootstrap_classes.items():
+            if field_name in self.fields:
+                existing_class = self.fields[field_name].widget.attrs.get('class', '')
+                if existing_class:
+                    self.fields[field_name].widget.attrs['class'] = f"{existing_class} {css_class}"
+                else:
+                    self.fields[field_name].widget.attrs['class'] = css_class
+                
+                # Special handling for file input (should be hidden in custom upload area)
+                if field_name == 'image':
+                    self.fields[field_name].widget.attrs['style'] = 'display: none;'
+                    self.fields[field_name].widget.attrs['accept'] = 'image/*'
+                
+                # Add placeholder text for better UX
+                if field_name == 'name':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter item name'
+                elif field_name == 'description':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter item description'
+                elif field_name == 'sku':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Leave blank to auto-generate'
+                elif field_name == 'barcode':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter barcode if available'
+                elif field_name == 'storage_location':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'e.g., Warehouse A, Shelf 1'
+                elif field_name == 'dimensions':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'e.g., 10x5x3 cm'
+                elif field_name == 'storage_requirements':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Special storage conditions if any'
+        
         self.helper = FormHelper()
         self.helper.layout = Layout(
             HTML('<h5>Basic Information</h5>'),
