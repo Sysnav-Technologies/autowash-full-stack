@@ -66,7 +66,7 @@ class LandingView(TemplateView):
         return context
 
 def register_view(request):
-    """Simplified user registration view - only essential fields"""
+    """Enhanced user registration view with flexible validation"""
     if request.user.is_authenticated:
         return redirect('accounts:dashboard_redirect')
     
@@ -77,6 +77,13 @@ def register_view(request):
                 with transaction.atomic():
                     user = form.save(commit=False)
                     user.is_active = False  # User will be activated after email verification
+                    
+                    # Set first_name and last_name if provided
+                    if form.cleaned_data.get('first_name'):
+                        user.first_name = form.cleaned_data['first_name']
+                    if form.cleaned_data.get('last_name'):
+                        user.last_name = form.cleaned_data['last_name']
+                    
                     user.save()
                     
                     # Create user profile with phone
@@ -93,13 +100,24 @@ def register_view(request):
                             request, 
                             'Account created! Please check your email for the verification code.'
                         )
-                        return redirect('accounts:verify_otp')
+                        # Include email parameter in redirect
+                        return redirect(f"{reverse('accounts:verify_otp')}?email={user.email}")
                     else:
                         messages.error(request, 'Account created but failed to send verification email. Please contact support.')
-                        return redirect('accounts:verify_otp')
+                        # Include email parameter even if sending failed
+                        return redirect(f"{reverse('accounts:verify_otp')}?email={user.email}")
                         
             except Exception as e:
                 messages.error(request, f'Registration failed: {str(e)}')
+        else:
+            # More user-friendly error handling
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if field == '__all__':
+                        messages.error(request, error)
+                    else:
+                        field_label = form.fields[field].label or field.replace('_', ' ').title()
+                        messages.error(request, f"{field_label}: {error}")
     else:
         form = UserRegistrationForm()
     
