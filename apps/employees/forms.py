@@ -48,6 +48,71 @@ class EmployeeForm(forms.ModelForm):
             is_active=True
         )
         
+        # Apply Bootstrap classes to all form fields
+        bootstrap_classes = {
+            'first_name': 'form-control',
+            'last_name': 'form-control',
+            'email': 'form-control',
+            'username': 'form-control',
+            'password': 'form-control',
+            'photo': 'form-control',
+            'department': 'form-select',
+            'position': 'form-select',
+            'role': 'form-select',
+            'employment_type': 'form-select',
+            'hire_date': 'form-control',
+            'probation_end_date': 'form-control',
+            'salary': 'form-control',
+            'hourly_rate': 'form-control',
+            'commission_rate': 'form-control',
+            'supervisor': 'form-select',
+            'phone': 'form-control',
+            'date_of_birth': 'form-control',
+            'gender': 'form-select',
+            'marital_status': 'form-select',
+            'national_id': 'form-control',
+            'address_line_1': 'form-control',
+            'address_line_2': 'form-control',
+            'city': 'form-control',
+            'state': 'form-control',
+            'postal_code': 'form-control',
+            'emergency_contact_name': 'form-control',
+            'emergency_contact_phone': 'form-control',
+            'emergency_contact_relationship': 'form-control',
+            'is_active': 'form-check-input',
+            'can_login': 'form-check-input',
+            'receive_notifications': 'form-check-input',
+        }
+        
+        # Apply CSS classes to all fields
+        for field_name, css_class in bootstrap_classes.items():
+            if field_name in self.fields:
+                existing_class = self.fields[field_name].widget.attrs.get('class', '')
+                if existing_class:
+                    self.fields[field_name].widget.attrs['class'] = f"{existing_class} {css_class}"
+                else:
+                    self.fields[field_name].widget.attrs['class'] = css_class
+                
+                # Add helpful placeholders
+                if field_name == 'first_name':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter first name'
+                elif field_name == 'last_name':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter last name'
+                elif field_name == 'email':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter email address'
+                elif field_name == 'username':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter username'
+                elif field_name == 'phone':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter phone number'
+                elif field_name == 'national_id':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter national ID number'
+                elif field_name == 'address_line_1':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter street address'
+                elif field_name == 'city':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter city'
+                elif field_name == 'emergency_contact_name':
+                    self.fields[field_name].widget.attrs['placeholder'] = 'Enter emergency contact name'
+        
         # Make username and password required for new employees
         if not self.instance.pk:
             self.fields['username'].required = True
