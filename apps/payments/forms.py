@@ -144,23 +144,34 @@ class MPesaPaymentForm(forms.Form):
         widget=forms.TextInput(attrs={
             'placeholder': '+254712345678',
             'pattern': r'(\+254|0)[17]\d{8}',
-            'title': 'Enter a valid Kenyan mobile number'
+            'title': 'Enter a valid Kenyan mobile number',
+            'class': 'form-control form-control-lg'
         }),
         help_text="Enter the customer's M-Pesa registered phone number"
     )
     
     def __init__(self, *args, **kwargs):
+        # Extract initial phone number if provided
+        initial_phone = kwargs.pop('initial_phone', None)
         super().__init__(*args, **kwargs)
+        
+        # Set initial value if provided
+        if initial_phone:
+            self.fields['phone_number'].initial = initial_phone
         
         self.helper = FormHelper()
         self.helper.layout = Layout(
-            'phone_number',
-            HTML('<div class="alert alert-info mt-3">'),
-            HTML('<i class="fas fa-info-circle"></i> '),
-            HTML('The customer will receive an M-Pesa prompt on their phone to complete the payment.'),
+            Field('phone_number', css_class='mb-3'),
+            HTML('<div class="alert alert-info mt-3 mb-4">'),
+            HTML('<i class="fas fa-info-circle me-2"></i> '),
+            HTML('<strong>What happens next:</strong><br>'),
+            HTML('• The customer will receive an M-Pesa prompt on their phone<br>'),
+            HTML('• They need to enter their M-Pesa PIN to complete payment<br>'),
+            HTML('• Payment confirmation will appear here automatically'),
             HTML('</div>'),
             FormActions(
-                Submit('submit', 'Send M-Pesa Request', css_class='btn btn-success btn-lg')
+                Submit('submit', 'Send M-Pesa Request', css_class='btn btn-success btn-lg w-100 py-3'),
+                HTML('<a href="javascript:history.back()" class="btn btn-outline-secondary mt-2 w-100">Cancel</a>')
             )
         )
     

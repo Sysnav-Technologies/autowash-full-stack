@@ -820,15 +820,18 @@ def process_mpesa_payment_view(request, payment_id):
     else:
         # Pre-fill with customer phone if available
         initial_phone = ''
-        if payment.customer and payment.customer.phone:
+        if payment.customer_phone:
+            initial_phone = payment.customer_phone
+        elif payment.customer and hasattr(payment.customer, 'phone'):
             initial_phone = str(payment.customer.phone)
         
-        form = MPesaPaymentForm(initial={'phone_number': initial_phone})
+        form = MPesaPaymentForm(initial_phone=initial_phone)
     
     context = {
         'payment': payment,
         'form': form,
-        'title': f'M-Pesa Payment - {payment.payment_id}'
+        'title': f'M-Pesa Payment - {payment.payment_id}',
+        'initial_phone': initial_phone  # Pass to template
     }
     
     return render(request, 'payments/process_mpesa.html', context)

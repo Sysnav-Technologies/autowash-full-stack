@@ -25,15 +25,15 @@
     }
     
     .mpesa-logo {
-        width: 80px;
-        height: 80px;
+        width: 60px;
+        height: 60px;
         background: white;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         margin: 0 auto 1rem;
-        font-size: 2rem;
+        font-size: 1.5rem;
         color: #10b981;
     }
     
@@ -56,99 +56,47 @@
     .summary-item:last-child {
         border-bottom: none;
         font-weight: 700;
+        color: #059669;
         font-size: 1.1rem;
-        color: #059669;
-    }
-    
-    .phone-display {
-        background: #065f46;
-        color: white;
-        border-radius: 10px;
-        padding: 1rem;
-        text-align: center;
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin: 1rem 0;
-        font-family: 'Courier New', monospace;
-    }
-    
-    .status-pending {
-        background: #fef3c7;
-        border: 1px solid #fbbf24;
-        color: #92400e;
-    }
-    
-    .status-processing {
-        background: #dbeafe;
-        border: 1px solid #3b82f6;
-        color: #1e40af;
-    }
-    
-    .status-completed {
-        background: #dcfce7;
-        border: 1px solid #10b981;
-        color: #059669;
-    }
-    
-    .status-failed {
-        background: #fee2e2;
-        border: 1px solid #ef4444;
-        color: #dc2626;
-    }
-    
-    .status-indicator {
-        padding: 1rem;
-        border-radius: 10px;
-        text-align: center;
-        margin: 1rem 0;
-        font-weight: 600;
-    }
-    
-    .spinner {
-        width: 40px;
-        height: 40px;
-        border: 4px solid #e5e7eb;
-        border-top: 4px solid #10b981;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto;
-    }
-    
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    
-    .instructions {
-        background: #eff6ff;
-        border: 1px solid #bfdbfe;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1.5rem 0;
     }
     
     .btn-mpesa {
         background: linear-gradient(135deg, #10b981, #059669);
         border: none;
         color: white;
-        border-radius: 10px;
-        padding: 0.75rem 2rem;
         font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
         transition: all 0.3s ease;
     }
     
     .btn-mpesa:hover {
+        background: linear-gradient(135deg, #059669, #047857);
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
         color: white;
     }
     
-    .countdown {
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #dc2626;
-        text-align: center;
+    .form-floating label {
+        color: #6b7280;
+    }
+    
+    .form-control:focus {
+        border-color: #10b981;
+        box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
+    }
+    
+    .attendant-note {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 1rem;
         margin: 1rem 0;
+    }
+    
+    .status-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
     }
 </style>
 {% endblock %}
@@ -162,229 +110,168 @@
                 <div class="mpesa-logo">
                     <i class="fas fa-mobile-alt"></i>
                 </div>
-                <h2 class="mb-2">M-Pesa Payment</h2>
-                <p class="mb-0 opacity-90">{{ request.tenant.name }}</p>
+                <h3 class="mb-2">M-Pesa Payment</h3>
+                <p class="mb-0 opacity-90">Process customer payment</p>
             </div>
             
-            <div class="card-body p-4">
+            <div class="p-4">
                 <!-- Payment Summary -->
                 <div class="payment-summary">
-                    <h5 class="mb-3 text-center">
-                        <i class="fas fa-receipt text-success me-2"></i>Payment Details
-                    </h5>
-                    <div class="summary-item">
-                        <span>Payment ID:</span>
-                        <span>{{ payment.payment_id }}</span>
-                    </div>
+                    <h6 class="fw-bold mb-3 text-success">
+                        <i class="fas fa-receipt me-2"></i>Payment Details
+                    </h6>
                     {% if payment.customer %}
                     <div class="summary-item">
                         <span>Customer:</span>
-                        <span>{{ payment.customer.display_name }}</span>
+                        <strong>{{ payment.customer.display_name }}</strong>
                     </div>
                     {% endif %}
-                    {% if payment.service_order %}
                     <div class="summary-item">
-                        <span>Service Order:</span>
-                        <span>{{ payment.service_order.order_number }}</span>
+                        <span>Payment ID:</span>
+                        <strong>{{ payment.payment_id }}</strong>
+                    </div>
+                    {% if payment.description %}
+                    <div class="summary-item">
+                        <span>Description:</span>
+                        <strong>{{ payment.description }}</strong>
                     </div>
                     {% endif %}
                     <div class="summary-item">
                         <span>Amount:</span>
-                        <span>KES {{ payment.amount|floatformat:2 }}</span>
+                        <strong>KES {{ payment.amount|floatformat:2 }}</strong>
                     </div>
-                    {% if payment.processing_fee > 0 %}
-                    <div class="summary-item">
-                        <span>Processing Fee:</span>
-                        <span>KES {{ payment.processing_fee|floatformat:2 }}</span>
-                    </div>
-                    <div class="summary-item">
-                        <span>Total Amount:</span>
-                        <span>KES {{ payment.amount|add:payment.processing_fee|floatformat:2 }}</span>
-                    </div>
-                    {% endif %}
                 </div>
                 
-                <!-- Phone Number Display -->
-                <div class="phone-display">
-                    <i class="fas fa-mobile-alt me-2"></i>{{ payment.customer_phone }}
-                </div>
-                
-                <!-- Payment Status -->
-                <div class="status-indicator status-{{ payment.status }}">
-                    {% if payment.status == 'pending' %}
-                        <div class="spinner mb-2"></div>
-                        <div>Waiting for Payment Request...</div>
-                        <small>We're sending the payment request to your phone</small>
-                    {% elif payment.status == 'processing' %}
-                        <div class="spinner mb-2"></div>
-                        <div>Processing Payment...</div>
-                        <small>Please complete the payment on your phone</small>
-                    {% elif payment.status == 'completed' %}
-                        <i class="fas fa-check-circle fa-2x mb-2"></i>
-                        <div>Payment Successful!</div>
-                        <small>Transaction ID: {{ payment.transaction_id }}</small>
-                    {% elif payment.status == 'failed' %}
-                        <i class="fas fa-times-circle fa-2x mb-2"></i>
-                        <div>Payment Failed</div>
-                        <small>{{ payment.failure_reason|default:"Payment was not completed" }}</small>
-                    {% endif %}
-                </div>
-                
-                <!-- Instructions -->
-                {% if payment.status == 'pending' or payment.status == 'processing' %}
-                <div class="instructions">
-                    <h6 class="fw-bold mb-3">
-                        <i class="fas fa-info-circle text-primary me-2"></i>How to Complete Payment
-                    </h6>
-                    <ol class="mb-0">
-                        <li class="mb-2">You will receive a payment request on your phone</li>
-                        <li class="mb-2">Enter your M-Pesa PIN to confirm</li>
-                        <li class="mb-2">Wait for confirmation SMS</li>
-                        <li>Payment will be automatically verified</li>
-                    </ol>
-                </div>
-                
-                <!-- Countdown Timer -->
-                <div class="countdown" id="countdown">
-                    Payment expires in: <span id="timeRemaining">05:00</span>
-                </div>
-                {% endif %}
-                
-                <!-- Form for Processing -->
                 {% if payment.status == 'pending' %}
-                <form method="post" id="mpesaForm">
-                    {% csrf_token %}
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <div class="form-floating">
-                                <input type="tel" class="form-control" id="mpesaPhone" name="phone_number" 
-                                       value="{{ payment.customer_phone }}" placeholder="254712345678" required>
-                                <label>M-Pesa Phone Number</label>
-                            </div>
+                    <!-- Form for Processing -->
+                    <form method="post" id="mpesaForm">
+                        {% csrf_token %}
+                        
+                        <div class="attendant-note">
+                            <h6 class="text-primary mb-2">
+                                <i class="fas fa-user-tie me-2"></i>Attendant Instructions
+                            </h6>
+                            <ol class="mb-0 small">
+                                <li>Enter customer's M-Pesa phone number below</li>
+                                <li>Click "Send Request" - payment prompt will be sent to customer's phone</li>
+                                <li>Ask customer to check their phone and enter M-Pesa PIN</li>
+                                <li>Wait for payment confirmation on this screen</li>
+                            </ol>
                         </div>
-                        <div class="col-md-6">
+                        
+                        <div class="mb-4">
                             <div class="form-floating">
-                                <input type="number" class="form-control" id="amount" name="amount" 
-                                       value="{{ payment.amount }}" readonly>
-                                <label>Amount (KES)</label>
+                                <input type="tel" class="form-control form-control-lg" id="mpesaPhone" name="phone_number" 
+                                       value="{{ payment.customer_phone|default:'' }}" 
+                                       placeholder="254712345678" pattern="(254[0-9]\d{8}|0[0-9]\d{8})" required 
+                                       title="Enter customer's M-Pesa phone number">
+                                <label><i class="fas fa-mobile-alt me-2"></i>Customer's M-Pesa Phone Number</label>
                             </div>
+                            <small class="text-muted">Format: 254xxxxxxxxx or 0xxxxxxxxx (10 digits for 0, 12 digits for 254)</small>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-mpesa btn-lg px-5 py-3 w-100">
+                                <i class="fas fa-paper-plane me-2"></i>Send Payment Request
+                            </button>
+                        </div>
+                    </form>
+                    
+                {% elif payment.status == 'processing' %}
+                    <!-- Processing Status -->
+                    <div class="text-center py-4">
+                        <div class="text-primary status-icon">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                        <h4 class="text-primary">Processing Payment</h4>
+                        <p class="text-muted">Payment request sent to {{ payment.customer_phone }}</p>
+                        <div class="attendant-note">
+                            <strong>Next Steps:</strong> Ask customer to check their phone and complete the M-Pesa payment
                         </div>
                     </div>
                     
-                    <div class="text-center">
-                        <button type="submit" class="btn btn-mpesa btn-lg">
-                            <i class="fas fa-paper-plane me-2"></i>Send Payment Request
-                        </button>
+                {% elif payment.status == 'completed' %}
+                    <!-- Payment Completed -->
+                    <div class="text-center py-4">
+                        <div class="text-success status-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <h4 class="text-success">Payment Successful!</h4>
+                        <p class="text-muted">The M-Pesa payment has been completed.</p>
+                        <a href="javascript:history.back()" class="btn btn-success">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Payments
+                        </a>
                     </div>
-                </form>
+                    
+                {% elif payment.status == 'failed' %}
+                    <!-- Payment Failed -->
+                    <div class="text-center py-4">
+                        <div class="text-danger status-icon">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <h4 class="text-danger">Payment Failed</h4>
+                        <p class="text-muted">The M-Pesa payment could not be processed.</p>
+                        {% if payment.failure_reason %}
+                        <div class="alert alert-danger">
+                            {{ payment.failure_reason }}
+                        </div>
+                        {% endif %}
+                        <a href="javascript:history.back()" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Payments
+                        </a>
+                    </div>
                 {% endif %}
-                
-                <!-- Action Buttons -->
-                <div class="text-center mt-4">
-                    {% if payment.status == 'pending' or payment.status == 'processing' %}
-                    <button class="btn btn-outline-primary me-2" onclick="checkPaymentStatus()">
-                        <i class="fas fa-sync me-2"></i>Check Status
-                    </button>
-                    {% endif %}
-                    
-                    {% if payment.status == 'completed' %}
-                    <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/receipt/" 
-                       class="btn btn-success me-2">
-                        <i class="fas fa-receipt me-2"></i>View Receipt
-                    </a>
-                    {% endif %}
-                    
-                    <a href="/business/{{ request.tenant.slug }}/payments/" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>Back to Payments
-                    </a>
-                </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Auto-refresh for pending/processing payments -->
+{% if payment.status == 'processing' %}
 <script>
-let countdownTimer;
-let timeRemaining = 300; // 5 minutes in seconds
-
-function startCountdown() {
-    countdownTimer = setInterval(function() {
-        timeRemaining--;
-        
-        const minutes = Math.floor(timeRemaining / 60);
-        const seconds = timeRemaining % 60;
-        
-        document.getElementById('timeRemaining').textContent = 
-            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        
-        if (timeRemaining <= 0) {
-            clearInterval(countdownTimer);
-            document.getElementById('countdown').innerHTML = 
-                '<span class="text-danger">Payment request expired. Please try again.</span>';
-        }
-    }, 1000);
-}
-
-function checkPaymentStatus() {
-    fetch(`/business/{{ request.tenant.slug }}/payments/ajax/{{ payment.payment_id }}/mpesa-status/`, {
-        method: 'GET',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'X-Requested-With': 'XMLHttpRequest',
-            'Content-Type': 'application/json'
-        },
-        credentials: 'same-origin'
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.status === 'completed') {
-                location.reload();
-            } else if (data.status === 'failed') {
-                clearInterval(countdownTimer);
-                location.reload();
-            }
-        })
-        .catch(error => {
-            console.error('Error checking payment status:', error);
-        });
-}
-
-// Auto-refresh status for pending/processing payments
-{% if payment.status == 'pending' or payment.status == 'processing' %}
 document.addEventListener('DOMContentLoaded', function() {
-    startCountdown();
-    
-    // Check status every 10 seconds
-    setInterval(checkPaymentStatus, 10000);
+    // Auto-refresh every 5 seconds to check payment status
+    setTimeout(function() {
+        location.reload();
+    }, 5000);
 });
+</script>
 {% endif %}
 
-// Form submission
-document.getElementById('mpesaForm')?.addEventListener('submit', function(e) {
-    console.log('Form submission started');
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    const phoneInput = e.target.querySelector('input[name="phone_number"]');
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('mpesaForm');
     
-    // Basic validation
-    if (!phoneInput.value.trim()) {
-        e.preventDefault();
-        alert('Please enter a phone number');
-        return false;
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const phoneInput = this.querySelector('input[name="phone_number"]');
+            const submitBtn = this.querySelector('button[type="submit"]');
+            
+            if (!phoneInput.value.trim()) {
+                e.preventDefault();
+                alert('Please enter customer\'s M-Pesa phone number');
+                phoneInput.focus();
+                return;
+            }
+            
+            // Disable button and show processing state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending Request...';
+        });
+        
+        // Format phone number as user types
+        const phoneInput = form.querySelector('input[name="phone_number"]');
+        phoneInput.addEventListener('input', function() {
+            let value = this.value.replace(/\D/g, ''); // Remove non-digits
+            
+            // Convert 0712345678 to 254712345678
+            if (value.startsWith('0') && value.length === 10) {
+                value = '254' + value.substring(1);
+            }
+            
+            this.value = value;
+        });
     }
-    
-    // Update button state
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending Request...';
-    
-    // Log form data for debugging
-    const formData = new FormData(e.target);
-    console.log('Form data:', Object.fromEntries(formData));
 });
 </script>
 {% endblock %}

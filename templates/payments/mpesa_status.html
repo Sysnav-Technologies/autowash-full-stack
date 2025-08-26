@@ -71,6 +71,28 @@
         to { transform: rotate(360deg); }
     }
     
+    /* Enhanced status alerts */
+    .status-alert-pending {
+        background: linear-gradient(135deg, #fff3cd, #ffeaa7) !important;
+        border-radius: 12px !important;
+        border: none !important;
+    }
+    
+    .status-alert-processing {
+        background: linear-gradient(135deg, #cce7ff, #a8d8ff) !important;
+        border-radius: 12px !important;
+        border: none !important;
+    }
+    
+    .status-alert-failed {
+        border-radius: 12px !important;
+        border: none !important;
+    }
+    
+    .status-spinner {
+        animation: spin 1s linear infinite;
+    }
+    
     .status-title {
         font-size: 2rem;
         font-weight: 700;
@@ -125,6 +147,26 @@
 <div class="container-fluid px-4">
     <div class="status-container">
         <div class="status-card status-{{ payment.status }}">
+            <!-- Attendant Note -->
+            {% if payment.status == 'pending' or payment.status == 'processing' %}
+            <div class="alert alert-info mb-4">
+                <h6 class="fw-bold mb-2">
+                    <i class="fas fa-user-tie me-2"></i>Attendant Instructions
+                </h6>
+                {% if payment.status == 'pending' %}
+                <p class="mb-0 small">
+                    1. Ask the customer to check their phone for the M-Pesa payment request<br>
+                    2. Customer should enter their M-Pesa PIN to complete payment<br>
+                    3. This page will automatically update when payment is confirmed
+                </p>
+                {% else %}
+                <p class="mb-0 small">
+                    Payment is being processed. Please wait for confirmation.
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
+            
             <div class="status-icon">
                 {% if payment.status == 'completed' %}
                     <i class="fas fa-check"></i>
@@ -155,19 +197,44 @@
             
             <p class="status-description">
                 {% if payment.status == 'completed' %}
-                    Your payment has been successfully processed and confirmed.
+                    <span class="text-success fw-bold">✅ Payment Successfully Completed!</span><br>
+                    The customer's payment has been successfully processed and confirmed.
                 {% elif payment.status == 'pending' %}
-                    Your payment request has been sent. Please check your phone and enter your M-Pesa PIN.
+                    <span class="text-warning fw-bold">📱 Waiting for Customer Payment</span><br>
+                    <div class="alert alert-warning status-alert-pending mt-3 mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm text-warning me-3 status-spinner" role="status"></div>
+                            <div>
+                                <strong>Payment request sent to customer's phone</strong><br>
+                                <small class="text-muted">Ask customer to check their phone for M-Pesa prompt and enter PIN</small>
+                            </div>
+                        </div>
+                    </div>
                 {% elif payment.status == 'processing' %}
-                    We're processing your payment. This may take a few moments.
+                    <span class="text-primary fw-bold">⚙️ Processing Customer Payment</span><br>
+                    <div class="alert alert-primary status-alert-processing mt-3 mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm text-primary me-3 status-spinner" role="status"></div>
+                            <div>
+                                <strong>Customer payment is being processed</strong><br>
+                                <small class="text-muted">This may take a few moments. Please keep this page open.</small>
+                            </div>
+                        </div>
+                    </div>
                 {% elif payment.status == 'failed' %}
+                    <span class="text-danger fw-bold">❌ Payment Failed</span><br>
                     {% if payment.failure_reason %}
-                        {{ payment.failure_reason }}
+                        <div class="alert alert-danger status-alert-failed mt-3">
+                            Customer payment failed: {{ payment.failure_reason }}
+                        </div>
                     {% else %}
-                        Your payment could not be completed. Please try again.
+                        <div class="alert alert-danger status-alert-failed mt-3">
+                            Customer payment could not be completed. You may try processing again.
+                        </div>
                     {% endif %}
                 {% else %}
-                    We're checking the status of your payment.
+                    <span class="text-info fw-bold">🔍 Checking Payment Status</span><br>
+                    Checking the status of the customer's payment.
                 {% endif %}
             </p>
             
@@ -175,7 +242,7 @@
             {% if payment.status == 'pending' or payment.status == 'processing' %}
             <div class="auto-refresh">
                 <i class="fas fa-sync fa-spin me-2"></i>
-                This page will automatically refresh when your payment status changes.
+                This page will automatically refresh when the customer's payment status changes.
             </div>
             {% endif %}
             
