@@ -209,7 +209,7 @@ def subscription_active_required(view_func):
             if not request.business.subscription:
                 messages.warning(request, 'This business does not have a subscription. Please contact support.')
                 business_slug = getattr(request, 'business_slug', request.business.slug)
-                return redirect(f'/business/{business_slug}/subscriptions/plans/')
+                return redirect(f'/business/{business_slug}/subscriptions/upgrade/')
             
             subscription = request.business.subscription
             
@@ -228,7 +228,7 @@ def subscription_active_required(view_func):
             if not subscription.is_active:
                 messages.warning(request, 'Your subscription is not active. Please renew to continue using the service.')
                 business_slug = getattr(request, 'business_slug', request.business.slug)
-                return redirect(f'/business/{business_slug}/subscriptions/plans/')
+                return redirect(f'/business/{business_slug}/subscriptions/upgrade/')
         
         except Exception as e:
             # Handle database errors gracefully (e.g., missing subscription table)

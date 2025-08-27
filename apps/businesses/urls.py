@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 from . import views_tenant_settings as settings_views
 from apps.accounts.views import profile_view
@@ -38,13 +38,8 @@ urlpatterns = [
     path('settings/hours/', settings_views.business_hours_view, name='business_hours'),
     path('settings/backup/', settings_views.backup_settings_view, name='backup_settings'),
 
-    # Subscription Management
-    path('subscription/', views.subscription_overview, name='subscription_overview'),
-    path('subscription/overview/', views.subscription_overview, name='subscription_overview'),
-    path('subscription/billing/', views.billing_history, name='billing_history'),
-    path('subscription/payment-methods/', views.payment_methods, name='payment_methods'),
-    path('subscription/usage/', views.usage_analytics, name='usage_analytics'),
-    path('subscription/settings/', views.subscription_settings, name='subscription_settings'),
+    # Subscription Management - Include from subscriptions app
+    path('subscriptions/', include('apps.subscriptions.urls')),
 
     # Settings API endpoints
     path('settings/api/backup/create/', settings_views.create_backup_api, name='create_backup_api'),

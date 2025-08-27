@@ -1,0 +1,356 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Payment Status - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .payment-status-card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border-radius: 1rem;
+        text-align: center;
+        padding: 3rem 2rem;
+    }
+    
+    .status-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        margin: 0 auto 1.5rem;
+    }
+    
+    .status-pending {
+        background: linear-gradient(135deg, #ffc107, #e0a800);
+        color: white;
+        animation: pulse 2s infinite;
+    }
+    
+    .status-completed {
+        background: linear-gradient(135deg, #28a745, #1e7e34);
+        color: white;
+    }
+    
+    .status-failed {
+        background: linear-gradient(135deg, #dc3545, #c82333);
+        color: white;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    .payment-details {
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin: 2rem 0;
+    }
+    
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+    
+    .countdown {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #007bff;
+    }
+    
+    .instructions {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        margin: 1rem 0;
+    }
+    
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="payment-status-card card">
+                <div class="card-body">
+                    {% if payment.status == 'pending' %}
+                    <!-- Pending Payment -->
+                    <div class="status-icon status-pending">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>Payment Processing</h3>
+                    <p class="text-muted mb-3">
+                        We're processing your payment. This usually takes a few seconds.
+                    </p>
+                    
+                    <div class="loading-spinner"></div>
+                    <p class="countdown" id="countdown">Checking payment status...</p>
+                    
+                    <div class="instructions">
+                        <h6><i class="fas fa-mobile-alt me-2"></i>M-Pesa Instructions</h6>
+                        <ol class="text-start">
+                            <li>Check your phone for an M-Pesa payment request</li>
+                            <li>Enter your M-Pesa PIN to confirm the payment</li>
+                            <li>Wait for confirmation SMS from M-Pesa</li>
+                            <li>This page will automatically update once payment is confirmed</li>
+                        </ol>
+                    </div>
+                    
+                    {% elif payment.status == 'completed' %}
+                    <!-- Successful Payment -->
+                    <div class="status-icon status-completed">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h3 class="text-success">Payment Successful!</h3>
+                    <p class="text-muted mb-3">
+                        Your subscription payment has been processed successfully.
+                    </p>
+                    
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Your subscription is now active and all features are available.
+                    </div>
+                    
+                    {% elif payment.status == 'failed' %}
+                    <!-- Failed Payment -->
+                    <div class="status-icon status-failed">
+                        <i class="fas fa-times"></i>
+                    </div>
+                    <h3 class="text-danger">Payment Failed</h3>
+                    <p class="text-muted mb-3">
+                        We couldn't process your payment. Please try again.
+                    </p>
+                    
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        The payment was declined or timed out. Please check your M-Pesa balance and try again.
+                    </div>
+                    
+                    {% endif %}
+                    
+                    <!-- Payment Details -->
+                    <div class="payment-details">
+                        <h6 class="mb-3">Payment Details</h6>
+                        <div class="detail-row">
+                            <span>Amount:</span>
+                            <strong>KES {{ payment.amount|floatformat:2 }}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Payment Method:</span>
+                            <span>
+                                <i class="fas fa-mobile-alt me-1"></i>
+                                M-Pesa
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span>Phone Number:</span>
+                            <span>{{ payment.metadata.phone_number|default:"Not provided" }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span>Transaction ID:</span>
+                            <span class="font-monospace">{{ payment.transaction_id|slice:":20" }}...</span>
+                        </div>
+                        <div class="detail-row">
+                            <span>Date:</span>
+                            <span>{{ payment.created_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span>Status:</span>
+                            <span class="badge bg-{% if payment.status == 'completed' %}success{% elif payment.status == 'failed' %}danger{% else %}warning{% endif %}">
+                                {{ payment.status|title }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-2">
+                        {% if payment.status == 'completed' %}
+                        <a href="/business/{{ business.slug }}/business/subscriptions/overview/" class="btn btn-success">
+                            <i class="fas fa-arrow-right me-2"></i>Go to Subscription Dashboard
+                        </a>
+                        <a href="/business/{{ business.slug }}/" class="btn btn-outline-primary">
+                            <i class="fas fa-home me-2"></i>Go to Dashboard
+                        </a>
+                        
+                        {% elif payment.status == 'failed' %}
+                        <a href="/business/{{ business.slug }}/business/subscriptions/payment/" class="btn btn-primary">
+                            <i class="fas fa-redo me-2"></i>Try Again
+                        </a>
+                        <a href="/business/{{ business.slug }}/business/subscriptions/overview/" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Subscription
+                        </a>
+                        
+                        {% else %}
+                        <button class="btn btn-primary" onclick="checkPaymentStatus()" id="checkStatusBtn">
+                            <i class="fas fa-sync me-2"></i>Check Status Now
+                        </button>
+                        <a href="/business/{{ business.slug }}/business/subscriptions/overview/" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Subscription
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Help Section -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-question-circle me-2"></i>Need Help?</h6>
+                    <p class="text-muted mb-2">If you're experiencing issues with your payment:</p>
+                    <ul class="text-muted">
+                        <li>Ensure you have sufficient M-Pesa balance</li>
+                        <li>Check that you entered the correct phone number</li>
+                        <li>Make sure your phone is on and has network coverage</li>
+                        <li>Contact our support team if the problem persists</li>
+                    </ul>
+                    
+                    <div class="mt-3">
+                        <a href="mailto:support@autowash.com" class="btn btn-outline-primary btn-sm me-2">
+                            <i class="fas fa-envelope me-1"></i>Email Support
+                        </a>
+                        <a href="tel:+254700000000" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-phone me-1"></i>Call Support
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let checkInterval;
+let countdownInterval;
+let timeElapsed = 0;
+
+document.addEventListener('DOMContentLoaded', function() {
+    {% if payment.status == 'pending' %}
+    startPaymentStatusCheck();
+    startCountdown();
+    {% endif %}
+});
+
+function startPaymentStatusCheck() {
+    // Check immediately
+    checkPaymentStatus();
+    
+    // Then check every 5 seconds
+    checkInterval = setInterval(checkPaymentStatus, 5000);
+    
+    // Stop checking after 5 minutes
+    setTimeout(() => {
+        if (checkInterval) {
+            clearInterval(checkInterval);
+            document.getElementById('countdown').textContent = 'Payment check timed out. Please refresh the page or contact support.';
+        }
+    }, 300000); // 5 minutes
+}
+
+function startCountdown() {
+    countdownInterval = setInterval(() => {
+        timeElapsed++;
+        const minutes = Math.floor(timeElapsed / 60);
+        const seconds = timeElapsed % 60;
+        
+        if (timeElapsed < 60) {
+            document.getElementById('countdown').textContent = `Checking payment status... (${timeElapsed}s)`;
+        } else {
+            document.getElementById('countdown').textContent = `Checking payment status... (${minutes}m ${seconds}s)`;
+        }
+        
+        if (timeElapsed >= 300) { // 5 minutes
+            clearInterval(countdownInterval);
+            document.getElementById('countdown').textContent = 'Payment check timed out.';
+        }
+    }, 1000);
+}
+
+function checkPaymentStatus() {
+    const btn = document.getElementById('checkStatusBtn');
+    if (btn) {
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Checking...';
+        btn.disabled = true;
+    }
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'completed' || data.status === 'failed') {
+            // Payment status changed, reload the page
+            location.reload();
+        }
+        
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-sync me-2"></i>Check Status Now';
+            btn.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error checking payment status:', error);
+        
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-sync me-2"></i>Check Status Now';
+            btn.disabled = false;
+        }
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Clean up intervals when leaving the page
+window.addEventListener('beforeunload', function() {
+    if (checkInterval) clearInterval(checkInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,455 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Usage Tracking - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .usage-card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .usage-progress {
+        height: 10px;
+        border-radius: 5px;
+    }
+    
+    .metric-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        margin-right: 1rem;
+    }
+    
+    .icon-customers {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+    }
+    
+    .icon-employees {
+        background: linear-gradient(135deg, #28a745, #1e7e34);
+        color: white;
+    }
+    
+    .icon-storage {
+        background: linear-gradient(135deg, #ffc107, #e0a800);
+        color: white;
+    }
+    
+    .icon-api {
+        background: linear-gradient(135deg, #6f42c1, #5a2d91);
+        color: white;
+    }
+    
+    .usage-chart {
+        height: 300px;
+    }
+    
+    .period-selector {
+        border: none;
+        background: #f8f9fa;
+        border-radius: 20px;
+        padding: 0.5rem 1rem;
+        margin: 0.25rem;
+        transition: all 0.2s;
+    }
+    
+    .period-selector.active {
+        background: #007bff;
+        color: white;
+    }
+    
+    .alert-usage {
+        border-left: 4px solid #ffc107;
+        background: #fff3cd;
+    }
+    
+    .alert-critical {
+        border-left: 4px solid #dc3545;
+        background: #f8d7da;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Usage Tracking</h2>
+                <a href="/business/{{ business.slug }}/business/subscriptions/overview/" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Overview
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Current Period Summary -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card usage-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Current Billing Period Usage</h6>
+                    <span class="text-muted">
+                        {{ current_period.start_date|date:"M d" }} - {{ current_period.end_date|date:"M d, Y" }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Customers -->
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="metric-icon icon-customers">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0">{{ usage.customers.current }}/{{ subscription.plan.max_customers }}</h5>
+                                    <small class="text-muted">Customers</small>
+                                    <div class="usage-progress progress mt-2">
+                                        <div class="progress-bar bg-primary" style="width: {{ usage.customers.percentage }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Employees -->
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="metric-icon icon-employees">
+                                    <i class="fas fa-user-tie"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0">{{ usage.employees.current }}/{{ subscription.plan.max_employees }}</h5>
+                                    <small class="text-muted">Employees</small>
+                                    <div class="usage-progress progress mt-2">
+                                        <div class="progress-bar bg-success" style="width: {{ usage.employees.percentage }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Storage -->
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="metric-icon icon-storage">
+                                    <i class="fas fa-database"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0">{{ usage.storage.current_gb }}/{{ subscription.plan.storage_gb }}GB</h5>
+                                    <small class="text-muted">Storage</small>
+                                    <div class="usage-progress progress mt-2">
+                                        <div class="progress-bar bg-warning" style="width: {{ usage.storage.percentage }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- API Calls -->
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="metric-icon icon-api">
+                                    <i class="fas fa-exchange-alt"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0">{{ usage.api_calls.current|floatformat:0 }}/{{ subscription.plan.api_calls_per_month|floatformat:0 }}</h5>
+                                    <small class="text-muted">API Calls</small>
+                                    <div class="usage-progress progress mt-2">
+                                        <div class="progress-bar bg-info" style="width: {{ usage.api_calls.percentage }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Usage Alerts -->
+    {% if usage_alerts %}
+    <div class="row mb-4">
+        <div class="col-12">
+            {% for alert in usage_alerts %}
+            <div class="alert {% if alert.level == 'critical' %}alert-critical{% else %}alert-usage{% endif %} d-flex align-items-center">
+                <i class="fas {% if alert.level == 'critical' %}fa-exclamation-triangle{% else %}fa-exclamation-circle{% endif %} me-3"></i>
+                <div>
+                    <strong>{{ alert.title }}</strong>
+                    <p class="mb-0">{{ alert.message }}</p>
+                </div>
+                {% if alert.action_url %}
+                <a href="{{ alert.action_url }}" class="btn btn-sm btn-outline-{% if alert.level == 'critical' %}danger{% else %}warning{% endif %} ms-auto">
+                    {{ alert.action_text }}
+                </a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Usage Charts -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card usage-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Usage Trends</h6>
+                    <div>
+                        <button class="period-selector active" onclick="changePeriod('30d')">30 Days</button>
+                        <button class="period-selector" onclick="changePeriod('90d')">90 Days</button>
+                        <button class="period-selector" onclick="changePeriod('1y')">1 Year</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="usageChart" class="usage-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- Plan Details -->
+            <div class="card usage-card">
+                <div class="card-header">
+                    <h6 class="mb-0">Current Plan Limits</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Customers</span>
+                            <span>{{ subscription.plan.max_customers }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Employees</span>
+                            <span>{{ subscription.plan.max_employees }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Storage</span>
+                            <span>{{ subscription.plan.storage_gb }}GB</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>API Calls/Month</span>
+                            <span>{{ subscription.plan.api_calls_per_month|floatformat:0 }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <a href="/business/{{ business.slug }}/business/subscriptions/upgrade/" class="btn btn-primary">
+                            <i class="fas fa-arrow-up me-2"></i>Upgrade Plan
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Usage History -->
+            <div class="card usage-card">
+                <div class="card-header">
+                    <h6 class="mb-0">Recent Activity</h6>
+                </div>
+                <div class="card-body">
+                    {% if recent_activities %}
+                    <div class="timeline">
+                        {% for activity in recent_activities %}
+                        <div class="timeline-item mb-3">
+                            <div class="d-flex">
+                                <div class="timeline-marker bg-primary"></div>
+                                <div class="timeline-content">
+                                    <h6 class="mb-1">{{ activity.title }}</h6>
+                                    <p class="text-muted mb-1">{{ activity.description }}</p>
+                                    <small class="text-muted">{{ activity.created_at|timesince }} ago</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No recent activity</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detailed Breakdown -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card usage-card">
+                <div class="card-header">
+                    <h6 class="mb-0">Detailed Usage Breakdown</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Current Usage</th>
+                                    <th>Plan Limit</th>
+                                    <th>Percentage</th>
+                                    <th>Last Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-users text-primary me-2"></i>
+                                        Active Customers
+                                    </td>
+                                    <td>{{ usage.customers.current }}</td>
+                                    <td>{{ subscription.plan.max_customers }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar bg-primary" style="width: {{ usage.customers.percentage }}%"></div>
+                                        </div>
+                                        <small>{{ usage.customers.percentage }}%</small>
+                                    </td>
+                                    <td>{{ usage.customers.last_updated|timesince }} ago</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-user-tie text-success me-2"></i>
+                                        Active Employees
+                                    </td>
+                                    <td>{{ usage.employees.current }}</td>
+                                    <td>{{ subscription.plan.max_employees }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar bg-success" style="width: {{ usage.employees.percentage }}%"></div>
+                                        </div>
+                                        <small>{{ usage.employees.percentage }}%</small>
+                                    </td>
+                                    <td>{{ usage.employees.last_updated|timesince }} ago</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-database text-warning me-2"></i>
+                                        Storage Used
+                                    </td>
+                                    <td>{{ usage.storage.current_gb }}GB</td>
+                                    <td>{{ subscription.plan.storage_gb }}GB</td>
+                                    <td>
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar bg-warning" style="width: {{ usage.storage.percentage }}%"></div>
+                                        </div>
+                                        <small>{{ usage.storage.percentage }}%</small>
+                                    </td>
+                                    <td>{{ usage.storage.last_updated|timesince }} ago</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-exchange-alt text-info me-2"></i>
+                                        API Calls (This Month)
+                                    </td>
+                                    <td>{{ usage.api_calls.current|floatformat:0 }}</td>
+                                    <td>{{ subscription.plan.api_calls_per_month|floatformat:0 }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar bg-info" style="width: {{ usage.api_calls.percentage }}%"></div>
+                                        </div>
+                                        <small>{{ usage.api_calls.percentage }}%</small>
+                                    </td>
+                                    <td>{{ usage.api_calls.last_updated|timesince }} ago</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let usageChart;
+let currentPeriod = '30d';
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeChart();
+});
+
+function initializeChart() {
+    const ctx = document.getElementById('usageChart').getContext('2d');
+    
+    usageChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Customers',
+                data: [],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Employees',
+                data: [],
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Storage (GB)',
+                data: [],
+                borderColor: '#ffc107',
+                backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            }
+        }
+    });
+    
+    loadChartData(currentPeriod);
+}
+
+function changePeriod(period) {
+    currentPeriod = period;
+    
+    // Update active button
+    document.querySelectorAll('.period-selector').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    loadChartData(period);
+}
+
+function loadChartData(period) {
+    fetch(`/business/{{ business.slug }}/business/subscriptions/api/usage-data/?period=${period}`)
+        .then(response => response.json())
+        .then(data => {
+            usageChart.data.labels = data.labels;
+            usageChart.data.datasets[0].data = data.customers;
+            usageChart.data.datasets[1].data = data.employees;
+            usageChart.data.datasets[2].data = data.storage;
+            usageChart.update();
+        })
+        .catch(error => {
+            console.error('Error loading chart data:', error);
+        });
+}
+</script>
+{% endblock %}

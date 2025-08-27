@@ -1,0 +1,268 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Complete Payment - {{ plan.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/subscriptions.css' %}">
+<style>
+.payment-container {
+    max-width: 600px;
+    margin: 2rem auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+}
+
+.payment-header {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 2rem;
+    text-align: center;
+}
+
+.payment-body {
+    padding: 2rem;
+}
+
+.plan-summary {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.payment-methods {
+    margin-bottom: 2rem;
+}
+
+.payment-method {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.payment-method:hover {
+    border-color: #007bff;
+}
+
+.payment-method.selected {
+    border-color: #007bff;
+    background: #f0f8ff;
+}
+
+.payment-method input[type="radio"] {
+    margin-right: 0.5rem;
+}
+
+.phone-input {
+    display: none;
+    margin-top: 1rem;
+}
+
+.phone-input .form-floating {
+    margin-bottom: 0.5rem;
+}
+
+.phone-input .form-control:focus {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+}
+
+.submit-button {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 8px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentMethods = document.querySelectorAll('input[name="payment_method"]');
+    const phoneInputSection = document.getElementById('phone-input-section');
+    const form = document.querySelector('form');
+    
+    paymentMethods.forEach(method => {
+        method.addEventListener('change', function() {
+            // Remove selected class from all methods
+            document.querySelectorAll('.payment-method').forEach(pm => {
+                pm.classList.remove('selected');
+            });
+            
+            // Add selected class to current method
+            this.closest('.payment-method').classList.add('selected');
+            
+            // Show/hide phone input for M-Pesa
+            if (this.value === 'mpesa') {
+                phoneInputSection.style.display = 'block';
+                // Make phone input required for M-Pesa
+                const phoneInput = document.getElementById('phone_number');
+                phoneInput.setAttribute('required', 'required');
+            } else {
+                phoneInputSection.style.display = 'none';
+                // Remove required attribute for other payment methods
+                const phoneInput = document.getElementById('phone_number');
+                phoneInput.removeAttribute('required');
+            }
+        });
+    });
+    
+    // Form submission validation
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const selectedMethod = document.querySelector('input[name="payment_method"]:checked');
+            const phoneInput = document.getElementById('phone_number');
+            const submitBtn = this.querySelector('button[type="submit"]');
+            
+            if (!selectedMethod) {
+                e.preventDefault();
+                alert('Please select a payment method');
+                return;
+            }
+            
+            if (selectedMethod.value === 'mpesa' && !phoneInput.value.trim()) {
+                e.preventDefault();
+                alert('Please enter your M-Pesa phone number');
+                phoneInput.focus();
+                return;
+            }
+            
+            // Disable button and show processing state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing Payment...';
+        });
+        
+        // Format phone number as user types
+        const phoneInput = document.getElementById('phone_number');
+        if (phoneInput) {
+            phoneInput.addEventListener('input', function() {
+                let value = this.value.replace(/\D/g, ''); // Remove non-digits
+                
+                // Convert 0712345678 to 254712345678
+                if (value.startsWith('0') && value.length === 10) {
+                    value = '254' + value.substring(1);
+                }
+                
+                this.value = value;
+            });
+        }
+    }
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="payment-container">
+    <!-- Payment Header -->
+    <div class="payment-header">
+        <h2>Complete Your Payment</h2>
+        <p class="mb-0">Secure payment for {{ plan.name }}</p>
+    </div>
+    
+    <!-- Payment Body -->
+    <div class="payment-body">
+        <!-- Plan Summary -->
+        <div class="plan-summary">
+            <h5 class="mb-3">Order Summary</h5>
+            <div class="d-flex justify-content-between mb-2">
+                <span>Plan:</span>
+                <strong>{{ plan.name }}</strong>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span>Duration:</span>
+                <span>
+                    {% if plan.duration_months == 1 %}
+                        1 Month
+                    {% elif plan.duration_months == 3 %}
+                        3 Months
+                    {% elif plan.duration_months == 6 %}
+                        6 Months
+                    {% elif plan.duration_months == 12 %}
+                        1 Year
+                    {% elif plan.duration_months == 0 %}
+                        Negotiable
+                    {% else %}
+                        {{ plan.duration_months }} Months
+                    {% endif %}
+                </span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span>Business:</span>
+                <span>{{ business.name }}</span>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between">
+                <strong>Total Amount:</strong>
+                <strong class="text-success">KES {{ amount|floatformat:2 }}</strong>
+            </div>
+        </div>
+        
+        <!-- Payment Form -->
+        <form method="post">
+            {% csrf_token %}
+            
+            <!-- Payment Methods -->
+            <div class="payment-methods">
+                <h5 class="mb-3">Select Payment Method</h5>
+                
+                <!-- M-Pesa -->
+                <div class="payment-method">
+                    <label class="d-flex align-items-center">
+                        <input type="radio" name="payment_method" value="mpesa" required>
+                        <div class="flex-grow-1">
+                            <strong>M-Pesa</strong>
+                            <div class="text-muted small">Pay using your M-Pesa mobile money</div>
+                        </div>
+                        <img src="{% static 'img/mpesa-logo.png' %}" alt="M-Pesa" style="height: 30px;" onerror="this.style.display='none'">
+                    </label>
+                </div>
+                
+                <!-- Bank Transfer -->
+                <div class="payment-method">
+                    <label class="d-flex align-items-center">
+                        <input type="radio" name="payment_method" value="bank_transfer" required>
+                        <div class="flex-grow-1">
+                            <strong>Bank Transfer</strong>
+                            <div class="text-muted small">Direct bank transfer with instructions via email</div>
+                        </div>
+                        <i class="fas fa-university text-primary" style="font-size: 1.5rem;"></i>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Phone Number Input for M-Pesa -->
+            <div id="phone-input-section" class="phone-input">
+                <div class="form-floating">
+                    <input type="tel" class="form-control form-control-lg" id="phone_number" name="phone_number" 
+                           placeholder="254712345678" pattern="(254[0-9]\d{8}|0[0-9]\d{8})" required 
+                           title="Enter your M-Pesa phone number">
+                    <label><i class="fas fa-mobile-alt me-2"></i>M-Pesa Phone Number</label>
+                </div>
+                <small class="text-muted">Format: 254xxxxxxxxx or 0xxxxxxxxx (10 digits for 0, 12 digits for 254)</small>
+            </div>
+            
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-success submit-button">
+                <i class="fas fa-lock me-2"></i>
+                Complete Payment - KES {{ amount|floatformat:2 }}
+            </button>
+        </form>
+        
+        <!-- Security Note -->
+        <div class="text-center mt-3">
+            <small class="text-muted">
+                <i class="fas fa-shield-alt me-1"></i>
+                Your payment is secured with 256-bit SSL encryption
+            </small>
+        </div>
+    </div>
+</div>
+{% endblock %}

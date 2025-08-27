@@ -14,14 +14,43 @@ import json
 import uuid
 import csv
 import io
+import logging
 from datetime import datetime, timedelta
 from .models import (
     SubscriptionPlan, Subscription, Payment, SubscriptionUsage,
     SubscriptionDiscount, SubscriptionInvoice
 )
 from .forms import SubscriptionForm, PaymentForm
-from .utils import create_mpesa_payment, verify_discount_code
+from .utils import create_mpesa_payment, verify_discount_code, process_mpesa_callback
 from apps.accounts.models import Business
+
+logger = logging.getLogger(__name__)
+
+def get_business_subscription(business):
+    """
+    Helper function to safely get subscription from default database
+    to avoid tenant database lookup issues
+    """
+    try:
+        from apps.subscriptions.models import Subscription
+        return Subscription.objects.using('default').filter(business_id=business.id).first()
+    except Exception:
+        return None
+
+def get_business_subscription_with_plan(business):
+    """
+    Helper function to safely get subscription with plan from default database
+    """
+    try:
+        from apps.subscriptions.models import Subscription, SubscriptionPlan
+        subscription = Subscription.objects.using('default').filter(business_id=business.id).first()
+        if subscription and subscription.plan_id:
+            plan = SubscriptionPlan.objects.using('default').filter(id=subscription.plan_id).first()
+            # Attach the plan to avoid further database lookups
+            subscription._plan_cache = plan
+        return subscription
+    except Exception:
+        return None
 
 def get_subscription_urls(request):
     """Generate all subscription URLs for templates with tenant slug."""
@@ -72,7 +101,7 @@ def get_subscription_urls(request):
 
 def pricing_view(request):
     """Display subscription plans"""
-    plans = SubscriptionPlan.objects.filter(is_active=True).order_by('sort_order', 'price')
+    plans = SubscriptionPlan.objects.using('default').filter(is_active=True).order_by('sort_order', 'price')
     
     # Calculate savings for annual billing
     for plan in plans:
@@ -91,7 +120,7 @@ def pricing_view(request):
     # Check if user has active subscription
     if request.user.is_authenticated:
         try:
-            business = Business.objects.get(owner=request.user)
+            business = Business.objects.using('default').get(owner=request.user)
             if business.subscription and business.subscription.is_active:
                 context['user_has_subscription'] = True
                 context['current_subscription'] = business.subscription
@@ -105,7 +134,7 @@ def subscription_selection_view(request):
     """Subscription selection for new businesses after registration"""
     # Check if user has a business
     try:
-        business = Business.objects.get(owner=request.user)
+        business = Business.objects.using('default').get(owner=request.user)
     except Business.DoesNotExist:
         messages.error(request, "You need to register a business first.")
         return redirect('accounts:business_register')
@@ -122,7 +151,7 @@ def subscription_selection_view(request):
             return redirect('/auth/verification-pending/')
     
     # Get available plans
-    plans = SubscriptionPlan.objects.filter(is_active=True).order_by('sort_order', 'price')
+    plans = SubscriptionPlan.objects.using('default').filter(is_active=True).order_by('sort_order', 'price')
     
     # Calculate savings for annual billing
     for plan in plans:
@@ -155,7 +184,7 @@ def subscribe_view(request, plan_slug):
     
     # Check if user has a business
     try:
-        business = Business.objects.get(owner=request.user)
+        business = Business.objects.using('default').get(owner=request.user)
     except Business.DoesNotExist:
         messages.error(request, "You need to register a business first.")
         return redirect('accounts:business_register')
@@ -255,7 +284,7 @@ def payment_view(request, payment_id):
     
     # Ensure the payment belongs to user's business
     try:
-        business = Business.objects.get(owner=request.user, subscription=payment.subscription)
+        business = Business.objects.using('default').get(owner=request.user, subscription=payment.subscription)
     except Business.DoesNotExist:
         messages.error(request, "Payment not found.")
         return redirect('subscriptions:pricing')
@@ -267,7 +296,7 @@ def payment_view(request, payment_id):
             phone_number = form.cleaned_data.get('phone_number')
             
             payment.payment_method = payment_method
-            payment.save()
+            payment.save(using='default')
             
             if payment_method == 'mpesa':
                 # Initiate M-Pesa payment
@@ -275,7 +304,7 @@ def payment_view(request, payment_id):
                 if result['success']:
                     payment.status = 'processing'
                     payment.transaction_id = result['checkout_request_id']
-                    payment.save()
+                    payment.save(using='default')
                     
                     messages.success(request, "Payment request sent to your phone. Please complete the payment.")
                     return redirect('subscriptions:payment_status', payment_id=payment.payment_id)
@@ -306,7 +335,7 @@ def payment_status_view(request, payment_id):
     
     # Ensure the payment belongs to user's business
     try:
-        business = Business.objects.get(owner=request.user, subscription=payment.subscription)
+        business = Business.objects.using('default').get(owner=request.user, subscription=payment.subscription)
     except Business.DoesNotExist:
         messages.error(request, "Payment not found.")
         return redirect('subscriptions:pricing')
@@ -322,8 +351,8 @@ def payment_status_view(request, payment_id):
 def manage_subscription_view(request):
     """Manage current subscription"""
     try:
-        business = Business.objects.get(owner=request.user)
-        subscription = business.subscription
+        business = Business.objects.using('default').get(owner=request.user)
+        subscription = get_business_subscription(business)
     except (Business.DoesNotExist, AttributeError):
         messages.error(request, "No active subscription found.")
         return redirect('subscriptions:pricing')
@@ -349,7 +378,7 @@ def manage_subscription_view(request):
         'recent_payments': recent_payments,
         'invoices': invoices,
         'can_upgrade': True,  # Logic for upgrade availability
-        'available_plans': SubscriptionPlan.objects.filter(is_active=True).exclude(id=subscription.plan.id)
+        'available_plans': SubscriptionPlan.objects.using('default').filter(is_active=True).exclude(id=subscription.plan.id)
     }
     
     return render(request, 'subscriptions/manage.html', context)
@@ -359,8 +388,8 @@ def manage_subscription_view(request):
 def cancel_subscription_view(request):
     """Cancel subscription"""
     try:
-        business = Business.objects.get(owner=request.user)
-        subscription = business.subscription
+        business = Business.objects.using('default').get(owner=request.user)
+        subscription = get_business_subscription(business)
     except (Business.DoesNotExist, AttributeError):
         return JsonResponse({'success': False, 'message': 'No subscription found'})
     
@@ -376,62 +405,120 @@ def cancel_subscription_view(request):
     return JsonResponse({'success': True, 'message': 'Subscription cancelled successfully'})
 
 @login_required
-def upgrade_subscription_view(request, plan_slug):
-    """Upgrade to a different plan"""
-    new_plan = get_object_or_404(SubscriptionPlan, slug=plan_slug, is_active=True)
-    
+def upgrade_view(request):
+    """
+    General upgrade view for expired or trial subscriptions
+    """
     try:
-        business = Business.objects.get(owner=request.user)
-        current_subscription = business.subscription
+        # Access Business from public schema
+        business = Business.objects.using('default').get(owner=request.user)
+        # Access subscription from default database explicitly
+        subscription = get_business_subscription(business)
     except (Business.DoesNotExist, AttributeError):
-        messages.error(request, "No current subscription found.")
+        messages.error(request, "No subscription found.")
         return redirect('subscriptions:pricing')
     
-    if not current_subscription or not current_subscription.is_active:
-        messages.error(request, "No active subscription to upgrade.")
+    if not subscription:
+        messages.error(request, "No subscription found.")
         return redirect('subscriptions:pricing')
     
-    # Calculate prorated amount
-    days_remaining = current_subscription.days_remaining
-    current_daily_rate = current_subscription.amount / 30  # Approximate
-    new_monthly_rate = new_plan.price
-    new_daily_rate = new_monthly_rate / 30
+    # Get available plans from public schema
+    available_plans = SubscriptionPlan.objects.using('default').filter(is_active=True)
     
-    prorated_credit = current_daily_rate * days_remaining
-    upgrade_cost = (new_daily_rate * days_remaining) - prorated_credit
+    # Get the current plan explicitly from default database
+    current_plan = None
+    if subscription and subscription.plan_id:
+        current_plan = SubscriptionPlan.objects.using('default').filter(id=subscription.plan_id).first()
     
-    if request.method == 'POST':
-        if upgrade_cost > 0:
-            # Create payment for upgrade
-            payment = Payment.objects.create(
-                subscription=current_subscription,
-                amount=upgrade_cost,
-                payment_method='mpesa',
-                status='pending'
-            )
-            return redirect('subscriptions:payment', payment_id=payment.payment_id)
-        else:
-            # Immediate upgrade (downgrade or equal cost)
-            current_subscription.plan = new_plan
-            current_subscription.save()
-            
-            # Update business limits
-            business.max_employees = new_plan.max_employees
-            business.max_customers = new_plan.max_customers
-            business.save()
-            
-            messages.success(request, f"Successfully upgraded to {new_plan.name}!")
-            return redirect('subscriptions:manage_subscription')
+    # If user has an active subscription, show upgrade options
+    if subscription.is_active:
+        messages.info(request, "You already have an active subscription.")
+        return redirect('subscriptions:manage_subscription')
+    
+    # Calculate trial days remaining if applicable
+    trial_days_left = 0
+    if subscription.status == 'trial' and subscription.trial_end_date:
+        trial_days_left = max(0, (subscription.trial_end_date - timezone.now()).days)
     
     context = {
-        'current_subscription': current_subscription,
-        'new_plan': new_plan,
-        'upgrade_cost': max(0, upgrade_cost),
-        'prorated_credit': prorated_credit,
-        'is_upgrade': new_plan.price > current_subscription.plan.price
+        'business': business,
+        'subscription': subscription,
+        'available_plans': available_plans,
+        'current_plan': current_plan,
+        'trial_days_left': trial_days_left,
+        'subscription_expired': subscription.status == 'expired',
+        'title': 'Upgrade Your Subscription' if subscription.status == 'expired' else 'Choose Your Plan'
     }
     
     return render(request, 'subscriptions/upgrade.html', context)
+
+@login_required
+def upgrade_subscription_view(request, plan_slug):
+    """Upgrade/renew subscription to a specific plan - goes directly to payment"""
+    new_plan = get_object_or_404(SubscriptionPlan.objects.using('default'), slug=plan_slug, is_active=True)
+    
+    try:
+        business = Business.objects.using('default').get(owner=request.user)
+        current_subscription = get_business_subscription(business)
+    except (Business.DoesNotExist, AttributeError):
+        messages.error(request, "No subscription found.")
+        return redirect('subscriptions:pricing')
+    
+    # Allow upgrade for expired, cancelled, or trial subscriptions
+    if not current_subscription:
+        messages.error(request, "No subscription found.")
+        return redirect('subscriptions:pricing')
+    
+    # Calculate pricing
+    amount = new_plan.price
+    discount_amount = Decimal('0.00')
+    final_amount = amount - discount_amount
+    
+    if request.method == 'POST':
+        payment_method = request.POST.get('payment_method')
+        phone_number = request.POST.get('phone_number')
+        
+        if not payment_method:
+            messages.error(request, "Please select a payment method.")
+            return render(request, 'subscriptions/upgrade_payment.html', {
+                'plan': new_plan, 'business': business, 'subscription': current_subscription,
+                'amount': final_amount
+            })
+        
+        # Create payment record using subscription_id to avoid relationship issues
+        payment = Payment.objects.using('default').create(
+            subscription_id=current_subscription.id,
+            amount=final_amount,
+            payment_method=payment_method,
+            status='pending'
+        )
+        
+        if payment_method == 'mpesa':
+            # Initiate M-Pesa payment
+            result = create_mpesa_payment(payment, phone_number)
+            if result['success']:
+                payment.status = 'processing'
+                payment.transaction_id = result['checkout_request_id']
+                payment.save(using='default')
+                
+                messages.success(request, "Payment request sent to your phone. Please complete the payment.")
+                return redirect('subscriptions:payment_status', payment_id=payment.payment_id)
+            else:
+                messages.error(request, f"Payment failed: {result['message']}")
+        
+        elif payment_method == 'bank_transfer':
+            messages.info(request, "Bank transfer instructions will be sent to your email.")
+            return redirect('subscriptions:payment_status', payment_id=payment.payment_id)
+    
+    context = {
+        'plan': new_plan,
+        'business': business,
+        'subscription': current_subscription,
+        'amount': final_amount,
+        'is_upgrade': True
+    }
+    
+    return render(request, 'subscriptions/upgrade_payment.html', context)
 
 @csrf_exempt
 def mpesa_callback_view(request):
@@ -489,7 +576,7 @@ def check_discount_code_view(request):
             return JsonResponse({'valid': False, 'message': 'Missing parameters'})
         
         try:
-            plan = SubscriptionPlan.objects.get(id=plan_id)
+            plan = SubscriptionPlan.objects.using('default').get(id=plan_id)
             discount = verify_discount_code(code, plan, plan.price)
             
             if discount:
@@ -515,7 +602,7 @@ def download_invoice_view(request, invoice_id):
     
     # Ensure invoice belongs to user's business
     try:
-        business = Business.objects.get(owner=request.user, subscription=invoice.subscription)
+        business = Business.objects.using('default').get(owner=request.user, subscription=invoice.subscription)
     except Business.DoesNotExist:
         messages.error(request, "Invoice not found.")
         return redirect('subscriptions:manage_subscription')
@@ -555,7 +642,7 @@ def send_payment_instructions_email(email, payment):
 
 def send_payment_success_email(payment):
     """Send payment success notification"""
-    business = Business.objects.get(subscription=payment.subscription)
+    business = Business.objects.using('default').get(subscription=payment.subscription)
     
     subject = "Payment Successful - Subscription Activated"
     context = {
@@ -662,7 +749,11 @@ def billing_history(request):
         
     except Exception as e:
         messages.error(request, f'Error loading billing history: {str(e)}')
-        return redirect('subscriptions:subscription_overview')
+        # Redirect to businesses app subscription overview
+        business_slug = request.tenant.slug if hasattr(request, 'tenant') else None
+        if business_slug:
+            return redirect(f'/business/{business_slug}/subscriptions/overview/')
+        return redirect('subscriptions:manage_subscription')
 
 
 @login_required
@@ -687,7 +778,11 @@ def payment_methods(request):
         
     except Exception as e:
         messages.error(request, f'Error loading payment methods: {str(e)}')
-        return redirect('subscriptions:subscription_overview')
+        # Redirect to businesses app subscription overview
+        business_slug = request.tenant.slug if hasattr(request, 'tenant') else None
+        if business_slug:
+            return redirect(f'/business/{business_slug}/subscriptions/overview/')
+        return redirect('subscriptions:manage_subscription')
 
 
 @login_required
@@ -749,7 +844,11 @@ def usage_analytics(request):
         
     except Exception as e:
         messages.error(request, f'Error loading usage analytics: {str(e)}')
-        return redirect('subscriptions:subscription_overview')
+        # Redirect to businesses app subscription overview
+        business_slug = request.tenant.slug if hasattr(request, 'tenant') else None
+        if business_slug:
+            return redirect(f'/business/{business_slug}/subscriptions/overview/')
+        return redirect('subscriptions:manage_subscription')
 
 
 @login_required
@@ -782,7 +881,11 @@ def subscription_settings(request):
             else:
                 messages.warning(request, 'No active subscription found.')
             
-            return redirect('subscriptions:subscription_settings')
+            # Redirect to businesses app subscription overview
+            business_slug = request.tenant.slug if hasattr(request, 'tenant') else None
+            if business_slug:
+                return redirect(f'/business/{business_slug}/subscriptions/overview/')
+            return redirect('subscriptions:manage_subscription')
         
         context = {
             'subscription': subscription,
@@ -792,7 +895,11 @@ def subscription_settings(request):
         
     except Exception as e:
         messages.error(request, f'Error loading subscription settings: {str(e)}')
-        return redirect('subscriptions:subscription_overview')
+        # Redirect to businesses app subscription overview
+        business_slug = request.tenant.slug if hasattr(request, 'tenant') else None
+        if business_slug:
+            return redirect(f'/business/{business_slug}/subscriptions/overview/')
+        return redirect('subscriptions:manage_subscription')
 
 
 # AJAX endpoints for subscription functionality
@@ -1228,3 +1335,374 @@ def generate_usage_report(request):
         
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+@csrf_exempt
+@require_POST
+def mpesa_callback_view(request):
+    """
+    Handle M-Pesa Daraja API callbacks
+    """
+    try:
+        # Parse JSON data from M-Pesa
+        callback_data = json.loads(request.body.decode('utf-8'))
+        
+        # Extract payment ID from query parameters
+        payment_id = request.GET.get('payment_id')
+        
+        if not payment_id:
+            logger.error("M-Pesa callback received without payment_id")
+            return JsonResponse({'status': 'error', 'message': 'Payment ID required'})
+        
+        # Process the callback
+        from .utils import process_mpesa_callback
+        result = process_mpesa_callback(callback_data)
+        
+        if result['success']:
+            # Find and update the payment
+            try:
+                payment = Payment.objects.get(payment_id=payment_id)
+                
+                # Update payment with M-Pesa details
+                payment.status = 'completed'
+                payment.transaction_id = result['payment_details'].get('mpesa_receipt', result['checkout_request_id'])
+                payment.paid_at = timezone.now()
+                payment.save()
+                
+                # Update subscription status
+                subscription = payment.subscription
+                subscription.status = 'active'
+                subscription.save()
+                
+                # Update business subscription status
+                business = subscription.business
+                business.subscription = subscription
+                business.save()
+                
+                # Send confirmation email
+                try:
+                    send_payment_confirmation_email(business.owner.email, payment)
+                except Exception as e:
+                    logger.error(f"Failed to send payment confirmation email: {e}")
+                
+                logger.info(f"Payment {payment_id} completed successfully")
+                
+            except Payment.DoesNotExist:
+                logger.error(f"Payment {payment_id} not found for M-Pesa callback")
+                
+        else:
+            # Payment failed
+            try:
+                payment = Payment.objects.get(payment_id=payment_id)
+                payment.status = 'failed'
+                payment.save()
+                
+                logger.warning(f"Payment {payment_id} failed: {result['message']}")
+                
+            except Payment.DoesNotExist:
+                logger.error(f"Payment {payment_id} not found for failed M-Pesa callback")
+        
+        # Always return success to M-Pesa to acknowledge receipt
+        return JsonResponse({'status': 'success'})
+        
+    except Exception as e:
+        logger.error(f"Error processing M-Pesa callback: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+def send_payment_confirmation_email(email, payment):
+    """Send payment confirmation email"""
+    subject = f"Payment Confirmation - {payment.subscription.plan.name}"
+    
+    context = {
+        'payment': payment,
+        'subscription': payment.subscription,
+        'business': payment.subscription.business,
+    }
+    
+    html_message = render_to_string('emails/payment_confirmation.html', context)
+    plain_message = render_to_string('emails/payment_confirmation.txt', context)
+    
+    send_mail(
+        subject,
+        plain_message,
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        html_message=html_message,
+        fail_silently=False,
+    )
+
+def send_payment_instructions_email(email, payment):
+    """Send bank transfer payment instructions"""
+    subject = f"Payment Instructions - {payment.subscription.plan.name}"
+    
+    context = {
+        'payment': payment,
+        'subscription': payment.subscription,
+        'business': payment.subscription.business,
+    }
+    
+    html_message = render_to_string('emails/payment_instructions.html', context)
+    plain_message = render_to_string('emails/payment_instructions.txt', context)
+    
+    send_mail(
+        subject,
+        plain_message,
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        html_message=html_message,
+        fail_silently=False,
+    )
+
+@login_required
+def subscription_payment_view(request):
+    """Handle subscription payment with M-Pesa integration"""
+    try:
+        business = Business.objects.using('default').get(owner=request.user)
+        subscription = business.subscription
+    except (Business.DoesNotExist, AttributeError):
+        messages.error(request, "No subscription found.")
+        return redirect('subscriptions:select')
+    
+    if not subscription:
+        messages.error(request, "No subscription found.")
+        return redirect('subscriptions:select')
+    
+    # Check if subscription needs payment
+    if subscription.status == 'active':
+        messages.info(request, "Your subscription is already active.")
+        if business.is_verified and business.is_approved:
+            return redirect(f'/business/{business.slug}/dashboard/')
+        else:
+            return redirect('/auth/verification-pending/')
+    
+    # Get or create pending payment
+    payment = Payment.objects.filter(
+        subscription=subscription,
+        status='pending'
+    ).first()
+    
+    if not payment:
+        payment = Payment.objects.create(
+            subscription=subscription,
+            amount=subscription.plan.price,
+            payment_method='mpesa',
+            status='pending'
+        )
+    
+    if request.method == 'POST':
+        payment_method = request.POST.get('payment_method', 'mpesa')
+        phone_number = request.POST.get('phone_number', '').strip()
+        
+        if payment_method == 'mpesa':
+            if not phone_number:
+                messages.error(request, "Phone number is required for M-Pesa payment.")
+                return render(request, 'subscriptions/payment.html', {
+                    'subscription': subscription,
+                    'payment': payment,
+                    'business': business
+                })
+            
+            # Validate phone number format
+            if not phone_number.replace('+', '').replace('-', '').replace(' ', '').isdigit():
+                messages.error(request, "Please enter a valid phone number.")
+                return render(request, 'subscriptions/payment.html', {
+                    'subscription': subscription,
+                    'payment': payment,
+                    'business': business
+                })
+            
+            # Initiate M-Pesa payment
+            result = create_mpesa_payment(payment, phone_number)
+            
+            if result['success']:
+                payment.status = 'processing'
+                payment.transaction_id = result['checkout_request_id']
+                payment.save()
+                
+                messages.success(request, "Payment request sent to your phone. Please complete the payment on your M-Pesa menu.")
+                return redirect('subscriptions:payment_status', payment_id=payment.payment_id)
+            else:
+                messages.error(request, f"Payment failed: {result['message']}")
+        
+        elif payment_method == 'bank_transfer':
+            # Send bank transfer instructions
+            try:
+                send_payment_instructions_email(business.owner.email, payment)
+                messages.success(request, "Bank transfer instructions have been sent to your email.")
+                return redirect('subscriptions:payment_status', payment_id=payment.payment_id)
+            except Exception as e:
+                messages.error(request, "Failed to send payment instructions. Please try again.")
+    
+    context = {
+        'subscription': subscription,
+        'payment': payment,
+        'business': business,
+        'title': 'Complete Your Payment'
+    }
+    
+    return render(request, 'subscriptions/payment.html', context)
+
+@login_required
+def payment_status_view(request, payment_id):
+    """Display payment status and handle completion"""
+    payment = get_object_or_404(Payment.objects.using('default'), payment_id=payment_id)
+    
+    # Get subscription and business from default database
+    subscription = Subscription.objects.using('default').filter(id=payment.subscription_id).first()
+    if not subscription:
+        messages.error(request, "Subscription not found.")
+        return redirect('subscriptions:select')
+    
+    business = Business.objects.using('default').filter(id=subscription.business_id).first()
+    if not business:
+        messages.error(request, "Business not found.")
+        return redirect('subscriptions:select')
+    
+    # Ensure the payment belongs to the current user's business
+    if business.owner != request.user:
+        messages.error(request, "Payment not found.")
+        return redirect('subscriptions:select')
+    
+    # Check if payment is completed and redirect if needed
+    if payment.status == 'completed':
+        if not request.GET.get('show_status'):  # Allow viewing status with query param
+            messages.success(request, "Payment completed successfully! Your subscription is now active.")
+            if business.is_verified and business.is_approved:
+                return redirect(f'/business/{business.slug}/dashboard/')
+            else:
+                return redirect('/auth/verification-pending/')
+    
+    context = {
+        'payment': payment,
+        'subscription': subscription,
+        'business': business,
+        'title': 'Payment Status'
+    }
+    
+    return render(request, 'subscriptions/payment_status.html', context)
+
+@csrf_exempt
+@require_POST
+def mpesa_callback_view(request):
+    """Handle M-Pesa callback for subscription payments"""
+    try:
+        # Get payment_id from query parameters
+        payment_id = request.GET.get('payment_id')
+        if not payment_id:
+            logger.error("No payment_id in M-Pesa callback")
+            return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Payment ID missing'})
+        
+        # Get the payment
+        try:
+            payment = Payment.objects.get(payment_id=payment_id)
+        except Payment.DoesNotExist:
+            logger.error(f"Payment not found: {payment_id}")
+            return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Payment not found'})
+        
+        # Parse callback data
+        callback_data = json.loads(request.body)
+        result = process_mpesa_callback(callback_data)
+        
+        if result['success']:
+            # Payment successful
+            payment.mark_as_completed(
+                transaction_id=result['payment_details'].get('mpesa_receipt', ''),
+                notes=f"M-Pesa payment completed. Amount: {result['payment_details'].get('amount', '')}"
+            )
+            
+            # Activate subscription
+            subscription = payment.subscription
+            subscription.status = 'active'
+            subscription.start_date = timezone.now()
+            subscription.save()
+            
+            # Send confirmation email
+            try:
+                send_payment_confirmation_email(subscription.business.owner.email, payment)
+            except Exception as e:
+                logger.error(f"Failed to send payment confirmation email: {str(e)}")
+            
+            logger.info(f"Subscription payment completed: {payment.payment_id}")
+        else:
+            # Payment failed
+            payment.mark_as_failed(result.get('message', 'Payment failed'))
+            
+            # Send failure email
+            try:
+                send_payment_failed_email(subscription.business.owner.email, payment)
+            except Exception as e:
+                logger.error(f"Failed to send payment failure email: {str(e)}")
+            
+            logger.warning(f"Subscription payment failed: {payment.payment_id} - {result.get('message', '')}")
+        
+        return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Success'})
+        
+    except Exception as e:
+        logger.error(f"Error processing M-Pesa callback: {str(e)}")
+        return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Internal server error'})
+
+def send_payment_confirmation_email(email, payment):
+    """Send payment confirmation email"""
+    subscription = payment.subscription
+    business = subscription.business
+    
+    context = {
+        'business': business,
+        'subscription': subscription,
+        'payment': payment,
+        'domain': settings.SITE_DOMAIN,
+    }
+    
+    subject = f"Payment Confirmation - {business.name}"
+    html_message = render_to_string('emails/payment_confirmation.html', context)
+    plain_message = render_to_string('emails/payment_confirmation.txt', context)
+    
+    send_mail(
+        subject,
+        plain_message,
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        html_message=html_message,
+        fail_silently=False,
+    )
+
+def send_payment_failed_email(email, payment):
+    """Send payment failure email"""
+    subscription = payment.subscription
+    business = subscription.business
+    
+    context = {
+        'business': business,
+        'subscription': subscription,
+        'payment': payment,
+        'domain': settings.SITE_DOMAIN,
+    }
+    
+    subject = f"Payment Failed - {business.name}"
+    html_message = render_to_string('emails/payment_failed.html', context)
+    plain_message = render_to_string('emails/payment_failed.txt', context)
+    
+    send_mail(
+        subject,
+        plain_message,
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        html_message=html_message,
+        fail_silently=False,
+    )
+
+def payment_status_api_view(request, payment_id):
+    """API endpoint to check payment status"""
+    try:
+        payment = get_object_or_404(Payment, payment_id=payment_id)
+        
+        # Ensure the payment belongs to the current user's business
+        if payment.subscription.business.owner != request.user:
+            return JsonResponse({'error': 'Payment not found'}, status=404)
+        
+        return JsonResponse({
+            'status': payment.status,
+            'transaction_id': payment.transaction_id,
+            'paid_at': payment.paid_at.isoformat() if payment.paid_at else None,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

@@ -212,20 +212,48 @@ class MySQLTenantMiddleware(MiddlewareMixin):
 
 class TenantBusinessContextMiddleware(MiddlewareMixin):
     """
-    Middleware to add business context to requests
-    Replaces the previous BusinessContextMiddleware
+    Middleware to add business context to requests and enforce subscription access
     """
     
     def process_request(self, request):
-        """Add business context to request"""
+        """Add business context to request and check subscription status"""
         tenant = getattr(request, 'tenant', None)
         
         if tenant:
-            # Add business context
-            request.business = tenant  # For backward compatibility
+            # Add business context - avoid setting tenant object directly to prevent DB routing issues
             request.business_id = tenant.id
             request.business_slug = tenant.slug
             request.business_name = tenant.name
+            
+            # Create a simple object with basic properties for template access
+            class BusinessContext:
+                def __init__(self, tenant):
+                    self.id = tenant.id
+                    self.slug = tenant.slug
+                    self.name = tenant.name
+                    
+            request.business = BusinessContext(tenant)
+            
+            # Check subscription status before allowing access to business features
+            if self._should_check_subscription(request.path_info):
+                subscription_redirect = self._check_subscription_access(tenant, request)
+                if subscription_redirect:
+                    return HttpResponseRedirect(subscription_redirect)
+            else:
+                # For subscription-related pages, still set subscription context but don't block access
+                from apps.subscriptions.models import Subscription
+                from django.utils import timezone
+                
+                # Get tenant ID safely to avoid database routing issues
+                tenant_id = getattr(tenant, 'id', None) if tenant else None
+                if tenant_id:
+                    # Get subscription from default database - use tenant ID not object
+                    subscription = Subscription.objects.using('default').filter(business_id=tenant_id).first()
+                    
+                    # Store subscription data for template access without triggering database queries
+                    request.subscription_cache = subscription
+                    request.subscription_is_active = subscription.is_active if subscription else False
+                    request.subscription_is_expired = not subscription.is_active if subscription else True
             
             # Load tenant settings
             try:
@@ -248,7 +276,79 @@ class TenantBusinessContextMiddleware(MiddlewareMixin):
             request.business_id = None
             request.business_slug = None
             request.business_name = None
-            request.tenant_settings = None
+    
+    def _should_check_subscription(self, path):
+        """Check if this path requires subscription validation"""
+        # Only check subscription for business-specific paths
+        if not path.startswith('/business/'):
+            return False
+            
+        # Only allow subscription-related and auth URLs when subscription is expired
+        allowed_business_paths = [
+            '/subscriptions/',
+            '/auth/logout/',
+        ]
+        
+        # Extract the path after the business slug (e.g., /business/executive-wash/dashboard/ -> /dashboard/)
+        path_parts = path.split('/')
+        if len(path_parts) >= 4:  # ['', 'business', 'slug', 'remaining...']
+            business_relative_path = '/' + '/'.join(path_parts[3:])
+            
+            for allowed_path in allowed_business_paths:
+                if business_relative_path.startswith(allowed_path):
+                    return False
+        
+        # Always allow static/media files
+        if path.startswith('/static/') or path.startswith('/media/'):
+            return False
+        
+        # Block everything else when in business context
+        return True
+    
+    def _check_subscription_access(self, tenant, request):
+        """Check if tenant has valid subscription for accessing business features"""
+        try:
+            from apps.subscriptions.models import Subscription
+            from django.utils import timezone
+            
+            # Get tenant ID safely to avoid database routing issues
+            tenant_id = getattr(tenant, 'id', None) if tenant else None
+            if not tenant_id:
+                return f'/business/{getattr(tenant, "slug", "unknown")}/subscriptions/upgrade/'
+            
+            # Get subscription from default database - use tenant ID not object
+            subscription = Subscription.objects.using('default').filter(business_id=tenant_id).first()
+            
+            # Store subscription data for template access without triggering database queries
+            request.subscription_cache = subscription
+            request.subscription_is_active = subscription.is_active if subscription else False
+            request.subscription_is_expired = not subscription.is_active if subscription else True
+            
+            if not subscription:
+                # No subscription found
+                return f'/business/{tenant.slug}/subscriptions/upgrade/'
+            
+            # Check if subscription is active
+            if not subscription.is_active:
+                if subscription.status == 'expired':
+                    return f'/business/{tenant.slug}/subscriptions/upgrade/'
+                elif subscription.status == 'trial':
+                    # Check if trial has expired
+                    if subscription.trial_end_date and timezone.now() > subscription.trial_end_date:
+                        # Update status and redirect using default database
+                        subscription.status = 'expired'
+                        subscription.save(using='default')
+                        return f'/business/{tenant.slug}/subscriptions/upgrade/'
+                elif subscription.status in ['cancelled', 'suspended']:
+                    return f'/business/{tenant.slug}/subscriptions/upgrade/'
+            
+            # Subscription is valid, allow access
+            return None
+            
+        except Exception as e:
+            print(f"ERROR Error in subscription middleware: {e}")
+            # In case of error, redirect to upgrade to be safe
+            return f'/business/{tenant.slug}/subscriptions/upgrade/'
 
 
 class TenantURLMiddleware(MiddlewareMixin):

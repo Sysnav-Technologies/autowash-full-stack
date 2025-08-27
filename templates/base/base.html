@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ title|default:"Autowash" }}{% endblock %}</title>
     {% load static %}
+    {% load subscription_tags %}
     
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
@@ -26,6 +27,38 @@
     <link href="{% static 'css/sidebar.css' %}" rel="stylesheet">
     <link href="{% static 'css/auth.css' %}" rel="stylesheet">
     <link href="{% static 'css/components.css' %}" rel="stylesheet">
+    
+    <style>
+    /* Subscription expired layout adjustments */
+    .app-main-content.subscription-expired {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    
+    .subscription-expired-banner {
+        background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+        color: white;
+        padding: 1rem;
+        text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .subscription-expired-banner .btn {
+        margin-left: 1rem;
+        background: white;
+        color: #ff6b6b;
+        border: none;
+        font-weight: 600;
+    }
+    
+    .subscription-expired-banner .btn:hover {
+        background: #f8f9fa;
+        transform: translateY(-1px);
+    }
+    </style>
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -72,13 +105,33 @@
             <!-- Sidebar Overlay for Mobile -->
             <div class="sidebar-overlay" id="sidebarOverlay"></div>
             
-            <!-- Sidebar -->
-            {% include 'includes/sidebar/main.html' %}
+            <!-- Sidebar - Hidden when subscription is expired -->
+            {% subscription_is_active as subscription_active %}
+            {% if not request.business or subscription_active %}
+                {% include 'includes/sidebar/main.html' %}
+            {% endif %}
             
             <!-- Main Content -->
-            <div class="app-main-content" id="appMainContent">
-                <!-- Topbar -->
-                {% include 'includes/topbar/main.html' %}
+            {% subscription_is_expired as subscription_expired %}
+            <div class="app-main-content {% if subscription_expired %}subscription-expired{% endif %}" id="appMainContent">
+                <!-- Subscription Expired Banner -->
+                {% if subscription_expired %}
+                    <div class="subscription-expired-banner">
+                        <div class="container-fluid">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Your subscription has expired!</strong> 
+                            Upgrade now to continue using all features.
+                            <a href="/business/{{ request.business_slug }}/subscriptions/upgrade/" class="btn btn-sm">
+                                <i class="fas fa-bolt me-1"></i>Upgrade Now
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- Topbar - Hidden when subscription is expired -->
+                {% if not request.business or subscription_active %}
+                    {% include 'includes/topbar/main.html' %}
+                {% endif %}
                 
                 <!-- Page Content -->
                 <div class="app-content-area">

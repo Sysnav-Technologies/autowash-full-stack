@@ -146,18 +146,30 @@ class BusinessStatusMiddleware:
         if not business.is_approved:
             return '/auth/verification-pending/'
         
-        # Subscription not active (trial expired)
+        # Subscription not active (trial expired or expired)
         if not business.subscription.is_active:
-            # Check if trial period has started
-            from datetime import timedelta
-            from django.utils import timezone
+            # Check subscription status
+            subscription = business.subscription
             
-            if business.approved_at:
-                trial_end = business.approved_at + timedelta(days=7)
-                if timezone.now() > trial_end:
-                    return '/subscriptions/upgrade/'
-            
-            return '/auth/verification-pending/'
+            if subscription.status == 'expired':
+                # Subscription has expired, redirect to upgrade/reactivate
+                return f'/business/{business.slug}/subscriptions/upgrade/'
+            elif subscription.status == 'trial':
+                # Check if trial has expired
+                if subscription.trial_end_date and timezone.now() > subscription.trial_end_date:
+                    # Trial has expired, update status and redirect to payment
+                    subscription.status = 'expired'
+                    subscription.save()
+                    return f'/business/{business.slug}/subscriptions/upgrade/'
+                else:
+                    # Trial is still active, wait for verification
+                    return '/auth/verification-pending/'
+            elif subscription.status in ['cancelled', 'suspended']:
+                # Subscription cancelled or suspended, redirect to reactivate
+                return f'/business/{business.slug}/subscriptions/upgrade/'
+            else:
+                # Other cases, wait for verification
+                return '/auth/verification-pending/'
         
         # Not verified (database setup incomplete)
         if not business.is_verified:
