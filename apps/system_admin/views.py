@@ -100,15 +100,15 @@ def system_dashboard(request):
         'pending_approval': Tenant.objects.filter(is_approved=False, is_active=True).count(),
         'active_businesses': Tenant.objects.filter(is_approved=True, is_active=True).count(),
         'suspended_businesses': Tenant.objects.filter(is_active=False).count(),
-        'total_subscriptions': Subscription.objects.filter(status='active').count(),
-        'trial_subscriptions': Subscription.objects.filter(status='trial').count(),
-        'expired_subscriptions': Subscription.objects.filter(status='expired').count(),
-        'cancelled_subscriptions': Subscription.objects.filter(status='cancelled').count(),
+        'total_subscriptions': Subscription.objects.using('default').filter(status='active').count(),
+        'trial_subscriptions': Subscription.objects.using('default').filter(status='trial').count(),
+        'expired_subscriptions': Subscription.objects.using('default').filter(status='expired').count(),
+        'cancelled_subscriptions': Subscription.objects.using('default').filter(status='cancelled').count(),
     }
     
     # Revenue statistics
     current_month = timezone.now().replace(day=1)
-    stats['monthly_revenue'] = Payment.objects.filter(
+    stats['monthly_revenue'] = Payment.objects.using('default').filter(
         status='completed',
         paid_at__gte=current_month
     ).aggregate(total=Sum('amount'))['total'] or 0
@@ -120,7 +120,7 @@ def system_dashboard(request):
     ).select_related('owner').order_by('-created_at')[:10]
     
     # Subscription distribution by plan
-    subscription_stats = SubscriptionPlan.objects.annotate(
+    subscription_stats = SubscriptionPlan.objects.using('default').annotate(
         active_count=Count('subscription', filter=Q(subscription__status='active')),
         trial_count=Count('subscription', filter=Q(subscription__status='trial')),
         total_revenue=Sum('subscription__amount', filter=Q(subscription__status='active'))
@@ -149,7 +149,7 @@ def approve_business(request, business_id):
         plan_id = request.POST.get('subscription_plan')
         if plan_id:
             try:
-                plan = SubscriptionPlan.objects.get(id=plan_id)
+                plan = SubscriptionPlan.objects.using('default').get(id=plan_id)
                 
                 # Start the approval process
                 with transaction.atomic():
@@ -164,7 +164,7 @@ def approve_business(request, business_id):
                     # 2. Create subscription if it doesn't exist
                     subscription = None
                     if not hasattr(business, 'subscription') or not business.subscription:
-                        subscription = Subscription.objects.create(
+                        subscription = Subscription.objects.using('default').create(
                             business=business,
                             plan=plan,
                             status='trial',  # Start with trial
@@ -248,7 +248,7 @@ def approve_business(request, business_id):
     TenantDatabaseRouter.clear_tenant()
     
     # Get available subscription plans
-    plans = SubscriptionPlan.objects.filter(is_active=True).order_by('price')
+    plans = SubscriptionPlan.objects.using('default').filter(is_active=True).order_by('price')
     
     context = {
         'business': business,
@@ -351,7 +351,7 @@ def subscription_management(request):
     search = request.GET.get('search', '')
     
     # Build queryset
-    subscriptions = Subscription.objects.select_related('business', 'plan')
+    subscriptions = Subscription.objects.using('default').select_related('business', 'plan')
     
     if status_filter != 'all':
         subscriptions = subscriptions.filter(status=status_filter)
@@ -372,18 +372,18 @@ def subscription_management(request):
     
     # Get subscription statistics
     subscription_stats = {
-        'total': Subscription.objects.count(),
-        'active': Subscription.objects.filter(status='active').count(),
-        'trial': Subscription.objects.filter(status='trial').count(),
-        'expired': Subscription.objects.filter(status='expired').count(),
-        'cancelled': Subscription.objects.filter(status='cancelled').count(),
+        'total': Subscription.objects.using('default').count(),
+        'active': Subscription.objects.using('default').filter(status='active').count(),
+        'trial': Subscription.objects.using('default').filter(status='trial').count(),
+        'expired': Subscription.objects.using('default').filter(status='expired').count(),
+        'cancelled': Subscription.objects.using('default').filter(status='cancelled').count(),
     }
     
     # Revenue statistics
     revenue_stats = {
-        'total_revenue': Payment.objects.filter(status='completed').aggregate(
+        'total_revenue': Payment.objects.using('default').filter(status='completed').aggregate(
             total=Sum('amount'))['total'] or 0,
-        'monthly_revenue': Payment.objects.filter(
+        'monthly_revenue': Payment.objects.using('default').filter(
             status='completed',
             paid_at__month=timezone.now().month,
             paid_at__year=timezone.now().year
@@ -391,7 +391,7 @@ def subscription_management(request):
     }
     
     # Available plans and status choices
-    plans = SubscriptionPlan.objects.filter(is_active=True).order_by('name')
+    plans = SubscriptionPlan.objects.using('default').filter(is_active=True).order_by('name')
     status_choices = Subscription.STATUS_CHOICES
     
     context = {
@@ -412,7 +412,7 @@ def subscription_management(request):
 def subscription_plans(request):
     """Manage subscription plans"""
     
-    plans = SubscriptionPlan.objects.annotate(
+    plans = SubscriptionPlan.objects.using('default').annotate(
         active_subscriptions=Count('subscription', filter=Q(subscription__status='active')),
         total_revenue=Sum('subscription__amount', filter=Q(subscription__status='active'))
     ).order_by('duration_months', 'price')
@@ -438,7 +438,7 @@ def create_subscription_plan(request):
         
         if name and slug and plan_type and price and duration_months:
             try:
-                plan = SubscriptionPlan.objects.create(
+                plan = SubscriptionPlan.objects.using('default').create(
                     name=name,
                     slug=slug,
                     plan_type=plan_type,
@@ -498,8 +498,8 @@ def payment_management(request):
     method_filter = request.GET.get('method', '')
     search = request.GET.get('search', '')
     
-    # Build queryset
-    payments = Payment.objects.select_related('subscription', 'subscription__business')
+    # Build queryset - use default database for subscription data
+    payments = Payment.objects.using('default').select_related('subscription').prefetch_related('subscription__business')
     
     if status_filter != 'all':
         payments = payments.filter(status=status_filter)
@@ -508,10 +508,19 @@ def payment_management(request):
         payments = payments.filter(payment_method=method_filter)
     
     if search:
+        # Get subscriptions and businesses separately to avoid cross-database joins
+        subscription_ids = []
+        if search:
+            # Search in businesses by name
+            businesses = Tenant.objects.using('default').filter(name__icontains=search)
+            business_subscriptions = Subscription.objects.using('default').filter(business__in=businesses)
+            subscription_ids.extend(business_subscriptions.values_list('id', flat=True))
+        
+        # Filter payments
         payments = payments.filter(
             Q(payment_id__icontains=search) |
             Q(transaction_id__icontains=search) |
-            Q(subscription__business__name__icontains=search)
+            Q(subscription_id__in=subscription_ids)
         )
     
     # Pagination
@@ -519,19 +528,25 @@ def payment_management(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Payment statistics
+    # Payment statistics - use default database
     payment_stats = {
-        'total_payments': Payment.objects.count(),
-        'completed': Payment.objects.filter(status='completed').count(),
-        'pending': Payment.objects.filter(status='pending').count(),
-        'failed': Payment.objects.filter(status='failed').count(),
-        'total_amount': Payment.objects.filter(status='completed').aggregate(
+        'total_payments': Payment.objects.using('default').count(),
+        'completed': Payment.objects.using('default').filter(status='completed').count(),
+        'pending': Payment.objects.using('default').filter(status='pending').count(),
+        'failed': Payment.objects.using('default').filter(status='failed').count(),
+        'total_amount': Payment.objects.using('default').filter(status='completed').aggregate(
             total=Sum('amount'))['total'] or 0,
     }
+    
+    # Get active subscriptions for manual payment modal
+    active_subscriptions = Subscription.objects.using('default').filter(
+        status__in=['active', 'trial', 'expired']
+    ).select_related('business', 'plan')[:100]  # Limit for performance
     
     context = {
         'page_obj': page_obj,
         'payment_stats': payment_stats,
+        'active_subscriptions': active_subscriptions,
         'status_choices': Payment.STATUS_CHOICES,
         'method_choices': Payment.PAYMENT_METHODS,
         'current_status': status_filter,
@@ -560,11 +575,11 @@ def system_analytics(request):
             'count': count
         })
     
-    # Revenue analytics
+    # Revenue analytics - use default database
     revenue_data = []
     for i in range(days):
         date = start_date + timedelta(days=i)
-        revenue = Payment.objects.filter(
+        revenue = Payment.objects.using('default').filter(
             status='completed',
             paid_at__date=date.date()
         ).aggregate(total=Sum('amount'))['total'] or 0
@@ -573,8 +588,8 @@ def system_analytics(request):
             'revenue': float(revenue)
         })
     
-    # Plan popularity
-    plan_stats = SubscriptionPlan.objects.annotate(
+    # Plan popularity - use default database
+    plan_stats = SubscriptionPlan.objects.using('default').annotate(
         subscriber_count=Count('subscription'),
         total_revenue=Sum('subscription__amount')
     ).order_by('-subscriber_count')
@@ -584,14 +599,14 @@ def system_analytics(request):
         'new_businesses': Tenant.objects.filter(
             created_at__gte=start_date
         ).count(),
-        'new_subscriptions': Subscription.objects.filter(
+        'new_subscriptions': Subscription.objects.using('default').filter(
             created_at__gte=start_date
         ).count(),
-        'total_revenue': Payment.objects.filter(
+        'total_revenue': Payment.objects.using('default').filter(
             status='completed',
             paid_at__gte=start_date
         ).aggregate(total=Sum('amount'))['total'] or 0,
-        'average_subscription_value': Subscription.objects.filter(
+        'average_subscription_value': Subscription.objects.using('default').filter(
             created_at__gte=start_date
         ).aggregate(avg=Avg('amount'))['avg'] or 0,
     }
@@ -619,7 +634,7 @@ def bulk_approve_businesses(request):
         return redirect('system_admin:business_management')
     
     try:
-        plan = SubscriptionPlan.objects.get(id=plan_id)
+        plan = SubscriptionPlan.objects.using('default').get(id=plan_id)
         approved_count = 0
         failed_setups = []
         
@@ -638,7 +653,7 @@ def bulk_approve_businesses(request):
                         
                         # Create subscription if it doesn't exist
                         if not hasattr(business, 'subscription') or not business.subscription:
-                            subscription = Subscription.objects.create(
+                            subscription = Subscription.objects.using('default').create(
                                 business=business,
                                 plan=plan,
                                 status='trial',
@@ -861,12 +876,12 @@ def export_data(request):
         pass
     elif data_type == 'subscriptions':
         # Export subscription data
-        subscriptions = Subscription.objects.all()
+        subscriptions = Subscription.objects.using('default').all()
         # Implementation would generate CSV/Excel file
         pass
     elif data_type == 'payments':
         # Export payment data
-        payments = Payment.objects.all()
+        payments = Payment.objects.using('default').all()
         # Implementation would generate CSV/Excel file
         pass
     
@@ -909,13 +924,14 @@ def record_payment(request, subscription_id):
     """Record a manual payment for a subscription"""
     from .forms import PaymentRecordForm
     
-    subscription = get_object_or_404(Subscription, id=subscription_id)
+    # Get subscription from default database
+    subscription = get_object_or_404(Subscription.objects.using('default'), id=subscription_id)
     
     if request.method == 'POST':
         form = PaymentRecordForm(request.POST)
         if form.is_valid():
-            # Create payment record
-            payment = Payment.objects.create(
+            # Create payment record in default database
+            payment = Payment.objects.using('default').create(
                 subscription=subscription,
                 amount=form.cleaned_data['amount'],
                 payment_method=form.cleaned_data['payment_method'],
@@ -928,24 +944,94 @@ def record_payment(request, subscription_id):
             # Update subscription status if needed
             if subscription.status in ['expired', 'suspended']:
                 subscription.status = 'active'
-                subscription.save()
+                subscription.save(using='default')
             
-            messages.success(request, f'Payment of {payment.amount} recorded successfully for {subscription.business.name}')
+            # Get business name for display
+            business = Tenant.objects.using('default').get(id=subscription.business_id)
+            messages.success(request, f'Payment of {payment.amount} recorded successfully for {business.name}')
             return redirect('system_admin:payment_management')
     else:
+        # Get plan for initial amount
+        plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
         form = PaymentRecordForm(initial={
             'subscription': subscription.id,
             'payment_date': timezone.now().date(),
-            'amount': subscription.plan.price
+            'amount': plan.price
         })
+    
+    # Get business and plan for context
+    business = Tenant.objects.using('default').get(id=subscription.business_id)
+    plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
     
     context = {
         'form': form,
         'subscription': subscription,
-        'title': f'Record Payment - {subscription.business.name}'
+        'business': business,
+        'plan': plan,
+        'title': f'Record Payment - {business.name}'
     }
     
     return render(request, 'system_admin/record_payment.html', context)
+
+@staff_member_required
+def update_payment_status(request):
+    """Update payment status via AJAX or form submission"""
+    if request.method == 'POST':
+        payment_id = request.POST.get('payment_id')
+        new_status = request.POST.get('status')
+        
+        if payment_id and new_status in ['completed', 'failed', 'pending']:
+            try:
+                payment = Payment.objects.using('default').get(id=payment_id)
+                payment.status = new_status
+                if new_status == 'completed':
+                    payment.paid_at = timezone.now()
+                payment.save()
+                messages.success(request, f'Payment status updated to {new_status}')
+            except Payment.DoesNotExist:
+                messages.error(request, 'Payment not found')
+            except Exception as e:
+                messages.error(request, f'Error updating payment: {str(e)}')
+        else:
+            messages.error(request, 'Invalid payment ID or status')
+    
+    return redirect('system_admin:payment_management')
+
+@staff_member_required
+def record_manual_payment(request):
+    """Handle manual payment creation from the modal"""
+    if request.method == 'POST':
+        subscription_id = request.POST.get('subscription_id')
+        amount = request.POST.get('amount')
+        payment_method = request.POST.get('payment_method')
+        reference_number = request.POST.get('reference_number')
+        notes = request.POST.get('notes')
+        
+        try:
+            subscription = Subscription.objects.using('default').get(id=subscription_id)
+            payment = Payment.objects.using('default').create(
+                subscription=subscription,
+                amount=Decimal(amount),
+                payment_method=payment_method,
+                reference_number=reference_number,
+                notes=notes,
+                status='completed',
+                paid_at=timezone.now()
+            )
+            
+            # Update subscription status if needed
+            if subscription.status in ['expired', 'suspended']:
+                subscription.status = 'active'
+                subscription.save(using='default')
+            
+            business = Tenant.objects.using('default').get(id=subscription.business_id)
+            messages.success(request, f'Payment of {payment.amount} recorded successfully for {business.name}')
+        except Subscription.DoesNotExist:
+            messages.error(request, 'Subscription not found')
+        except Exception as e:
+            messages.error(request, f'Error creating payment: {str(e)}')
+    
+    return redirect('system_admin:payment_management')
 
 
 @staff_member_required
@@ -953,7 +1039,8 @@ def generate_invoice(request, subscription_id):
     """Generate an invoice for a subscription"""
     from .forms import InvoiceGenerationForm
     
-    subscription = get_object_or_404(Subscription, id=subscription_id)
+    # Get subscription from default database
+    subscription = get_object_or_404(Subscription.objects.using('default'), id=subscription_id)
     
     if request.method == 'POST':
         form = InvoiceGenerationForm(request.POST)
@@ -964,8 +1051,8 @@ def generate_invoice(request, subscription_id):
             tax = form.cleaned_data['tax_amount']
             total = subtotal - discount + tax
             
-            # Create invoice
-            invoice = SubscriptionInvoice.objects.create(
+            # Create invoice in default database
+            invoice = SubscriptionInvoice.objects.using('default').create(
                 subscription=subscription,
                 subtotal=subtotal,
                 discount_amount=discount,
@@ -983,16 +1070,24 @@ def generate_invoice(request, subscription_id):
             messages.success(request, f'Invoice {invoice.invoice_number} generated successfully')
             return redirect('system_admin:invoice_management')
     else:
+        # Get plan for initial amount
+        plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
         form = InvoiceGenerationForm(initial={
             'subscription': subscription.id,
-            'subtotal': subscription.plan.price,
+            'subtotal': plan.price,
             'due_date': (timezone.now() + timedelta(days=30)).date()
         })
+    
+    # Get business and plan for context
+    business = Tenant.objects.using('default').get(id=subscription.business_id)
+    plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
     
     context = {
         'form': form,
         'subscription': subscription,
-        'title': f'Generate Invoice - {subscription.business.name}'
+        'business': business,
+        'plan': plan,
+        'title': f'Generate Invoice - {business.name}'
     }
     
     return render(request, 'system_admin/generate_invoice.html', context)
@@ -1006,19 +1101,27 @@ def invoice_management(request):
     status_filter = request.GET.get('status', 'all')
     search = request.GET.get('search', '')
     
-    # Build queryset
-    invoices = SubscriptionInvoice.objects.select_related(
-        'subscription', 'subscription__business', 'payment'
-    )
+    # Build queryset - use default database for subscription data
+    invoices = SubscriptionInvoice.objects.using('default').select_related('subscription').all()
     
     if status_filter != 'all':
         invoices = invoices.filter(status=status_filter)
     
     if search:
+        # Get subscriptions and businesses separately to avoid cross-database joins
+        subscription_ids = []
+        if search:
+            # Search in businesses by name or email
+            businesses = Tenant.objects.using('default').filter(
+                Q(name__icontains=search) | Q(owner__email__icontains=search)
+            )
+            business_subscriptions = Subscription.objects.using('default').filter(business__in=businesses)
+            subscription_ids.extend(business_subscriptions.values_list('id', flat=True))
+        
+        # Filter invoices
         invoices = invoices.filter(
             Q(invoice_number__icontains=search) |
-            Q(subscription__business__name__icontains=search) |
-            Q(subscription__business__owner__email__icontains=search)
+            Q(subscription_id__in=subscription_ids)
         )
     
     # Check for overdue invoices and update status
@@ -1033,16 +1136,16 @@ def invoice_management(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Invoice statistics
+    # Invoice statistics - use default database
     invoice_stats = {
-        'total': SubscriptionInvoice.objects.count(),
-        'draft': SubscriptionInvoice.objects.filter(status='draft').count(),
-        'sent': SubscriptionInvoice.objects.filter(status='sent').count(),
-        'paid': SubscriptionInvoice.objects.filter(status='paid').count(),
-        'overdue': SubscriptionInvoice.objects.filter(status='overdue').count(),
-        'total_amount': SubscriptionInvoice.objects.aggregate(
+        'total': SubscriptionInvoice.objects.using('default').count(),
+        'draft': SubscriptionInvoice.objects.using('default').filter(status='draft').count(),
+        'sent': SubscriptionInvoice.objects.using('default').filter(status='sent').count(),
+        'paid': SubscriptionInvoice.objects.using('default').filter(status='paid').count(),
+        'overdue': SubscriptionInvoice.objects.using('default').filter(status='overdue').count(),
+        'total_amount': SubscriptionInvoice.objects.using('default').aggregate(
             total=Sum('total_amount'))['total'] or 0,
-        'paid_amount': SubscriptionInvoice.objects.filter(status='paid').aggregate(
+        'paid_amount': SubscriptionInvoice.objects.using('default').filter(status='paid').aggregate(
             total=Sum('total_amount'))['total'] or 0,
     }
     
@@ -1061,11 +1164,12 @@ def invoice_management(request):
 @staff_member_required
 def mark_invoice_paid(request, invoice_id):
     """Mark an invoice as paid"""
-    invoice = get_object_or_404(SubscriptionInvoice, id=invoice_id)
+    # Get invoice from default database
+    invoice = get_object_or_404(SubscriptionInvoice.objects.using('default'), id=invoice_id)
     
     if request.method == 'POST':
-        # Create a payment record
-        payment = Payment.objects.create(
+        # Create a payment record in default database
+        payment = Payment.objects.using('default').create(
             subscription=invoice.subscription,
             amount=invoice.total_amount,
             payment_method=request.POST.get('payment_method', 'manual'),
@@ -1078,6 +1182,7 @@ def mark_invoice_paid(request, invoice_id):
         # Link payment to invoice and mark as paid
         invoice.payment = payment
         invoice.status = 'paid'
+        invoice.save(using='default')
         invoice.paid_date = timezone.now().date()
         invoice.save()
         
@@ -1674,10 +1779,10 @@ def suspension_management(request):
     suspension_stats = {
         'suspended_users': User.objects.filter(is_active=False).count(),
         'suspended_businesses': Tenant.objects.filter(is_active=False).count(),
-        'suspended_subscriptions': Subscription.objects.filter(status='suspended').count(),
+        'suspended_subscriptions': Subscription.objects.using('default').filter(status='suspended').count(),
         'total_users': User.objects.count(),
         'total_businesses': Tenant.objects.count(),
-        'total_subscriptions': Subscription.objects.count(),
+        'total_subscriptions': Subscription.objects.using('default').count(),
     }
     
     # Get recent suspension activities
@@ -1688,7 +1793,7 @@ def suspension_management(request):
     # Get suspended entities for quick access
     suspended_users = User.objects.filter(is_active=False).select_related().order_by('-date_joined')[:10]
     suspended_businesses = Tenant.objects.filter(is_active=False).select_related('owner').order_by('-updated_at')[:10]
-    suspended_subscriptions = Subscription.objects.filter(status='suspended').select_related('business').order_by('-updated_at')[:10]
+    suspended_subscriptions = Subscription.objects.using('default').filter(status='suspended').select_related('business').order_by('-updated_at')[:10]
     
     context = {
         'suspension_stats': suspension_stats,
@@ -1961,8 +2066,8 @@ def notification_management(request):
     orders_week = ServiceOrder.objects.filter(created_at__date__gte=week_ago).count()
     
     # Payment notifications (approximate based on payments)
-    payments_today = Payment.objects.filter(created_at__date=today, status='completed').count()
-    payments_week = Payment.objects.filter(created_at__date__gte=week_ago, status='completed').count()
+    payments_today = Payment.objects.using('default').filter(created_at__date=today, status='completed').count()
+    payments_week = Payment.objects.using('default').filter(created_at__date__gte=week_ago, status='completed').count()
     
     # Low stock items
     low_stock_items = InventoryItem.objects.filter(
@@ -1971,12 +2076,12 @@ def notification_management(request):
     ).count()
     
     # Subscription statistics
-    active_subscriptions = Subscription.objects.filter(status='active').count()
-    expiring_soon = Subscription.objects.filter(
+    active_subscriptions = Subscription.objects.using('default').filter(status='active').count()
+    expiring_soon = Subscription.objects.using('default').filter(
         status='active',
         end_date__lte=timezone.now() + timedelta(days=7)
     ).count()
-    expired_today = Subscription.objects.filter(
+    expired_today = Subscription.objects.using('default').filter(
         status='active',
         end_date__date=today
     ).count()
@@ -2002,7 +2107,7 @@ def notification_management(request):
     ).select_related().order_by('-created_at')[:10]
     
     # Get subscription expiry alerts
-    expiring_subscriptions = Subscription.objects.filter(
+    expiring_subscriptions = Subscription.objects.using('default').filter(
         status='active',
         end_date__lte=timezone.now() + timedelta(days=7)
     ).select_related('business', 'plan').order_by('end_date')[:10]

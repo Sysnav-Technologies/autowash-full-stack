@@ -336,8 +336,8 @@
                         {{ invoice.period_start|date:"M d" }} - {{ invoice.period_end|date:"M d, Y" }}
                     </td>
                     <td class="text-center">1</td>
-                    <td class="text-right">KES {{ invoice.amount|floatformat:2 }}</td>
-                    <td class="text-right">KES {{ invoice.amount|floatformat:2 }}</td>
+                    <td class="text-right">KES {{ invoice.subtotal|default:invoice.total_amount|floatformat:2 }}</td>
+                    <td class="text-right">KES {{ invoice.subtotal|default:invoice.total_amount|floatformat:2 }}</td>
                 </tr>
             </tbody>
         </table>
@@ -345,16 +345,16 @@
         <!-- Totals -->
         <div class="invoice-totals">
             <div class="total-row">
-                <span>Total Amount (VAT Inclusive):</span>
-                <span>KES {{ invoice.total_amount|default:invoice.amount|floatformat:2 }}</span>
-            </div>
-            <div class="total-row">
                 <span>Subtotal (Before VAT):</span>
-                <span>KES {% widthratio invoice.total_amount|default:invoice.amount 116 100 %}</span>
+                <span>KES {{ invoice.subtotal|default:invoice.total_amount|floatformat:2 }}</span>
             </div>
             <div class="total-row">
-                <span>VAT (16% Inclusive):</span>
-                <span>KES {% widthratio invoice.total_amount|default:invoice.amount 116 16 %}</span>
+                <span>VAT (16%):</span>
+                <span>KES {{ invoice.tax_amount|default:0|floatformat:2 }}</span>
+            </div>
+            <div class="total-row final">
+                <span>Total Amount (VAT Inclusive):</span>
+                <span>KES {{ invoice.total_amount|floatformat:2 }}</span>
             </div>
             {% if invoice.discount_amount %}
             <div class="total-row">

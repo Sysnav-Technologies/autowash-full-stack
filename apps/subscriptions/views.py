@@ -284,10 +284,10 @@ def payment_view(request, payment_id):
     
     # Ensure the payment belongs to user's business
     try:
-        business = Tenant.objects.using('default').get(owner=request.user, subscription=payment.subscription)
+        business = Tenant.objects.using('default').get(owner=request.user, id=payment.subscription.business_id)
     except Tenant.DoesNotExist:
         messages.error(request, "Payment not found.")
-        return redirect('subscriptions:pricing')
+        return redirect('subscriptions:plans')
     
     if request.method == 'POST':
         form = PaymentForm(request.POST)
@@ -333,13 +333,24 @@ def payment_status_view(request, payment_id):
     """Check payment status"""
     payment = get_object_or_404(Payment.objects.using('default'), payment_id=payment_id)
     
-    # Ensure the payment belongs to user's business
-    try:
-        from apps.core.tenant_models import Tenant
-        business = Tenant.objects.using('default').get(owner=request.user, subscription=payment.subscription)
-    except Tenant.DoesNotExist:
-        messages.error(request, "Payment not found.")
-        return redirect('subscriptions:pricing')
+    # Ensure the payment belongs to user's business or user is admin
+    business = None
+    if request.user.is_staff or request.user.is_superuser:
+        # System admin can access any payment status
+        try:
+            from apps.core.tenant_models import Tenant
+            business = Tenant.objects.using('default').get(id=payment.subscription.business_id)
+        except Tenant.DoesNotExist:
+            messages.error(request, "Associated business not found.")
+            return redirect('subscriptions:plans')
+    else:
+        # Regular users can only access their own business payments
+        try:
+            from apps.core.tenant_models import Tenant
+            business = Tenant.objects.using('default').get(owner=request.user, id=payment.subscription.business_id)
+        except Tenant.DoesNotExist:
+            messages.error(request, "Payment not found.")
+            return redirect('subscriptions:plans')
     
     context = {
         'payment': payment,
@@ -364,7 +375,7 @@ def check_payment_status_ajax(request, payment_id):
         # Ensure the payment belongs to user's business
         try:
             from apps.core.tenant_models import Tenant
-            business = Tenant.objects.using('default').get(owner=request.user, subscription=payment.subscription)
+            business = Tenant.objects.using('default').get(owner=request.user, id=payment.subscription.business_id)
         except Tenant.DoesNotExist:
             return JsonResponse({
                 'status': 'error',
@@ -441,10 +452,10 @@ def manage_subscription_view(request):
         subscription = get_business_subscription(business)
     except (Tenant.DoesNotExist, AttributeError):
         messages.error(request, "No active subscription found.")
-        return redirect('subscriptions:pricing')
+        return redirect('subscriptions:plans')
     
     if not subscription:
-        return redirect('subscriptions:pricing')
+        return redirect('subscriptions:plans')
     
     # Get subscription usage from default database
     try:
@@ -510,11 +521,11 @@ def upgrade_view(request):
         subscription = get_business_subscription(business)
     except (Tenant.DoesNotExist, AttributeError):
         messages.error(request, "No subscription found.")
-        return redirect('subscriptions:pricing')
+        return redirect('subscriptions:plans')
     
     if not subscription:
         messages.error(request, "No subscription found.")
-        return redirect('subscriptions:pricing')
+        return redirect('subscriptions:plans')
     
     # Get available plans from public schema
     available_plans = SubscriptionPlan.objects.using('default').filter(is_active=True)
@@ -556,12 +567,12 @@ def upgrade_subscription_view(request, plan_slug):
         current_subscription = get_business_subscription(business)
     except (Tenant.DoesNotExist, AttributeError):
         messages.error(request, "No subscription found.")
-        return redirect('subscriptions:pricing')
+        return redirect('subscriptions:plans')
     
     # Allow upgrade for expired, cancelled, or trial subscriptions
     if not current_subscription:
         messages.error(request, "No subscription found.")
-        return redirect('subscriptions:pricing')
+        return redirect('subscriptions:plans')
     
     # Calculate pricing
     amount = new_plan.price
@@ -829,12 +840,22 @@ def download_invoice_view(request, invoice_id):
     """Download invoice PDF"""
     invoice = get_object_or_404(SubscriptionInvoice, id=invoice_id)
     
-    # Ensure invoice belongs to user's business
-    try:
-        business = Tenant.objects.using('default').get(owner=request.user, subscription=invoice.subscription)
-    except Tenant.DoesNotExist:
-        messages.error(request, "Invoice not found.")
-        return redirect('subscriptions:pricing')
+    # Check access permissions
+    business = None
+    if request.user.is_staff or request.user.is_superuser:
+        # System admin can access any invoice
+        try:
+            business = Tenant.objects.using('default').get(id=invoice.subscription.business_id)
+        except Tenant.DoesNotExist:
+            messages.error(request, "Associated business not found.")
+            return redirect('subscriptions:plans')
+    else:
+        # Regular users can only access their own business invoices
+        try:
+            business = Tenant.objects.using('default').get(owner=request.user, id=invoice.subscription.business_id)
+        except Tenant.DoesNotExist:
+            messages.error(request, "Invoice not found.")
+            return redirect('subscriptions:plans')
     
     # Get plan from default database to avoid cross-database issues
     plan = SubscriptionPlan.objects.using('default').get(id=invoice.subscription.plan_id) if invoice.subscription else None
@@ -842,7 +863,6 @@ def download_invoice_view(request, invoice_id):
     # Generate PDF using HTML template
     from django.template.loader import get_template
     from django.http import HttpResponse
-    import weasyprint
     
     context = {
         'invoice': invoice,
@@ -858,26 +878,112 @@ def download_invoice_view(request, invoice_id):
         }
     }
     
-    # Render HTML template
-    template = get_template('subscriptions/invoice_pdf.html')
-    html_string = template.render(context)
-    
-    # Generate PDF
+    # Generate PDF with ReportLab (Windows-compatible)
     try:
-        # Use weasyprint if available, otherwise fall back to browser-based generation
-        try:
-            import weasyprint
-            pdf_file = weasyprint.HTML(string=html_string).write_pdf()
-            response = HttpResponse(pdf_file, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.invoice_number}.pdf"'
-            return response
-        except ImportError:
-            # Fallback: Return HTML with print styles and auto-print script
-            response = HttpResponse(html_string)
-            response['Content-Type'] = 'text/html'
-            return response
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import inch
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+        from io import BytesIO
+        
+        # Create PDF buffer
+        buffer = BytesIO()
+        
+        # Create the PDF object
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.HexColor('#007bff'),
+            spaceAfter=30,
+        )
+        
+        # Add company header
+        company_title = Paragraph("AutoWash App Limited", title_style)
+        elements.append(company_title)
+        elements.append(Spacer(1, 12))
+        
+        # Invoice details
+        invoice_data = [
+            ['Invoice Number:', invoice.invoice_number],
+            ['Invoice Date:', invoice.created_at.strftime('%B %d, %Y')],
+            ['Due Date:', invoice.due_date.strftime('%B %d, %Y') if invoice.due_date else 'N/A'],
+            ['Business:', business.name],
+            ['Plan:', plan.name if plan else 'N/A'],
+            ['Subtotal:', f"KES {invoice.subtotal:,.2f}"],
+            ['VAT (16%):', f"KES {invoice.tax_amount:,.2f}"],
+            ['Total Amount:', f"KES {invoice.total_amount:,.2f}"],
+            ['Status:', invoice.status.title()],
+        ]
+        
+        invoice_table = Table(invoice_data, colWidths=[2*inch, 3*inch])
+        invoice_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.grey),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('BACKGROUND', (1, 0), (1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(invoice_table)
+        elements.append(Spacer(1, 20))
+        
+        # Bank details
+        bank_title = Paragraph("Payment Details", styles['Heading2'])
+        elements.append(bank_title)
+        elements.append(Spacer(1, 12))
+        
+        bank_data = [
+            ['Bank Name:', context['bank_details']['bank_name']],
+            ['Account Number:', context['bank_details']['account_number']],
+            ['Account Name:', context['bank_details']['account_name']],
+            ['Branch:', context['bank_details']['branch']],
+            ['Swift Code:', context['bank_details']['swift_code']],
+            ['Reference:', context['bank_details']['reference']],
+        ]
+        
+        bank_table = Table(bank_data, colWidths=[2*inch, 3*inch])
+        bank_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightblue),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('BACKGROUND', (1, 0), (1, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(bank_table)
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get PDF data
+        pdf_data = buffer.getvalue()
+        buffer.close()
+        
+        # Return PDF response
+        response = HttpResponse(pdf_data, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.invoice_number}.pdf"'
+        return response
+        
     except Exception as e:
         # If PDF generation fails, return HTML version
+        template = get_template('subscriptions/invoice_pdf.html')
+        html_string = template.render(context)
         return render(request, 'subscriptions/invoice_pdf.html', context)
 
 @login_required
@@ -889,12 +995,22 @@ def view_payment_invoice(request, payment_id):
     # Get subscription separately from default database
     subscription = Subscription.objects.using('default').get(id=payment.subscription_id)
     
-    # Ensure payment belongs to user's business
-    try:
-        business = Tenant.objects.using('default').get(owner=request.user, subscription=subscription)
-    except Tenant.DoesNotExist:
-        messages.error(request, "Invoice not found.")
-        return redirect('subscriptions:pricing')
+    # Ensure payment belongs to user's business or user is admin
+    business = None
+    if request.user.is_staff or request.user.is_superuser:
+        # System admin can access any payment invoice
+        try:
+            business = Tenant.objects.using('default').get(id=subscription.business_id)
+        except Tenant.DoesNotExist:
+            messages.error(request, "Associated business not found.")
+            return redirect('subscriptions:plans')
+    else:
+        # Regular users can only access their own business payments
+        try:
+            business = Tenant.objects.using('default').get(owner=request.user, id=subscription.business_id)
+        except Tenant.DoesNotExist:
+            messages.error(request, "Invoice not found.")
+            return redirect('subscriptions:plans')
     
     # Get plan from default database to avoid cross-database issues
     plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
@@ -906,7 +1022,8 @@ def view_payment_invoice(request, payment_id):
         'due_date': payment.created_at,
         'period_start': payment.created_at,
         'period_end': payment.created_at + timezone.timedelta(days=30),
-        'amount': payment.amount,
+        'subtotal': payment.amount / Decimal('1.16'),  # Calculate subtotal from VAT-inclusive amount
+        'tax_amount': payment.amount - (payment.amount / Decimal('1.16')),  # Calculate VAT
         'total_amount': payment.amount,
         'status': payment.status,
         'subscription': subscription
@@ -929,30 +1046,114 @@ def view_payment_invoice(request, payment_id):
     
     # Check if download is requested
     if request.GET.get('download') == 'true':
-        # Generate PDF using HTML template
-        from django.template.loader import get_template
-        from django.http import HttpResponse
-        
-        # Render HTML template
-        template = get_template('subscriptions/invoice_pdf.html')
-        html_string = template.render(context)
-        
-        # Generate PDF
+        # Generate PDF using ReportLab (Windows-compatible)
         try:
-            # Use weasyprint if available, otherwise fall back to browser-based generation
-            try:
-                import weasyprint
-                pdf_file = weasyprint.HTML(string=html_string).write_pdf()
-                response = HttpResponse(pdf_file, content_type='application/pdf')
-                response['Content-Disposition'] = f'attachment; filename="invoice_PAY-{payment.payment_id}.pdf"'
-                return response
-            except ImportError:
-                # Fallback: Return HTML with print styles and auto-print script
-                response = HttpResponse(html_string)
-                response['Content-Type'] = 'text/html'
-                return response
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.units import inch
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib import colors
+            from io import BytesIO
+            from django.http import HttpResponse
+            
+            # Create PDF buffer
+            buffer = BytesIO()
+            
+            # Create the PDF object
+            doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+            
+            # Container for the 'Flowable' objects
+            elements = []
+            
+            # Define styles
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                textColor=colors.HexColor('#007bff'),
+                spaceAfter=30,
+            )
+            
+            # Add company header
+            company_title = Paragraph("AutoWash App Limited", title_style)
+            elements.append(company_title)
+            elements.append(Spacer(1, 12))
+            
+            # Payment Invoice details
+            invoice_data = [
+                ['Payment ID:', f"PAY-{payment.payment_id}"],
+                ['Payment Date:', payment.created_at.strftime('%B %d, %Y')],
+                ['Business:', business.name],
+                ['Plan:', plan.name],
+                ['Subtotal:', f"KES {payment.amount / 1.16:,.2f}"],  # Calculate subtotal from VAT-inclusive amount
+                ['VAT (16%):', f"KES {payment.amount - (payment.amount / 1.16):,.2f}"],  # Calculate VAT
+                ['Total Amount:', f"KES {payment.amount:,.2f}"],
+                ['Status:', payment.status.title()],
+                ['Payment Method:', payment.payment_method or 'N/A'],
+            ]
+            
+            invoice_table = Table(invoice_data, colWidths=[2*inch, 3*inch])
+            invoice_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.grey),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('BACKGROUND', (1, 0), (1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            elements.append(invoice_table)
+            elements.append(Spacer(1, 20))
+            
+            # Bank details
+            bank_title = Paragraph("Payment Details", styles['Heading2'])
+            elements.append(bank_title)
+            elements.append(Spacer(1, 12))
+            
+            bank_data = [
+                ['Bank Name:', context['bank_details']['bank_name']],
+                ['Account Number:', context['bank_details']['account_number']],
+                ['Account Name:', context['bank_details']['account_name']],
+                ['Branch:', context['bank_details']['branch']],
+                ['Swift Code:', context['bank_details']['swift_code']],
+                ['Reference:', context['bank_details']['reference']],
+            ]
+            
+            bank_table = Table(bank_data, colWidths=[2*inch, 3*inch])
+            bank_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightblue),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('BACKGROUND', (1, 0), (1, -1), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            elements.append(bank_table)
+            
+            # Build PDF
+            doc.build(elements)
+            
+            # Get PDF data
+            pdf_data = buffer.getvalue()
+            buffer.close()
+            
+            # Return PDF response
+            response = HttpResponse(pdf_data, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="invoice_PAY-{payment.payment_id}.pdf"'
+            return response
+            
         except Exception as e:
             # If PDF generation fails, return HTML version
+            from django.template.loader import get_template
+            template = get_template('subscriptions/invoice_pdf.html')
+            html_string = template.render(context)
             return render(request, 'subscriptions/invoice_pdf.html', context)
     
     return render(request, 'subscriptions/invoice_pdf.html', context)
@@ -986,7 +1187,7 @@ def send_payment_instructions_email(email, payment):
 
 def send_payment_success_email(payment):
     """Send payment success notification"""
-    business = Tenant.objects.using('default').get(subscription=payment.subscription)
+    business = Tenant.objects.using('default').get(id=payment.subscription.business_id)
     
     subject = "Payment Successful - Subscription Activated"
     context = {
@@ -1529,7 +1730,7 @@ def generate_invoice_pdf(request):
         
         # Ensure payment belongs to user's business
         try:
-            business = Tenant.objects.using('default').get(owner=request.user, subscription=subscription)
+            business = Tenant.objects.using('default').get(owner=request.user, id=subscription.business_id)
         except Tenant.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Invoice not found'})
         
@@ -1543,7 +1744,8 @@ def generate_invoice_pdf(request):
             'due_date': payment.created_at,
             'period_start': payment.created_at,
             'period_end': payment.created_at + timezone.timedelta(days=30),
-            'amount': payment.amount,
+            'subtotal': payment.amount / Decimal('1.16'),  # Calculate subtotal from VAT-inclusive amount
+            'tax_amount': payment.amount - (payment.amount / Decimal('1.16')),  # Calculate VAT
             'total_amount': payment.amount,
             'status': payment.status,
             'subscription': subscription
@@ -1564,17 +1766,106 @@ def generate_invoice_pdf(request):
             }
         }
         
-        # Generate PDF using HTML template
+        # Generate PDF using ReportLab (Windows-compatible)
         from django.template.loader import get_template
         from django.http import HttpResponse
         import base64
         
-        template = get_template('subscriptions/invoice_pdf.html')
-        html_string = template.render(context)
-        
         try:
-            import weasyprint
-            pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.units import inch
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib import colors
+            from io import BytesIO
+            
+            # Create PDF buffer
+            buffer = BytesIO()
+            
+            # Create the PDF object
+            doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+            
+            # Container for the 'Flowable' objects
+            elements = []
+            
+            # Define styles
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                textColor=colors.HexColor('#007bff'),
+                spaceAfter=30,
+            )
+            
+            # Add company header
+            company_title = Paragraph("AutoWash App Limited", title_style)
+            elements.append(company_title)
+            elements.append(Spacer(1, 12))
+            
+            # Payment Invoice details
+            invoice_data_table = [
+                ['Payment ID:', f"PAY-{payment.payment_id}"],
+                ['Payment Date:', payment.created_at.strftime('%B %d, %Y')],
+                ['Business:', business.name],
+                ['Plan:', plan.name],
+                ['Subtotal:', f"KES {payment.amount / 1.16:,.2f}"],  # Calculate subtotal from VAT-inclusive amount
+                ['VAT (16%):', f"KES {payment.amount - (payment.amount / 1.16):,.2f}"],  # Calculate VAT
+                ['Total Amount:', f"KES {payment.amount:,.2f}"],
+                ['Status:', payment.status.title()],
+                ['Payment Method:', payment.payment_method or 'N/A'],
+            ]
+            
+            invoice_table = Table(invoice_data_table, colWidths=[2*inch, 3*inch])
+            invoice_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.grey),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('BACKGROUND', (1, 0), (1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            elements.append(invoice_table)
+            elements.append(Spacer(1, 20))
+            
+            # Bank details
+            bank_title = Paragraph("Payment Details", styles['Heading2'])
+            elements.append(bank_title)
+            elements.append(Spacer(1, 12))
+            
+            bank_data = [
+                ['Bank Name:', context['bank_details']['bank_name']],
+                ['Account Number:', context['bank_details']['account_number']],
+                ['Account Name:', context['bank_details']['account_name']],
+                ['Branch:', context['bank_details']['branch']],
+                ['Swift Code:', context['bank_details']['swift_code']],
+                ['Reference:', context['bank_details']['reference']],
+            ]
+            
+            bank_table = Table(bank_data, colWidths=[2*inch, 3*inch])
+            bank_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightblue),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('BACKGROUND', (1, 0), (1, -1), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            elements.append(bank_table)
+            
+            # Build PDF
+            doc.build(elements)
+            
+            # Get PDF data
+            pdf_file = buffer.getvalue()
+            buffer.close()
             
             # Encode PDF as base64 for JSON response
             pdf_base64 = base64.b64encode(pdf_file).decode('utf-8')
@@ -1585,8 +1876,9 @@ def generate_invoice_pdf(request):
                 'pdf_data': pdf_base64,
                 'filename': f'invoice_PAY-{payment.payment_id}.pdf'
             })
-        except ImportError:
-            # If weasyprint not available, return download URL
+            
+        except Exception as e:
+            # If PDF generation fails, return download URL fallback
             return JsonResponse({
                 'success': True,
                 'message': 'PDF generation ready',
