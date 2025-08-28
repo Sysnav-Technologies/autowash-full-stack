@@ -22,7 +22,7 @@ from .models import (
 )
 from .forms import SubscriptionForm, PaymentForm
 from .utils import create_mpesa_payment, verify_discount_code, process_mpesa_callback
-from apps.accounts.models import Business
+from apps.core.tenant_models import Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -120,11 +120,11 @@ def pricing_view(request):
     # Check if user has active subscription
     if request.user.is_authenticated:
         try:
-            business = Business.objects.using('default').get(owner=request.user)
+            business = Tenant.objects.using('default').get(owner=request.user)
             if business.subscription and business.subscription.is_active:
                 context['user_has_subscription'] = True
                 context['current_subscription'] = business.subscription
-        except Business.DoesNotExist:
+        except Tenant.DoesNotExist:
             pass
     
     return render(request, 'subscriptions/pricing.html', context)
@@ -134,8 +134,8 @@ def subscription_selection_view(request):
     """Subscription selection for new businesses after registration"""
     # Check if user has a business
     try:
-        business = Business.objects.using('default').get(owner=request.user)
-    except Business.DoesNotExist:
+        business = Tenant.objects.using('default').get(owner=request.user)
+    except Tenant.DoesNotExist:
         messages.error(request, "You need to register a business first.")
         return redirect('accounts:business_register')
     
@@ -184,8 +184,8 @@ def subscribe_view(request, plan_slug):
     
     # Check if user has a business
     try:
-        business = Business.objects.using('default').get(owner=request.user)
-    except Business.DoesNotExist:
+        business = Tenant.objects.using('default').get(owner=request.user)
+    except Tenant.DoesNotExist:
         messages.error(request, "You need to register a business first.")
         return redirect('accounts:business_register')
     
@@ -284,8 +284,8 @@ def payment_view(request, payment_id):
     
     # Ensure the payment belongs to user's business
     try:
-        business = Business.objects.using('default').get(owner=request.user, subscription=payment.subscription)
-    except Business.DoesNotExist:
+        business = Tenant.objects.using('default').get(owner=request.user, subscription=payment.subscription)
+    except Tenant.DoesNotExist:
         messages.error(request, "Payment not found.")
         return redirect('subscriptions:pricing')
     
@@ -331,12 +331,13 @@ def payment_view(request, payment_id):
 @login_required
 def payment_status_view(request, payment_id):
     """Check payment status"""
-    payment = get_object_or_404(Payment, payment_id=payment_id)
+    payment = get_object_or_404(Payment.objects.using('default'), payment_id=payment_id)
     
     # Ensure the payment belongs to user's business
     try:
-        business = Business.objects.using('default').get(owner=request.user, subscription=payment.subscription)
-    except Business.DoesNotExist:
+        from apps.core.tenant_models import Tenant
+        business = Tenant.objects.using('default').get(owner=request.user, subscription=payment.subscription)
+    except Tenant.DoesNotExist:
         messages.error(request, "Payment not found.")
         return redirect('subscriptions:pricing')
     
@@ -347,13 +348,98 @@ def payment_status_view(request, payment_id):
     
     return render(request, 'subscriptions/payment_status.html', context)
 
+def check_payment_status_ajax(request, payment_id):
+    """AJAX endpoint to check subscription payment status"""
+    
+    # Check if user is authenticated - return JSON error instead of redirect
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Authentication required'
+        }, status=401)
+    
+    try:
+        payment = get_object_or_404(Payment.objects.using('default'), payment_id=payment_id)
+        
+        # Ensure the payment belongs to user's business
+        try:
+            from apps.core.tenant_models import Tenant
+            business = Tenant.objects.using('default').get(owner=request.user, subscription=payment.subscription)
+        except Tenant.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Payment not found'
+            }, status=404)
+        
+        if payment.status in ['completed', 'verified']:
+            # Update subscription status if payment is completed
+            if payment.status == 'completed' and payment.subscription:
+                subscription = payment.subscription
+                if subscription.status != 'active':
+                    subscription.status = 'active'
+                    subscription.save(using='default')
+                    
+                    # Update business subscription reference
+                    business.subscription = subscription
+                    business.save(using='default')
+            
+            return JsonResponse({
+                'status': 'completed',
+                'message': 'Payment completed successfully',
+                'payment_status': payment.status,
+                'completed_at': payment.completed_at.isoformat() if payment.completed_at else None
+            })
+        elif payment.status == 'failed':
+            return JsonResponse({
+                'status': 'failed',
+                'message': payment.failure_reason or 'Payment failed',
+                'payment_status': payment.status
+            })
+        else:
+            # For pending/processing payments, check with M-Pesa API
+            try:
+                from .utils import check_mpesa_payment_status
+                result = check_mpesa_payment_status(payment_id)
+                
+                if result['success']:
+                    # Payment was completed, reload payment to get updated status
+                    payment.refresh_from_db()
+                    return JsonResponse({
+                        'status': 'completed',
+                        'message': result['message'],
+                        'payment_status': payment.status,
+                        'transaction_id': result.get('transaction_id')
+                    })
+                else:
+                    return JsonResponse({
+                        'status': payment.status,
+                        'message': result.get('message', 'Checking payment status...'),
+                        'payment_status': payment.status,
+                        'conversation_id': result.get('conversation_id')
+                    })
+            except Exception as e:
+                # Fall back to current status if M-Pesa check fails
+                logger.error(f"Subscription M-Pesa status check failed: {e}")
+                return JsonResponse({
+                    'status': payment.status,
+                    'message': 'Checking payment status...',
+                    'payment_status': payment.status
+                })
+            
+    except Exception as e:
+        logger.error(f"Subscription payment status check error: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Error checking payment status'
+        }, status=500)
+
 @login_required
 def manage_subscription_view(request):
     """Manage current subscription"""
     try:
-        business = Business.objects.using('default').get(owner=request.user)
+        business = Tenant.objects.using('default').get(owner=request.user)
         subscription = get_business_subscription(business)
-    except (Business.DoesNotExist, AttributeError):
+    except (Tenant.DoesNotExist, AttributeError):
         messages.error(request, "No active subscription found.")
         return redirect('subscriptions:pricing')
     
@@ -388,9 +474,9 @@ def manage_subscription_view(request):
 def cancel_subscription_view(request):
     """Cancel subscription"""
     try:
-        business = Business.objects.using('default').get(owner=request.user)
+        business = Tenant.objects.using('default').get(owner=request.user)
         subscription = get_business_subscription(business)
-    except (Business.DoesNotExist, AttributeError):
+    except (Tenant.DoesNotExist, AttributeError):
         return JsonResponse({'success': False, 'message': 'No subscription found'})
     
     if not subscription or not subscription.is_active:
@@ -411,10 +497,10 @@ def upgrade_view(request):
     """
     try:
         # Access Business from public schema
-        business = Business.objects.using('default').get(owner=request.user)
+        business = Tenant.objects.using('default').get(owner=request.user)
         # Access subscription from default database explicitly
         subscription = get_business_subscription(business)
-    except (Business.DoesNotExist, AttributeError):
+    except (Tenant.DoesNotExist, AttributeError):
         messages.error(request, "No subscription found.")
         return redirect('subscriptions:pricing')
     
@@ -458,9 +544,9 @@ def upgrade_subscription_view(request, plan_slug):
     new_plan = get_object_or_404(SubscriptionPlan.objects.using('default'), slug=plan_slug, is_active=True)
     
     try:
-        business = Business.objects.using('default').get(owner=request.user)
+        business = Tenant.objects.using('default').get(owner=request.user)
         current_subscription = get_business_subscription(business)
-    except (Business.DoesNotExist, AttributeError):
+    except (Tenant.DoesNotExist, AttributeError):
         messages.error(request, "No subscription found.")
         return redirect('subscriptions:pricing')
     
@@ -522,47 +608,182 @@ def upgrade_subscription_view(request, plan_slug):
 
 @csrf_exempt
 def mpesa_callback_view(request):
-    """Handle M-Pesa payment callbacks"""
+    """Handle M-Pesa payment callbacks for subscriptions"""
     if request.method == 'POST':
         try:
             callback_data = json.loads(request.body)
+            payment_id = request.GET.get('payment_id')
+            action = request.GET.get('action', 'payment')  # payment, status, timeout
             
-            # Extract transaction details from callback
-            checkout_request_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-            result_code = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
+            logger.info(f"M-Pesa callback received: action={action}, payment_id={payment_id}")
             
-            if checkout_request_id:
-                try:
-                    payment = Payment.objects.get(transaction_id=checkout_request_id)
+            if action == 'status':
+                # Handle transaction status query result
+                return handle_transaction_status_callback(callback_data, payment_id)
+            elif action == 'timeout':
+                # Handle timeout callback
+                return handle_timeout_callback(callback_data, payment_id)
+            else:
+                # Handle STK push callback (default)
+                return handle_stk_push_callback(callback_data, payment_id)
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in M-Pesa callback: {e}")
+        except Exception as e:
+            logger.error(f"Error processing M-Pesa callback: {e}")
+    
+    return HttpResponse('OK')
+
+def handle_stk_push_callback(callback_data, payment_id):
+    """Handle STK push payment callback"""
+    try:
+        # Extract transaction details from STK push callback
+        stk_callback = callback_data.get('Body', {}).get('stkCallback', {})
+        checkout_request_id = stk_callback.get('CheckoutRequestID')
+        result_code = stk_callback.get('ResultCode')
+        
+        if checkout_request_id:
+            try:
+                # Find payment by transaction ID or payment ID
+                payment = None
+                if payment_id:
+                    payment = Payment.objects.using('default').get(payment_id=payment_id)
+                else:
+                    payment = Payment.objects.using('default').get(transaction_id=checkout_request_id)
+                
+                if result_code == 0:  # Success
+                    # Extract transaction details
+                    callback_metadata = stk_callback.get('CallbackMetadata', {}).get('Item', [])
+                    mpesa_receipt_number = None
+                    transaction_amount = None
+                    phone_number = None
                     
-                    if result_code == 0:  # Success
-                        # Extract transaction details
-                        callback_metadata = callback_data.get('Body', {}).get('stkCallback', {}).get('CallbackMetadata', {}).get('Item', [])
-                        mpesa_receipt_number = None
+                    for item in callback_metadata:
+                        if item.get('Name') == 'MpesaReceiptNumber':
+                            mpesa_receipt_number = item.get('Value')
+                        elif item.get('Name') == 'Amount':
+                            transaction_amount = item.get('Value')
+                        elif item.get('Name') == 'PhoneNumber':
+                            phone_number = item.get('Value')
+                    
+                    # Update payment
+                    payment.status = 'completed'
+                    payment.transaction_id = mpesa_receipt_number or checkout_request_id
+                    payment.completed_at = timezone.now()
+                    payment.save(using='default')
+                    
+                    # Update subscription status
+                    subscription = payment.subscription
+                    if subscription and subscription.status != 'active':
+                        subscription.status = 'active'
+                        subscription.save(using='default')
                         
-                        for item in callback_metadata:
-                            if item.get('Name') == 'MpesaReceiptNumber':
-                                mpesa_receipt_number = item.get('Value')
-                                break
-                        
-                        payment.mark_as_completed(
-                            transaction_id=mpesa_receipt_number or checkout_request_id,
-                            notes="M-Pesa payment completed"
-                        )
-                        
-                        # Send success email
+                        # Update business subscription reference
+                        from apps.core.tenant_models import Tenant
+                        business = Tenant.objects.using('default').filter(id=subscription.business_id).first()
+                        if business:
+                            business.subscription = subscription
+                            business.save(using='default')
+                    
+                    logger.info(f"Payment {payment.payment_id} completed successfully via STK push")
+                    
+                    # Send success email
+                    try:
                         send_payment_success_email(payment)
+                    except Exception as e:
+                        logger.error(f"Failed to send payment success email: {e}")
                         
-                    else:
-                        # Payment failed
-                        result_desc = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultDesc', 'Payment failed')
-                        payment.mark_as_failed(result_desc)
-                        
-                except Payment.DoesNotExist:
-                    pass
+                else:
+                    # Payment failed
+                    result_desc = stk_callback.get('ResultDesc', 'Payment failed')
+                    payment.status = 'failed'
+                    payment.failure_reason = result_desc
+                    payment.save(using='default')
                     
-        except json.JSONDecodeError:
-            pass
+                    logger.warning(f"Payment {payment.payment_id} failed: {result_desc}")
+                    
+            except Payment.DoesNotExist:
+                logger.error(f"Payment not found for STK callback: payment_id={payment_id}, checkout_request_id={checkout_request_id}")
+                
+    except Exception as e:
+        logger.error(f"Error handling STK push callback: {e}")
+    
+    return HttpResponse('OK')
+
+def handle_transaction_status_callback(callback_data, payment_id):
+    """Handle transaction status query callback"""
+    try:
+        result = callback_data.get('Result', {})
+        result_code = result.get('ResultCode')
+        
+        if not payment_id:
+            logger.error("No payment_id in transaction status callback")
+            return HttpResponse('OK')
+            
+        try:
+            payment = Payment.objects.using('default').get(payment_id=payment_id)
+            
+            if result_code == 0:  # Success
+                # Extract transaction details
+                result_parameters = result.get('ResultParameters', {}).get('ResultParameter', [])
+                
+                transaction_status = None
+                receipt_number = None
+                
+                for param in result_parameters:
+                    key = param.get('Key')
+                    value = param.get('Value')
+                    
+                    if key == 'TransactionStatus':
+                        transaction_status = value
+                    elif key == 'ReceiptNo':
+                        receipt_number = value
+                
+                # Update payment based on transaction status
+                if transaction_status == 'Completed':
+                    payment.status = 'completed'
+                    if receipt_number:
+                        payment.transaction_id = receipt_number
+                    payment.completed_at = timezone.now()
+                    payment.save(using='default')
+                    
+                    logger.info(f"Payment {payment_id} confirmed as completed via status query")
+                    
+                elif transaction_status in ['Failed', 'Cancelled']:
+                    payment.status = 'failed'
+                    payment.failure_reason = f"Transaction {transaction_status.lower()}"
+                    payment.save(using='default')
+                    
+                    logger.warning(f"Payment {payment_id} confirmed as failed via status query")
+                    
+            else:
+                # Query failed
+                result_desc = result.get('ResultDesc', 'Status query failed')
+                logger.warning(f"Transaction status query failed for payment {payment_id}: {result_desc}")
+                
+        except Payment.DoesNotExist:
+            logger.error(f"Payment not found for status callback: {payment_id}")
+            
+    except Exception as e:
+        logger.error(f"Error handling transaction status callback: {e}")
+    
+    return HttpResponse('OK')
+
+def handle_timeout_callback(callback_data, payment_id):
+    """Handle timeout callback"""
+    try:
+        if payment_id:
+            payment = Payment.objects.using('default').get(payment_id=payment_id)
+            payment.status = 'failed'
+            payment.failure_reason = 'Transaction timeout'
+            payment.save(using='default')
+            
+            logger.warning(f"Payment {payment_id} timed out")
+            
+    except Payment.DoesNotExist:
+        logger.error(f"Payment not found for timeout callback: {payment_id}")
+    except Exception as e:
+        logger.error(f"Error handling timeout callback: {e}")
     
     return HttpResponse('OK')
 
@@ -602,8 +823,8 @@ def download_invoice_view(request, invoice_id):
     
     # Ensure invoice belongs to user's business
     try:
-        business = Business.objects.using('default').get(owner=request.user, subscription=invoice.subscription)
-    except Business.DoesNotExist:
+        business = Tenant.objects.using('default').get(owner=request.user, subscription=invoice.subscription)
+    except Tenant.DoesNotExist:
         messages.error(request, "Invoice not found.")
         return redirect('subscriptions:manage_subscription')
     
@@ -642,7 +863,7 @@ def send_payment_instructions_email(email, payment):
 
 def send_payment_success_email(payment):
     """Send payment success notification"""
-    business = Business.objects.using('default').get(subscription=payment.subscription)
+    business = Tenant.objects.using('default').get(subscription=payment.subscription)
     
     subject = "Payment Successful - Subscription Activated"
     context = {
@@ -1456,9 +1677,9 @@ def send_payment_instructions_email(email, payment):
 def subscription_payment_view(request):
     """Handle subscription payment with M-Pesa integration"""
     try:
-        business = Business.objects.using('default').get(owner=request.user)
+        business = Tenant.objects.using('default').get(owner=request.user)
         subscription = business.subscription
-    except (Business.DoesNotExist, AttributeError):
+    except (Tenant.DoesNotExist, AttributeError):
         messages.error(request, "No subscription found.")
         return redirect('subscriptions:select')
     
@@ -1552,7 +1773,7 @@ def payment_status_view(request, payment_id):
         messages.error(request, "Subscription not found.")
         return redirect('subscriptions:select')
     
-    business = Business.objects.using('default').filter(id=subscription.business_id).first()
+    business = Tenant.objects.using('default').filter(id=subscription.business_id).first()
     if not business:
         messages.error(request, "Business not found.")
         return redirect('subscriptions:select')
@@ -1561,6 +1782,33 @@ def payment_status_view(request, payment_id):
     if business.owner != request.user:
         messages.error(request, "Payment not found.")
         return redirect('subscriptions:select')
+    
+    # Check M-Pesa status if payment is still pending/processing
+    if payment.status in ['pending', 'processing']:
+        try:
+            from .utils import check_mpesa_payment_status
+            logger.info(f"Checking M-Pesa status for payment {payment_id}")
+            result = check_mpesa_payment_status(payment_id)
+            logger.info(f"M-Pesa status check result: {result}")
+            
+            if result.get('success') or result.get('development_mode'):
+                # Refresh payment from database to get updated status
+                payment.refresh_from_db()
+                
+                # Update subscription to active if not already
+                if subscription.status != 'active':
+                    subscription.status = 'active'
+                    subscription.activated_at = timezone.now()
+                    subscription.save(using='default')
+                
+                # Update business subscription reference
+                business.subscription = subscription
+                business.save(using='default')
+                
+                logger.info(f"Payment {payment_id} completed - subscription activated")
+                
+        except Exception as e:
+            logger.error(f"Error checking payment status in view: {e}")
     
     # Check if payment is completed and redirect if needed
     if payment.status == 'completed':

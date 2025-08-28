@@ -145,11 +145,19 @@ class Subscription(TimeStampedModel):
     def is_active(self):
         """Check if subscription is currently active"""
         now = timezone.now()
-        return (
-            self.status in ['active', 'trial'] and 
-            self.end_date > now and 
-            (not self.trial_end_date or self.trial_end_date > now)
-        )
+        
+        if self.status == 'active':
+            # For active subscriptions, only check end_date
+            return self.end_date > now
+        elif self.status == 'trial':
+            # For trial subscriptions, check both end_date and trial_end_date
+            return (
+                self.end_date > now and 
+                (not self.trial_end_date or self.trial_end_date > now)
+            )
+        else:
+            # For other statuses (expired, cancelled, etc.), not active
+            return False
     
     @property
     def is_trial(self):

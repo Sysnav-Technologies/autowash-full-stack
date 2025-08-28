@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Payment Status</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -121,21 +122,21 @@
                 <!-- Action Buttons -->
                 <div class="mt-4">
                     {% if payment.status == 'completed' %}
-                        <a href="/business/{{ business.slug }}/" class="btn btn-success btn-custom">
+                        <a href="/business/{{ business.slug }}/dashboard/" class="btn btn-success btn-custom">
                             <i class="fas fa-home me-2"></i>Go to Dashboard
                         </a>
                     {% elif payment.status == 'failed' %}
                         <a href="/business/{{ business.slug }}/subscriptions/upgrade/" class="btn btn-primary btn-custom">
                             <i class="fas fa-redo me-2"></i>Try Again
                         </a>
-                        <a href="/business/{{ business.slug }}/" class="btn btn-secondary btn-custom">
+                        <a href="/business/{{ business.slug }}/dashboard/" class="btn btn-secondary btn-custom">
                             <i class="fas fa-home me-2"></i>Dashboard
                         </a>
                     {% else %}
                         <button onclick="checkStatus()" class="btn btn-primary btn-custom">
                             <i class="fas fa-refresh me-2"></i>Check Status
                         </button>
-                        <a href="/business/{{ business.slug }}/" class="btn btn-secondary btn-custom">
+                        <a href="/business/{{ business.slug }}/dashboard/" class="btn btn-secondary btn-custom">
                             <i class="fas fa-home me-2"></i>Dashboard
                         </a>
                     {% endif %}
@@ -146,11 +147,20 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Auto-refresh for pending/processing payments
+        // Simple page refresh for pending/processing payments - no AJAX to avoid conflicts
         {% if payment.status == 'pending' or payment.status == 'processing' %}
-            setTimeout(function() {
+        
+        // Prevent multiple timers
+        if (!window.paymentRefreshTimer) {
+            console.log('Setting up payment refresh timer');
+            
+            // Simple page refresh every 15 seconds
+            window.paymentRefreshTimer = setTimeout(function() {
+                console.log('Refreshing payment status page');
                 window.location.reload();
-            }, 10000);
+            }, 15000);
+        }
+        
         {% endif %}
 
         function checkStatus() {
@@ -160,7 +170,7 @@
             
             setTimeout(function() {
                 window.location.reload();
-            }, 2000);
+            }, 1000);
         }
     </script>
 </body>

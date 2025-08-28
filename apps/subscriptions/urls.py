@@ -14,6 +14,7 @@ urlpatterns = [
     path('payment/<uuid:payment_id>/', views.payment_view, name='payment'),
     path('payment/', views.subscription_payment_view, name='subscription_payment'),
     path('payment-status/<uuid:payment_id>/', views.payment_status_view, name='payment_status'),
+    path('ajax/payment-status/<uuid:payment_id>/', views.check_payment_status_ajax, name='check_payment_status_ajax'),
     
     # Subscription management (business tenant context)
     path('overview/', views.subscription_overview, name='subscription_overview'),
@@ -47,4 +48,5 @@ urlpatterns = [
     
     # Callbacks (external services)
     path('mpesa-callback/', views.mpesa_callback_view, name='mpesa_callback'),
+    path('mpesa-timeout/', views.mpesa_callback_view, name='mpesa_timeout'),
 ]
