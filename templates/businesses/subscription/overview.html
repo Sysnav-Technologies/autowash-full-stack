@@ -2,7 +2,10 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Subscription Overview - {{ business.name }}{% endblock %}
+{% block title %}Subscription Ove                        <div class="mb-3">
+                            <h3 class="mb-1">{{ current_plan.name }}</h3>
+                            <p class="mb-0 opacity-75">{{ current_plan.description }}</p>
+                        </div>w - {{ business.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -106,8 +109,8 @@
                 <div class="subscription-header {% if subscription.status == 'trial' %}trial{% elif subscription.status == 'expired' %}expired{% endif %}">
                     <div class="row align-items-center">
                         <div class="col-md-8">
-                            <h3 class="mb-1">{{ subscription.plan.name }}</h3>
-                            <p class="mb-0 opacity-75">{{ subscription.plan.description }}</p>
+                            <h3 class="mb-1">{{ current_plan.name|default:"No Plan" }}</h3>
+                            <p class="mb-0 opacity-75">{{ current_plan.description|default:"No plan description available" }}</p>
                         </div>
                         <div class="col-md-4 text-md-end">
                             <div class="status-badge status-{{ subscription.status }}">
@@ -122,7 +125,7 @@
                         <div class="col-md-6">
                             <h6>Subscription Details</h6>
                             <ul class="list-unstyled">
-                                <li><strong>Plan:</strong> {{ subscription.plan.name }}</li>
+                                <li><strong>Plan:</strong> {{ current_plan.name }}</li>
                                 <li><strong>Amount:</strong> KES {{ subscription.amount|floatformat:2|intcomma }}</li>
                                 <li><strong>Start Date:</strong> {{ subscription.start_date|date:"F d, Y" }}</li>
                                 <li><strong>End Date:</strong> {{ subscription.end_date|date:"F d, Y" }}</li>
@@ -134,26 +137,28 @@
                                 {% endif %}
                             </ul>
                         </div>
+                        {% if current_plan %}
                         <div class="col-md-6">
                             <h6>Plan Features</h6>
                             <ul class="feature-list">
                                 <li><i class="fas fa-users text-primary me-2"></i>
-                                    {% if subscription.plan.max_employees == -1 %}Unlimited{% else %}{{ subscription.plan.max_employees }}{% endif %} Employees
+                                    {% if current_plan.max_employees == -1 %}Unlimited{% else %}{{ current_plan.max_employees }}{% endif %} Employees
                                 </li>
                                 <li><i class="fas fa-user-friends text-primary me-2"></i>
-                                    {% if subscription.plan.max_customers == -1 %}Unlimited{% else %}{{ subscription.plan.max_customers }}{% endif %} Customers
+                                    {% if current_plan.max_customers == -1 %}Unlimited{% else %}{{ current_plan.max_customers }}{% endif %} Customers
                                 </li>
                                 <li><i class="fas fa-map-marker-alt text-primary me-2"></i>
-                                    {% if subscription.plan.max_locations == -1 %}Unlimited{% else %}{{ subscription.plan.max_locations }}{% endif %} Locations
+                                    {% if current_plan.max_locations == -1 %}Unlimited{% else %}{{ current_plan.max_locations }}{% endif %} Locations
                                 </li>
                                 <li><i class="fas fa-cogs text-primary me-2"></i>
-                                    {% if subscription.plan.max_services == -1 %}Unlimited{% else %}{{ subscription.plan.max_services }}{% endif %} Services
+                                    {% if current_plan.max_services == -1 %}Unlimited{% else %}{{ current_plan.max_services }}{% endif %} Services
                                 </li>
                                 <li><i class="fas fa-hdd text-primary me-2"></i>
-                                    {% if subscription.plan.storage_limit == -1 %}Unlimited{% else %}{{ subscription.plan.storage_limit }}MB{% endif %} Storage
+                                    {% if current_plan.storage_limit == -1 %}Unlimited{% else %}{{ current_plan.storage_limit }}MB{% endif %} Storage
                                 </li>
                             </ul>
                         </div>
+                        {% endif %}
                     </div>
                     
                     <!-- Action Buttons -->
@@ -213,16 +218,16 @@
                     <h6 class="mb-0">Current Usage</h6>
                 </div>
                 <div class="card-body">
-                    {% if usage %}
+                    {% if usage_stats and current_plan %}
                     <!-- Employees -->
                     <div class="mb-3">
                         <div class="d-flex justify-content-between mb-1">
                             <small>Employees</small>
-                            <small>{{ usage.employees_count }}/{% if subscription.plan.max_employees == -1 %}∞{% else %}{{ subscription.plan.max_employees }}{% endif %}</small>
+                            <small>{{ usage_stats.employees_count }}/{% if current_plan.max_employees == -1 %}∞{% else %}{{ current_plan.max_employees }}{% endif %}</small>
                         </div>
-                        {% if subscription.plan.max_employees != -1 %}
+                        {% if current_plan.max_employees != -1 %}
                         <div class="progress usage-progress">
-                            <div class="progress-bar" style="width: {% widthratio usage.employees_count subscription.plan.max_employees 100 %}%"></div>
+                            <div class="progress-bar" style="width: {% widthratio usage_stats.employees_count current_plan.max_employees 100 %}%"></div>
                         </div>
                         {% endif %}
                     </div>
@@ -231,11 +236,11 @@
                     <div class="mb-3">
                         <div class="d-flex justify-content-between mb-1">
                             <small>Customers</small>
-                            <small>{{ usage.customers_count }}/{% if subscription.plan.max_customers == -1 %}∞{% else %}{{ subscription.plan.max_customers }}{% endif %}</small>
+                            <small>{{ usage_stats.customers_count }}/{% if current_plan.max_customers == -1 %}∞{% else %}{{ current_plan.max_customers }}{% endif %}</small>
                         </div>
-                        {% if subscription.plan.max_customers != -1 %}
+                        {% if current_plan.max_customers != -1 %}
                         <div class="progress usage-progress">
-                            <div class="progress-bar" style="width: {% widthratio usage.customers_count subscription.plan.max_customers 100 %}%"></div>
+                            <div class="progress-bar" style="width: {% widthratio usage_stats.customers_count current_plan.max_customers 100 %}%"></div>
                         </div>
                         {% endif %}
                     </div>
@@ -244,11 +249,11 @@
                     <div class="mb-3">
                         <div class="d-flex justify-content-between mb-1">
                             <small>Services</small>
-                            <small>{{ usage.services_count }}/{% if subscription.plan.max_services == -1 %}∞{% else %}{{ subscription.plan.max_services }}{% endif %}</small>
+                            <small>{{ usage_stats.services_count }}/{% if current_plan.max_services == -1 %}∞{% else %}{{ current_plan.max_services }}{% endif %}</small>
                         </div>
-                        {% if subscription.plan.max_services != -1 %}
+                        {% if current_plan.max_services != -1 %}
                         <div class="progress usage-progress">
-                            <div class="progress-bar" style="width: {% widthratio usage.services_count subscription.plan.max_services 100 %}%"></div>
+                            <div class="progress-bar" style="width: {% widthratio usage_stats.services_count current_plan.max_services 100 %}%"></div>
                         </div>
                         {% endif %}
                     </div>
@@ -257,11 +262,11 @@
                     <div class="mb-0">
                         <div class="d-flex justify-content-between mb-1">
                             <small>Storage</small>
-                            <small>{{ usage.storage_used }}MB/{% if subscription.plan.storage_limit == -1 %}∞{% else %}{{ subscription.plan.storage_limit }}MB{% endif %}</small>
+                            <small>{{ usage_stats.storage_used }}MB/{% if current_plan.storage_limit == -1 %}∞{% else %}{{ current_plan.storage_limit }}MB{% endif %}</small>
                         </div>
-                        {% if subscription.plan.storage_limit != -1 %}
+                        {% if current_plan.storage_limit != -1 %}
                         <div class="progress usage-progress">
-                            <div class="progress-bar" style="width: {% widthratio usage.storage_used subscription.plan.storage_limit 100 %}%"></div>
+                            <div class="progress-bar" style="width: {% widthratio usage_stats.storage_used current_plan.storage_limit 100 %}%"></div>
                         </div>
                         {% endif %}
                     </div>

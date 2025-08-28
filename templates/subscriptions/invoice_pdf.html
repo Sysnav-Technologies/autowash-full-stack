@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice #{{ invoice.invoice_number }} - AutoWash App Limited</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+        }
+        
+        .invoice-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+        }
+        
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #007bff;
+        }
+        
+        .company-info {
+            flex: 1;
+        }
+        
+        .company-logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        
+        .company-details {
+            font-size: 11px;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .invoice-meta {
+            text-align: right;
+            flex: 1;
+        }
+        
+        .invoice-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .invoice-number {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .invoice-date {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .billing-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        
+        .bill-to, .business-info {
+            flex: 1;
+        }
+        
+        .bill-to {
+            margin-right: 30px;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        .address-line {
+            margin-bottom: 3px;
+            font-size: 11px;
+        }
+        
+        .invoice-items {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        
+        .invoice-items th {
+            background-color: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 11px;
+            text-transform: uppercase;
+            border: 1px solid #dee2e6;
+        }
+        
+        .invoice-items td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            font-size: 11px;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .invoice-totals {
+            width: 300px;
+            margin-left: auto;
+            margin-bottom: 30px;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .total-row.final {
+            font-weight: bold;
+            font-size: 14px;
+            border-bottom: 2px solid #007bff;
+            border-top: 2px solid #007bff;
+            background-color: #f8f9fa;
+            padding: 12px 0;
+        }
+        
+        .payment-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .payment-info h4 {
+            color: #007bff;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .payment-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 11px;
+        }
+        
+        .footer-notes {
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .footer-notes .company-footer {
+            margin-top: 15px;
+        }
+        
+        .description {
+            color: #666;
+        }
+
+        /* Action buttons - hidden when printing */
+        .no-print {
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            text-decoration: none;
+            border-radius: 0.375rem;
+            margin-right: 1rem;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Print styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-paid {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-overdue {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Header -->
+        <div class="invoice-header">
+            <div class="company-info">
+                <div class="company-logo">AutoWash App Limited</div>
+                <div class="company-details">
+                    Smart Car Care Management System<br>
+                    Nairobi, Kenya<br>
+                    Email: support@autowash.co.ke<br>
+                    Phone: +254 700 000 000<br>
+                    Website: www.autowash.co.ke
+                </div>
+            </div>
+            <div class="invoice-meta">
+                <div class="invoice-title">INVOICE</div>
+                <div class="invoice-number">#{{ invoice.invoice_number }}</div>
+                <div class="invoice-date">{{ invoice.created_at|date:"F d, Y" }}</div>
+                <div class="invoice-date">
+                    <span class="status-badge status-{{ invoice.status|default:'pending' }}">
+                        {{ invoice.status|default:'pending'|title }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Billing Information -->
+        <div class="billing-info">
+            <div class="bill-to">
+                <div class="section-title">Bill To</div>
+                <div class="address-line"><strong>{{ business.name }}</strong></div>
+                <div class="address-line">{{ business.address|default:"Address not provided" }}</div>
+                <div class="address-line">{{ business.city|default:"" }}{% if business.postal_code %}, {{ business.postal_code }}{% endif %}</div>
+                <div class="address-line">{{ business.country|default:"Kenya" }}</div>
+                {% if business.phone %}
+                <div class="address-line">Phone: {{ business.phone }}</div>
+                {% endif %}
+                {% if business.email %}
+                <div class="address-line">Email: {{ business.email }}</div>
+                {% endif %}
+            </div>
+            <div class="business-info">
+                <div class="section-title">Invoice Details</div>
+                <div class="address-line"><strong>Issue Date:</strong> {{ invoice.created_at|date:"F d, Y" }}</div>
+                <div class="address-line"><strong>Due Date:</strong> {{ invoice.due_date|date:"F d, Y"|default:"Upon Receipt" }}</div>
+                <div class="address-line"><strong>Payment Terms:</strong> Net 30 Days</div>
+                <div class="address-line"><strong>Subscription Period:</strong> {{ invoice.period_start|date:"M d, Y" }} - {{ invoice.period_end|date:"M d, Y" }}</div>
+            </div>
+        </div>
+
+        <!-- Invoice Items -->
+        <table class="invoice-items">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th class="text-center">Period</th>
+                    <th class="text-center">Quantity</th>
+                    <th class="text-right">Unit Price</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <strong>{{ plan.name }} Subscription</strong><br>
+                        <small class="description">{{ plan.description }}</small>
+                    </td>
+                    <td class="text-center">
+                        {{ invoice.period_start|date:"M d" }} - {{ invoice.period_end|date:"M d, Y" }}
+                    </td>
+                    <td class="text-center">1</td>
+                    <td class="text-right">KES {{ invoice.amount|floatformat:2 }}</td>
+                    <td class="text-right">KES {{ invoice.amount|floatformat:2 }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Totals -->
+        <div class="invoice-totals">
+            <div class="total-row">
+                <span>Total Amount (VAT Inclusive):</span>
+                <span>KES {{ invoice.total_amount|default:invoice.amount|floatformat:2 }}</span>
+            </div>
+            <div class="total-row">
+                <span>Subtotal (Before VAT):</span>
+                <span>KES {% widthratio invoice.total_amount|default:invoice.amount 116 100 %}</span>
+            </div>
+            <div class="total-row">
+                <span>VAT (16% Inclusive):</span>
+                <span>KES {% widthratio invoice.total_amount|default:invoice.amount 116 16 %}</span>
+            </div>
+            {% if invoice.discount_amount %}
+            <div class="total-row">
+                <span>Discount Applied:</span>
+                <span>-KES {{ invoice.discount_amount|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Payment Information -->
+        <div class="payment-info">
+            <h4>Payment Information</h4>
+            <div class="payment-details">
+                <div>
+                    <strong>Payment Methods:</strong><br>
+                    • M-Pesa: Pay via AutoWash App Limited<br>
+                    • Bank Transfer: See details below<br>
+                    • Credit/Debit Card: Online payment
+                </div>
+                <div>
+                    <strong>Bank Details:</strong><br>
+                    Bank: {{ bank_details.bank_name }}<br>
+                    Account: {{ bank_details.account_number }}<br>
+                    Name: {{ bank_details.account_name }}<br>
+                    Branch: {{ bank_details.branch }}<br>
+                    Swift Code: {{ bank_details.swift_code }}<br>
+                    Reference: {{ bank_details.reference }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-notes">
+            <p><strong>Terms & Conditions:</strong></p>
+            <p>Payment is due within 30 days of invoice date. Late payments may incur additional charges.</p>
+            <p>For support or questions about this invoice, please contact us at support@autowash.co.ke</p>
+            <p class="company-footer">
+                <strong>AutoWash App Limited</strong> | Smart Car Care Management Solutions<br>
+                This is a computer-generated invoice. Thank you for your business!
+            </p>
+        </div>
+
+        <!-- Action buttons (hidden when printing) -->
+        <div class="no-print">
+            <a href="?download=true" class="btn btn-primary">
+                <i class="fas fa-download"></i> Download PDF
+            </a>
+            <button onclick="window.print()" class="btn btn-secondary">
+                <i class="fas fa-print"></i> Print
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Auto print when opened in new window
+        if (window.location.search.includes('print=true')) {
+            window.onload = function() {
+                window.print();
+            }
+        }
+    </script>
+</body>
+</html>

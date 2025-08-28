@@ -47,6 +47,7 @@
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
@@ -90,7 +91,7 @@
                                 <tr>
                                     <td>{{ payment.created_at|date:"M d, Y" }}</td>
                                     <td>
-                                        <strong>{{ payment.subscription.plan.name }}</strong><br>
+                                        <strong>{{ current_plan.name }}</strong><br>
                                         <small class="text-muted">Subscription payment</small>
                                     </td>
                                     <td>
@@ -119,15 +120,18 @@
                                     </td>
                                     <td>
                                         {% if payment.status == 'completed' %}
-                                        <a href="#" class="invoice-link" onclick="downloadInvoice('{{ payment.payment_id }}')">
-                                            <i class="fas fa-download me-1"></i>Invoice
+                                        <a href="/business/{{ business.slug }}/subscriptions/invoice/{{ payment.payment_id }}/" class="invoice-link" target="_blank">
+                                            <i class="fas fa-file-pdf me-1"></i>View Invoice
+                                        </a>
+                                        <a href="/business/{{ business.slug }}/subscriptions/invoice/{{ payment.payment_id }}/?download=true" class="btn btn-sm btn-outline-success ms-2">
+                                            <i class="fas fa-download"></i> Download
                                         </a>
                                         {% elif payment.status == 'pending' %}
-                                        <a href="/business/{{ business.slug }}/business/subscriptions/payment-status/{{ payment.payment_id }}/" class="btn btn-sm btn-outline-primary">
+                                        <a href="/business/{{ business.slug }}/subscriptions/payment-status/{{ payment.payment_id }}/" class="btn btn-sm btn-outline-primary">
                                             <i class="fas fa-credit-card me-1"></i>Complete Payment
                                         </a>
                                         {% elif payment.status == 'failed' %}
-                                        <a href="/business/{{ business.slug }}/business/subscriptions/payment/" class="btn btn-sm btn-outline-warning">
+                                        <a href="/business/{{ business.slug }}/subscriptions/payment/" class="btn btn-sm btn-outline-warning">
                                             <i class="fas fa-redo me-1"></i>Retry
                                         </a>
                                         {% endif %}
@@ -194,34 +198,48 @@
 <script>
 function downloadInvoice(paymentId) {
     // Generate and download invoice for payment
-    const url = `/subscriptions/api/generate-invoice/${paymentId}/`;
+    const url = '/subscriptions/api/generate-pdf/';
     
     fetch(url, {
         method: 'POST',
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json',
-        }
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `payment_id=${paymentId}`
     })
-    .then(response => {
-        if (response.ok) {
-            return response.blob();
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.pdf_data) {
+                // If PDF data is provided, download directly
+                const byteCharacters = atob(data.pdf_data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], {type: 'application/pdf'});
+                
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename || `invoice_${paymentId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else if (data.download_url) {
+                // If download URL is provided, redirect to it
+                window.open(data.download_url, '_blank');
+            }
+        } else {
+            alert('Error generating invoice: ' + data.error);
         }
-        throw new Error('Failed to generate invoice');
-    })
-    .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `invoice_${paymentId}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to download invoice. Please try again.');
+        alert('Failed to generate invoice. Please try again.');
     });
 }
 

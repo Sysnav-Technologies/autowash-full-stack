@@ -31,6 +31,7 @@ urlpatterns = [
     path('check-discount/', views.check_discount_code_view, name='check_discount'),
     
     # Invoices (public access)
+    path('invoice/<uuid:payment_id>/', views.view_payment_invoice, name='view_payment_invoice'),
     path('invoice/<uuid:invoice_id>/download/', views.download_invoice_view, name='download_invoice'),
     
     # AJAX endpoints for subscription functionality (that exist in subscriptions app)

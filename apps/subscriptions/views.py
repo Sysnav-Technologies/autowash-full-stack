@@ -194,7 +194,7 @@ def subscribe_view(request, plan_slug):
         # If user has active subscription and business is verified, go to subscription management
         if business.is_verified and business.is_approved:
             messages.info(request, "You already have an active subscription.")
-            return redirect('subscriptions:manage_subscription')
+            return redirect(f'/business/{business.slug}/subscriptions/manage/')
         else:
             # If subscription is active but business not fully verified, go to verification
             messages.info(request, "Your subscription is active. Please wait for business verification to complete.")
@@ -249,7 +249,7 @@ def subscribe_view(request, plan_slug):
             business.save()
             
             # Create usage tracking
-            SubscriptionUsage.objects.create(subscription=subscription)
+            SubscriptionUsage.objects.using('default').create(subscription=subscription)
             
             # Send business registration email after subscription selection
             try:
@@ -446,28 +446,36 @@ def manage_subscription_view(request):
     if not subscription:
         return redirect('subscriptions:pricing')
     
-    # Get subscription usage
-    usage = getattr(subscription, 'usage', None)
-    if not usage:
-        usage = SubscriptionUsage.objects.create(subscription=subscription)
+    # Get subscription usage from default database
+    try:
+        usage = SubscriptionUsage.objects.using('default').filter(subscription=subscription).first()
+        if not usage:
+            usage = SubscriptionUsage.objects.using('default').create(subscription=subscription)
+    except Exception as e:
+        logger.warning(f"Could not access subscription usage: {e}")
+        usage = None
     
-    # Get recent payments
-    recent_payments = subscription.payments.order_by('-created_at')[:5]
+    # Get recent payments from default database
+    recent_payments = Payment.objects.using('default').filter(subscription=subscription).order_by('-created_at')[:5]
     
-    # Get invoices
-    invoices = subscription.invoices.order_by('-created_at')[:10]
+    # Get invoices from default database
+    invoices = SubscriptionInvoice.objects.using('default').filter(subscription=subscription).order_by('-created_at')[:10]
+    
+    # Get current plan from default database
+    current_plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
     
     context = {
         'business': business,
         'subscription': subscription,
+        'current_plan': current_plan,
         'usage': usage,
         'recent_payments': recent_payments,
         'invoices': invoices,
         'can_upgrade': True,  # Logic for upgrade availability
-        'available_plans': SubscriptionPlan.objects.using('default').filter(is_active=True).exclude(id=subscription.plan.id)
+        'available_plans': SubscriptionPlan.objects.using('default').filter(is_active=True).exclude(id=subscription.plan_id)
     }
     
-    return render(request, 'subscriptions/manage.html', context)
+    return render(request, 'businesses/subscription/manage.html', context)
 
 @login_required
 @require_POST
@@ -519,7 +527,7 @@ def upgrade_view(request):
     # If user has an active subscription, show upgrade options
     if subscription.is_active:
         messages.info(request, "You already have an active subscription.")
-        return redirect('subscriptions:manage_subscription')
+        return redirect(f'/business/{business.slug}/subscriptions/manage/')
     
     # Calculate trial days remaining if applicable
     trial_days_left = 0
@@ -826,21 +834,136 @@ def download_invoice_view(request, invoice_id):
         business = Tenant.objects.using('default').get(owner=request.user, subscription=invoice.subscription)
     except Tenant.DoesNotExist:
         messages.error(request, "Invoice not found.")
-        return redirect('subscriptions:manage_subscription')
+        return redirect('subscriptions:pricing')
     
-    # Generate PDF (you'll need to implement PDF generation)
-    # For now, return a simple HTML view
+    # Get plan from default database to avoid cross-database issues
+    plan = SubscriptionPlan.objects.using('default').get(id=invoice.subscription.plan_id) if invoice.subscription else None
+    
+    # Generate PDF using HTML template
+    from django.template.loader import get_template
+    from django.http import HttpResponse
+    import weasyprint
+    
     context = {
         'invoice': invoice,
-        'business': business
+        'business': business,
+        'plan': plan,
+        'bank_details': {
+            'bank_name': 'Family Bank',
+            'account_number': '0142013518620',
+            'account_name': 'AutoWash App Ltd',
+            'branch': 'Eldoret Branch',
+            'swift_code': 'EQBLKENA',
+            'reference': invoice.invoice_number
+        }
     }
+    
+    # Render HTML template
+    template = get_template('subscriptions/invoice_pdf.html')
+    html_string = template.render(context)
+    
+    # Generate PDF
+    try:
+        # Use weasyprint if available, otherwise fall back to browser-based generation
+        try:
+            import weasyprint
+            pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.invoice_number}.pdf"'
+            return response
+        except ImportError:
+            # Fallback: Return HTML with print styles and auto-print script
+            response = HttpResponse(html_string)
+            response['Content-Type'] = 'text/html'
+            return response
+    except Exception as e:
+        # If PDF generation fails, return HTML version
+        return render(request, 'subscriptions/invoice_pdf.html', context)
+
+@login_required
+def view_payment_invoice(request, payment_id):
+    """View invoice for a specific payment"""
+    # Get payment from default database
+    payment = get_object_or_404(Payment.objects.using('default'), payment_id=payment_id)
+    
+    # Get subscription separately from default database
+    subscription = Subscription.objects.using('default').get(id=payment.subscription_id)
+    
+    # Ensure payment belongs to user's business
+    try:
+        business = Tenant.objects.using('default').get(owner=request.user, subscription=subscription)
+    except Tenant.DoesNotExist:
+        messages.error(request, "Invoice not found.")
+        return redirect('subscriptions:pricing')
+    
+    # Get plan from default database to avoid cross-database issues
+    plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
+    
+    # Create a temporary invoice-like object for the template
+    invoice_data = {
+        'invoice_number': f"PAY-{payment.payment_id}",
+        'created_at': payment.created_at,
+        'due_date': payment.created_at,
+        'period_start': payment.created_at,
+        'period_end': payment.created_at + timezone.timedelta(days=30),
+        'amount': payment.amount,
+        'total_amount': payment.amount,
+        'status': payment.status,
+        'subscription': subscription
+    }
+    
+    context = {
+        'invoice': type('obj', (object,), invoice_data),
+        'business': business,
+        'plan': plan,
+        'payment': payment,
+        'bank_details': {
+            'bank_name': 'Family Bank',
+            'account_number': '0142013518620',
+            'account_name': 'AutoWash App Limited',
+            'branch': 'Eldoret Branch',
+            'swift_code': 'EQBLKENA',
+            'reference': f"PAY-{payment.payment_id}"
+        }
+    }
+    
+    # Check if download is requested
+    if request.GET.get('download') == 'true':
+        # Generate PDF using HTML template
+        from django.template.loader import get_template
+        from django.http import HttpResponse
+        
+        # Render HTML template
+        template = get_template('subscriptions/invoice_pdf.html')
+        html_string = template.render(context)
+        
+        # Generate PDF
+        try:
+            # Use weasyprint if available, otherwise fall back to browser-based generation
+            try:
+                import weasyprint
+                pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+                response = HttpResponse(pdf_file, content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="invoice_PAY-{payment.payment_id}.pdf"'
+                return response
+            except ImportError:
+                # Fallback: Return HTML with print styles and auto-print script
+                response = HttpResponse(html_string)
+                response['Content-Type'] = 'text/html'
+                return response
+        except Exception as e:
+            # If PDF generation fails, return HTML version
+            return render(request, 'subscriptions/invoice_pdf.html', context)
     
     return render(request, 'subscriptions/invoice_pdf.html', context)
 
 # Utility functions
 def send_payment_instructions_email(email, payment):
     """Send bank transfer instructions"""
-    subject = f"Payment Instructions - Invoice #{payment.subscription.invoices.first().invoice_number}"
+    # Get first invoice from default database
+    first_invoice = SubscriptionInvoice.objects.using('default').filter(subscription=payment.subscription).first()
+    invoice_number = first_invoice.invoice_number if first_invoice else payment.payment_id
+    subject = f"Payment Instructions - Invoice #{invoice_number}"
     context = {
         'payment': payment,
         'bank_details': {
@@ -914,7 +1037,15 @@ def subscription_overview(request):
         # Use default database for subscription queries since subscriptions are in SHARED_APPS
         subscription = Subscription.objects.using('default').filter(
             business=business
-        ).select_related('plan').first()
+        ).first()
+        
+        # Get plan separately from default database to avoid cross-database joins
+        current_plan = None
+        if subscription and subscription.plan_id:
+            try:
+                current_plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
+            except SubscriptionPlan.DoesNotExist:
+                current_plan = None
         
         # Get available plans
         available_plans = SubscriptionPlan.objects.using('default').filter(is_active=True)
@@ -924,15 +1055,19 @@ def subscription_overview(request):
         month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         # Get usage metrics (these would come from your actual usage tracking)
+        # Using the tenant database for business-specific counts
         usage_stats = {
             'orders_this_month': 0,  # Replace with actual count
-            'customers_count': 0,    # Replace with actual count
+            'customers_count': 0,    # Replace with actual count from tenant DB
+            'employees_count': 0,    # Replace with actual count from tenant DB
+            'services_count': 0,     # Replace with actual count from tenant DB
             'storage_used': 0,       # Replace with actual calculation
             'api_calls': 0,          # Replace with actual count
         }
         
         context = {
             'subscription': subscription,
+            'current_plan': current_plan,
             'available_plans': available_plans,
             'usage_stats': usage_stats,
             'current_date': current_date,
@@ -955,15 +1090,34 @@ def billing_history(request):
             messages.error(request, 'Business context not found.')
             return redirect('/')
         
-        # Get billing history
-        invoices = SubscriptionInvoice.objects.using('default').filter(
-            subscription__business=business
-        ).select_related('subscription__plan').order_by('-created_at')
+        # Get current subscription
+        subscription = Subscription.objects.using('default').filter(
+            business=business
+        ).first()
         
-        # Pagination could be added here
+        if not subscription:
+            messages.error(request, 'No subscription found.')
+            return redirect('subscriptions:select')
+        
+        # Get plan separately from default database
+        plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id) if subscription else None
+        
+        # Get billing history - both invoices and payments
+        invoices = SubscriptionInvoice.objects.using('default').filter(
+            subscription=subscription
+        ).order_by('-created_at')
+        
+        # Get all payments for this subscription
+        payments = Payment.objects.using('default').filter(
+            subscription=subscription
+        ).order_by('-created_at')
         
         context = {
+            'subscription': subscription,
+            'current_plan': plan,
+            'business': business,
             'invoices': invoices,
+            'payments': payments,
         }
         
         return render(request, 'businesses/subscription/billing_history.html', context)
@@ -1018,7 +1172,12 @@ def usage_analytics(request):
         # Get current subscription
         subscription = Subscription.objects.using('default').filter(
             business=business
-        ).select_related('plan').first()
+        ).first()
+        
+        # Get plan from default database if subscription exists
+        plan = None
+        if subscription:
+            plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
         
         # Get usage metrics for the current month
         current_date = timezone.now()
@@ -1033,19 +1192,19 @@ def usage_analytics(request):
         usage_summary = {
             'orders': {
                 'used': sum(getattr(metric, 'orders_count', 0) for metric in usage_metrics),
-                'limit': subscription.plan.max_services if subscription else 1000,  # Using max_services as orders proxy
+                'limit': plan.max_services if plan else 1000,  # Using max_services as orders proxy
             },
             'customers': {
                 'used': sum(getattr(metric, 'customers_count', 0) for metric in usage_metrics),
-                'limit': subscription.plan.max_customers if subscription else 500,
+                'limit': plan.max_customers if plan else 500,
             },
             'storage': {
                 'used': sum(getattr(metric, 'storage_mb', 0) for metric in usage_metrics),
-                'limit': subscription.plan.storage_limit if subscription else 1024,  # Using storage_limit
+                'limit': plan.storage_limit if plan else 1024,  # Using storage_limit
             },
             'api_calls': {
                 'used': sum(getattr(metric, 'api_calls', 0) for metric in usage_metrics),
-                'limit': subscription.plan.max_employees * 1000 if subscription else 10000,  # Using max_employees as API proxy
+                'limit': plan.max_employees * 1000 if plan else 10000,  # Using max_employees as API proxy
             },
         }
         
@@ -1056,6 +1215,7 @@ def usage_analytics(request):
         
         context = {
             'subscription': subscription,
+            'current_plan': plan,
             'usage_metrics': usage_metrics[:30],  # Last 30 days
             'usage_summary': usage_summary,
             'current_month': current_date.strftime('%B %Y'),
@@ -1084,7 +1244,10 @@ def subscription_settings(request):
         # Get current subscription
         subscription = Subscription.objects.using('default').filter(
             business=business
-        ).select_related('plan').first()
+        ).first()
+        
+        # Get plan separately from default database
+        plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id) if subscription else None
         
         if request.method == 'POST':
             # Handle subscription settings updates
@@ -1144,7 +1307,7 @@ def select_subscription_plan(request):
             return JsonResponse({'success': False, 'error': 'Plan ID required'})
         
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # Get the plan
         plan = get_object_or_404(SubscriptionPlan.objects.using('default'), id=plan_id)
@@ -1191,7 +1354,7 @@ def cancel_subscription_ajax(request):
         feedback = request.POST.get('feedback', '')
         
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # Get active subscription
         subscription = Subscription.objects.using('default').filter(
@@ -1232,7 +1395,8 @@ def add_payment_method(request):
         set_default = request.POST.get('set_default') == 'true'
         
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        from apps.core.tenant_models import Tenant
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # Validate card number (basic validation)
         if not card_number or len(card_number.replace(' ', '')) < 13:
@@ -1281,7 +1445,7 @@ def set_default_payment_method(request):
             return JsonResponse({'success': False, 'error': 'Payment method ID required'})
         
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # In real implementation, you'd update the payment methods
         # PaymentMethod.objects.filter(business=business).update(is_default=False)
@@ -1305,7 +1469,7 @@ def remove_payment_method(request):
             return JsonResponse({'success': False, 'error': 'Payment method ID required'})
         
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # In real implementation, you'd remove the payment method
         # payment_method = PaymentMethod.objects.filter(id=payment_method_id, business=business).first()
@@ -1330,7 +1494,7 @@ def track_invoice_download(request):
             return JsonResponse({'success': False, 'error': 'Invoice ID required'})
         
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # Track download (you could create a DownloadLog model)
         # DownloadLog.objects.create(
@@ -1353,23 +1517,81 @@ def track_invoice_download(request):
 def generate_invoice_pdf(request):
     """AJAX endpoint for generating invoice PDF"""
     try:
-        invoice_id = request.POST.get('invoice_id')
-        if not invoice_id:
-            return JsonResponse({'success': False, 'error': 'Invoice ID required'})
+        payment_id = request.POST.get('payment_id')
+        if not payment_id:
+            return JsonResponse({'success': False, 'error': 'Payment ID required'})
         
-        # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        # Get payment from default database
+        payment = get_object_or_404(Payment.objects.using('default'), payment_id=payment_id)
         
-        # In real implementation, you'd generate the PDF
-        # from reportlab.pdfgen import canvas
-        # from reportlab.lib.pagesizes import letter
+        # Get subscription separately from default database
+        subscription = Subscription.objects.using('default').get(id=payment.subscription_id)
         
-        # For now, return success
-        return JsonResponse({
-            'success': True, 
-            'message': 'PDF generated successfully',
-            'pdf_url': f'/media/invoices/invoice_{invoice_id}.pdf'
-        })
+        # Ensure payment belongs to user's business
+        try:
+            business = Tenant.objects.using('default').get(owner=request.user, subscription=subscription)
+        except Tenant.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Invoice not found'})
+        
+        # Get plan from default database
+        plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
+        
+        # Create invoice data
+        invoice_data = {
+            'invoice_number': f"PAY-{payment.payment_id}",
+            'created_at': payment.created_at,
+            'due_date': payment.created_at,
+            'period_start': payment.created_at,
+            'period_end': payment.created_at + timezone.timedelta(days=30),
+            'amount': payment.amount,
+            'total_amount': payment.amount,
+            'status': payment.status,
+            'subscription': subscription
+        }
+        
+        context = {
+            'invoice': type('obj', (object,), invoice_data),
+            'business': business,
+            'plan': plan,
+            'payment': payment,
+            'bank_details': {
+                'bank_name': 'Family Bank',
+                'account_number': '0142013518620',
+                'account_name': 'AutoWash App Limited',
+                'branch': 'Eldoret Branch',
+                'swift_code': 'EQBLKENA',
+                'reference': f"PAY-{payment.payment_id}"
+            }
+        }
+        
+        # Generate PDF using HTML template
+        from django.template.loader import get_template
+        from django.http import HttpResponse
+        import base64
+        
+        template = get_template('subscriptions/invoice_pdf.html')
+        html_string = template.render(context)
+        
+        try:
+            import weasyprint
+            pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+            
+            # Encode PDF as base64 for JSON response
+            pdf_base64 = base64.b64encode(pdf_file).decode('utf-8')
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'PDF generated successfully',
+                'pdf_data': pdf_base64,
+                'filename': f'invoice_PAY-{payment.payment_id}.pdf'
+            })
+        except ImportError:
+            # If weasyprint not available, return download URL
+            return JsonResponse({
+                'success': True,
+                'message': 'PDF generation ready',
+                'download_url': f'/business/{business.slug}/subscriptions/invoice/{payment_id}/?download=true'
+            })
         
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
@@ -1385,10 +1607,15 @@ def export_billing_history(request):
         end_date = request.GET.get('end_date')
         
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # Get subscription and related data
         subscription = Subscription.objects.using('default').filter(business=business).first()
+        
+        # Get plan from default database if subscription exists
+        plan = None
+        if subscription:
+            plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
         
         # Create date filter
         date_filter = {}
@@ -1406,8 +1633,8 @@ def export_billing_history(request):
         billing_data = [
             {
                 'date': timezone.now().date(),
-                'description': f'{subscription.plan.name} Plan' if subscription else 'Subscription',
-                'amount': subscription.plan.price if subscription else 0,
+                'description': f'{plan.name} Plan' if plan else 'Subscription',
+                'amount': plan.price if plan else 0,
                 'status': 'Paid'
             }
         ]
@@ -1441,7 +1668,7 @@ def refresh_usage_data(request):
     """AJAX endpoint for refreshing usage data"""
     try:
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # Get current subscription
         subscription = Subscription.objects.using('default').filter(business=business).first()
@@ -1504,7 +1731,7 @@ def generate_usage_report(request):
         date_range = request.GET.get('date_range', 'last_30_days')
         
         # Get the business
-        business = get_object_or_404(Business, slug=request.tenant.slug)
+        business = get_object_or_404(Tenant, slug=request.tenant.slug)
         
         # Get usage data for the specified period
         from apps.services.models import Service
@@ -1581,7 +1808,7 @@ def mpesa_callback_view(request):
         if result['success']:
             # Find and update the payment
             try:
-                payment = Payment.objects.get(payment_id=payment_id)
+                payment = Payment.objects.using('default').get(payment_id=payment_id)
                 
                 # Update payment with M-Pesa details
                 payment.status = 'completed'
@@ -1613,7 +1840,7 @@ def mpesa_callback_view(request):
         else:
             # Payment failed
             try:
-                payment = Payment.objects.get(payment_id=payment_id)
+                payment = Payment.objects.using('default').get(payment_id=payment_id)
                 payment.status = 'failed'
                 payment.save()
                 
@@ -1631,7 +1858,9 @@ def mpesa_callback_view(request):
 
 def send_payment_confirmation_email(email, payment):
     """Send payment confirmation email"""
-    subject = f"Payment Confirmation - {payment.subscription.plan.name}"
+    # Get plan from default database
+    plan = SubscriptionPlan.objects.using('default').get(id=payment.subscription.plan_id)
+    subject = f"Payment Confirmation - {plan.name}"
     
     context = {
         'payment': payment,
@@ -1653,7 +1882,9 @@ def send_payment_confirmation_email(email, payment):
 
 def send_payment_instructions_email(email, payment):
     """Send bank transfer payment instructions"""
-    subject = f"Payment Instructions - {payment.subscription.plan.name}"
+    # Get plan from default database
+    plan = SubscriptionPlan.objects.using('default').get(id=payment.subscription.plan_id)
+    subject = f"Payment Instructions - {plan.name}"
     
     context = {
         'payment': payment,
@@ -1691,20 +1922,22 @@ def subscription_payment_view(request):
     if subscription.status == 'active':
         messages.info(request, "Your subscription is already active.")
         if business.is_verified and business.is_approved:
-            return redirect(f'/business/{business.slug}/dashboard/')
+            return redirect(f'/business/{business.slug}/')
         else:
             return redirect('/auth/verification-pending/')
     
     # Get or create pending payment
-    payment = Payment.objects.filter(
+    payment = Payment.objects.using('default').filter(
         subscription=subscription,
         status='pending'
     ).first()
     
     if not payment:
-        payment = Payment.objects.create(
+        # Get plan from default database
+        plan = SubscriptionPlan.objects.using('default').get(id=subscription.plan_id)
+        payment = Payment.objects.using('default').create(
             subscription=subscription,
-            amount=subscription.plan.price,
+            amount=plan.price,
             payment_method='mpesa',
             status='pending'
         )
@@ -1815,7 +2048,7 @@ def payment_status_view(request, payment_id):
         if not request.GET.get('show_status'):  # Allow viewing status with query param
             messages.success(request, "Payment completed successfully! Your subscription is now active.")
             if business.is_verified and business.is_approved:
-                return redirect(f'/business/{business.slug}/dashboard/')
+                return redirect(f'/business/{business.slug}/')
             else:
                 return redirect('/auth/verification-pending/')
     
@@ -1841,7 +2074,7 @@ def mpesa_callback_view(request):
         
         # Get the payment
         try:
-            payment = Payment.objects.get(payment_id=payment_id)
+            payment = Payment.objects.using('default').get(payment_id=payment_id)
         except Payment.DoesNotExist:
             logger.error(f"Payment not found: {payment_id}")
             return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Payment not found'})
