@@ -552,26 +552,107 @@ def purchase_order_print(request, pk):
 @employee_required(['owner', 'manager', 'supervisor'])
 def purchase_order_pdf(request, pk):
     try:
-        from weasyprint import HTML, CSS
-        from django.template.loader import render_to_string
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import inch
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+        from io import BytesIO
         
         order = get_object_or_404(PurchaseOrder, pk=pk)
+        items = order.items.select_related('item').all()
         
-        html_string = render_to_string('suppliers/purchase_order_print.html', {
-            'order': order,
-            'items': order.items.select_related('item').all(),
-            'request': request,
-        })
+        # Create PDF buffer
+        buffer = BytesIO()
         
-        html = HTML(string=html_string, base_url=request.build_absolute_uri())
-        pdf = html.write_pdf()
+        # Create the PDF object
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.HexColor('#007bff'),
+            spaceAfter=30,
+        )
+        
+        # Add company header
+        company_title = Paragraph("Purchase Order", title_style)
+        elements.append(company_title)
+        elements.append(Spacer(1, 12))
+        
+        # Order details
+        order_data = [
+            ['PO Number:', order.po_number],
+            ['Date:', order.created_at.strftime('%B %d, %Y')],
+            ['Supplier:', order.supplier.name],
+            ['Status:', order.status.title()],
+            ['Total Amount:', f"KES {order.total_amount:,.2f}"],
+        ]
+        
+        order_table = Table(order_data, colWidths=[2*inch, 3*inch])
+        order_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.grey),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('BACKGROUND', (1, 0), (1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(order_table)
+        elements.append(Spacer(1, 20))
+        
+        # Items table
+        items_title = Paragraph("Items", styles['Heading2'])
+        elements.append(items_title)
+        elements.append(Spacer(1, 12))
+        
+        # Items data
+        items_data = [['Item', 'Quantity', 'Unit Price', 'Total']]
+        for item in items:
+            items_data.append([
+                item.item.name,
+                str(item.quantity),
+                f"KES {item.unit_price:,.2f}",
+                f"KES {item.total_price:,.2f}"
+            ])
+        
+        items_table = Table(items_data, colWidths=[3*inch, 1*inch, 1.5*inch, 1.5*inch])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(items_table)
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get PDF data
+        pdf = buffer.getvalue()
+        buffer.close()
         
         response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="PO-{order.po_number}.pdf"'
         return response
         
-    except ImportError:
-        messages.error(request, 'PDF generation is not available. Please install weasyprint.')
+    except Exception as e:
+        messages.error(request, f'PDF generation failed: {str(e)}')
         return redirect('suppliers:purchase_order_detail', pk=pk)
 
 @login_required
@@ -1884,30 +1965,108 @@ def invoice_print(request, pk):
 def invoice_pdf(request, pk):
     """Generate PDF for invoice"""
     try:
-        from weasyprint import HTML, CSS
-        from django.template.loader import render_to_string
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import inch
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+        from io import BytesIO
         
         invoice = get_object_or_404(Invoice, pk=pk)
+        items = invoice.items.all()
         
-        # Render HTML template
-        html_string = render_to_string('suppliers/invoice_print.html', {
-            'invoice': invoice,
-            'items': invoice.items.all(),
-            'request': request,
-        })
+        # Create PDF buffer
+        buffer = BytesIO()
         
-        # Create PDF
-        html = HTML(string=html_string, base_url=request.build_absolute_uri())
-        pdf = html.write_pdf()
+        # Create the PDF object
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.HexColor('#007bff'),
+            spaceAfter=30,
+        )
+        
+        # Add company header
+        company_title = Paragraph(f"Invoice - {invoice.invoice_number}", title_style)
+        elements.append(company_title)
+        elements.append(Spacer(1, 12))
+        
+        # Invoice details
+        invoice_data = [
+            ['Invoice Number:', invoice.invoice_number],
+            ['Date:', invoice.created_at.strftime('%B %d, %Y')],
+            ['Supplier:', invoice.supplier.name],
+            ['Status:', invoice.status.title()],
+            ['Total Amount:', f"KES {invoice.total_amount:,.2f}"],
+        ]
+        
+        invoice_table = Table(invoice_data, colWidths=[2*inch, 3*inch])
+        invoice_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.grey),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('BACKGROUND', (1, 0), (1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(invoice_table)
+        elements.append(Spacer(1, 20))
+        
+        # Items table
+        items_title = Paragraph("Items", styles['Heading2'])
+        elements.append(items_title)
+        elements.append(Spacer(1, 12))
+        
+        # Items data
+        items_data = [['Item', 'Quantity', 'Unit Price', 'Total']]
+        for item in items:
+            items_data.append([
+                item.item.name,
+                str(item.quantity),
+                f"KES {item.unit_price:,.2f}",
+                f"KES {item.total_price:,.2f}"
+            ])
+        
+        items_table = Table(items_data, colWidths=[3*inch, 1*inch, 1.5*inch, 1.5*inch])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(items_table)
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get PDF data
+        pdf = buffer.getvalue()
+        buffer.close()
         
         # Return PDF response
         response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="Invoice-{invoice.invoice_number}.pdf"'
         return response
         
-    except ImportError:
-        # Fallback if weasyprint is not installed
-        messages.error(request, 'PDF generation is not available. Please install weasyprint.')
+    except Exception as e:
+        messages.error(request, f'PDF generation failed: {str(e)}')
         return redirect('suppliers:invoice_detail', pk=pk)
 
 @login_required

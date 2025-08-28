@@ -1,0 +1,214 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Payment - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .payment-card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border-radius: 1rem;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    
+    .payment-header {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        border-radius: 1rem 1rem 0 0;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .payment-amount {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0.5rem 0;
+    }
+    
+    .mpesa-logo {
+        width: 60px;
+        height: 60px;
+        background: #00a651;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        margin: 0 auto 1rem;
+    }
+    
+    .form-floating {
+        margin-bottom: 1rem;
+    }
+    
+    .phone-input {
+        background: #f8f9fa;
+        border: 2px solid #dee2e6;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        font-size: 1.1rem;
+        transition: all 0.2s;
+    }
+    
+    .phone-input:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        background: white;
+    }
+    
+    .payment-info {
+        background: #e3f2fd;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .security-notice {
+        background: #f8f9fa;
+        border-left: 4px solid #28a745;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="payment-card card">
+                <div class="payment-header">
+                    <div class="mpesa-logo">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h4>M-Pesa Payment</h4>
+                    <div class="payment-amount">KES {{ subscription.amount|floatformat:2 }}</div>
+                    <p class="mb-0">{{ subscription.plan.name }} Subscription</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="post" id="paymentForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="payment_method" value="mpesa">
+                        
+                        <div class="payment-info">
+                            <h6><i class="fas fa-info-circle me-2"></i>Payment Information</h6>
+                            <div class="row">
+                                <div class="col-6">
+                                    <small class="text-muted">Plan</small>
+                                    <p class="mb-0"><strong>{{ subscription.plan.name }}</strong></p>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Amount</small>
+                                    <p class="mb-0"><strong>KES {{ subscription.amount|floatformat:2 }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-floating">
+                            <input 
+                                type="tel" 
+                                class="form-control phone-input" 
+                                id="phone_number" 
+                                name="phone_number" 
+                                placeholder="254712345678"
+                                pattern="[0-9]{12}"
+                                required
+                                value="{{ request.user.profile.phone_number|default:'' }}"
+                            >
+                            <label for="phone_number">M-Pesa Phone Number</label>
+                            <div class="form-text">
+                                Enter your M-Pesa registered phone number (e.g., 254712345678)
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg" id="payBtn">
+                                <i class="fas fa-mobile-alt me-2"></i>
+                                Pay with M-Pesa
+                            </button>
+                            <a href="/business/{{ business.slug }}/business/subscriptions/overview/" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                    
+                    <div class="security-notice">
+                        <h6><i class="fas fa-shield-alt me-2"></i>Secure Payment</h6>
+                        <p class="text-muted mb-0">
+                            Your payment is secured by M-Pesa and our encrypted systems. 
+                            We never store your financial information.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payment Instructions -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-list-ol me-2"></i>How it works</h6>
+                    <ol class="text-muted">
+                        <li>Enter your M-Pesa registered phone number</li>
+                        <li>Click "Pay with M-Pesa" to initiate the payment</li>
+                        <li>You'll receive an M-Pesa payment request on your phone</li>
+                        <li>Enter your M-Pesa PIN to confirm the payment</li>
+                        <li>Wait for confirmation and your subscription will be activated</li>
+                    </ol>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-clock me-2"></i>
+                        <strong>Payment Processing:</strong> 
+                        Payments typically process within 1-2 minutes. You'll be redirected to a status page after submitting.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('paymentForm').addEventListener('submit', function(e) {
+    const btn = document.getElementById('payBtn');
+    const phoneInput = document.getElementById('phone_number');
+    
+    // Basic phone number validation
+    const phoneNumber = phoneInput.value.trim();
+    if (!phoneNumber.match(/^254[0-9]{9}$/)) {
+        e.preventDefault();
+        alert('Please enter a valid M-Pesa phone number (e.g., 254712345678)');
+        phoneInput.focus();
+        return;
+    }
+    
+    // Show loading state
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+    btn.disabled = true;
+    
+    // Form will submit normally
+});
+
+// Auto-format phone number
+document.getElementById('phone_number').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+    
+    // Auto-prepend 254 if user starts with 07 or 71, etc.
+    if (value.startsWith('07') || value.startsWith('71') || value.startsWith('72') || value.startsWith('73') || value.startsWith('74') || value.startsWith('75') || value.startsWith('76') || value.startsWith('77') || value.startsWith('78') || value.startsWith('79')) {
+        if (value.startsWith('0')) {
+            value = '254' + value.substring(1);
+        }
+    }
+    
+    // Limit to 12 digits
+    if (value.length > 12) {
+        value = value.substring(0, 12);
+    }
+    
+    e.target.value = value;
+});
+</script>
+{% endblock %}

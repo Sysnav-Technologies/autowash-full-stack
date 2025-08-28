@@ -139,17 +139,29 @@ class Subscription(TimeStampedModel):
         verbose_name_plural = "Subscriptions"
     
     def __str__(self):
-        return f"{self.plan.name} - {self.get_status_display()}"
+        try:
+            # Avoid cross-database queries by using plan_id instead of plan.name
+            return f"Subscription {self.subscription_id} - {self.get_status_display()}"
+        except:
+            return f"Subscription {self.subscription_id}"
     
     @property
     def is_active(self):
         """Check if subscription is currently active"""
         now = timezone.now()
-        return (
-            self.status in ['active', 'trial'] and 
-            self.end_date > now and 
-            (not self.trial_end_date or self.trial_end_date > now)
-        )
+        
+        if self.status == 'active':
+            # For active subscriptions, only check end_date
+            return self.end_date > now
+        elif self.status == 'trial':
+            # For trial subscriptions, check both end_date and trial_end_date
+            return (
+                self.end_date > now and 
+                (not self.trial_end_date or self.trial_end_date > now)
+            )
+        else:
+            # For other statuses (expired, cancelled, etc.), not active
+            return False
     
     @property
     def is_trial(self):
@@ -409,7 +421,7 @@ class SubscriptionInvoice(TimeStampedModel):
     
     # Invoice details
     invoice_number = models.CharField(max_length=50, unique=True)
-    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='subscription_invoices')
+    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='invoices')
     payment = models.OneToOneField(Payment, on_delete=models.SET_NULL, null=True, blank=True)
     
     # Amounts

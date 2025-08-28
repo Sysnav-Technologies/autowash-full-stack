@@ -26,11 +26,13 @@ urlpatterns = [
     # Payment Management
     path('payments/', views.payment_management, name='payment_management'),
     path('payments/record/<uuid:subscription_id>/', views.record_payment, name='record_payment'),
+    path('payments/record-manual/', views.record_manual_payment, name='record_manual_payment'),
+    path('payments/update-status/', views.update_payment_status, name='update_payment_status'),
     
     # Invoice Management
     path('invoices/', views.invoice_management, name='invoice_management'),
     path('invoices/generate/<uuid:subscription_id>/', views.generate_invoice, name='generate_invoice'),
-    path('invoices/mark-paid/<int:invoice_id>/', views.mark_invoice_paid, name='mark_invoice_paid'),
+    path('invoices/mark-paid/<uuid:invoice_id>/', views.mark_invoice_paid, name='mark_invoice_paid'),
     
     # User Management
     path('users/', views.user_management, name='user_management'),

@@ -158,12 +158,17 @@ MIDDLEWARE.extend([
     # Auth middleware after tenant middleware
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     
-    # Suspension and access control middleware (after auth)
+    # Message middleware (must come before middleware that uses messages)
+    'django.contrib.messages.middleware.MessageMiddleware',
+    
+    # Suspension and access control middleware (after auth and messages)
     'apps.core.suspension_middleware.SuspensionCheckMiddleware',
     'apps.core.suspension_middleware.BusinessAccessControlMiddleware',
     
-    # Message and other middleware
-    'django.contrib.messages.middleware.MessageMiddleware',
+    # Subscription status middleware (after messages middleware)
+    'apps.subscriptions.middleware.SubscriptionMiddleware',
+    
+    # Other middleware
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_ratelimit.middleware.RatelimitMiddleware',
     
@@ -425,7 +430,10 @@ if not RENDER and not CPANEL:
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
     MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
     MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
-    # Use a test callback URL for development that Safaricom accepts
+    MPESA_BASE_URL = config('MPESA_BASE_URL', default='https://sandbox.safaricom.co.ke')
+    # For development, use httpbin.org as M-Pesa requires public URLs
+    # To test real callbacks, use ngrok and update .env file
+    MPESA_TIMEOUT_URL = config('MPESA_TIMEOUT_URL', default='https://httpbin.org/post')
     MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://httpbin.org/post')
 else:
     MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='production')
@@ -435,9 +443,14 @@ else:
     MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
     
     if RENDER:
-        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://autowash-3jpr.onrender.com/api/mpesa/callback/')
+        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://autowash-3jpr.onrender.com/subscriptions/mpesa-callback/')
+        MPESA_TIMEOUT_URL = config('MPESA_TIMEOUT_URL', default='https://autowash-3jpr.onrender.com/subscriptions/mpesa-timeout/')
     elif CPANEL:
-        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://app.autowash.co.ke/api/mpesa/callback/')
+        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://app.autowash.co.ke/subscriptions/mpesa-callback/')
+        MPESA_TIMEOUT_URL = config('MPESA_TIMEOUT_URL', default='https://app.autowash.co.ke/subscriptions/mpesa-timeout/')
+    else:
+        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://your-domain.com/subscriptions/mpesa-callback/')
+        MPESA_TIMEOUT_URL = config('MPESA_TIMEOUT_URL', default='https://your-domain.com/subscriptions/mpesa-timeout/')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

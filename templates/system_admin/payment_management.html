@@ -98,9 +98,9 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Payment Management</h5>
                 <div>
-                    <a href="/admin/subscriptions/payment/add/" class="btn btn-success btn-sm me-2">
+                    <button class="btn btn-success btn-sm me-2" onclick="showManualPaymentModal()">
                         <i class="fas fa-plus me-1"></i>Manual Payment
-                    </a>
+                    </button>
                     <span class="badge bg-secondary">{{ page_obj.paginator.count }} payments</span>
                 </div>
             </div>
@@ -186,8 +186,8 @@
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <a href="/admin/subscriptions/payment/{{ payment.id }}/change/" 
-                                               class="btn btn-outline-primary btn-sm" title="View Details">
+                                            <a href="{% url 'subscriptions:view_payment_invoice' payment.payment_id %}" 
+                                               class="btn btn-outline-primary btn-sm" title="View Payment Details" target="_blank">
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                             <a href="{% url 'system_admin:record_payment' payment.subscription.id %}" 
@@ -261,6 +261,59 @@
         </div>
     </div>
 </div>
+
+<!-- Manual Payment Modal -->
+<div class="modal fade" id="manualPaymentModal" tabindex="-1" aria-labelledby="manualPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="manualPaymentModalLabel">Create Manual Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="manualPaymentForm" method="post" action="{% url 'system_admin:record_manual_payment' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="subscription_select" class="form-label">Subscription</label>
+                        <select name="subscription_id" id="subscription_select" class="form-select" required>
+                            <option value="">Select a subscription...</option>
+                            {% for subscription in active_subscriptions %}
+                                <option value="{{ subscription.id }}" data-amount="{{ subscription.plan.price }}">
+                                    {{ subscription.business.name }} - {{ subscription.plan.name }} ({{ subscription.get_status_display }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Amount (KES)</label>
+                        <input type="number" name="amount" id="amount" class="form-control" min="0" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="payment_method" class="form-label">Payment Method</label>
+                        <select name="payment_method" id="payment_method" class="form-select" required>
+                            <option value="mpesa">M-Pesa</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="cash">Cash</option>
+                            <option value="card">Card</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="reference_number" class="form-label">Reference Number</label>
+                        <input type="text" name="reference_number" id="reference_number" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea name="notes" id="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="manualPaymentForm" class="btn btn-success">Create Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -282,17 +335,48 @@
 function updatePaymentStatus(paymentId, newStatus) {
     const action = newStatus === 'completed' ? 'complete' : 'mark as failed';
     if (confirm(`Are you sure you want to ${action} this payment?`)) {
-        // In a real implementation, you'd make an AJAX call to update the status
-        // For now, we'll redirect to Django admin
-        window.location.href = `/admin/subscriptions/payment/${paymentId}/change/`;
+        // Create a form and submit it to the record payment URL with status update
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/system-admin/payments/update-status/`;
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        form.innerHTML = `
+            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+            <input type="hidden" name="payment_id" value="${paymentId}">
+            <input type="hidden" name="status" value="${newStatus}">
+        `;
+        
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 
 function generateReceipt(paymentId) {
-    // In a real implementation, you'd generate and download a PDF receipt
-    alert('Receipt generation feature will be implemented. For now, use Django admin to view payment details.');
-    window.open(`/admin/subscriptions/payment/${paymentId}/change/`, '_blank');
+    // Open the payment invoice view for receipt generation
+    window.open(`/subscriptions/payment/${paymentId}/`, '_blank');
 }
+
+function showManualPaymentModal() {
+    // Show the manual payment modal
+    const modal = new bootstrap.Modal(document.getElementById('manualPaymentModal'));
+    modal.show();
+}
+
+// Auto-populate amount when subscription is selected
+document.addEventListener('DOMContentLoaded', function() {
+    const subscriptionSelect = document.getElementById('subscription_select');
+    const amountInput = document.getElementById('amount');
+    
+    if (subscriptionSelect && amountInput) {
+        subscriptionSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption.dataset.amount) {
+                amountInput.value = selectedOption.dataset.amount;
+            }
+        });
+    }
+});
 
 // Add tooltips
 document.addEventListener('DOMContentLoaded', function() {

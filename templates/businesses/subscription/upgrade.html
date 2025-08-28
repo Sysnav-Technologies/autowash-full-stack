@@ -1,0 +1,589 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Upgrade Plan - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .plan-card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border-radius: 1rem;
+        transition: all 0.3s;
+        height: 100%;
+    }
+    
+    .plan-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .plan-card.current {
+        border: 2px solid #28a745;
+        transform: scale(1.02);
+    }
+    
+    .plan-card.recommended {
+        border: 2px solid #007bff;
+        position: relative;
+    }
+    
+    .plan-card.recommended::before {
+        content: "Recommended";
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #007bff;
+        color: white;
+        padding: 0.25rem 1rem;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+    
+    .plan-header {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        border-radius: 1rem 1rem 0 0;
+        padding: 2rem 1.5rem 1rem;
+        text-align: center;
+    }
+    
+    .plan-header.starter {
+        background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    }
+    
+    .plan-header.professional {
+        background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+    }
+    
+    .plan-header.enterprise {
+        background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    }
+    
+    .plan-price {
+        font-size: 3rem;
+        font-weight: bold;
+        color: #2c3e50;
+        margin: 0;
+    }
+    
+    .plan-period {
+        color: #6c757d;
+        font-size: 1rem;
+    }
+    
+    .feature-list {
+        list-style: none;
+        padding: 0;
+    }
+    
+    .feature-list li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f1f3f4;
+        display: flex;
+        align-items: center;
+    }
+    
+    .feature-list li:last-child {
+        border-bottom: none;
+    }
+    
+    .feature-included {
+        color: #28a745;
+    }
+    
+    .feature-not-included {
+        color: #6c757d;
+    }
+    
+    .comparison-table {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    
+    .billing-toggle {
+        background: #f8f9fa;
+        border-radius: 25px;
+        padding: 0.5rem;
+        display: inline-flex;
+        margin-bottom: 2rem;
+    }
+    
+    .billing-option {
+        padding: 0.5rem 1.5rem;
+        border-radius: 20px;
+        border: none;
+        background: transparent;
+        transition: all 0.2s;
+    }
+    
+    .billing-option.active {
+        background: #007bff;
+        color: white;
+    }
+    
+    .savings-badge {
+        background: #28a745;
+        color: white;
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 10px;
+        margin-left: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Choose Your Plan</h2>
+                <a href="/business/{{ business.slug }}/business/subscriptions/overview/" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Overview
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Billing Toggle -->
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <div class="billing-toggle">
+                <button class="billing-option active" onclick="toggleBilling('monthly')">Monthly</button>
+                <button class="billing-option" onclick="toggleBilling('annual')">
+                    Annual
+                    <span class="savings-badge">Save 20%</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Plan Cards -->
+    <div class="row mb-5">
+        {% for plan in available_plans %}
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="plan-card card {% if plan.id == current_subscription.plan.id %}current{% elif plan.is_recommended %}recommended{% endif %}">
+                <div class="plan-header {{ plan.slug }}">
+                    <h4 class="plan-name">{{ plan.name }}</h4>
+                    <div class="plan-price" data-monthly="{{ plan.monthly_price }}" data-annual="{{ plan.annual_price }}">
+                        KES {{ plan.monthly_price|floatformat:0 }}
+                    </div>
+                    <div class="plan-period">per month</div>
+                    {% if plan.id == current_subscription.plan.id %}
+                    <div class="mt-3">
+                        <span class="badge bg-success">Current Plan</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body">
+                    <ul class="feature-list">
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            Up to {{ plan.max_customers }} customers
+                        </li>
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            Up to {{ plan.max_employees }} employees
+                        </li>
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            {{ plan.storage_gb }}GB storage
+                        </li>
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            {{ plan.api_calls_per_month|floatformat:0 }} API calls/month
+                        </li>
+                        {% for feature in plan.features.all %}
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            {{ feature.name }}
+                        </li>
+                        {% endfor %}
+                        
+                        {% if plan.slug == 'starter' %}
+                        <li>
+                            <i class="fas fa-times feature-not-included me-2"></i>
+                            Advanced reporting
+                        </li>
+                        <li>
+                            <i class="fas fa-times feature-not-included me-2"></i>
+                            API access
+                        </li>
+                        <li>
+                            <i class="fas fa-times feature-not-included me-2"></i>
+                            Priority support
+                        </li>
+                        {% elif plan.slug == 'professional' %}
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            Advanced reporting
+                        </li>
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            API access
+                        </li>
+                        <li>
+                            <i class="fas fa-times feature-not-included me-2"></i>
+                            Priority support
+                        </li>
+                        {% else %}
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            Advanced reporting
+                        </li>
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            Full API access
+                        </li>
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            Priority support
+                        </li>
+                        <li>
+                            <i class="fas fa-check feature-included me-2"></i>
+                            Custom integrations
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                
+                <div class="card-footer bg-transparent border-0 p-3">
+                    {% if plan.id == current_subscription.plan.id %}
+                    <button class="btn btn-outline-success w-100" disabled>
+                        <i class="fas fa-check me-2"></i>Current Plan
+                    </button>
+                    {% elif plan.monthly_price > current_subscription.plan.monthly_price %}
+                    <button class="btn btn-primary w-100" onclick="upgradePlan('{{ plan.id }}')">
+                        <i class="fas fa-arrow-up me-2"></i>Upgrade
+                    </button>
+                    {% else %}
+                    <button class="btn btn-outline-primary w-100" onclick="downgradePlan('{{ plan.id }}')">
+                        <i class="fas fa-arrow-down me-2"></i>Downgrade
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Detailed Comparison -->
+    <div class="row">
+        <div class="col-12">
+            <div class="comparison-table">
+                <div class="card-header">
+                    <h5 class="mb-0">Detailed Feature Comparison</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-borderless">
+                            <thead>
+                                <tr>
+                                    <th>Feature</th>
+                                    {% for plan in available_plans %}
+                                    <th class="text-center">{{ plan.name }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Monthly Price</strong></td>
+                                    {% for plan in available_plans %}
+                                    <td class="text-center">
+                                        <span class="price-monthly">KES {{ plan.monthly_price|floatformat:0 }}</span>
+                                        <span class="price-annual d-none">KES {{ plan.annual_price|floatformat:0 }}</span>
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>Customers</td>
+                                    {% for plan in available_plans %}
+                                    <td class="text-center">{{ plan.max_customers }}</td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>Employees</td>
+                                    {% for plan in available_plans %}
+                                    <td class="text-center">{{ plan.max_employees }}</td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>Storage</td>
+                                    {% for plan in available_plans %}
+                                    <td class="text-center">{{ plan.storage_gb }}GB</td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>API Calls/Month</td>
+                                    {% for plan in available_plans %}
+                                    <td class="text-center">{{ plan.api_calls_per_month|floatformat:0 }}</td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>Basic Features</td>
+                                    {% for plan in available_plans %}
+                                    <td class="text-center">
+                                        <i class="fas fa-check text-success"></i>
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>Advanced Reporting</td>
+                                    <td class="text-center">
+                                        <i class="fas fa-times text-muted"></i>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-check text-success"></i>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-check text-success"></i>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>API Access</td>
+                                    <td class="text-center">
+                                        <i class="fas fa-times text-muted"></i>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-check text-success"></i>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-check text-success"></i>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Priority Support</td>
+                                    <td class="text-center">
+                                        <i class="fas fa-times text-muted"></i>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-times text-muted"></i>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-check text-success"></i>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Custom Integrations</td>
+                                    <td class="text-center">
+                                        <i class="fas fa-times text-muted"></i>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-times text-muted"></i>
+                                    </td>
+                                    <td class="text-center">
+                                        <i class="fas fa-check text-success"></i>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- FAQ Section -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <h4 class="mb-4">Frequently Asked Questions</h4>
+            <div class="accordion" id="faqAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                            What happens when I upgrade my plan?
+                        </button>
+                    </h2>
+                    <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            When you upgrade your plan, you'll immediately get access to all the new features and increased limits. You'll be charged a prorated amount for the remainder of your current billing cycle.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                            Can I downgrade my plan?
+                        </button>
+                    </h2>
+                    <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Yes, you can downgrade at any time. The downgrade will take effect at the end of your current billing cycle, and you'll retain access to your current plan features until then.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                            What payment methods do you accept?
+                        </button>
+                    </h2>
+                    <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            We accept M-Pesa payments for all subscription plans. You can set up automatic payments or pay manually each billing cycle.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upgrade Confirmation Modal -->
+<div class="modal fade" id="upgradeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Plan Change</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="upgradeContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmUpgrade">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedPlanId = null;
+let billingType = 'monthly';
+
+function toggleBilling(type) {
+    billingType = type;
+    
+    // Update button states
+    document.querySelectorAll('.billing-option').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Update prices
+    document.querySelectorAll('.plan-price').forEach(priceElement => {
+        const monthly = parseFloat(priceElement.dataset.monthly);
+        const annual = parseFloat(priceElement.dataset.annual);
+        
+        if (type === 'monthly') {
+            priceElement.textContent = `KES ${monthly.toFixed(0)}`;
+        } else {
+            priceElement.textContent = `KES ${(annual/12).toFixed(0)}`;
+        }
+    });
+    
+    // Update comparison table
+    if (type === 'monthly') {
+        document.querySelectorAll('.price-monthly').forEach(el => el.classList.remove('d-none'));
+        document.querySelectorAll('.price-annual').forEach(el => el.classList.add('d-none'));
+    } else {
+        document.querySelectorAll('.price-monthly').forEach(el => el.classList.add('d-none'));
+        document.querySelectorAll('.price-annual').forEach(el => el.classList.remove('d-none'));
+    }
+}
+
+function upgradePlan(planId) {
+    selectedPlanId = planId;
+    showUpgradeModal('upgrade');
+}
+
+function downgradePlan(planId) {
+    selectedPlanId = planId;
+    showUpgradeModal('downgrade');
+}
+
+function showUpgradeModal(action) {
+    const modal = new bootstrap.Modal(document.getElementById('upgradeModal'));
+    const content = document.getElementById('upgradeContent');
+    
+    // Fetch plan details and show confirmation
+    fetch('/business/{{ business.slug }}/business/subscriptions/api/plan-details/${selectedPlanId}/')
+        .then(response => response.json())
+        .then(plan => {
+            const isUpgrade = action === 'upgrade';
+            const price = billingType === 'monthly' ? plan.monthly_price : plan.annual_price;
+            const period = billingType === 'monthly' ? 'month' : 'year';
+            
+            content.innerHTML = `
+                <div class="text-center mb-4">
+                    <i class="fas fa-arrow-${isUpgrade ? 'up' : 'down'} fa-3x text-${isUpgrade ? 'primary' : 'warning'} mb-3"></i>
+                    <h5>${isUpgrade ? 'Upgrade' : 'Downgrade'} to ${plan.name}</h5>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <small class="text-muted">New Price</small>
+                        <p class="mb-0"><strong>KES ${price}/${period}</strong></p>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">${isUpgrade ? 'Prorated' : 'Next'} Charge</small>
+                        <p class="mb-0"><strong>KES ${(price * 0.7).toFixed(2)}</strong></p>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    ${isUpgrade ? 
+                        'You will be charged a prorated amount for the remaining time in your current billing cycle.' :
+                        'Your plan will be downgraded at the end of your current billing cycle.'
+                    }
+                </div>
+            `;
+            
+            modal.show();
+        });
+}
+
+document.getElementById('confirmUpgrade').addEventListener('click', function() {
+    if (selectedPlanId) {
+        // Show loading state
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+        this.disabled = true;
+        
+        // Submit plan change
+        fetch('/business/{{ business.slug }}/business/subscriptions/api/change-plan/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                plan_id: selectedPlanId,
+                billing_type: billingType
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (data.payment_required) {
+                    // Redirect to payment
+                    window.location.href = data.payment_url;
+                } else {
+                    // Plan changed successfully
+                    location.reload();
+                }
+            } else {
+                alert('Failed to change plan: ' + (data.error || 'Unknown error'));
+                this.innerHTML = 'Confirm';
+                this.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to change plan. Please try again.');
+            this.innerHTML = 'Confirm';
+            this.disabled = false;
+        });
+    }
+});
+</script>
+{% endblock %}

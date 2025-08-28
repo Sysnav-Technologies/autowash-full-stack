@@ -1,0 +1,475 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Upgrade Your Plan - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/subscriptions.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/subscriptions.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="subscription-page">
+    <div class="container">
+        <!-- Current Subscription Status -->
+        <div class="current-status-card mb-4">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h4 class="text-danger mb-2">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        {% if subscription.status == 'expired' %}
+                            Your subscription has expired
+                        {% elif subscription.status == 'trial' and trial_days_left <= 0 %}
+                            Your free trial has ended
+                        {% else %}
+                            Time to upgrade your plan
+                        {% endif %}
+                    </h4>
+                    <p class="text-muted mb-0">
+                        {% if current_plan %}
+                            Current Plan: <strong>{{ current_plan.name }}</strong>
+                        {% endif %}
+                        {% if subscription.status == 'expired' %}
+                            • Expired on {{ subscription.end_date|date:"M d, Y" }}
+                        {% elif subscription.status == 'trial' and trial_days_left <= 0 %}
+                            • Trial ended on {{ subscription.trial_end_date|date:"M d, Y" }}
+                        {% elif trial_days_left > 0 %}
+                            • {{ trial_days_left }} days left in trial
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="status-badge bg-danger text-white">
+                        {% if subscription.status == 'expired' %}
+                            EXPIRED
+                        {% elif subscription.status == 'trial' and trial_days_left <= 0 %}
+                            TRIAL ENDED
+                        {% else %}
+                            ACTION REQUIRED
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">{{ title }}</h1>
+            <p class="page-subtitle">{{ business.name }}, choose a new plan to continue using our services.</p>
+            
+            <!-- Billing Toggle -->
+            <div class="billing-toggle">
+                <button class="billing-option active" id="monthly-tab">Monthly Billing</button>
+                <button class="billing-option" id="annual-tab">Annual Billing <small class="ms-1">(Save 15%)</small></button>
+            </div>
+        </div>
+        
+        <!-- Plans Grid -->
+        <div class="plans-container">
+            <div class="row g-4">
+                {% for plan in available_plans %}
+                <div class="col-lg-4 col-md-6">
+                    <div class="plan-card {% if plan.is_popular %}featured{% endif %} {% if current_plan and plan.id == current_plan.id %}current-plan{% endif %}">
+                        <!-- Plan Header -->
+                        <div class="plan-header">
+                            {% if plan.is_popular %}
+                                <div class="popular-badge">Most Popular</div>
+                            {% endif %}
+                            {% if current_plan and plan.id == current_plan.id %}
+                                <div class="current-badge">Current Plan</div>
+                            {% endif %}
+                            {% if plan.name == 'Monthly Plan' or plan.duration_months == 1 %}
+                                <h3 class="plan-name">Monthly Plan</h3>
+                                <p class="plan-description">Ideal for startups and small businesses looking get started essential IT services.</p>
+                            {% elif plan.name == 'Quarterly Plan' or plan.duration_months == 3 %}
+                                <h3 class="plan-name">Quarterly Plan</h3>
+                                <p class="plan-description">Ideal for startups and medium businesses looking to get started essential IT services.</p>
+                            {% elif plan.name == 'Semi-Annual Plan' or plan.duration_months == 6 %}
+                                <h3 class="plan-name">Semi-Annual Plan</h3>
+                                <p class="plan-description">Perfect for growing businesses that require additional features and support.</p>
+                            {% elif plan.name == 'Annual Plan' or plan.duration_months == 12 %}
+                                <h3 class="plan-name">Annual Plan</h3>
+                                <p class="plan-description">Tailored for larger enterprises with complex IT needs and stringent security.</p>
+                            {% elif plan.name == 'One Off Plan' or plan.duration_months == 0 %}
+                                <h3 class="plan-name">One Off Plan</h3>
+                                <p class="plan-description">Tailored for established enterprises with personalized IT needs and stringent security.</p>
+                            {% else %}
+                                <h3 class="plan-name">{{ plan.name }}</h3>
+                                <p class="plan-description">{{ plan.description|truncatewords:10 }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Pricing -->
+                        <div class="plan-pricing">
+                            <div class="price-display">
+                                <span class="currency">KES</span>
+                                <span class="amount">{{ plan.price|floatformat:0 }}</span>
+                                <span class="period">
+                                    {% if plan.duration_months == 1 %}
+                                        /month
+                                    {% elif plan.duration_months == 3 %}
+                                        /quarter
+                                    {% elif plan.duration_months == 6 %}
+                                        /6 months
+                                    {% elif plan.duration_months == 12 %}
+                                        /Year
+                                    {% elif plan.duration_months == 0 %}
+                                        neg.
+                                    {% else %}
+                                        /{{ plan.duration_months }}mo
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% if plan.duration_months > 0 and subscription.status != 'active' %}
+                                <div class="billing-note">Continue where you left off</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Features -->
+                        <div class="features-section">
+                            <h4 class="features-title">Features Included:</h4>
+                            <ul class="features-list">
+                                {% if plan.duration_months == 1 %}
+                                    <!-- Monthly Plan Features -->
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Network Monitoring</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Helpdesk Support (Limited Hours)</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Basic Cybersecurity Protection</span>
+                                    </li>
+                                {% elif plan.duration_months == 3 %}
+                                    <!-- Quarterly Plan Features -->
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Network Monitoring</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Helpdesk Support (Limited Hours)</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Basic Cybersecurity Protection</span>
+                                    </li>
+                                {% elif plan.duration_months == 6 %}
+                                    <!-- Semi-Annual Plan Features -->
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>24/7 Network Monitoring</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Dedicated Helpdesk Support</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Advance Cybersecurity Protection</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Cloud Backup & Recovery</span>
+                                    </li>
+                                {% elif plan.duration_months == 12 %}
+                                    <!-- Annual Plan Features -->
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Customised Network Monitoring</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Priority Helpdesk Support</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Comprehensive Cybersecurity Suite</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Disaster Recovery Planning & Testing</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Onsite Support (as needed)</span>
+                                    </li>
+                                {% elif plan.duration_months == 0 %}
+                                    <!-- One Off Plan Features -->
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Customised Network Monitoring</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Priority Helpdesk Support</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Comprehensive Cybersecurity Suite</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Disaster Recovery Planning & Testing</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Onsite Support (as needed)</span>
+                                    </li>
+                                {% else %}
+                                    <!-- Default features for other plans -->
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>
+                                            {% if plan.max_employees == -1 %}
+                                                Unlimited employees
+                                            {% else %}
+                                                Up to {{ plan.max_employees }} employees
+                                            {% endif %}
+                                        </span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>
+                                            {% if plan.max_customers == -1 %}
+                                                Unlimited customers
+                                            {% else %}
+                                                Up to {{ plan.max_customers }} customers
+                                            {% endif %}
+                                        </span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Customer management</span>
+                                    </li>
+                                    <li class="feature-item">
+                                        <i class="fas fa-check feature-icon"></i>
+                                        <span>Service tracking</span>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        
+                        <!-- Select Button -->
+                        {% if current_plan and plan.id == current_plan.id %}
+                            <a href="/business/{{ request.tenant.slug }}/subscriptions/upgrade/{{ plan.slug }}/" 
+                               class="select-button btn-warning">
+                                Renew Plan
+                            </a>
+                        {% else %}
+                            <a href="/business/{{ request.tenant.slug }}/subscriptions/upgrade/{{ plan.slug }}/" 
+                               class="select-button {% if plan.is_popular %}btn-success{% else %}btn-primary{% endif %}">
+                                {% if current_plan and plan.price > current_plan.price %}
+                                    Upgrade to This Plan
+                                {% elif current_plan and plan.price < current_plan.price %}
+                                    Downgrade to This Plan
+                                {% else %}
+                                    Select This Plan
+                                {% endif %}
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Upgrade Benefits -->
+        <div class="upgrade-benefits mt-5">
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <div class="benefit-item">
+                        <i class="fas fa-bolt text-success fa-2x mb-3"></i>
+                        <h5>Instant Access</h5>
+                        <p class="text-muted">Get immediate access to all features after payment</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="benefit-item">
+                        <i class="fas fa-database text-primary fa-2x mb-3"></i>
+                        <h5>Data Preserved</h5>
+                        <p class="text-muted">All your business data and settings remain intact</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="benefit-item">
+                        <i class="fas fa-headset text-info fa-2x mb-3"></i>
+                        <h5>24/7 Support</h5>
+                        <p class="text-muted">Get help whenever you need it with our support team</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer Info -->
+        <div class="footer-info">
+            <div class="security-badge">
+                <i class="fas fa-shield-alt me-2"></i>
+                Secure • No setup fees • Cancel anytime
+            </div>
+            <div class="terms-links">
+                By continuing, you agree to our 
+                <a href="{% url 'serve_legal_document' 'terms-of-service' %}" target="_blank">Terms of Service</a> and 
+                <a href="{% url 'serve_legal_document' 'privacy-policy' %}" target="_blank">Privacy Policy</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Additional CSS for upgrade-specific styling -->
+<style>
+.current-status-card {
+    background: linear-gradient(135deg, #fff5f5, #fed7d7);
+    border: 1px solid #feb2b2;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.8rem;
+    display: inline-block;
+}
+
+.current-plan {
+    border: 2px solid #28a745 !important;
+    position: relative;
+    transform: scale(1.02);
+}
+
+.current-badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #28a745;
+    color: white;
+    padding: 0.25rem 1rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    z-index: 10;
+}
+
+.upgrade-benefits {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 3rem 2rem;
+    border-radius: 12px;
+    margin-top: 3rem;
+}
+
+.benefit-item {
+    padding: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.benefit-item:hover {
+    transform: translateY(-5px);
+}
+
+.plan-card.current-plan .select-button {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    border: none;
+    color: #212529;
+    font-weight: bold;
+}
+
+.plan-card.current-plan .select-button:hover {
+    background: linear-gradient(135deg, #e0a800, #d39e00);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.select-button {
+    transition: all 0.3s ease;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+    margin-top: 1rem;
+}
+
+.select-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border: none;
+    color: white;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    border: none;
+    color: white;
+}
+
+.page-title {
+    background: linear-gradient(135deg, #007bff, #6610f2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.billing-toggle {
+    display: flex;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 0.25rem;
+    margin: 1.5rem auto;
+    width: fit-content;
+}
+
+.billing-option {
+    background: transparent;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.billing-option.active {
+    background: white;
+    color: #007bff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .current-status-card {
+        text-align: center;
+    }
+    
+    .status-badge {
+        margin-top: 1rem;
+    }
+    
+    .billing-toggle {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .current-plan {
+        transform: none;
+    }
+}
+</style>
+{% endblock content %}

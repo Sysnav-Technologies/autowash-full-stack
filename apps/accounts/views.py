@@ -1186,26 +1186,43 @@ def dashboard_redirect(request):
             messages.info(request, 'Please complete your business registration.')
             return redirect('/auth/business/register/')
         
-        # Step 2: Check if subscription is selected
-        has_subscription = False
+        # Step 2: Check subscription status
+        has_active_subscription = False
+        has_expired_subscription = False
         try:
             # Check if business has an active subscription using the direct subscription field
-            has_subscription = (
+            has_active_subscription = (
                 business.subscription is not None and 
                 business.subscription.status in ['active', 'trial'] and
                 business.subscription.is_active
             )
-            print(f"Subscription check result: {has_subscription}")
+            
+            # Check if business has an expired/inactive subscription
+            has_expired_subscription = (
+                business.subscription is not None and 
+                business.subscription.status in ['expired', 'cancelled'] and
+                not business.subscription.is_active
+            )
+            
+            print(f"Active subscription check result: {has_active_subscription}")
+            print(f"Expired subscription check result: {has_expired_subscription}")
             if business.subscription:
                 print(f"Subscription status: {business.subscription.status}")
                 print(f"Subscription is_active: {business.subscription.is_active}")
         except Exception as e:
             print(f"Error checking subscription: {e}")
-            has_subscription = False
+            has_active_subscription = False
+            has_expired_subscription = False
             
-        print(f"Has subscription: {has_subscription}")
+        print(f"Has active subscription: {has_active_subscription}")
+        print(f"Has expired subscription: {has_expired_subscription}")
         
-        if not has_subscription:
+        # Handle different subscription states
+        if has_expired_subscription:
+            print("Expired subscription found, redirecting to subscription renewal/upgrade")
+            messages.warning(request, 'Your subscription has expired. Please renew or upgrade to continue using our services.')
+            return redirect(f'/business/{business.slug}/subscriptions/upgrade/')
+        elif not has_active_subscription and not has_expired_subscription:
             print("No subscription found, redirecting to subscription selection")
             messages.info(request, 'Please select a subscription plan to continue.')
             return redirect('/subscriptions/select/')

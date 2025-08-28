@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Payment Status</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f5f5f5;
+            padding: 50px 0;
+            font-family: Arial, sans-serif;
+        }
+        .card {
+            max-width: 600px;
+            margin: 0 auto;
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .status-success { color: #28a745; }
+        .status-pending { color: #ffc107; }
+        .status-processing { color: #17a2b8; }
+        .status-failed { color: #dc3545; }
+        .status-icon { font-size: 3rem; }
+        .btn-custom {
+            padding: 10px 25px;
+            border-radius: 25px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-body text-center p-5">
+                <!-- Status Icon and Title -->
+                <div class="mb-4">
+                    {% if payment.status == 'completed' %}
+                        <i class="fas fa-check-circle status-icon status-success"></i>
+                        <h2 class="mt-3 status-success">Payment Successful!</h2>
+                        <p class="text-muted">Your subscription has been activated.</p>
+                    {% elif payment.status == 'processing' %}
+                        <i class="fas fa-spinner fa-spin status-icon status-processing"></i>
+                        <h2 class="mt-3 status-processing">Processing Payment</h2>
+                        <p class="text-muted">We're confirming your M-Pesa payment.</p>
+                    {% elif payment.status == 'pending' %}
+                        <i class="fas fa-clock status-icon status-pending"></i>
+                        <h2 class="mt-3 status-pending">Payment Pending</h2>
+                        <p class="text-muted">Please complete the M-Pesa payment on your phone.</p>
+                    {% else %}
+                        <i class="fas fa-times-circle status-icon status-failed"></i>
+                        <h2 class="mt-3 status-failed">Payment Failed</h2>
+                        <p class="text-muted">Payment could not be processed.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Payment Details -->
+                <div class="row text-start mb-4">
+                    <div class="col-12">
+                        <h5><i class="fas fa-receipt me-2"></i>Payment Details</h5>
+                        <hr>
+                    </div>
+                    <div class="col-6"><strong>Payment ID:</strong></div>
+                    <div class="col-6">{{ payment.payment_id }}</div>
+                    
+                    <div class="col-6 mt-2"><strong>Amount:</strong></div>
+                    <div class="col-6 mt-2">KES {{ payment.amount }}</div>
+                    
+                    <div class="col-6 mt-2"><strong>Method:</strong></div>
+                    <div class="col-6 mt-2">
+                        {% if payment.payment_method == 'mpesa' %}
+                            <i class="fas fa-mobile-alt"></i> M-Pesa
+                        {% else %}
+                            {{ payment.payment_method|title }}
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-6 mt-2"><strong>Status:</strong></div>
+                    <div class="col-6 mt-2">
+                        <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'processing' %}bg-info{% elif payment.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                            {{ payment.status|title }}
+                        </span>
+                    </div>
+                    
+                    <div class="col-6 mt-2"><strong>Date:</strong></div>
+                    <div class="col-6 mt-2">{{ payment.created_at|date:"M d, Y H:i" }}</div>
+                    
+                    {% if payment.transaction_id %}
+                    <div class="col-6 mt-2"><strong>Transaction ID:</strong></div>
+                    <div class="col-6 mt-2">{{ payment.transaction_id }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Instructions -->
+                {% if payment.status == 'pending' %}
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-info-circle me-2"></i>Next Steps</h6>
+                        <ol class="text-start mb-0">
+                            <li>Check your phone for the M-Pesa payment request</li>
+                            <li>Enter your M-Pesa PIN to complete the payment</li>
+                            <li>Wait for confirmation</li>
+                        </ol>
+                    </div>
+                {% elif payment.status == 'processing' %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        We're verifying your payment. This usually takes 1-2 minutes.
+                    </div>
+                {% endif %}
+
+                <!-- Auto-refresh info -->
+                {% if payment.status == 'pending' or payment.status == 'processing' %}
+                    <div class="alert alert-primary">
+                        <i class="fas fa-sync-alt me-2"></i>
+                        This page will refresh automatically every 10 seconds.
+                    </div>
+                {% endif %}
+
+                <!-- Action Buttons -->
+                <div class="mt-4">
+                    {% if payment.status == 'completed' %}
+                        <a href="/business/{{ business.slug }}/dashboard/" class="btn btn-success btn-custom">
+                            <i class="fas fa-home me-2"></i>Go to Dashboard
+                        </a>
+                    {% elif payment.status == 'failed' %}
+                        <a href="/business/{{ business.slug }}/subscriptions/upgrade/" class="btn btn-primary btn-custom">
+                            <i class="fas fa-redo me-2"></i>Try Again
+                        </a>
+                        <a href="/business/{{ business.slug }}/dashboard/" class="btn btn-secondary btn-custom">
+                            <i class="fas fa-home me-2"></i>Dashboard
+                        </a>
+                    {% else %}
+                        <button onclick="checkStatus()" class="btn btn-primary btn-custom">
+                            <i class="fas fa-refresh me-2"></i>Check Status
+                        </button>
+                        <a href="/business/{{ business.slug }}/dashboard/" class="btn btn-secondary btn-custom">
+                            <i class="fas fa-home me-2"></i>Dashboard
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Simple page refresh for pending/processing payments - no AJAX to avoid conflicts
+        {% if payment.status == 'pending' or payment.status == 'processing' %}
+        
+        // Prevent multiple timers
+        if (!window.paymentRefreshTimer) {
+            console.log('Setting up payment refresh timer');
+            
+            // Simple page refresh every 15 seconds
+            window.paymentRefreshTimer = setTimeout(function() {
+                console.log('Refreshing payment status page');
+                window.location.reload();
+            }, 15000);
+        }
+        
+        {% endif %}
+
+        function checkStatus() {
+            const btn = event.target;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Checking...';
+            btn.disabled = true;
+            
+            setTimeout(function() {
+                window.location.reload();
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{% extends "emails/base.html" %}
+
+{% block email_title %}Payment Failed - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header error">
+        <h1>Payment Failed</h1>
+        <p>We were unable to process your subscription payment</p>
+    </div>
+    
+    <div class="content">
+        <p>Dear {{ business.name }} Team,</p>
+        
+        <p>We were unable to process your subscription payment. Please check the details below and try again.</p>
+        
+        <div class="details-box">
+            <h3>Failed Payment Details</h3>
+            <p><strong>Amount:</strong> KES {{ payment.amount|floatformat:2 }}</p>
+            <p><strong>Payment Method:</strong> M-Pesa</p>
+            <p><strong>Date:</strong> {{ payment.created_at|date:"F d, Y g:i A" }}</p>
+            {% if payment.failure_reason %}
+            <p><strong>Reason:</strong> {{ payment.failure_reason }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="details-box">
+            <h3>What to do next:</h3>
+            <ul>
+                <li>Ensure your M-Pesa account has sufficient funds</li>
+                <li>Check that your phone number is correct</li>
+                <li>Try the payment again in a few minutes</li>
+                <li>Contact M-Pesa support if the issue persists</li>
+            </ul>
+        </div>
+        
+        <div class="cta-section">
+            <a href="{{ domain }}/business/{{ business.slug }}/business/subscriptions/payment/" class="cta-button">Try Payment Again</a>
+        </div>
+        
+        <p>Your account access may be limited until the payment is completed successfully.</p>
+        
+        <p>If you continue to experience issues, please contact our support team for assistance.</p>
+        
+        <p>Thank you for your understanding.</p>
+    </div>
+</div>
+{% endblock %}
