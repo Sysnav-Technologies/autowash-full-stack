@@ -123,6 +123,8 @@ class SubscriptionMiddleware:
                     if employee_business:
                         # User is an employee - use the employee's business for subscription check
                         business = employee_business
+                        # Mark that this user is an employee for later checks
+                        request.is_employee_access = True
                     else:
                         # User is neither owner nor employee - redirect to business registration
                         return '/auth/business/register/'
@@ -130,10 +132,14 @@ class SubscriptionMiddleware:
                 except Exception:
                     # If there's an error checking employee status, redirect to registration
                     return '/auth/business/register/'
+            else:
+                # User owns a business - mark as owner access
+                request.is_employee_access = False
             
-            # Check if business is properly set up
-            if not business.is_approved or not business.is_verified or not business.is_active:
-                return '/auth/verification-pending/'
+            # Check if business is properly set up (only for business owners, not employees)
+            if not getattr(request, 'is_employee_access', False):
+                if not business.is_approved or not business.is_verified or not business.is_active:
+                    return '/auth/verification-pending/'
             
             # Check subscription using explicit database routing
             from apps.subscriptions.models import Subscription
@@ -146,16 +152,19 @@ class SubscriptionMiddleware:
                 subscription = business.subscription
             
             if not subscription:
-                # No subscription, redirect to subscription selection but preserve business context
-                if business.is_verified and business.is_approved:
-                    # Business is verified, go to subscription upgrade/selection
-                    return f'/business/{business.slug}/subscriptions/upgrade/'
-                else:
-                    # Business not verified yet, go to subscription selection
-                    return '/subscriptions/select/'
+                # No subscription - only redirect business owners, not employees
+                if not getattr(request, 'is_employee_access', False):
+                    if business.is_verified and business.is_approved:
+                        # Business is verified, go to subscription upgrade/selection
+                        return f'/business/{business.slug}/subscriptions/upgrade/'
+                    else:
+                        # Business not verified yet, go to subscription selection
+                        return '/subscriptions/select/'
+                # Employees can continue working even without business subscription
+                return None
             
-            # Check subscription status
-            if not subscription.is_active:
+            # Check subscription status (only enforce for business owners, not employees)
+            if not subscription.is_active and not getattr(request, 'is_employee_access', False):
                 # Allow access to subscription management paths
                 if self.is_subscription_management_path(request.path):
                     return None
