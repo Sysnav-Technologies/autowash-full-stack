@@ -61,6 +61,7 @@ class Customer(TenantSoftDeleteModel, Address, ContactInfo):
     # Customer status
     is_active = models.BooleanField(default=True)
     is_vip = models.BooleanField(default=False)
+    is_walk_in = models.BooleanField(default=False, help_text="Walk-in customer without full registration")
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     current_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     

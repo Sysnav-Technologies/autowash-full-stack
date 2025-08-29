@@ -33,6 +33,7 @@ urlpatterns = [
     path('ajax/<str:payment_id>/mpesa-status/', views.check_mpesa_status_ajax, name='check_mpesa_status'),
     path('ajax/summary/', views.payment_summary_ajax, name='payment_summary'),
     path('ajax/bulk-process/', views.process_bulk_payments, name='bulk_process'),
+    path('ajax/status/', views.payment_status_ajax, name='payment_status_ajax'),
     
     # M-Pesa Webhook
     path('webhook/mpesa/', views.mpesa_callback_view, name='mpesa_callback'),

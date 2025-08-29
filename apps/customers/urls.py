@@ -27,6 +27,11 @@ urlpatterns = [
     # AJAX endpoints
     path('ajax/search/', views.customer_search_ajax, name='search_ajax'),
     path('ajax/vehicles/search/', views.vehicle_search_ajax, name='vehicle_search_ajax'),
+    path('ajax/vehicle-customer/', views.vehicle_customer_ajax, name='vehicle_customer_ajax'),
+    path('ajax/check-walk-in-transactions/', views.check_walk_in_transactions_ajax, name='check_walk_in_transactions'),
+    
+    # Walk-in customer management
+    path('save-walk-in/<uuid:payment_id>/', views.save_walk_in_customer_view, name='save_walk_in'),
     
     # Loyalty Program
     path('loyalty/', views.loyalty_dashboard_view, name='loyalty_dashboard'),

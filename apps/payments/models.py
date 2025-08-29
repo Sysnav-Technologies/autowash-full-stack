@@ -343,6 +343,12 @@ class Payment(TenantTimeStampedModel):
             self.updated_by_user_id = user.id
         self.save()
         
+        # Check if this is a walk-in customer and we have transaction details
+        if (self.customer and hasattr(self.customer, 'is_walk_in') and 
+            self.customer.is_walk_in and self.customer_phone):
+            # Create a customer save suggestion for the attendant
+            self.create_customer_save_suggestion()
+        
         # Update service order payment status
         if self.service_order:
             try:
@@ -353,6 +359,46 @@ class Payment(TenantTimeStampedModel):
         
         # Send confirmation notifications
         self.send_payment_confirmation()
+    
+    def create_customer_save_suggestion(self):
+        """Create a suggestion to save walk-in customer details"""
+        try:
+            from apps.notification.models import Notification
+            
+            # Get the service order to find the attendant
+            attendant = None
+            if self.service_order and hasattr(self.service_order, 'assigned_attendant'):
+                attendant = self.service_order.assigned_attendant
+            
+            message = (
+                f"Walk-in customer paid via M-Pesa (Phone: {self.customer_phone}). "
+                f"Amount: KSh {self.amount}. Would you like to save their details for future visits?"
+            )
+            
+            Notification.objects.create(
+                user_id=attendant.user.id if attendant and attendant.user else 1,
+                employee=attendant if attendant else None,
+                notification_type='info',
+                priority='normal',
+                title='Save Customer Details?',
+                message=message,
+                related_object_type='payment',
+                related_object_id=self.id,
+                action_url=f'/customers/save-walk-in/{self.id}/',
+                action_text='Save Customer',
+                metadata={
+                    'customer_id': str(self.customer.id) if self.customer else None,
+                    'customer_phone': self.customer_phone,
+                    'payment_amount': float(self.amount),
+                    'payment_method': self.method,
+                    'suggestion_type': 'customer_save'
+                },
+                is_read=False
+            )
+            
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Could not create customer save suggestion: {e}")
     
     def fail_payment(self, reason=None):
         """Mark payment as failed"""

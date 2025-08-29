@@ -402,7 +402,7 @@ def order_create_view(request):
 @employee_required()
 @require_http_methods(["GET", "POST"])
 def quick_order_view(request):
-    """Quick order creation for walk-in customers"""
+    """Vehicle-first quick order creation with walk-in customer support"""
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -412,33 +412,126 @@ def quick_order_view(request):
                 # Import here to avoid circular imports
                 from apps.customers.models import Customer, Vehicle
                 
-                # Determine if this is an existing customer or new customer
-                existing_customer_id = request.POST.get('existing_customer_id')
+                # Step 1: Handle Vehicle (now first step)
+                existing_vehicle_id = request.POST.get('selected_vehicle_id')
+                vehicle = None
+                
+                if existing_vehicle_id:
+                    # Existing vehicle selected
+                    try:
+                        vehicle = Vehicle.objects.get(id=existing_vehicle_id, is_active=True)
+                        logger.info(f"Using existing vehicle: {vehicle.registration_number}")
+                    except Vehicle.DoesNotExist:
+                        error_msg = 'Selected vehicle not found'
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'success': False,
+                                'message': error_msg,
+                                'errors': {'vehicle': ['Vehicle not found']}
+                            })
+                        else:
+                            messages.error(request, error_msg)
+                            return redirect(get_business_url(request, 'services:quick_order'))
+                else:
+                    # New vehicle - validate required fields (only registration is required)
+                    vehicle_registration = request.POST.get('vehicle_registration', '').strip().upper()
+                    vehicle_make = request.POST.get('vehicle_make', '').strip() or 'Unknown'
+                    vehicle_model = request.POST.get('vehicle_model', '').strip() or 'Unknown'
+                    vehicle_color = request.POST.get('vehicle_color', '').strip() or 'Unknown'
+                    vehicle_type = request.POST.get('vehicle_type', '').strip() or 'car'
+                    vehicle_year = request.POST.get('vehicle_year', '') or '2020'
+                    
+                    if not vehicle_registration:
+                        error_msg = 'Vehicle registration number is required'
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'success': False,
+                                'message': error_msg,
+                                'errors': {'vehicle': ['Vehicle registration number is required']}
+                            })
+                        else:
+                            messages.error(request, error_msg)
+                            return redirect(get_business_url(request, 'services:quick_order'))
+                    
+                    # Check if vehicle already exists
+                    if Vehicle.objects.filter(registration_number=vehicle_registration).exists():
+                        error_msg = f'Vehicle {vehicle_registration} already exists'
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'success': False,
+                                'message': error_msg,
+                                'errors': {'vehicle_registration': ['Vehicle already exists']}
+                            })
+                        else:
+                            messages.error(request, error_msg)
+                            return redirect(get_business_url(request, 'services:quick_order'))
+                
+                # Step 2: Handle Customer
+                is_walk_in = request.POST.get('is_walk_in_customer', 'false') == 'true'
+                existing_customer_id = request.POST.get('selected_customer_id')
                 customer = None
                 
-                if existing_customer_id:
-                    # Existing customer
+                if is_walk_in:
+                    # Walk-in customer - create minimal customer record or use anonymous
+                    customer_name = request.POST.get('customer_name', '').strip()
+                    customer_phone = request.POST.get('customer_phone', '').strip()
+                    
+                    if customer_name or customer_phone:
+                        # Create customer with provided details
+                        name_parts = customer_name.split(' ', 1) if customer_name else ['Walk-in', 'Customer']
+                        first_name = name_parts[0]
+                        last_name = name_parts[1] if len(name_parts) > 1 else ''
+                        
+                        customer = Customer.objects.create(
+                            first_name=first_name,
+                            last_name=last_name,
+                            phone=customer_phone if customer_phone else None,
+                            email=request.POST.get('customer_email', '').strip(),
+                            customer_id=generate_unique_code('WALK', 6),
+                            is_walk_in=True,
+                            created_by_user_id=request.user.id
+                        )
+                        logger.info(f"Created walk-in customer: {customer.full_name}")
+                    else:
+                        # Create anonymous walk-in customer
+                        customer = Customer.objects.create(
+                            first_name='Walk-in',
+                            last_name='Customer',
+                            customer_id=generate_unique_code('WALK', 6),
+                            is_walk_in=True,
+                            created_by_user_id=request.user.id
+                        )
+                        logger.info("Created anonymous walk-in customer")
+                        
+                elif existing_customer_id:
+                    # Existing customer selected
                     try:
                         customer = Customer.objects.get(id=existing_customer_id)
                         logger.info(f"Using existing customer: {customer.full_name}")
                     except Customer.DoesNotExist:
-                        logger.error(f"Customer with ID {existing_customer_id} not found")
+                        error_msg = 'Selected customer not found'
                         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                             return JsonResponse({
                                 'success': False,
-                                'message': 'Selected customer not found',
+                                'message': error_msg,
                                 'errors': {'customer': ['Customer not found']}
                             })
                         else:
-                            messages.error(request, 'Selected customer not found')
+                            messages.error(request, error_msg)
                             return redirect(get_business_url(request, 'services:quick_order'))
+                            
+                elif vehicle and hasattr(vehicle, 'customer'):
+                    # Use vehicle's existing customer
+                    customer = vehicle.customer
+                    logger.info(f"Using vehicle's customer: {customer.full_name}")
+                    
                 else:
-                    # New customer - validate required fields
+                    # New customer registration
                     customer_name = request.POST.get('customer_name', '').strip()
                     customer_phone = request.POST.get('customer_phone', '').strip()
                     
                     if not customer_name or not customer_phone:
-                        error_msg = 'Customer name and phone are required'
+                        error_msg = 'Customer name and phone are required for new customers'
                         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                             return JsonResponse({
                                 'success': False,
@@ -467,60 +560,8 @@ def quick_order_view(request):
                     )
                     logger.info(f"Created new customer: {customer.full_name}")
                 
-                # Handle vehicle selection/creation
-                existing_vehicle_id = request.POST.get('existing_vehicle_id')
-                vehicle = None
-                
-                if existing_vehicle_id:
-                    # Existing vehicle
-                    try:
-                        vehicle = Vehicle.objects.get(id=existing_vehicle_id, customer=customer)
-                        logger.info(f"Using existing vehicle: {vehicle.registration_number}")
-                    except Vehicle.DoesNotExist:
-                        error_msg = 'Selected vehicle not found'
-                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                            return JsonResponse({
-                                'success': False,
-                                'message': error_msg,
-                                'errors': {'vehicle': ['Vehicle not found']}
-                            })
-                        else:
-                            messages.error(request, error_msg)
-                            return redirect(get_business_url(request, 'services:quick_order'))
-                else:
-                    # New vehicle - validate required fields
-                    vehicle_registration = request.POST.get('vehicle_registration', '').strip().upper()
-                    vehicle_make = request.POST.get('vehicle_make', '').strip()
-                    vehicle_model = request.POST.get('vehicle_model', '').strip()
-                    vehicle_color = request.POST.get('vehicle_color', '').strip()
-                    vehicle_type = request.POST.get('vehicle_type', '').strip()
-                    
-                    if not all([vehicle_registration, vehicle_make, vehicle_model, vehicle_color, vehicle_type]):
-                        error_msg = 'All vehicle fields are required'
-                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                            return JsonResponse({
-                                'success': False,
-                                'message': error_msg,
-                                'errors': {'vehicle': ['All vehicle information is required']}
-                            })
-                        else:
-                            messages.error(request, error_msg)
-                            return redirect(get_business_url(request, 'services:quick_order'))
-                    
-                    # Check if vehicle already exists
-                    if Vehicle.objects.filter(registration_number=vehicle_registration).exists():
-                        error_msg = f'Vehicle {vehicle_registration} already exists'
-                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                            return JsonResponse({
-                                'success': False,
-                                'message': error_msg,
-                                'errors': {'vehicle_registration': ['Vehicle already exists']}
-                            })
-                        else:
-                            messages.error(request, error_msg)
-                            return redirect(get_business_url(request, 'services:quick_order'))
-                    
-                    # Create new vehicle
+                # Create vehicle if it's new and assign to customer
+                if not vehicle:
                     vehicle = Vehicle.objects.create(
                         customer=customer,
                         registration_number=vehicle_registration,
@@ -528,10 +569,16 @@ def quick_order_view(request):
                         model=vehicle_model,
                         color=vehicle_color,
                         vehicle_type=vehicle_type,
-                        year=int(request.POST.get('vehicle_year', 2020)),
+                        year=int(vehicle_year),
                         created_by_user_id=request.user.id
                     )
                     logger.info(f"Created new vehicle: {vehicle.registration_number}")
+                elif request.POST.get('add_vehicle_to_customer') == 'on' and customer != vehicle.customer:
+                    # Add existing vehicle to new customer (transfer ownership)
+                    old_customer = vehicle.customer
+                    vehicle.customer = customer
+                    vehicle.save()
+                    logger.info(f"Transferred vehicle {vehicle.registration_number} from {old_customer.full_name} to {customer.full_name}")
                 
                 # Create the service order
                 order = ServiceOrder.objects.create(
@@ -3227,3 +3274,82 @@ def order_receipt_view(request, pk):
     return render(request, 'services/order_receipt.html', context)
 
 
+@login_required
+@employee_required()
+@ajax_required
+def vehicle_customer_ajax(request):
+    """Get customer details for a vehicle"""
+    vehicle_id = request.GET.get('vehicle_id')
+    
+    if not vehicle_id:
+        return JsonResponse({'success': False, 'error': 'Vehicle ID required'})
+    
+    try:
+        from apps.customers.models import Vehicle
+        vehicle = Vehicle.objects.select_related('customer').get(id=vehicle_id, is_active=True)
+        
+        customer_data = {
+            'id': str(vehicle.customer.id),
+            'name': vehicle.customer.full_name,
+            'full_name': vehicle.customer.full_name,
+            'phone': str(vehicle.customer.phone) if vehicle.customer.phone else '',
+            'customer_id': vehicle.customer.customer_id,
+            'email': vehicle.customer.email or '',
+            'is_walk_in': vehicle.customer.is_walk_in
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'customer': customer_data
+        })
+        
+    except Vehicle.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Vehicle not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@employee_required()
+@require_GET
+def payment_status_ajax(request):
+    """Check payment status for walk-in customer notifications"""
+    order_id = request.GET.get('order_id')
+    
+    if not order_id:
+        return JsonResponse({'success': False, 'error': 'Order ID required'})
+    
+    try:
+        order = ServiceOrder.objects.get(order_id=order_id)
+        
+        # Get the latest payment for this order
+        payment = Payment.objects.filter(service_order=order).order_by('-created_at').first()
+        
+        if not payment:
+            return JsonResponse({'success': False, 'error': 'No payment found'})
+        
+        # Check if customer is walk-in
+        customer_is_walk_in = (
+            payment.customer and 
+            hasattr(payment.customer, 'is_walk_in') and 
+            payment.customer.is_walk_in
+        )
+        
+        payment_data = {
+            'id': str(payment.id),
+            'status': payment.status,
+            'method': payment.method,
+            'amount': float(payment.amount),
+            'customer_phone': payment.customer_phone,
+            'customer_is_walk_in': customer_is_walk_in
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'payment': payment_data
+        })
+        
+    except ServiceOrder.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Order not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

@@ -72,6 +72,7 @@ urlpatterns = [
     path('ajax/calculate-price/', views.calculate_order_price, name='calculate_price'),
     path('ajax/customer/search/', views.customer_search_ajax, name='customer_search'),
     path('ajax/vehicle/search/', views.vehicle_search_ajax, name='vehicle_search'),
+    path('ajax/vehicle/customer/', views.vehicle_customer_ajax, name='vehicle_customer'),
     path('ajax/start-next/', views.start_next_service, name='start_next_service'),
     path('ajax/current-service/', views.get_current_service, name='current_service'),
     path('ajax/bay/status/', views.bay_status_ajax, name='bay_status'),
