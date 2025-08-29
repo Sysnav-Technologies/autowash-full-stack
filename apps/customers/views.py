@@ -820,3 +820,152 @@ def loyalty_dashboard_view(request):
         'urls': get_customer_urls(request),
     }
     return render(request, 'customers/loyalty_dashboard.html', context)
+
+
+@login_required
+@employee_required()
+@ajax_required
+def vehicle_customer_ajax(request):
+    """Get customer details for a vehicle"""
+    vehicle_id = request.GET.get('vehicle_id')
+    
+    if not vehicle_id:
+        return JsonResponse({'success': False, 'error': 'Vehicle ID required'})
+    
+    try:
+        vehicle = Vehicle.objects.select_related('customer').get(id=vehicle_id, is_active=True)
+        
+        customer_data = {
+            'id': str(vehicle.customer.id),
+            'name': vehicle.customer.full_name,
+            'full_name': vehicle.customer.full_name,
+            'phone': str(vehicle.customer.phone) if vehicle.customer.phone else '',
+            'customer_id': vehicle.customer.customer_id,
+            'email': vehicle.customer.email or '',
+            'is_walk_in': getattr(vehicle.customer, 'is_walk_in', False)
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'customer': customer_data
+        })
+        
+    except Vehicle.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Vehicle not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@employee_required()
+def save_walk_in_customer_view(request, payment_id):
+    """Convert walk-in customer to regular customer with details from payment"""
+    from apps.payments.models import Payment
+    
+    try:
+        payment = get_object_or_404(Payment, id=payment_id)
+        
+        if not (payment.customer and hasattr(payment.customer, 'is_walk_in') and payment.customer.is_walk_in):
+            messages.error(request, 'This is not a walk-in customer.')
+            return redirect('customers:list')
+        
+        if request.method == 'POST':
+            form = CustomerForm(request.POST, instance=payment.customer)
+            if form.is_valid():
+                with transaction.atomic():
+                    customer = form.save(commit=False)
+                    customer.is_walk_in = False  # Convert to regular customer
+                    
+                    # Update phone from payment if not provided
+                    if not customer.phone and payment.customer_phone:
+                        customer.phone = payment.customer_phone
+                    
+                    # Generate proper customer ID if it's still a walk-in ID
+                    if customer.customer_id.startswith('WALK'):
+                        from apps.core.utils import generate_unique_code
+                        customer.customer_id = generate_unique_code('CUST', 6)
+                    
+                    customer.updated_by_user_id = request.user.id
+                    customer.save()
+                    
+                    # Mark notification as read if it exists
+                    from apps.notification.models import Notification
+                    Notification.objects.filter(
+                        related_object_type='payment',
+                        related_object_id=payment_id,
+                        metadata__suggestion_type='customer_save'
+                    ).update(is_read=True)
+                    
+                    messages.success(request, f'Customer {customer.full_name} saved successfully!')
+                    return redirect('customers:detail', pk=customer.id)
+        else:
+            # Pre-fill form with existing data and transaction phone
+            initial_data = {}
+            if payment.customer_phone:
+                initial_data['phone'] = payment.customer_phone
+            
+            form = CustomerForm(instance=payment.customer, initial=initial_data)
+        
+        context = {
+            'form': form,
+            'payment': payment,
+            'customer': payment.customer,
+            'title': 'Save Walk-in Customer',
+        }
+        
+        return render(request, 'customers/save_walk_in.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error: {str(e)}')
+        return redirect('customers:list')
+
+
+@login_required
+@employee_required()
+@ajax_required
+def check_walk_in_transactions_ajax(request):
+    """Check if walk-in customer has transaction details available for saving"""
+    customer_id = request.GET.get('customer_id')
+    
+    if not customer_id:
+        return JsonResponse({'success': False, 'error': 'Customer ID required'})
+    
+    try:
+        customer = get_object_or_404(Customer, id=customer_id)
+        
+        # Check if customer is walk-in
+        if not (hasattr(customer, 'is_walk_in') and customer.is_walk_in):
+            return JsonResponse({'success': True, 'has_transactions': False})
+        
+        # Check for recent payments with transaction details
+        from apps.payments.models import Payment
+        recent_payments = Payment.objects.filter(
+            customer=customer,
+            status='completed',
+            method='mpesa',
+            customer_phone__isnull=False
+        ).order_by('-created_at')[:5]
+        
+        has_transactions = recent_payments.exists()
+        recent_payment_data = None
+        
+        if has_transactions:
+            latest_payment = recent_payments.first()
+            recent_payment_data = {
+                'id': str(latest_payment.id),
+                'amount': float(latest_payment.amount),
+                'customer_phone': latest_payment.customer_phone,
+                'created_at': latest_payment.created_at.isoformat()
+            }
+        
+        return JsonResponse({
+            'success': True,
+            'has_transactions': has_transactions,
+            'recent_payment': recent_payment_data,
+            'transaction_count': recent_payments.count()
+        })
+        
+    except Customer.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Customer not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

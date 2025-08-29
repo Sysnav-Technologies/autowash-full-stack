@@ -839,11 +839,11 @@
     <div class="order-progress">
         <div class="progress-step active" id="step1-indicator">
             <div class="progress-number">1</div>
-            <div class="progress-label">Customer</div>
+            <div class="progress-label">Vehicle</div>
         </div>
         <div class="progress-step" id="step2-indicator">
             <div class="progress-number">2</div>
-            <div class="progress-label">Vehicle</div>
+            <div class="progress-label">Customer</div>
         </div>
         <div class="progress-step" id="step3-indicator">
             <div class="progress-number">3</div>
@@ -858,8 +858,94 @@
     <form id="quickOrderForm" method="post">
         {% csrf_token %}
         
-        <!-- Step 1: Customer Selection -->
+        <!-- Step 1: Vehicle Search/Selection -->
         <div class="step-content active" id="step1">
+            <div class="form-card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-car"></i>
+                        Search Vehicle
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Vehicle Search -->
+                    <div class="customer-search-section">
+                        <h6><i class="fas fa-search"></i> Search by Registration Number</h6>
+                        <div class="search-input-group">
+                            <input type="text" class="form-control" id="vehicleSearchInput" placeholder="Enter registration number (e.g., KCA 123A)..." style="text-transform: uppercase;">
+                            <button type="button" class="search-btn" onclick="searchVehiclesByRegistration()">
+                                <i class="fas fa-search"></i>
+                                Search
+                            </button>
+                        </div>
+                        <div id="vehicleSearchResults" class="search-results" style="display: none;"></div>
+                    </div>
+
+                    <!-- Selected Vehicle Display -->
+                    <div id="selectedVehicleDisplay" style="display: none;">
+                        <div class="selected-vehicle">
+                            <div class="selection-header">
+                                <h6><i class="fas fa-check-circle text-success"></i> Selected Vehicle</h6>
+                                <button type="button" class="change-btn" onclick="changeVehicle()">Change</button>
+                            </div>
+                            <div id="selectedVehicleInfo"></div>
+                        </div>
+                    </div>
+
+                    <!-- New Vehicle Form -->
+                    <div id="newVehicleForm">
+                        <h6><i class="fas fa-plus"></i> Register New Vehicle</h6>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vehicleRegistration" class="form-label required">Registration Number</label>
+                                <input type="text" class="form-control" id="vehicleRegistration" name="vehicle_registration" required style="text-transform: uppercase;">
+                            </div>
+                            <div class="form-group">
+                                <label for="vehicleType" class="form-label">Vehicle Type (Optional)</label>
+                                <select class="form-control form-select" id="vehicleType" name="vehicle_type">
+                                    <option value="">Select Type</option>
+                                    <option value="sedan">Sedan</option>
+                                    <option value="suv">SUV</option>
+                                    <option value="hatchback">Hatchback</option>
+                                    <option value="pickup">Pickup Truck</option>
+                                    <option value="van">Van</option>
+                                    <option value="bus">Bus</option>
+                                    <option value="motorcycle">Motorcycle</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vehicleMake" class="form-label">Make (Optional)</label>
+                                <input type="text" class="form-control" id="vehicleMake" name="vehicle_make" placeholder="e.g., Toyota">
+                            </div>
+                            <div class="form-group">
+                                <label for="vehicleModel" class="form-label">Model (Optional)</label>
+                                <input type="text" class="form-control" id="vehicleModel" name="vehicle_model" placeholder="e.g., Camry">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vehicleColor" class="form-label">Color (Optional)</label>
+                                <input type="text" class="form-control" id="vehicleColor" name="vehicle_color" placeholder="e.g., White">
+                            </div>
+                            <div class="form-group">
+                                <label for="vehicleYear" class="form-label">Year</label>
+                                <input type="number" class="form-control" id="vehicleYear" name="vehicle_year" min="1990" max="2025" value="2020">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden fields for selected vehicle -->
+                    <input type="hidden" id="selectedVehicleId" name="selected_vehicle_id">
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Customer Selection -->
+        <div class="step-content" id="step2">
             <div class="form-card">
                 <div class="card-header">
                     <h5 class="card-title">
@@ -869,8 +955,36 @@
                 </div>
                 
                 <div class="card-body">
+                    <!-- Walk-in Customer Option -->
+                    <div class="walk-in-option">
+                        <button type="button" class="btn btn-outline-primary btn-lg w-100 mb-3" onclick="selectWalkInCustomer()">
+                            <i class="fas fa-walking"></i>
+                            Walk-in Customer
+                        </button>
+                        <div class="text-center mb-3">
+                            <small class="text-muted">OR</small>
+                        </div>
+                    </div>
+
+                    <!-- Existing Customer from Vehicle -->
+                    <div id="vehicleCustomerDisplay" style="display: none;">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Vehicle Owner Found</strong>
+                            <div id="vehicleCustomerInfo"></div>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-success" onclick="useVehicleCustomer()">
+                                    Use This Customer
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showCustomerOptions()">
+                                    Different Customer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Customer Search -->
-                    <div class="customer-search-section">
+                    <div class="customer-search-section" id="customerSearchSection">
                         <h6><i class="fas fa-search"></i> Search Existing Customer</h6>
                         <div class="search-input-group">
                             <input type="text" class="form-control" id="customerSearchInput" placeholder="Search by name, phone, or customer ID...">
@@ -894,114 +1008,42 @@
                     </div>
 
                     <!-- New Customer Form -->
-                    <div id="newCustomerForm">
-                        <h6><i class="fas fa-user-plus"></i> New Customer</h6>
+                    <div id="newCustomerForm" style="display: none;">
+                        <h6><i class="fas fa-user-plus"></i> Register New Customer</h6>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="customerName" class="form-label required">Full Name</label>
-                                <input type="text" class="form-control" id="customerName" name="customer_name" required>
+                                <label for="customerName" class="form-label">Full Name</label>
+                                <input type="text" class="form-control" id="customerName" name="customer_name" placeholder="Optional for walk-in">
                             </div>
                             <div class="form-group">
-                                <label for="customerPhone" class="form-label required">Phone Number</label>
-                                <input type="tel" class="form-control" id="customerPhone" name="customer_phone" required>
+                                <label for="customerPhone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="customerPhone" name="customer_phone" placeholder="Optional for walk-in">
                             </div>
                         </div>
                         <div class="form-group">
                             <label for="customerEmail" class="form-label">Email (Optional)</label>
                             <input type="email" class="form-control" id="customerEmail" name="customer_email">
                         </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="addVehicleToCustomer" name="add_vehicle_to_customer">
+                            <label class="form-check-label" for="addVehicleToCustomer">
+                                Add vehicle to this customer's account
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Walk-in Customer Display -->
+                    <div id="walkInCustomerDisplay" style="display: none;">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-walking"></i>
+                            <strong>Walk-in Customer</strong>
+                            <p class="mb-0">Customer details will be captured during payment if needed.</p>
+                        </div>
                     </div>
 
                     <!-- Hidden fields for selected customer -->
                     <input type="hidden" id="selectedCustomerId" name="selected_customer_id">
-                </div>
-            </div>
-        </div>
-
-        <!-- Step 2: Vehicle Selection -->
-        <div class="step-content" id="step2">
-            <div class="form-card">
-                <div class="card-header">
-                    <h5 class="card-title">
-                        <i class="fas fa-car"></i>
-                        Select Vehicle
-                    </h5>
-                </div>
-                
-                <div class="card-body">
-                    <!-- Vehicle Search (for existing customers) -->
-                    <div id="vehicleSearchSection" style="display: none;">
-                        <div class="customer-search-section">
-                            <h6><i class="fas fa-search"></i> Search Customer's Vehicles</h6>
-                            <div class="search-input-group">
-                                <input type="text" class="form-control" id="vehicleSearchInput" placeholder="Search by registration number...">
-                                <button type="button" class="search-btn" onclick="searchVehicles()">
-                                    <i class="fas fa-search"></i>
-                                    Search
-                                </button>
-                            </div>
-                            <div id="vehicleSearchResults" class="search-results" style="display: none;"></div>
-                        </div>
-                    </div>
-
-                    <!-- Selected Vehicle Display -->
-                    <div id="selectedVehicleDisplay" style="display: none;">
-                        <div class="selected-vehicle">
-                            <div class="selection-header">
-                                <h6><i class="fas fa-check-circle text-success"></i> Selected Vehicle</h6>
-                                <button type="button" class="change-btn" onclick="changeVehicle()">Change</button>
-                            </div>
-                            <div id="selectedVehicleInfo"></div>
-                        </div>
-                    </div>
-
-                    <!-- New Vehicle Form -->
-                    <div id="newVehicleForm">
-                        <h6><i class="fas fa-plus"></i> Vehicle Information</h6>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="vehicleRegistration" class="form-label required">Registration Number</label>
-                                <input type="text" class="form-control" id="vehicleRegistration" name="vehicle_registration" required style="text-transform: uppercase;">
-                            </div>
-                            <div class="form-group">
-                                <label for="vehicleType" class="form-label required">Vehicle Type</label>
-                                <select class="form-control form-select" id="vehicleType" name="vehicle_type" required>
-                                    <option value="">Select Type</option>
-                                    <option value="sedan">Sedan</option>
-                                    <option value="suv">SUV</option>
-                                    <option value="hatchback">Hatchback</option>
-                                    <option value="pickup">Pickup Truck</option>
-                                    <option value="van">Van</option>
-                                    <option value="bus">Bus</option>
-                                    <option value="motorcycle">Motorcycle</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="vehicleMake" class="form-label required">Make</label>
-                                <input type="text" class="form-control" id="vehicleMake" name="vehicle_make" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="vehicleModel" class="form-label required">Model</label>
-                                <input type="text" class="form-control" id="vehicleModel" name="vehicle_model" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="vehicleColor" class="form-label required">Color</label>
-                                <input type="text" class="form-control" id="vehicleColor" name="vehicle_color" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="vehicleYear" class="form-label">Year</label>
-                                <input type="number" class="form-control" id="vehicleYear" name="vehicle_year" min="1990" max="2025" value="2020">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Hidden fields for selected vehicle -->
-                    <input type="hidden" id="selectedVehicleId" name="selected_vehicle_id">
+                    <input type="hidden" id="isWalkInCustomer" name="is_walk_in_customer" value="false">
                 </div>
             </div>
         </div>
@@ -1267,6 +1309,46 @@
         </div>
     </div>
 </div>
+
+<!-- Customer Save Notification Modal -->
+<div class="modal fade" id="customerSaveModal" tabindex="-1" aria-labelledby="customerSaveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="customerSaveModalLabel">
+                    <i class="fas fa-user-plus me-2"></i>Save Walk-in Customer
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <i class="fas fa-mobile-alt text-success mb-3" style="font-size: 3rem;"></i>
+                    <h6>M-Pesa Payment Successful!</h6>
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>Customer Details from Transaction:</strong>
+                    <div id="transactionCustomerDetails">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+                
+                <p class="text-muted">
+                    Would you like to save this walk-in customer's details for future visits? 
+                    This will help you provide better service next time they visit.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Skip for Now
+                </button>
+                <button type="button" class="btn btn-success" id="saveCustomerBtn">
+                    <i class="fas fa-save me-2"></i>Save Customer Details
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -1274,6 +1356,7 @@
 let currentStep = 1;
 let selectedCustomer = null;
 let selectedVehicle = null;
+let vehicleCustomer = null; // Customer from selected vehicle
 let selectedServices = [];
 let selectedPackage = null;
 let allServices = [];
@@ -1317,7 +1400,7 @@ function showStep(step) {
     
     // Update step-specific content
     if (step === 2) {
-        updateVehicleStep();
+        updateCustomerStep(); // Now step 2 is customer step
     } else if (step === 4) {
         updateReviewStep();
     }
@@ -1362,9 +1445,9 @@ function updateNavigationButtons() {
 function validateCurrentStep() {
     switch (currentStep) {
         case 1:
-            return validateCustomerStep();
-        case 2:
             return validateVehicleStep();
+        case 2:
+            return validateCustomerStep();
         case 3:
             return validateServicesStep();
         case 4:
@@ -1466,85 +1549,20 @@ function changeCustomer() {
     document.getElementById('customerEmail').value = '';
 }
 
-function validateCustomerStep() {
-    if (selectedCustomer) {
-        return true;
-    }
-    
-    // Validate new customer form
-    const name = document.getElementById('customerName').value.trim();
-    const phone = document.getElementById('customerPhone').value.trim();
-    
-    if (!name || !phone) {
-        showToast('Please enter customer name and phone number', 'error');
-        return false;
-    }
-    
-    return true;
-}
-
-// Vehicle Management
-function updateVehicleStep() {
-    if (selectedCustomer) {
-        document.getElementById('vehicleSearchSection').style.display = 'block';
-        loadCustomerVehicles();
-    } else {
-        document.getElementById('vehicleSearchSection').style.display = 'none';
-    }
-}
-
-function loadCustomerVehicles() {
-    if (!selectedCustomer) return;
-    
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/vehicle/search/?customer_id=${selectedCustomer.id}`, {
-        method: 'GET',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.results && data.results.length > 0) {
-            displayVehicleOptions(data.results);
-        }
-    })
-    .catch(error => {
-        console.error('Error loading vehicles:', error);
-    });
-}
-
-function displayVehicleOptions(vehicles) {
+// Vehicle Management (Step 1)
+function searchVehiclesByRegistration() {
+    const query = document.getElementById('vehicleSearchInput').value.trim();
     const resultsContainer = document.getElementById('vehicleSearchResults');
     
-    let html = '<h6>Customer\'s Vehicles:</h6>';
-    vehicles.forEach(vehicle => {
-        html += `
-            <div class="search-result-item" onclick="selectVehicle('${vehicle.id}', '${vehicle.registration}', '${vehicle.make}', '${vehicle.model}', '${vehicle.color}')">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <strong>${vehicle.registration}</strong>
-                        <br><small>${vehicle.make} ${vehicle.model}</small>
-                    </div>
-                    <div class="text-end">
-                        <small class="text-muted">${vehicle.color}</small>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
+    if (query.length < 2) {
+        resultsContainer.style.display = 'none';
+        return;
+    }
     
-    resultsContainer.innerHTML = html;
+    resultsContainer.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
     resultsContainer.style.display = 'block';
-}
-
-function searchVehicles() {
-    const query = document.getElementById('vehicleSearchInput').value.trim();
-    const customerId = selectedCustomer ? selectedCustomer.id : '';
     
-    if (query.length < 2) return;
-    
-    fetch(`/business/{{ request.tenant.slug }}/services/ajax/vehicle/search/?q=${encodeURIComponent(query)}&customer_id=${customerId}`, {
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/vehicle/search/?q=${encodeURIComponent(query)}`, {
         method: 'GET',
         headers: {
             'X-CSRFToken': getCookie('csrftoken'),
@@ -1557,6 +1575,7 @@ function searchVehicles() {
     })
     .catch(error => {
         console.error('Vehicle search error:', error);
+        resultsContainer.innerHTML = '<div class="text-danger p-3">Error searching vehicles</div>';
     });
 }
 
@@ -1564,14 +1583,14 @@ function displayVehicleResults(vehicles) {
     const resultsContainer = document.getElementById('vehicleSearchResults');
     
     if (vehicles.length === 0) {
-        resultsContainer.innerHTML = '<div class="text-muted p-3">No vehicles found</div>';
+        resultsContainer.innerHTML = '<div class="text-muted p-3">No vehicles found with this registration</div>';
         return;
     }
     
     let html = '';
     vehicles.forEach(vehicle => {
         html += `
-            <div class="search-result-item" onclick="selectVehicle('${vehicle.id}', '${vehicle.registration}', '${vehicle.make}', '${vehicle.model}', '${vehicle.color}')">
+            <div class="search-result-item" onclick="selectExistingVehicle('${vehicle.id}', '${vehicle.registration}', '${vehicle.make}', '${vehicle.model}', '${vehicle.color}', '${vehicle.customer_name}')">
                 <div class="d-flex justify-content-between">
                     <div>
                         <strong>${vehicle.registration}</strong>
@@ -1579,7 +1598,7 @@ function displayVehicleResults(vehicles) {
                     </div>
                     <div class="text-end">
                         <small class="text-muted">${vehicle.color}</small>
-                        <br><small>${vehicle.customer_name}</small>
+                        <br><small>Owner: ${vehicle.customer_name}</small>
                     </div>
                 </div>
             </div>
@@ -1589,25 +1608,146 @@ function displayVehicleResults(vehicles) {
     resultsContainer.innerHTML = html;
 }
 
-function selectVehicle(id, registration, make, model, color) {
-    selectedVehicle = { id, registration, make, model, color };
+function selectExistingVehicle(id, registration, make, model, color, customerName) {
+    console.log('selectExistingVehicle called with:', { id, registration, make, model, color, customerName });
     
-    // Update UI
+    selectedVehicle = { id, registration, make, model, color, customerName };
+    
+    // Update vehicle UI
     document.getElementById('selectedVehicleId').value = id;
     document.getElementById('selectedVehicleInfo').innerHTML = `
         <strong>${registration}</strong><br>
         <small>${make} ${model}</small><br>
-        <small>Color: ${color}</small>
+        <small>Color: ${color}</small><br>
+        <small>Owner: ${customerName}</small>
     `;
     
     // Show selected vehicle, hide search and new vehicle form
     document.getElementById('selectedVehicleDisplay').style.display = 'block';
     document.getElementById('vehicleSearchResults').style.display = 'none';
     document.getElementById('newVehicleForm').style.display = 'none';
+    
+    // Load vehicle's customer info for step 2
+    console.log('Calling loadVehicleCustomer with auto-advance = true');
+    loadVehicleCustomer(id, true); // Pass true to auto-advance
+    
+    // Clear search input
+    document.getElementById('vehicleSearchInput').value = '';
+}
+
+function loadVehicleCustomer(vehicleId, autoAdvance = false) {
+    console.log('loadVehicleCustomer called with vehicleId:', vehicleId, 'autoAdvance:', autoAdvance);
+    
+    // This will load the customer details when we move to step 2
+    fetch(`/business/{{ request.tenant.slug }}/customers/ajax/vehicle-customer/?vehicle_id=${vehicleId}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Vehicle customer response:', data);
+        
+        if (data.success && data.customer) {
+            // Set both variables to ensure validation works
+            vehicleCustomer = data.customer;
+            selectedCustomer = data.customer;
+            
+            console.log('Loaded vehicle customer:', data.customer);
+            
+            // Check if customer is walk-in
+            const isWalkInCustomer = data.customer.is_walk_in;
+            
+            // Pre-fill customer information
+            document.getElementById('selectedCustomerId').value = data.customer.id;
+            document.getElementById('isWalkInCustomer').value = isWalkInCustomer ? 'true' : 'false';
+            
+            console.log('Set customer form values:', {
+                selectedCustomerId: data.customer.id,
+                isWalkInCustomer: isWalkInCustomer ? 'true' : 'false'
+            });
+            
+            // Hide all other customer options and show vehicle customer display
+            document.getElementById('walkInCustomerDisplay').style.display = 'none';
+            document.getElementById('selectedCustomerDisplay').style.display = 'none';
+            document.getElementById('newCustomerForm').style.display = 'none';
+            document.getElementById('customerSearchSection').style.display = 'none';
+            document.getElementById('vehicleCustomerDisplay').style.display = 'block';
+            
+            let customerInfoHtml = '';
+            if (isWalkInCustomer) {
+                customerInfoHtml = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-walking me-2"></i>
+                        <strong>Walk-in Customer:</strong> ${data.customer.full_name || 'Unknown'}<br>
+                        <small>Phone: ${data.customer.phone || 'Not provided'}</small><br>
+                        <small>Customer ID: ${data.customer.customer_id}</small><br>
+                        <small class="text-muted">Previous walk-in customer</small>
+                    </div>
+                `;
+                
+                // Check for transaction details and ask to save if needed
+                checkWalkInCustomerTransactions(data.customer.id);
+            } else {
+                customerInfoHtml = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-car me-2"></i>
+                        <strong>Vehicle Owner:</strong> ${data.customer.full_name}<br>
+                        <small>Phone: ${data.customer.phone}</small><br>
+                        <small>Customer ID: ${data.customer.customer_id}</small>
+                    </div>
+                `;
+            }
+            
+            const vehicleCustomerInfoElement = document.getElementById('vehicleCustomerInfo');
+            if (vehicleCustomerInfoElement) {
+                vehicleCustomerInfoElement.innerHTML = customerInfoHtml;
+            } else {
+                console.error('vehicleCustomerInfo element not found');
+            }
+            
+            // If auto-advance is enabled, automatically go to next step
+            if (autoAdvance) {
+                console.log('Starting auto-advance for vehicle customer, is walk-in:', isWalkInCustomer);
+                console.log('Current step before auto-advance:', currentStep);
+                
+                // For vehicle with customer (walk-in or regular), skip customer step and go directly to services
+                setTimeout(() => {
+                    console.log('Auto-advancing directly to services step, skipping customer selection');
+                    console.log('Setting currentStep from', currentStep, 'to 3');
+                    currentStep = 3; // Skip customer step, go directly to services
+                    
+                    // Mark step 2 as completed since we have a customer
+                    const step2Indicator = document.getElementById('step2-indicator');
+                    if (step2Indicator) {
+                        step2Indicator.classList.add('completed');
+                        step2Indicator.classList.remove('active');
+                        console.log('Marked step 2 as completed');
+                    }
+                    
+                    console.log('Calling showStep(3)');
+                    showStep(currentStep);
+                    console.log('Calling updateStepIndicator()');
+                    updateStepIndicator();
+                    console.log('Calling updateNavigationButtons()');
+                    updateNavigationButtons();
+                    console.log('Auto-advance complete, currentStep is now:', currentStep);
+                }, 300);
+            } else {
+                console.log('Auto-advance is disabled or no customer found');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error loading vehicle customer:', error);
+    });
 }
 
 function changeVehicle() {
     selectedVehicle = null;
+    vehicleCustomer = null;
     document.getElementById('selectedVehicleId').value = '';
     document.getElementById('selectedVehicleDisplay').style.display = 'none';
     document.getElementById('newVehicleForm').style.display = 'block';
@@ -1626,18 +1766,215 @@ function validateVehicleStep() {
         return true;
     }
     
-    // Validate new vehicle form
+    // Validate new vehicle form - only registration is required
     const registration = document.getElementById('vehicleRegistration').value.trim();
-    const make = document.getElementById('vehicleMake').value.trim();
-    const model = document.getElementById('vehicleModel').value.trim();
-    const color = document.getElementById('vehicleColor').value.trim();
-    const type = document.getElementById('vehicleType').value;
     
-    if (!registration || !make || !model || !color || !type) {
-        showToast('Please fill in all required vehicle information', 'error');
+    if (!registration) {
+        showToast('Please enter vehicle registration number', 'error');
         return false;
     }
     
+    return true;
+}
+
+// Customer Management (Step 2)
+function selectWalkInCustomer() {
+    selectedCustomer = null;
+    document.getElementById('isWalkInCustomer').value = 'true';
+    document.getElementById('selectedCustomerId').value = '';
+    
+    // Show walk-in display, hide other options
+    document.getElementById('walkInCustomerDisplay').style.display = 'block';
+    document.getElementById('selectedCustomerDisplay').style.display = 'none';
+    document.getElementById('newCustomerForm').style.display = 'none';
+    document.getElementById('customerSearchSection').style.display = 'none';
+    document.getElementById('vehicleCustomerDisplay').style.display = 'none';
+}
+
+function showCustomerOptions() {
+    document.getElementById('walkInCustomerDisplay').style.display = 'none';
+    document.getElementById('vehicleCustomerDisplay').style.display = 'none';
+    document.getElementById('customerSearchSection').style.display = 'block';
+    document.getElementById('newCustomerForm').style.display = 'block';
+}
+
+function useVehicleCustomer() {
+    if (vehicleCustomer) {
+        selectedCustomer = vehicleCustomer;
+        document.getElementById('selectedCustomerId').value = vehicleCustomer.id;
+        document.getElementById('isWalkInCustomer').value = 'false';
+        
+        document.getElementById('selectedCustomerInfo').innerHTML = `
+            <strong>${vehicleCustomer.name}</strong><br>
+            <small>Phone: ${vehicleCustomer.phone}</small><br>
+            <small>ID: ${vehicleCustomer.customer_id}</small>
+        `;
+        
+        document.getElementById('selectedCustomerDisplay').style.display = 'block';
+        document.getElementById('vehicleCustomerDisplay').style.display = 'none';
+        document.getElementById('customerSearchSection').style.display = 'none';
+        document.getElementById('newCustomerForm').style.display = 'none';
+        document.getElementById('walkInCustomerDisplay').style.display = 'none';
+    }
+}
+
+function updateCustomerStep() {
+    // Show vehicle customer option if we have one
+    if (selectedVehicle && vehicleCustomer) {
+        const vehicleCustomerInfoElement = document.getElementById('vehicleCustomerInfo');
+        if (vehicleCustomerInfoElement) {
+            vehicleCustomerInfoElement.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-car me-2"></i>
+                    <strong>Vehicle Owner:</strong> ${vehicleCustomer.full_name || vehicleCustomer.name}<br>
+                    <small>Phone: ${vehicleCustomer.phone}</small><br>
+                    <small>Customer ID: ${vehicleCustomer.customer_id}</small>
+                </div>
+            `;
+        } else {
+            console.error('vehicleCustomerInfo element not found in updateCustomerStep');
+        }
+        
+        // Hide other options and show vehicle customer
+        document.getElementById('walkInCustomerDisplay').style.display = 'none';
+        document.getElementById('selectedCustomerDisplay').style.display = 'none';
+        document.getElementById('newCustomerForm').style.display = 'none';
+        document.getElementById('customerSearchSection').style.display = 'none';
+        document.getElementById('vehicleCustomerDisplay').style.display = 'block';
+    } else {
+        document.getElementById('vehicleCustomerDisplay').style.display = 'none';
+        // Show customer search and walk-in options by default
+        document.getElementById('customerSearchSection').style.display = 'block';
+        document.getElementById('newCustomerForm').style.display = 'block';
+    }
+}
+
+function searchCustomers() {
+    const query = document.getElementById('customerSearchInput').value.trim();
+    const resultsContainer = document.getElementById('customerSearchResults');
+    
+    if (query.length < 2) {
+        resultsContainer.style.display = 'none';
+        return;
+    }
+    
+    resultsContainer.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    resultsContainer.style.display = 'block';
+    
+    fetch(`/business/{{ request.tenant.slug }}/services/ajax/customer/search/?q=${encodeURIComponent(query)}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayCustomerResults(data.customers || []);
+    })
+    .catch(error => {
+        console.error('Search error:', error);
+        resultsContainer.innerHTML = '<div class="text-danger p-3">Error searching customers</div>';
+    });
+}
+
+function displayCustomerResults(customers) {
+    const resultsContainer = document.getElementById('customerSearchResults');
+    
+    if (customers.length === 0) {
+        resultsContainer.innerHTML = '<div class="text-muted p-3">No customers found</div>';
+        return;
+    }
+    
+    let html = '';
+    customers.forEach(customer => {
+        html += `
+            <div class="search-result-item" onclick="selectCustomer('${customer.id}', '${customer.full_name}', '${customer.phone}', '${customer.customer_id}')">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>${customer.full_name}</strong>
+                        <br><small>${customer.phone || 'No phone'}</small>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted">${customer.customer_id}</small>
+                        <br><small>${customer.vehicle_count || 0} vehicle(s)</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+}
+
+function selectCustomer(id, name, phone, customerId) {
+    selectedCustomer = { id, name, phone, customerId };
+    document.getElementById('isWalkInCustomer').value = 'false';
+    
+    // Update UI
+    document.getElementById('selectedCustomerId').value = id;
+    document.getElementById('selectedCustomerInfo').innerHTML = `
+        <strong>${name}</strong><br>
+        <small>Phone: ${phone}</small><br>
+        <small>ID: ${customerId}</small>
+    `;
+    
+    // Show selected customer, hide other options
+    document.getElementById('selectedCustomerDisplay').style.display = 'block';
+    document.getElementById('customerSearchResults').style.display = 'none';
+    document.getElementById('newCustomerForm').style.display = 'none';
+    document.getElementById('walkInCustomerDisplay').style.display = 'none';
+    document.getElementById('vehicleCustomerDisplay').style.display = 'none';
+    
+    // Clear search input
+    document.getElementById('customerSearchInput').value = '';
+}
+
+function changeCustomer() {
+    selectedCustomer = null;
+    document.getElementById('selectedCustomerId').value = '';
+    document.getElementById('isWalkInCustomer').value = 'false';
+    document.getElementById('selectedCustomerDisplay').style.display = 'none';
+    
+    // Show customer options again
+    showCustomerOptions();
+    
+    // Clear form fields
+    document.getElementById('customerName').value = '';
+    document.getElementById('customerPhone').value = '';
+    document.getElementById('customerEmail').value = '';
+}
+
+function validateCustomerStep() {
+    const isWalkIn = document.getElementById('isWalkInCustomer').value === 'true';
+    
+    // Debug logging
+    console.log('Validating customer step:', {
+        isWalkIn,
+        selectedCustomer: !!selectedCustomer,
+        vehicleCustomer: !!vehicleCustomer,
+        selectedCustomerId: selectedCustomer?.id,
+        vehicleCustomerId: vehicleCustomer?.id
+    });
+    
+    if (isWalkIn || selectedCustomer || vehicleCustomer) {
+        console.log('Customer step validation passed');
+        return true;
+    }
+    
+    // Check if customer form has data for new customer
+    const name = document.getElementById('customerName').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    
+    // For new vehicle registration, at least one of name or phone should be provided
+    if (!name && !phone) {
+        console.log('Customer step validation failed: no customer details');
+        showToast('Please provide customer details, select an existing customer, or choose walk-in', 'error');
+        return false;
+    }
+    
+    console.log('Customer step validation passed with form data');
     return true;
 }
 
@@ -1862,37 +2199,75 @@ function validateServicesStep() {
 
 // Review Step
 function updateReviewStep() {
-    // Update customer info
-    const customerInfo = selectedCustomer ? 
-        `<strong>${selectedCustomer.name}</strong><br><small>Phone: ${selectedCustomer.phone}</small>` :
-        `<strong>${document.getElementById('customerName').value}</strong><br><small>Phone: ${document.getElementById('customerPhone').value}</small>`;
+    // Update customer info - handle walk-in, selected, and vehicle customers
+    let customerInfo = '';
+    const isWalkIn = document.getElementById('isWalkInCustomer').value === 'true';
+    
+    if (isWalkIn) {
+        customerInfo = `<div class="alert alert-warning"><i class="fas fa-walking me-2"></i><strong>Walk-in Customer</strong><br><small>No registration required</small></div>`;
+    } else if (vehicleCustomer) {
+        customerInfo = `<div class="alert alert-info"><i class="fas fa-car me-2"></i><strong>${vehicleCustomer.full_name || vehicleCustomer.name}</strong><br><small>Phone: ${vehicleCustomer.phone}</small><br><small>ID: ${vehicleCustomer.customer_id}</small><br><small class="text-muted">Vehicle Owner</small></div>`;
+    } else if (selectedCustomer) {
+        customerInfo = `<strong>${selectedCustomer.name}</strong><br><small>Phone: ${selectedCustomer.phone}</small><br><small>ID: ${selectedCustomer.customerId}</small>`;
+    } else {
+        const customerName = document.getElementById('customerName').value.trim();
+        const customerPhone = document.getElementById('customerPhone').value.trim();
+        if (customerName || customerPhone) {
+            customerInfo = `<strong>${customerName || 'New Customer'}</strong><br><small>Phone: ${customerPhone || 'Not provided'}</small><br><small class="text-muted">New Registration</small>`;
+        } else {
+            customerInfo = `<div class="text-muted">No customer information</div>`;
+        }
+    }
     document.getElementById('reviewCustomerInfo').innerHTML = customerInfo;
     
     // Update vehicle info
-    const vehicleInfo = selectedVehicle ?
-        `<strong>${selectedVehicle.registration}</strong><br><small>${selectedVehicle.make} ${selectedVehicle.model}</small><br><small>Color: ${selectedVehicle.color}</small>` :
-        `<strong>${document.getElementById('vehicleRegistration').value}</strong><br><small>${document.getElementById('vehicleMake').value} ${document.getElementById('vehicleModel').value}</small><br><small>Color: ${document.getElementById('vehicleColor').value}</small>`;
+    let vehicleInfo = '';
+    if (selectedVehicle) {
+        vehicleInfo = `<strong>${selectedVehicle.registration}</strong><br><small>${selectedVehicle.make} ${selectedVehicle.model}</small><br><small>Color: ${selectedVehicle.color}</small>`;
+        if (selectedVehicle.customerName) {
+            vehicleInfo += `<br><small class="text-muted">Owner: ${selectedVehicle.customerName}</small>`;
+        }
+    } else {
+        const registration = document.getElementById('vehicleRegistration').value.trim();
+        const make = document.getElementById('vehicleMake').value.trim();
+        const model = document.getElementById('vehicleModel').value.trim();
+        const color = document.getElementById('vehicleColor').value.trim();
+        if (registration || make || model) {
+            vehicleInfo = `<strong>${registration || 'New Vehicle'}</strong><br><small>${make} ${model}</small><br><small>Color: ${color}</small><br><small class="text-muted">New Registration</small>`;
+        } else {
+            vehicleInfo = `<div class="text-muted">No vehicle information</div>`;
+        }
+    }
     document.getElementById('reviewVehicleInfo').innerHTML = vehicleInfo;
     
     // Update services info
     let servicesHtml = '';
-    selectedServices.forEach(service => {
-        servicesHtml += `<div>${service.name} - KES ${service.price.toFixed(2)}</div>`;
-    });
+    if (selectedServices && selectedServices.length > 0) {
+        selectedServices.forEach(service => {
+            servicesHtml += `<div class="d-flex justify-content-between"><span>${service.name}</span><span>KES ${service.price.toFixed(2)}</span></div>`;
+        });
+    } else {
+        servicesHtml = '<div class="text-muted">No services selected</div>';
+    }
     document.getElementById('reviewServicesInfo').innerHTML = servicesHtml;
     
     // Update total info with inclusive VAT
-    const totalInclusiveVAT = selectedServices.reduce((sum, service) => sum + service.price, 0); // Prices already include VAT
-    const taxAmount = totalInclusiveVAT * 0.16 / 1.16; // Extract VAT from inclusive price
-    const subtotalExVAT = totalInclusiveVAT - taxAmount; // Subtotal without VAT
-    const duration = selectedServices.reduce((sum, service) => sum + service.duration, 0);
-    
-    document.getElementById('reviewTotalInfo').innerHTML = `
-        <div>Subtotal (ex VAT): KES ${subtotalExVAT.toFixed(2)}</div>
-        <div>VAT (16%): KES ${taxAmount.toFixed(2)}</div>
-        <div><strong>Total (incl VAT): KES ${totalInclusiveVAT.toFixed(2)}</strong></div>
-        <div><small>Duration: ${duration} minutes</small></div>
-    `;
+    if (selectedServices && selectedServices.length > 0) {
+        const totalInclusiveVAT = selectedServices.reduce((sum, service) => sum + service.price, 0); // Prices already include VAT
+        const taxAmount = totalInclusiveVAT * 0.16 / 1.16; // Extract VAT from inclusive price
+        const subtotalExVAT = totalInclusiveVAT - taxAmount; // Subtotal without VAT
+        const duration = selectedServices.reduce((sum, service) => sum + service.duration, 0);
+        
+        document.getElementById('reviewTotalInfo').innerHTML = `
+            <div class="d-flex justify-content-between"><span>Subtotal (ex VAT):</span><span>KES ${subtotalExVAT.toFixed(2)}</span></div>
+            <div class="d-flex justify-content-between"><span>VAT (16%):</span><span>KES ${taxAmount.toFixed(2)}</span></div>
+            <hr>
+            <div class="d-flex justify-content-between"><strong><span>Total (incl VAT):</span><span>KES ${totalInclusiveVAT.toFixed(2)}</span></strong></div>
+            <div class="d-flex justify-content-between text-muted"><small><span>Estimated Duration:</span><span>${duration} minutes</span></small></div>
+        `;
+    } else {
+        document.getElementById('reviewTotalInfo').innerHTML = '<div class="text-muted">No services selected</div>';
+    }
 }
 
 // Form Submission
@@ -1921,26 +2296,9 @@ function submitOrder() {
             throw new Error('CSRF token not found');
         }
         
-        // Customer data
-        if (selectedCustomer) {
-            formData.set('existing_customer_id', selectedCustomer.id);
-        } else {
-            const customerName = document.getElementById('customerName').value.trim();
-            const customerPhone = document.getElementById('customerPhone').value.trim();
-            const customerEmail = document.getElementById('customerEmail').value.trim();
-            
-            if (!customerName || !customerPhone) {
-                throw new Error('Customer name and phone are required');
-            }
-            
-            formData.set('customer_name', customerName);
-            formData.set('customer_phone', customerPhone);
-            formData.set('customer_email', customerEmail);
-        }
-        
-        // Vehicle data
+        // Vehicle data (now step 1)
         if (selectedVehicle) {
-            formData.set('existing_vehicle_id', selectedVehicle.id);
+            formData.set('selected_vehicle_id', selectedVehicle.id);
         } else {
             const vehicleRegistration = document.getElementById('vehicleRegistration').value.trim().toUpperCase();
             const vehicleMake = document.getElementById('vehicleMake').value.trim();
@@ -1949,16 +2307,39 @@ function submitOrder() {
             const vehicleType = document.getElementById('vehicleType').value;
             const vehicleYear = document.getElementById('vehicleYear').value;
             
-            if (!vehicleRegistration || !vehicleMake || !vehicleModel || !vehicleColor || !vehicleType) {
-                throw new Error('All vehicle information is required');
+            if (!vehicleRegistration) {
+                throw new Error('Vehicle registration number is required');
             }
             
             formData.set('vehicle_registration', vehicleRegistration);
-            formData.set('vehicle_make', vehicleMake);
-            formData.set('vehicle_model', vehicleModel);
-            formData.set('vehicle_color', vehicleColor);
-            formData.set('vehicle_type', vehicleType);
-            formData.set('vehicle_year', vehicleYear);
+            formData.set('vehicle_make', vehicleMake || 'Unknown');
+            formData.set('vehicle_model', vehicleModel || 'Unknown');
+            formData.set('vehicle_color', vehicleColor || 'Unknown');
+            formData.set('vehicle_type', vehicleType || 'car');
+            formData.set('vehicle_year', vehicleYear || '2020');
+        }
+
+        // Customer data (now step 2)
+        const isWalkIn = document.getElementById('isWalkInCustomer').value === 'true';
+        formData.set('is_walk_in_customer', isWalkIn);
+        
+        if (selectedCustomer) {
+            formData.set('selected_customer_id', selectedCustomer.id);
+        } else if (!isWalkIn) {
+            const customerName = document.getElementById('customerName').value.trim();
+            const customerPhone = document.getElementById('customerPhone').value.trim();
+            const customerEmail = document.getElementById('customerEmail').value.trim();
+            
+            if (customerName || customerPhone) {
+                formData.set('customer_name', customerName);
+                formData.set('customer_phone', customerPhone);
+                formData.set('customer_email', customerEmail);
+                
+                // Check if vehicle should be added to customer
+                if (document.getElementById('addVehicleToCustomer').checked) {
+                    formData.set('add_vehicle_to_customer', 'on');
+                }
+            }
         }
         
         // Service selection data
@@ -2016,6 +2397,11 @@ function submitOrder() {
             if (data.success) {
                 showToast('Order created successfully!', 'success');
                 
+                // Start checking payment status for walk-in customers with M-Pesa
+                if (data.order_id) {
+                    checkPaymentStatus(data.order_id);
+                }
+                
                 // Redirect after a short delay
                 setTimeout(() => {
                     if (data.redirect_url) {
@@ -2072,8 +2458,10 @@ function submitOrder() {
 }
 
 function validateAllSteps() {
-    // Validate customer
-    if (!selectedCustomer) {
+    // Validate customer - check if walk-in is selected or vehicle customer is loaded
+    const isWalkIn = document.getElementById('isWalkInCustomer').value === 'true';
+    
+    if (!isWalkIn && !selectedCustomer && !vehicleCustomer) {
         const name = document.getElementById('customerName').value.trim();
         const phone = document.getElementById('customerPhone').value.trim();
         if (!name || !phone) {
@@ -2081,15 +2469,11 @@ function validateAllSteps() {
         }
     }
     
-    // Validate vehicle
+    // Validate vehicle - only registration is required
     if (!selectedVehicle) {
         const registration = document.getElementById('vehicleRegistration').value.trim();
-        const make = document.getElementById('vehicleMake').value.trim();
-        const model = document.getElementById('vehicleModel').value.trim();
-        const color = document.getElementById('vehicleColor').value.trim();
-        const type = document.getElementById('vehicleType').value;
         
-        if (!registration || !make || !model || !color || !type) {
+        if (!registration) {
             return false;
         }
     }
@@ -2295,7 +2679,9 @@ document.getElementById('vehicleSearchInput').addEventListener('input', function
     clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
         if (this.value.length >= 2) {
-            searchVehicles();
+            searchVehiclesByRegistration();
+        } else {
+            document.getElementById('vehicleSearchResults').style.display = 'none';
         }
     }, 300);
 });
@@ -2394,6 +2780,109 @@ function showToast(message, type) {
             toast.remove();
         }
     }, 5000);
+}
+
+// Check for walk-in customer transaction details
+function checkWalkInCustomerTransactions(customerId) {
+    // Check if this walk-in customer has recent M-Pesa transactions that could be saved
+    fetch(`/business/{{ request.tenant.slug }}/customers/ajax/check-walk-in-transactions/?customer_id=${customerId}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.has_transactions) {
+            // Show notification that customer has transaction details available
+            showToast(`This walk-in customer has transaction details available. Consider saving their information.`, 'info');
+            
+            // Optional: Show save suggestion modal if there are recent payments
+            if (data.recent_payment) {
+                setTimeout(() => {
+                    showCustomerSaveModal({
+                        payment_id: data.recent_payment.id,
+                        customer_phone: data.recent_payment.customer_phone,
+                        amount: data.recent_payment.amount
+                    });
+                }, 2000);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error checking walk-in customer transactions:', error);
+    });
+}
+
+// Customer Save Notification Functions
+function showCustomerSaveModal(paymentData) {
+    // Populate transaction details
+    const detailsDiv = document.getElementById('transactionCustomerDetails');
+    detailsDiv.innerHTML = `
+        <div><strong>Phone:</strong> ${paymentData.customer_phone || 'N/A'}</div>
+        <div><strong>Amount:</strong> KSh ${paymentData.amount || 'N/A'}</div>
+        <div><strong>Transaction:</strong> ${paymentData.payment_id || 'N/A'}</div>
+    `;
+    
+    // Store payment ID for save action
+    document.getElementById('saveCustomerBtn').setAttribute('data-payment-id', paymentData.payment_id);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('customerSaveModal'));
+    modal.show();
+}
+
+// Handle save customer button click
+document.getElementById('saveCustomerBtn').addEventListener('click', function() {
+    const paymentId = this.getAttribute('data-payment-id');
+    if (paymentId) {
+        // Redirect to save customer page
+        window.location.href = `/customers/save-walk-in/${paymentId}/`;
+    }
+});
+
+// Function to check for payment completion and show notification
+function checkPaymentStatus(orderId) {
+    if (!orderId) return;
+    
+    // Poll for payment completion every 3 seconds
+    const checkInterval = setInterval(() => {
+        fetch(`/business/{{ request.tenant.slug }}/payments/ajax/status/?order_id=${orderId}`, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.payment) {
+                if (data.payment.status === 'completed' && data.payment.method === 'mpesa') {
+                    // Check if customer is walk-in
+                    if (data.payment.customer_is_walk_in && data.payment.customer_phone) {
+                        clearInterval(checkInterval);
+                        showCustomerSaveModal({
+                            payment_id: data.payment.id,
+                            customer_phone: data.payment.customer_phone,
+                            amount: data.payment.amount
+                        });
+                    }
+                } else if (data.payment.status === 'failed') {
+                    clearInterval(checkInterval);
+                    showToast('Payment failed. Please try again.', 'error');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error checking payment status:', error);
+        });
+    }, 3000);
+    
+    // Stop checking after 5 minutes
+    setTimeout(() => {
+        clearInterval(checkInterval);
+    }, 300000);
 }
 </script>
 

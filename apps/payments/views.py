@@ -1464,3 +1464,50 @@ def get_payment_method_config(request, method_id):
         return JsonResponse({'success': False, 'error': 'Payment method not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@employee_required()
+@ajax_required
+def payment_status_ajax(request):
+    """Check payment status for walk-in customer notifications"""
+    order_id = request.GET.get('order_id')
+    
+    if not order_id:
+        return JsonResponse({'success': False, 'error': 'Order ID required'})
+    
+    try:
+        from apps.services.models import ServiceOrder
+        order = ServiceOrder.objects.get(order_id=order_id)
+        
+        # Get the latest payment for this order
+        payment = Payment.objects.filter(service_order=order).order_by('-created_at').first()
+        
+        if not payment:
+            return JsonResponse({'success': False, 'error': 'No payment found'})
+        
+        # Check if customer is walk-in
+        customer_is_walk_in = (
+            payment.customer and 
+            hasattr(payment.customer, 'is_walk_in') and 
+            payment.customer.is_walk_in
+        )
+        
+        payment_data = {
+            'id': str(payment.id),
+            'status': payment.status,
+            'method': payment.method,
+            'amount': float(payment.amount),
+            'customer_phone': payment.customer_phone,
+            'customer_is_walk_in': customer_is_walk_in
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'payment': payment_data
+        })
+        
+    except ServiceOrder.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Order not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
