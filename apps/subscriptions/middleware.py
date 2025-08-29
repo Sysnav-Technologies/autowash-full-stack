@@ -89,8 +89,47 @@ class SubscriptionMiddleware:
             business = Tenant.objects.using('default').filter(owner=request.user).first()
             
             if not business:
-                # User doesn't have a business yet
-                return '/auth/business/register/'
+                # User doesn't own a business - check if they're an employee
+                try:
+                    # Check if user is an employee of any verified business
+                    verified_businesses = Tenant.objects.using('default').filter(
+                        is_verified=True, 
+                        is_active=True, 
+                        is_approved=True
+                    )
+                    
+                    employee_business = None
+                    for tenant in verified_businesses:
+                        try:
+                            from apps.employees.models import Employee
+                            from apps.core.database_router import TenantDatabaseManager
+                            
+                            # Ensure tenant database is registered
+                            TenantDatabaseManager.add_tenant_to_settings(tenant)
+                            db_alias = f"tenant_{tenant.id}"
+                            
+                            employee = Employee.objects.using(db_alias).filter(
+                                user_id=request.user.id, 
+                                is_active=True
+                            ).first()
+                            
+                            if employee:
+                                employee_business = tenant
+                                break
+                                
+                        except Exception:
+                            continue  # Skip tenant if there's an error
+                    
+                    if employee_business:
+                        # User is an employee - use the employee's business for subscription check
+                        business = employee_business
+                    else:
+                        # User is neither owner nor employee - redirect to business registration
+                        return '/auth/business/register/'
+                        
+                except Exception:
+                    # If there's an error checking employee status, redirect to registration
+                    return '/auth/business/register/'
             
             # Check if business is properly set up
             if not business.is_approved or not business.is_verified or not business.is_active:

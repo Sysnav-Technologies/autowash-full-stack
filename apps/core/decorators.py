@@ -106,8 +106,16 @@ def employee_required(roles=None):
                     # User is the business owner, grant access
                     try:
                         from apps.employees.models import Employee
-                        # Try to get or create employee record for owner
-                        employee, created = Employee.objects.get_or_create(
+                        from apps.core.database_router import TenantDatabaseManager
+                        
+                        # Ensure tenant database is registered in settings
+                        TenantDatabaseManager.add_tenant_to_settings(request.tenant)
+                        
+                        # Use the correct tenant database for owner employee record
+                        db_alias = f"tenant_{request.tenant.id}"
+                        
+                        # Try to get or create employee record for owner in tenant database
+                        employee, created = Employee.objects.using(db_alias).get_or_create(
                             user_id=request.user.id,
                             defaults={
                                 'employee_id': f'OWN{request.user.id}',
@@ -130,8 +138,20 @@ def employee_required(roles=None):
                 
             try:
                 from apps.employees.models import Employee
-                # FIX: Use user_id instead of user foreign key for cross-schema compatibility
-                employee = Employee.objects.get(user_id=request.user.id, is_active=True)
+                from apps.core.database_router import TenantDatabaseManager
+                
+                # Ensure tenant database is registered in settings
+                if hasattr(request, 'tenant') and request.tenant:
+                    TenantDatabaseManager.add_tenant_to_settings(request.tenant)
+                    
+                    # Use the correct tenant database
+                    db_alias = f"tenant_{request.tenant.id}"
+                    
+                    # FIX: Use user_id and tenant-specific database for cross-schema compatibility
+                    employee = Employee.objects.using(db_alias).get(user_id=request.user.id, is_active=True)
+                else:
+                    # Fallback to default database if no tenant (shouldn't happen)
+                    employee = Employee.objects.get(user_id=request.user.id, is_active=True)
                 
                 if not employee.is_active:
                     return render(request, 'errors/access_denied.html', {

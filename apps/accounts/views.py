@@ -1315,9 +1315,13 @@ def dashboard_redirect(request):
                     print(f"Employee role: {employee.role}")
                     break
                         
+            except (ImportError, LookupError, ConnectionError) as e:
+                # Skip tenants where we can't check due to database/import issues
+                print(f"Could not check tenant {tenant.name} due to {type(e).__name__}: {e}")
+                continue
             except Exception as e:
-                # Skip tenants where we can't check (maybe database doesn't exist yet)
-                print(f"Could not check tenant {tenant.name}: {e}")
+                # Log other exceptions but don't let them stop the search
+                print(f"Unexpected error checking tenant {tenant.name}: {e}")
                 continue
         
         if employee_business:

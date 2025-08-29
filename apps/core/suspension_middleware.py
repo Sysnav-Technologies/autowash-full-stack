@@ -214,8 +214,15 @@ class BusinessAccessControlMiddleware(MiddlewareMixin):
         # Check if user is an employee
         try:
             from apps.employees.models import Employee
+            from apps.core.database_router import TenantDatabaseManager
             
-            employee = Employee.objects.filter(
+            # Ensure tenant database is registered in settings
+            TenantDatabaseManager.add_tenant_to_settings(tenant)
+            
+            # Use the correct tenant database
+            db_alias = f"tenant_{tenant.id}"
+            
+            employee = Employee.objects.using(db_alias).filter(
                 user_id=user.id,
                 is_active=True
             ).first()
