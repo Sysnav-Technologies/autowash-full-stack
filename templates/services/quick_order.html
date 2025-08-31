@@ -4,6 +4,10 @@
 
 {% block title %}Quick Order - {{ block.super }}{% endblock %}
 
+{% block extra_head %}
+<meta name="csrf-token" content="{{ csrf_token }}">
+{% endblock %}
+
 {% block extra_css %}
 <style>
 :root {
@@ -2290,11 +2294,13 @@ function submitOrder() {
         // Prepare form data
         const formData = new FormData();
         
-        // Add CSRF token
-        const csrfToken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        // Add CSRF token with multiple fallbacks
+        const csrfToken = getCSRFToken();
         if (!csrfToken) {
-            throw new Error('CSRF token not found');
+            throw new Error('CSRF token not found. Please refresh the page.');
         }
+        
+        console.log('Using CSRF token:', csrfToken.substring(0, 10) + '...');
         
         // Vehicle data (now step 1)
         if (selectedVehicle) {
@@ -2364,15 +2370,46 @@ function submitOrder() {
         // Log the data being sent (for debugging)
         console.log('Submitting order with data:', Object.fromEntries(formData.entries()));
         
-        // Make the request with proper error handling
-        fetch(window.location.href, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': csrfToken,
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin'  // Important for CSRF
+        // Function to make the actual request
+        const makeRequest = (token) => {
+            return fetch(window.location.href, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': token,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'  // Important for CSRF
+            });
+        };
+        
+        // Make the request with CSRF retry logic
+        makeRequest(csrfToken)
+        .then(async (response) => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
+            // If CSRF failure, try to refresh token and retry once
+            if (response.status === 403) {
+                const responseText = await response.text();
+                if (responseText.includes('CSRF') || responseText.includes('csrf')) {
+                    console.log('CSRF error detected, attempting to refresh token...');
+                    try {
+                        const newToken = await refreshCSRFToken();
+                        if (newToken) {
+                            // Update formData with new token
+                            formData.set('csrfmiddlewaretoken', newToken);
+                            console.log('Retrying request with new CSRF token...');
+                            return makeRequest(newToken);
+                        }
+                    } catch (refreshError) {
+                        console.error('Failed to refresh CSRF token:', refreshError);
+                        throw new Error('CSRF token expired. Please refresh the page and try again.');
+                    }
+                }
+            }
+            
+            return response;
         })
         .then(response => {
             console.log('Response status:', response.status);
@@ -2427,12 +2464,15 @@ function submitOrder() {
             
             let errorMessage = 'Error creating order. Please try again.';
             
-            if (error.message.includes('CSRF')) {
+            if (error.message.includes('CSRF') || error.message.includes('csrf')) {
                 errorMessage = 'Security token expired. Please refresh the page and try again.';
+                // Add a refresh button to the error message
+                showToast(`${errorMessage} <button onclick="window.location.reload()" class="btn btn-sm btn-outline-light ms-2">Refresh Page</button>`, 'error');
+                return; // Don't show the generic toast
             } else if (error.message.includes('HTTP 500')) {
                 errorMessage = 'Server error. Please contact support if this persists.';
             } else if (error.message.includes('HTTP 403')) {
-                errorMessage = 'Access denied. Please refresh the page and try again.';
+                errorMessage = 'Access denied. Please check your permissions and try again.';
             } else if (error.message.includes('HTTP 404')) {
                 errorMessage = 'Service not found. Please refresh the page.';
             } else if (error.message.includes('Network')) {
@@ -2529,7 +2569,7 @@ function displayFormErrors(errors) {
     });
 }
 
-// Enhanced CSRF token getter
+// Enhanced CSRF token getter with multiple fallbacks
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -2544,6 +2584,95 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Robust CSRF token getter with multiple fallbacks and refresh capability
+function getCSRFToken() {
+    // First, try to get from form
+    const formToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (formToken && formToken.value) {
+        console.log('CSRF token from form:', formToken.value.substring(0, 10) + '...');
+        return formToken.value;
+    }
+    
+    // Second, try to get from cookie
+    const cookieToken = getCookie('csrftoken') || getCookie('autowash_csrftoken');
+    if (cookieToken) {
+        console.log('CSRF token from cookie:', cookieToken.substring(0, 10) + '...');
+        return cookieToken;
+    }
+    
+    // Third, try meta tag
+    const metaToken = document.querySelector('meta[name="csrf-token"]');
+    if (metaToken) {
+        console.log('CSRF token from meta:', metaToken.getAttribute('content').substring(0, 10) + '...');
+        return metaToken.getAttribute('content');
+    }
+    
+    console.error('No CSRF token found in form, cookie, or meta tag');
+    return null;
+}
+
+// Function to refresh CSRF token
+function refreshCSRFToken() {
+    return fetch(window.location.href, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.text())
+    .then(html => {
+        // Extract new CSRF token from response
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newToken = doc.querySelector('[name=csrfmiddlewaretoken]');
+        
+        if (newToken) {
+            // Update form token
+            const currentFormToken = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (currentFormToken) {
+                currentFormToken.value = newToken.value;
+                console.log('CSRF token refreshed');
+                return newToken.value;
+            }
+        }
+        throw new Error('Could not refresh CSRF token');
+    });
+}
+
+// Initialize page and token refresh
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Quick Order form initialized');
+    
+    // Check CSRF token on page load
+    const initialToken = getCSRFToken();
+    if (!initialToken) {
+        console.warn('No CSRF token found on page load');
+        showToast('Security token missing. Please refresh the page.', 'warning');
+    } else {
+        console.log('Initial CSRF token verified');
+    }
+    
+    // Refresh CSRF token every 10 minutes to prevent expiry
+    setInterval(() => {
+        refreshCSRFToken().then(() => {
+            console.log('CSRF token auto-refreshed');
+        }).catch(error => {
+            console.warn('Auto CSRF refresh failed:', error);
+        });
+    }, 600000); // 10 minutes
+    
+    // Also refresh token when page becomes visible again (user returns to tab)
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            refreshCSRFToken().then(() => {
+                console.log('CSRF token refreshed on page focus');
+            }).catch(error => {
+                console.warn('CSRF refresh on focus failed:', error);
+            });
+        }
+    });
+});
 
 // Enhanced toast with better positioning and styling
 function showToast(message, type) {
