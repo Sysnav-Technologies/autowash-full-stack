@@ -81,7 +81,7 @@ def get_payment_urls(request):
 @login_required
 @employee_required(['owner', 'manager'])
 def payment_dashboard_view(request):
-    """Enhanced payment dashboard with comprehensive metrics and proper data handling"""
+    """Payment dashboard"""
     try:
         today = timezone.now().date()
         
@@ -202,7 +202,7 @@ def payment_dashboard_view(request):
 @login_required
 @employee_required()
 def payment_list_view(request):
-    """Enhanced payment list view with comprehensive filtering and data"""
+    """Payment list view"""
     try:
         # Base queryset with proper relations
         payments = Payment.objects.select_related(

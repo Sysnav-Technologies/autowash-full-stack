@@ -92,7 +92,7 @@ def get_user_business_relationships(user):
 
 @staff_member_required
 def system_dashboard(request):
-    """Enhanced system admin dashboard with comprehensive statistics"""
+    """System admin dashboard"""
     
     # Get comprehensive statistics
     stats = {
@@ -141,7 +141,7 @@ def system_dashboard(request):
 
 @staff_member_required
 def approve_business(request, business_id):
-    """Approve a business application with comprehensive tenant setup"""
+    """Approve business application"""
     business = get_object_or_404(Tenant, id=business_id)
     
     if request.method == 'POST':
@@ -291,7 +291,7 @@ def reject_business(request, business_id):
 
 @staff_member_required
 def business_management(request):
-    """Comprehensive business management view"""
+    """Business management view"""
     
     # Get filter parameters
     status_filter = request.GET.get('status', 'all')
@@ -343,7 +343,7 @@ def business_management(request):
 
 @staff_member_required
 def subscription_management(request):
-    """Enhanced subscription management with analytics"""
+    """Subscription management"""
     
     # Get filter parameters
     status_filter = request.GET.get('status', 'all')

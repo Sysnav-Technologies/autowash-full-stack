@@ -24,6 +24,15 @@ from .forms import (
 import json
 import uuid
 
+def _convert_uuid(pk):
+    """Convert string UUID to UUID object if needed"""
+    try:
+        if isinstance(pk, str):
+            return uuid.UUID(pk)
+    except (ValueError, TypeError):
+        pass
+    return pk
+
 def get_customer_urls(request):
     """Generate all customer URLs for templates with tenant slug."""
     tenant_slug = request.tenant.slug
@@ -207,12 +216,10 @@ def customer_create_view(request):
 @employee_required()
 def customer_detail_view(request, pk):
     """Customer detail view with complete information - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
     try:
         if isinstance(pk, str):
             pk = uuid.UUID(pk)
     except (ValueError, TypeError):
-        # If conversion fails, let get_object_or_404 handle it
         pass
     
     customer = get_object_or_404(Customer, pk=pk)
@@ -265,13 +272,7 @@ def customer_detail_view(request, pk):
 @employee_required()
 def customer_edit_view(request, pk):
     """Edit customer information - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(pk, str):
-            pk = uuid.UUID(pk)
-    except (ValueError, TypeError): 
-        pass
-    
+    pk = _convert_uuid(pk)
     customer = get_object_or_404(Customer, pk=pk)
     
     if request.method == 'POST':
@@ -305,13 +306,7 @@ def customer_edit_view(request, pk):
 @employee_required()
 def vehicle_create_view(request, customer_pk):
     """Add vehicle to customer - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(customer_pk, str):
-            customer_pk = uuid.UUID(customer_pk)
-    except (ValueError, TypeError):
-        pass
-    
+    customer_pk = _convert_uuid(customer_pk)
     customer = get_object_or_404(Customer, pk=customer_pk)
     
     if request.method == 'POST':
@@ -347,13 +342,7 @@ def vehicle_create_view(request, customer_pk):
 @employee_required()
 def vehicle_detail_view(request, pk):
     """View vehicle details - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(pk, str):
-            pk = uuid.UUID(pk)
-    except (ValueError, TypeError):
-        pass
-    
+    pk = _convert_uuid(pk)
     vehicle = get_object_or_404(Vehicle, pk=pk)
     
     # Fetch related service orders
@@ -377,13 +366,7 @@ def vehicle_detail_view(request, pk):
 @employee_required()
 def vehicle_edit_view(request, pk):
     """Edit vehicle information - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(pk, str):
-            pk = uuid.UUID(pk)
-    except (ValueError, TypeError):
-        pass
-    
+    pk = _convert_uuid(pk)
     vehicle = get_object_or_404(Vehicle, pk=pk)
     
     if request.method == 'POST':
@@ -417,13 +400,7 @@ def vehicle_edit_view(request, pk):
 @employee_required()
 def customer_note_create_view(request, customer_pk):
     """Add note to customer - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(customer_pk, str):
-            customer_pk = uuid.UUID(customer_pk)
-    except (ValueError, TypeError):
-        pass
-    
+    customer_pk = _convert_uuid(customer_pk)
     customer = get_object_or_404(Customer, pk=customer_pk)
     
     if request.method == 'POST':
@@ -537,12 +514,7 @@ def vehicle_search_ajax(request):
 @require_POST
 def toggle_customer_vip(request, pk):
     """Toggle customer VIP status - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(pk, str):
-            pk = uuid.UUID(pk)
-    except (ValueError, TypeError):
-        pass
+    pk = _convert_uuid(pk)
     
     try:
         customer = get_object_or_404(Customer, pk=pk)
@@ -575,12 +547,7 @@ def toggle_customer_vip(request, pk):
 @require_POST
 def deactivate_customer(request, pk):
     """Deactivate customer account - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(pk, str):
-            pk = uuid.UUID(pk)
-    except (ValueError, TypeError):
-        pass
+    pk = _convert_uuid(pk)
     
     try:
         customer = get_object_or_404(Customer, pk=pk)
@@ -698,19 +665,11 @@ def customer_import_view(request):
             messages.error(request, f'Error importing customers: {str(e)}')
     return render(request, 'customers/customer_import.html', {'title': 'Import Customers', 'urls': get_customer_urls(request)})
 
-# Additional utility views
-
 @login_required
 @employee_required()
 def customer_feedback_view(request, customer_pk):
     """View customer feedback - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(customer_pk, str):
-            customer_pk = uuid.UUID(customer_pk)
-    except (ValueError, TypeError):
-        pass
-    
+    customer_pk = _convert_uuid(customer_pk)
     customer = get_object_or_404(Customer, pk=customer_pk)
     feedback_list = customer.feedback.all().order_by('-created_at')
     
@@ -744,13 +703,7 @@ def customer_feedback_view(request, customer_pk):
 @employee_required()
 def customer_documents_view(request, customer_pk):
     """View customer documents - FIXED UUID handling"""
-    # Convert string UUID to UUID object if needed
-    try:
-        if isinstance(customer_pk, str):
-            customer_pk = uuid.UUID(customer_pk)
-    except (ValueError, TypeError):
-        pass
-    
+    customer_pk = _convert_uuid(customer_pk)
     customer = get_object_or_404(Customer, pk=customer_pk)
     
     if request.method == 'POST':

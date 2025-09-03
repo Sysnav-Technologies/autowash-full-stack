@@ -179,7 +179,6 @@ def _generate_daily_summary(start_date, end_date):
         else:
             payments = payments_completed_in_period
         
-        # Enhanced date filtering for orders - try multiple date fields
         base_orders = ServiceOrder.objects.all()
         
         order_filters = [
@@ -209,7 +208,6 @@ def _generate_daily_summary(start_date, end_date):
             orders = base_orders
             best_order_filter = 'created_at'
         
-        # Enhanced date filtering for customers - try multiple date fields  
         base_customers = Customer.objects.all()
         
         customer_filters = [
@@ -343,10 +341,8 @@ def _generate_daily_summary(start_date, end_date):
 def _generate_financial_overview(start_date, end_date):
     """Generate financial overview report"""
     try:
-        # Enhanced date filtering - try multiple date fields for payments
         base_payments = Payment.objects.all().select_related('payment_method')
         
-        # Try different date field combinations for payments
         payment_filters = [
             Q(completed_at__date__gte=start_date, completed_at__date__lte=end_date),
             Q(created_at__date__gte=start_date, created_at__date__lte=end_date),
@@ -372,7 +368,6 @@ def _generate_financial_overview(start_date, end_date):
         if payments is None or payments_count == 0:
             payments = base_payments
         
-        # Enhanced date filtering for orders
         base_orders = ServiceOrder.objects.all()
         
         order_filters = [
@@ -795,7 +790,7 @@ def _generate_service_performance(start_date, end_date):
 
 
 def _generate_payment_summary_new(start_date, end_date):
-    """Generate comprehensive payment summary report"""
+    """Generate payment summary report"""
     try:
         from datetime import datetime
         from django.utils import timezone
@@ -1197,7 +1192,7 @@ def report_detail(request, report_id):
 @login_required
 @business_required
 def reports_list(request):
-    """List all generated reports with enhanced filtering"""
+    """List all generated reports"""
     reports = BusinessReport.objects.filter(status='completed').order_by('-created_at')
     
     # Filter by type if specified
@@ -1240,7 +1235,7 @@ def reports_list(request):
 @business_required
 @employee_required(['owner', 'manager'])
 def analytics_dashboard(request):
-    """Enhanced analytics dashboard with real-time insights"""
+    """Analytics dashboard"""
     from decimal import Decimal
     import json
     

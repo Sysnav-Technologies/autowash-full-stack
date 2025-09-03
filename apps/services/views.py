@@ -402,7 +402,7 @@ def order_create_view(request):
 @employee_required()
 @require_http_methods(["GET", "POST"])
 def quick_order_view(request):
-    """Vehicle-first quick order creation with walk-in customer support"""
+    """Quick order creation"""
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -901,7 +901,6 @@ def complete_service(request, order_id):
     order.actual_end_time = timezone.now()
     order.save()
     
-    # Complete all order items
     for item in order.order_items.all():
         if not item.completed_at:
             item.completed_at = timezone.now()
@@ -1354,7 +1353,7 @@ def payment_receipt(request, order_id):
 
 # ✅ Updated ServiceOrder model method
 def update_payment_status(self):
-    """Update order payment status based on payments - with real-time updates"""
+    """Update order payment status"""
     try:
         from apps.payments.models import Payment
         from decimal import Decimal
@@ -1835,12 +1834,10 @@ def service_delete_view(request, pk):
     return render(request, 'services/service_confirm_delete.html', context)
 
 # Category Management Views
-# Complete fixed category views for services/views.py
 
 @login_required
 @employee_required(['owner', 'manager'])
 def category_list_view(request):
-    """List service categories"""
     categories = ServiceCategory.objects.filter(is_active=True).annotate(
         total_services=Count('services', filter=Q(services__is_active=True)),
         active_services_count=Count('services', filter=Q(services__is_active=True))
@@ -3250,7 +3247,7 @@ def add_order_to_queue(order):
 @login_required
 @employee_required()
 def order_receipt_view(request, pk):
-    """Service order comprehensive receipt showing all payments"""
+    """Service order receipt"""
     order = get_object_or_404(ServiceOrder, id=pk)
     
     # Get all payments for this order

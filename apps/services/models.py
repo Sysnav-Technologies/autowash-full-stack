@@ -574,7 +574,7 @@ class ServiceOrder(TenantTimeStampedModel):
         )
     
     def get_payment_summary(self):
-        """Get comprehensive payment summary for this order"""
+        """Get payment summary for this order"""
         payments = self.get_completed_payments()
         
         return {

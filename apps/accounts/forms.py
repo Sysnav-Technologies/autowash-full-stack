@@ -18,7 +18,7 @@ import random
 import string
 
 class UserRegistrationForm(forms.ModelForm):
-    """Enhanced user registration form with auto-generated username"""
+    """User registration form with auto-generated username"""
     
     # Full name field - user enters their actual name
     full_name = forms.CharField(

@@ -1,5 +1,3 @@
-# apps/accounts/views.py - Updated with Google OAuth integration
-
 import re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout as auth_logout
@@ -33,7 +31,6 @@ from .forms import (
 )
 
 class LandingView(TemplateView):
-    """Public landing page"""
     template_name = 'public/landing.html'
     
     def get_context_data(self, **kwargs):
@@ -66,7 +63,6 @@ class LandingView(TemplateView):
         return context
 
 def register_view(request):
-    """Enhanced user registration view with flexible validation"""
     if request.user.is_authenticated:
         return redirect('accounts:dashboard_redirect')
     
@@ -76,9 +72,8 @@ def register_view(request):
             try:
                 with transaction.atomic():
                     user = form.save(commit=False)
-                    user.is_active = False  # User will be activated after email verification
+                    user.is_active = False
                     
-                    # Set first_name and last_name if provided
                     if form.cleaned_data.get('first_name'):
                         user.first_name = form.cleaned_data['first_name']
                     if form.cleaned_data.get('last_name'):
@@ -86,13 +81,11 @@ def register_view(request):
                     
                     user.save()
                     
-                    # Create user profile with phone
                     UserProfile.objects.create(
                         user=user,
                         phone=form.cleaned_data.get('phone'),
                     )
                     
-                    # Send OTP instead of verification email
                     success = send_otp_email(request, user)
                     
                     if success:
@@ -124,20 +117,15 @@ def register_view(request):
     return render(request, 'auth/register.html', {'form': form})
 
 def send_otp_email(request, user):
-    """Send OTP verification email"""
     try:
-        # Generate OTP
         otp = EmailOTP.generate_otp(user, user.email, purpose='registration')
         
-        # Build verification URL with email parameter
         verification_url = request.build_absolute_uri(
             reverse('accounts:verify_otp') + f'?email={user.email}'
         )
         
-        # Get current site
         current_site = Site.objects.get_current()
         
-        # Prepare email context
         email_context = {
             'user': user,
             'otp_code': otp.otp_code,
@@ -147,12 +135,10 @@ def send_otp_email(request, user):
             'expires_in_minutes': 10,
         }
         
-        # Render email templates
         subject = render_to_string('account/email/otp_verification_subject.txt', email_context).strip()
         html_message = render_to_string('account/email/otp_verification_message.html', email_context)
         text_message = render_to_string('account/email/otp_verification_message.txt', email_context)
         
-        # Send email
         send_mail(
             subject=subject,
             message=text_message,
@@ -170,17 +156,13 @@ def send_otp_email(request, user):
 
 
 def send_login_otp_email(request, user, otp_code):
-    """Send login OTP email"""
     try:
-        # Build verification URL with email parameter
         verification_url = request.build_absolute_uri(
             reverse('accounts:verify_login_otp') + f'?email={user.email}'
         )
         
-        # Get current site
         current_site = Site.objects.get_current()
         
-        # Prepare email context
         email_context = {
             'user': user,
             'otp_code': otp_code,
@@ -190,12 +172,10 @@ def send_login_otp_email(request, user, otp_code):
             'expires_in_minutes': 10,
         }
         
-        # Render email templates
         subject = render_to_string('account/email/login_otp_subject.txt', email_context).strip()
         html_message = render_to_string('account/email/login_otp_message.html', email_context)
         text_message = render_to_string('account/email/login_otp_message.txt', email_context)
         
-        # Send email
         send_mail(
             subject=subject,
             message=text_message,
@@ -219,19 +199,15 @@ def send_verification_email(request, user):
         from django.utils.http import urlsafe_base64_encode
         from django.utils.encoding import force_bytes
         
-        # Generate verification token
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         
-        # Build verification URL
         verification_url = request.build_absolute_uri(
             reverse('accounts:verify_email', kwargs={'uidb64': uid, 'token': token})
         )
         
-        # Get current site
         current_site = Site.objects.get_current()
         
-        # Prepare email context
         email_context = {
             'user': user,
             'activate_url': verification_url,
@@ -239,12 +215,10 @@ def send_verification_email(request, user):
             'protocol': 'https' if request.is_secure() else 'http',
         }
         
-        # Render email templates
         subject = render_to_string('account/email/email_confirmation_subject.txt', email_context).strip()
         html_message = render_to_string('account/email/email_confirmation_message.html', email_context)
         text_message = render_to_string('account/email/email_confirmation_message.txt', email_context)
         
-        # Send email
         send_mail(
             subject=subject,
             message=text_message,

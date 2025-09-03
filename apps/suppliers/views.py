@@ -2310,7 +2310,6 @@ def purchase_order_status_update(request, pk):
     
     return redirect(get_business_url(request, 'suppliers:purchase_order_detail', pk=pk))
 
-# Enhanced PurchaseOrderDetailView with status-based context
 @method_decorator([login_required, business_required, employee_required(['owner', 'manager', 'supervisor'])], name='dispatch')
 class PurchaseOrderDetailView(DetailView):
     """Purchase order detail view with status-based actions"""

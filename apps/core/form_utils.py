@@ -172,7 +172,7 @@ def validate_phone_number(value):
 
 
 def validate_email_address(value):
-    """Enhanced email validation"""
+    """Email validation"""
     from django.core.validators import EmailValidator
     from django.core.exceptions import ValidationError
     
