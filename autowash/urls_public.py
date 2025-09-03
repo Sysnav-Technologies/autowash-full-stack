@@ -9,9 +9,6 @@ from django.http import HttpResponseRedirect
 from apps.core.views import health_check
 
 def public_root_redirect(request):
-    """Handle root redirects for public schema"""
-    print("[PUBLIC] PUBLIC ROOT REDIRECT")
-         
     if request.user.is_authenticated:
         try:
             business = request.user.owned_tenants.first()
@@ -24,24 +21,18 @@ def public_root_redirect(request):
     else:
         return HttpResponseRedirect('/public/')
 
-print("[PUBLIC] PUBLIC URLs configuration loaded")
-
+# Public URL Configuration
 urlpatterns = [
-    # Health
+    # System health and administration
     path('health/', health_check, name='health_check'),
-    
-    # System Administration Interface 
-    path('admin/', admin.site.urls),  # Django admin for system management
-    path('system-admin/', include('apps.system_admin.urls')),  # Custom system admin interface
+    path('admin/', admin.site.urls),
+    path('system-admin/', include('apps.system_admin.urls')),
          
-    # Authentication and account management (public schema)
+    # Authentication (public schema)
     path('auth/', include('apps.accounts.urls')),
     path('accounts/', include('allauth.urls')),
          
-    # # Business registration and tenant creation (public schema)
-    # path('business/', include('apps.businesses.public_urls')),  # Public business operations
-         
-    # Public pages (landing, marketing, etc.)
+    # Public marketing pages
     path('public/', include([
         path('', TemplateView.as_view(template_name='public/landing.html'), name='landing'),
         path('pricing/', TemplateView.as_view(template_name='public/pricing.html'), name='pricing'),
@@ -50,35 +41,29 @@ urlpatterns = [
         path('about/', TemplateView.as_view(template_name='public/about.html'), name='about'),
     ])),
          
-    # Subscriptions (public schema)
+    # Subscriptions (public access)
     path('subscriptions/', include('apps.subscriptions.urls')),
          
-    
-    # When someone visits /business/slug/, the middleware intercepts and switches tenant
+    # Business tenant routing
     re_path(r'^business/(?P<slug>[\w-]+)/', include([
-        
         path('', lambda request, slug: HttpResponseRedirect('/'), name='business_root'),
     ])),
-         
-    # API endpoints for public access
-    # path('api/auth/', include('dj_rest_auth.urls')),
-    # path('api/public/', include('apps.accounts.api_urls')),
          
     # Root redirect
     path('', public_root_redirect, name='public_root_redirect'),
 ]
 
-# Debug Toolbar
+# Development settings
 if settings.DEBUG:
     try:
         import debug_toolbar
         urlpatterns = [
             path('__debug__/', include(debug_toolbar.urls)),
         ] + urlpatterns
-        print("[DEBUG] Debug toolbar URLs added to PUBLIC schema")
     except ImportError:
-        print("[WARNING] Debug toolbar not available (not installed)")
+        pass
 
+# Static and media files (development only)
 if not getattr(settings, 'RENDER', True) or settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

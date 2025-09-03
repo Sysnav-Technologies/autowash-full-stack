@@ -197,7 +197,6 @@ def check_mpesa_payment_status(payment_id):
             logger.warning("No access token available for payment status check")
             return {'success': False, 'message': 'Could not authenticate'}
         
-        # Enhanced development fallback - check multiple conditions
         is_development = (
             settings.DEBUG and 
             (

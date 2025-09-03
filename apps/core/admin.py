@@ -7,7 +7,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
 class SuperUserAdmin(BaseUserAdmin):
-    """Enhanced User admin for platform super admin"""
+    """User admin for platform super admin"""
     
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_superuser', 'date_joined')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
