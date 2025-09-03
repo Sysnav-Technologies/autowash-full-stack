@@ -17,6 +17,7 @@ class BusinessReport(TenantTimeStampedModel):
         ('service_performance', 'Service Performance'),
         ('payment_summary', 'Payment Summary'),
         ('employee_performance', 'Employee Performance'),
+        ('itemized_report', 'Itemized Services Report'),
     ]
     
     STATUS_CHOICES = [

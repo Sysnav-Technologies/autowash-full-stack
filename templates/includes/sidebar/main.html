@@ -11,7 +11,13 @@
         {% endif %}
         <div class="brand-text">
             <div class="brand-name">{{ request.tenant.name }}</div>
-            <div class="brand-type">{{ request.tenant.business_type|title }}</div>
+            <div class="brand-type">{{ request.tenant.bus                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/">
+                                <i class="nav-icon fas fa-chart-bar"></i>
+                                <span class="nav-text">All Reports</span>
+                            </a>
+                        </li>ype|title }}</div>
         </div>
     </div>
     
@@ -368,10 +374,6 @@
                             </a>
                         </li>
                         
-                        <li class="nav-divider">
-                            <span class="nav-divider-text">Alerts & Reports</span>
-                        </li>
-                        
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'alerts' %}active{% endif %}" 
                                href="/business/{{ request.tenant.slug }}/inventory/alerts/">
@@ -380,25 +382,6 @@
                                 {% if active_alerts_count > 0 %}
                                 <span class="nav-badge nav-badge-danger">{{ active_alerts_count }}</span>
                                 {% endif %}
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'low_stock_report' %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/inventory/reports/low-stock/">
-                                <i class="nav-icon fas fa-exclamation-triangle"></i>
-                                <span class="nav-text">Low Stock Report</span>
-                                {% if low_stock_items > 0 %}
-                                <span class="nav-badge nav-badge-warning">{{ low_stock_items }}</span>
-                                {% endif %}
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'valuation_report' %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/inventory/reports/valuation/">
-                                <i class="nav-icon fas fa-calculator"></i>
-                                <span class="nav-text">Valuation Report</span>
                             </a>
                         </li>
                     </ul>
@@ -450,14 +433,6 @@
                                href="/business/{{ request.tenant.slug }}/expenses/vendors/">
                                 <i class="nav-icon fas fa-truck"></i>
                                 <span class="nav-text">Vendors</span>
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/expenses/reports/">
-                                <i class="nav-icon fas fa-chart-bar"></i>
-                                <span class="nav-text">Reports</span>
                             </a>
                         </li>
                     </ul>
@@ -516,18 +491,6 @@
                                href="/business/{{ request.tenant.slug }}/payments/settings/">
                                 <i class="nav-icon fas fa-cog"></i>
                                 <span class="nav-text">Payment Settings</span>
-                            </a>
-                        </li>
-                        
-                        <li class="nav-divider">
-                            <span class="nav-divider-text">Reports & Export</span>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'payments' in request.resolver_match.namespace %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/payments/reports/">
-                                <i class="nav-icon fas fa-chart-bar"></i>
-                                <span class="nav-text">Reports</span>
                             </a>
                         </li>
                         
@@ -604,49 +567,51 @@
                     </a>
                     <ul class="nav-submenu">
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
                                href="/business/{{ request.tenant.slug }}/reports/">
-                                <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <span class="nav-text">Reports Dashboard</span>
+                                <i class="nav-icon fas fa-chart-bar"></i>
+                                <span class="nav-text">All Reports</span>
                             </a>
                         </li>
-                        
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'sales' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/reports/analytics/">
-                                <i class="nav-icon fas fa-chart-line"></i>
-                                <span class="nav-text">Analytics</span>
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and request.GET.report_type == 'business_overview' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/?report_type=business_overview">
+                                <i class="nav-icon fas fa-building"></i>
+                                <span class="nav-text">Business Overview</span>
                             </a>
                         </li>
-                        
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'financial' and 'reports' in request.resolver_match.namespace %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/reports/list/">
-                                <i class="nav-icon fas fa-dollar-sign"></i>
-                                <span class="nav-text">Report List</span>
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and request.GET.report_type == 'daily_summary' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/?report_type=daily_summary&period=daily">
+                                <i class="nav-icon fas fa-calendar-day"></i>
+                                <span class="nav-text">Daily Summary</span>
                             </a>
                         </li>
-                        
-                      
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and request.GET.report_type == 'weekly_summary' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/?report_type=weekly_summary&period=weekly">
+                                <i class="nav-icon fas fa-calendar-week"></i>
+                                <span class="nav-text">Weekly Summary</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and request.GET.report_type == 'monthly_summary' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/?report_type=monthly_summary&period=monthly">
+                                <i class="nav-icon fas fa-calendar-alt"></i>
+                                <span class="nav-text">Monthly Summary</span>
+                            </a>
+                        </li>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and request.GET.report_type == 'service_analysis' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/reports/?report_type=service_analysis">
+                                <i class="nav-icon fas fa-cogs"></i>
+                                <span class="nav-text">Service Analysis</span>
+                            </a>
+                        </li>
                     </ul>
                 </li>
-            </ul>
-        </div>
-        {% endif %}
-
-        <!-- Business Intelligence (Owner Only) -->
-        {% if user_role == 'owner' %}
-        <div class="nav-section">
-            <div class="nav-section-title">Analytics</div>
-            <ul class="nav-list">
-                <li class="nav-item">
-                    <a class="nav-link {% if 'analytics' in request.resolver_match.url_name %}active{% endif %}" 
-                       href="/business/{{ request.tenant.slug }}/reports/analytics/">
-                        <i class="nav-icon fas fa-chart-line"></i>
-                        <span class="nav-text">Analytics</span>
-                    </a>
-                </li>
-                
             </ul>
         </div>
         {% endif %}
