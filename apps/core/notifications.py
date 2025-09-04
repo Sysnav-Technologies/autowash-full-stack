@@ -222,7 +222,7 @@ def send_payment_confirmation_notification(payment, tenant=None):
     success = send_notification_email(
         to_email=order.customer.email,
         subject=subject,
-        template_name='payment_confirmation',
+        template_name='service_payment_confirmation',
         context=context,
         tenant=tenant
     )
