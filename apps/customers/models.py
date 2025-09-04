@@ -202,8 +202,28 @@ class Vehicle(TenantTimeStampedModel):
         return f"{self.registration_number} - {self.make} {self.model} ({self.customer.display_name})"
     
     @property
+    def license_plate(self):
+        """Backward compatibility property for templates"""
+        return self.registration_number
+    
+    @property
     def full_name(self):
         return f"{self.make} {self.model} {self.year}"
+    
+    @property
+    def display_name(self):
+        """Get a human-friendly display name for the vehicle"""
+        if self.make or self.model:
+            parts = []
+            if self.make:
+                parts.append(self.make)
+            if self.model:
+                parts.append(self.model)
+            return " ".join(parts)
+        elif self.registration_number:
+            return self.registration_number
+        else:
+            return "Unknown Vehicle"
     
     @property
     def service_count(self):

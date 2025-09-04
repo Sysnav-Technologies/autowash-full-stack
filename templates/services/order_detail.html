@@ -696,7 +696,17 @@
                     </div>
                     <div class="info-item">
                         <span class="info-label">Make & Model</span>
-                        <span class="info-value">{{ order.vehicle.make }} {{ order.vehicle.model }}</span>
+                        <span class="info-value">
+                            {% if order.vehicle %}
+                                {% if order.vehicle.make or order.vehicle.model %}
+                                    {{ order.vehicle.make|default:"Unknown" }} {{ order.vehicle.model|default:"Vehicle" }}
+                                {% else %}
+                                    {{ order.vehicle.license_plate|default:"Unknown Vehicle" }}
+                                {% endif %}
+                            {% else %}
+                                No vehicle assigned
+                            {% endif %}
+                        </span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">Color</span>
@@ -1040,10 +1050,10 @@
             <div class="card-body">
                 <div class="info-grid">
                     <div class="info-item">
-                        <span class="info-label">Assigned Attendant</span>
+                        <span class="info-label">Assigned Employee</span>
                         <span class="info-value">
                             {% if order.assigned_attendant %}
-                                {{ order.assigned_attendant.full_name }}
+                                {{ order.assigned_attendant.full_name }} ({{ order.assigned_attendant.get_role_display }})
                             {% else %}
                                 <span class="text-muted">Not assigned</span>
                             {% endif %}
@@ -1216,16 +1226,16 @@
             {% csrf_token %}
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="startAssignedAttendant" class="form-label">Assign Attendant <span class="text-danger">*</span></label>
+                    <label for="startAssignedAttendant" class="form-label">Assign Employee <span class="text-danger">*</span></label>
                     <select class="form-control form-select" id="startAssignedAttendant" name="assigned_attendant" required>
-                        <option value="">Select an attendant...</option>
+                        <option value="">Select an employee...</option>
                         {% for attendant in available_attendants %}
                             <option value="{{ attendant.id }}" {% if order.assigned_attendant and order.assigned_attendant.id == attendant.id %}selected{% endif %}>
-                                {{ attendant.full_name }}
+                                {{ attendant.full_name }} ({{ attendant.get_role_display }})
                             </option>
                         {% endfor %}
                     </select>
-                    <small class="form-text text-muted">An attendant must be assigned to start the service.</small>
+                    <small class="form-text text-muted">An employee must be assigned to start the service.</small>
                 </div>
                 
                 <div class="form-group">
@@ -1346,12 +1356,12 @@
             {% csrf_token %}
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="assignedAttendant" class="form-label">Assigned Attendant</label>
+                    <label for="assignedAttendant" class="form-label">Assigned Employee</label>
                     <select class="form-control form-select" id="assignedAttendant" name="assigned_attendant">
-                        <option value="">Select an attendant...</option>
+                        <option value="">Select an employee...</option>
                         {% for attendant in available_attendants %}
                             <option value="{{ attendant.id }}" {% if order.assigned_attendant.id == attendant.id %}selected{% endif %}>
-                                {{ attendant.full_name }}
+                                {{ attendant.full_name }} ({{ attendant.get_role_display }})
                             </option>
                         {% endfor %}
                     </select>
@@ -1447,7 +1457,7 @@ function validateStartServiceForm() {
     const attendantValue = attendantSelect.value;
     
     if (!attendantValue || attendantValue === '') {
-        alert('Please assign an attendant before starting the service.');
+        alert('Please assign an employee before starting the service.');
         attendantSelect.focus();
         return false;
     }
