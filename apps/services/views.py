@@ -832,13 +832,31 @@ def start_service(request, order_id):
         messages.error(request, 'Order cannot be started.')
         return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
+    # Validate that an attendant is assigned (either from form or already assigned)
+    assigned_attendant_id = request.POST.get('assigned_attendant')
+    if not assigned_attendant_id and not order.assigned_attendant:
+        messages.error(request, 'An attendant must be assigned before starting the service.')
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+    
     # Update order status
     order.status = 'in_progress'
     order.actual_start_time = timezone.now()
     
-    # Assign attendant if not already assigned
-    if not order.assigned_attendant:
-        order.assigned_attendant = request.employee
+    # Assign attendant from form or current user as fallback
+    assigned_attendant_id = request.POST.get('assigned_attendant')
+    if assigned_attendant_id:
+        try:
+            from apps.employees.models import Employee
+            attendant = Employee.objects.get(id=assigned_attendant_id)
+            order.assigned_attendant = attendant
+        except Employee.DoesNotExist:
+            # Fall back to current user if selected attendant doesn't exist
+            if hasattr(request, 'employee') and request.employee:
+                order.assigned_attendant = request.employee
+    elif not order.assigned_attendant:
+        # Assign current user if no attendant specified and none already assigned
+        if hasattr(request, 'employee') and request.employee:
+            order.assigned_attendant = request.employee
     
     order.save()
     
