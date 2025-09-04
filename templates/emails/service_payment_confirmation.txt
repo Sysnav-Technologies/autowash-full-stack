@@ -1,0 +1,39 @@
+Hello {{ customer.first_name|default:"Valued Customer" }}!
+
+Thank you for your payment! We're pleased to confirm that your payment for your service has been successfully processed.
+
+SERVICE ORDER DETAILS
+======================
+Order Number: {{ order.order_number }}
+Service Date: {{ order.scheduled_date|date:"F d, Y"|default:"Today" }}
+{% if vehicle and vehicle.license_plate %}Vehicle: {% if vehicle.make or vehicle.model %}{{ vehicle.make|default:"" }} {{ vehicle.model|default:"" }}{% endif %}{% if vehicle.license_plate %} ({{ vehicle.license_plate }}){% endif %}{% endif %}
+
+PAYMENT DETAILS
+================
+Amount Paid: KES {{ payment.amount|floatformat:2 }}
+Transaction ID: {{ payment.payment_id }}
+Payment Method: {{ payment.payment_method|title|default:"M-Pesa" }}
+Date & Time: {{ payment.created_at|date:"F d, Y g:i A" }}
+{% if order.total_amount > payment.amount %}Total Order Amount: KES {{ order.total_amount|floatformat:2 }}
+Remaining Balance: KES {{ remaining_balance|floatformat:2 }}{% else %}Payment Status: Fully Paid{% endif %}
+
+{% if order.items.all %}SERVICES
+=========
+{% for item in order.items.all %}• {{ item.service.name }} - KES {{ item.total_price|floatformat:2 }}
+{% endfor %}
+{% endif %}{% if not is_fully_paid %}⚠️ PARTIAL PAYMENT
+You have a remaining balance of KES {{ remaining_balance|floatformat:2 }}. Please complete your payment before or during service delivery.
+{% else %}✅ PAYMENT COMPLETE
+Your order is fully paid. Thank you! We look forward to providing you with excellent service.
+{% endif %}
+
+DOWNLOAD RECEIPT
+📄 Download Receipt: https://app.autowash.co.ke/business/{{ order.customer.business.slug|default:tenant.slug }}/services/orders/{{ order.pk }}/receipt/
+
+If you have any questions about your order or payment, please don't hesitate to contact us.
+
+Thank you for choosing our services!
+
+---
+This is an automated message from Autowash App.
+For support, please contact us through our official channels.

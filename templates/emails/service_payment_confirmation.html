@@ -1,0 +1,116 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<div class="greeting">
+    Hello {{ customer.first_name|default:"Valued Customer" }}!
+</div>
+
+<div class="message">
+    Thank you for your payment! We're pleased to confirm that your payment for your service has been successfully processed.
+</div>
+
+<div class="info-card">
+    <div class="info-card-header">
+        📋 Service Order Details
+    </div>
+    <div class="info-row">
+        <span class="info-label">Order Number:</span>
+        <span class="info-value">{{ order.order_number }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Service Date:</span>
+        <span class="info-value">{{ order.scheduled_date|date:"F d, Y"|default:"Today" }}</span>
+    </div>
+    {% if vehicle and vehicle.license_plate %}
+    <div class="info-row">
+        <span class="info-label">Vehicle:</span>
+        <span class="info-value">
+            {% if vehicle.make or vehicle.model %}
+                {{ vehicle.make|default:"" }} {{ vehicle.model|default:"" }}
+            {% endif %}
+            {% if vehicle.license_plate %}
+                ({{ vehicle.license_plate }})
+            {% endif %}
+        </span>
+    </div>
+    {% endif %}
+</div>
+
+<div class="info-card">
+    <div class="info-card-header">
+        💰 Payment Details
+    </div>
+    <div class="info-row">
+        <span class="info-label">Amount Paid:</span>
+        <span class="info-value">KES {{ payment.amount|floatformat:2 }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Transaction ID:</span>
+        <span class="info-value">{{ payment.payment_id }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Payment Method:</span>
+        <span class="info-value">{{ payment.payment_method|title|default:"M-Pesa" }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Date & Time:</span>
+        <span class="info-value">{{ payment.created_at|date:"F d, Y g:i A" }}</span>
+    </div>
+    
+    {% if order.total_amount > payment.amount %}
+    <div class="info-row">
+        <span class="info-label">Total Order Amount:</span>
+        <span class="info-value">KES {{ order.total_amount|floatformat:2 }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Remaining Balance:</span>
+        <span class="info-value">KES {{ remaining_balance|floatformat:2 }}</span>
+    </div>
+    {% else %}
+    <div class="info-row">
+        <span class="info-label">Payment Status:</span>
+        <span class="info-value status-badge status-success">Fully Paid</span>
+    </div>
+    {% endif %}
+</div>
+
+{% if order.items.all %}
+<div class="info-card">
+    <div class="info-card-header">
+        🚿 Services
+    </div>
+    {% for item in order.items.all %}
+    <div class="info-row">
+        <span class="info-label">{{ item.service.name }}</span>
+        <span class="info-value">KES {{ item.total_price|floatformat:2 }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if not is_fully_paid %}
+<div class="alert alert-warning">
+    <strong>⚠️ Partial Payment</strong><br>
+    You have a remaining balance of <strong>KES {{ remaining_balance|floatformat:2 }}</strong>. Please complete your payment before or during service delivery.
+</div>
+{% else %}
+<div class="alert alert-success">
+    <strong>✅ Payment Complete</strong><br>
+    Your order is fully paid. Thank you! We look forward to providing you with excellent service.
+</div>
+{% endif %}
+
+<div class="text-center">
+    <a href="https://app.autowash.co.ke/business/{{ order.customer.business.slug|default:tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-success">
+        📄 Download Receipt
+    </a>
+</div>
+
+<div class="message">
+    If you have any questions about your order or payment, please don't hesitate to contact us.
+</div>
+
+<div class="text-center">
+    Thank you for choosing our services!
+</div>
+{% endblock %}
