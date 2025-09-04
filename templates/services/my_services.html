@@ -100,6 +100,20 @@
                     {% endwith %}
                 </div>
                 
+                <div class="mb-3">
+                    {% if order.assigned_attendant %}
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-user-circle text-muted me-2"></i>
+                            <span class="text-muted">Assigned to: <strong>{{ order.assigned_attendant.full_name }}</strong></span>
+                        </div>
+                    {% else %}
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-user-circle text-muted me-2"></i>
+                            <span class="text-muted">Not assigned</span>
+                        </div>
+                    {% endif %}
+                </div>
+                
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="fw-bold">KES {{ order.total_amount }}</div>
                     <div class="d-flex gap-2">
@@ -123,8 +137,8 @@
             <div class="card-body text-center py-4">
                 <div class="d-flex flex-column align-items-center">
                     <img src="{% static 'images/empty.svg' %}" alt="No services" style="height: 120px;" class="mb-3">
-                    <h5 class="text-muted">No services assigned to you</h5>
-                    <p class="text-muted">When you get assigned services, they'll appear here</p>
+                    <h5 class="text-muted">No services created by you</h5>
+                    <p class="text-muted">Services you create will appear here</p>
                 </div>
             </div>
         </div>
@@ -142,6 +156,7 @@
                             <th>Customer</th>
                             <th>Vehicle</th>
                             <th>Services</th>
+                            <th>Assigned To</th>
                             <th>Status</th>
                             <th>Date</th>
                             <th>Total</th>
@@ -186,6 +201,18 @@
                                 {% endwith %}
                             </td>
                             <td>
+                                {% if order.assigned_attendant %}
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar avatar-xs me-2">
+                                            <div class="avatar-initial bg-success rounded-circle">{{ order.assigned_attendant.initials }}</div>
+                                        </div>
+                                        <span>{{ order.assigned_attendant.full_name }}</span>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">Not assigned</span>
+                                {% endif %}
+                            </td>
+                            <td>
                                 <span class="badge {% if order.status == 'completed' %}bg-success{% elif order.status == 'in_progress' %}bg-warning{% else %}bg-secondary{% endif %}">
                                     {{ order.get_status_display }}
                                 </span>
@@ -210,11 +237,11 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-4">
+                            <td colspan="9" class="text-center py-4">
                                 <div class="d-flex flex-column align-items-center">
                                     <img src="{% static 'images/empty.svg' %}" alt="No services" style="height: 120px;" class="mb-3">
-                                    <h5 class="text-muted">No services assigned to you</h5>
-                                    <p class="text-muted">When you get assigned services, they'll appear here</p>
+                                    <h5 class="text-muted">No services created by you</h5>
+                                    <p class="text-muted">Services you create will appear here</p>
                                 </div>
                             </td>
                         </tr>

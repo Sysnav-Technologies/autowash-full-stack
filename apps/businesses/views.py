@@ -1,4 +1,6 @@
 import json
+import logging
+import traceback
 from django.db import connection
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -7,12 +9,21 @@ from django.http import JsonResponse
 from django.db.models import Sum, Count, Avg, Q, F
 from django.utils import timezone
 from datetime import datetime, timedelta
-import traceback
+from decimal import Decimal
 from django.views.decorators.http import require_http_methods, require_POST
 from apps.core.decorators import employee_required, business_required
 from apps.core.utils import get_business_performance_metrics
 from apps.employees.models import Department, Employee
 from .models import BusinessMetrics, BusinessGoal, BusinessAlert, QuickAction, DashboardWidget
+from .utils import (
+    get_orders_for_date, get_orders_for_date_range, get_completed_statuses,
+    get_revenue_eligible_statuses, debug_order_data, get_customers_for_date,
+    get_customers_served_for_date, get_employees_active, get_payments_for_date,
+    get_expenses_for_date
+)
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 from .views_settings import (
     settings_overview, business_settings_view, service_settings_view,
@@ -122,6 +133,9 @@ def dashboard_view(request):
     if created or True:  # Always update for real-time data
         update_daily_metrics(today_metrics, request.user)  # Pass user for audit trail
     
+    # Refresh from database to get updated values
+    today_metrics.refresh_from_db()
+    
     # Quick stats for cards
     quick_stats = {
         'today_revenue': today_metrics.gross_revenue,
@@ -130,20 +144,31 @@ def dashboard_view(request):
         'employee_attendance': today_metrics.employee_attendance_rate,
     }
     
+    logger.info(f"DEBUG: Dashboard quick_stats: {quick_stats}")
+    
     # Get recent performance data for charts
     last_7_days = BusinessMetrics.objects.filter(
         date__gte=today - timedelta(days=7)
     ).order_by('date')
     
+    logger.info(f"DEBUG: Found {last_7_days.count()} metrics for last 7 days")
+    
     # Revenue trend data
-    revenue_trend = [
-        {
+    revenue_trend = []
+    for metric in last_7_days:
+        trend_data = {
             'date': metric.date.strftime('%Y-%m-%d'),
             'revenue': float(metric.gross_revenue),
             'customers': metric.total_customers_served
         }
-        for metric in last_7_days
-    ]
+        revenue_trend.append(trend_data)
+        logger.info(f"DEBUG: Chart data for {metric.date}: Revenue={metric.gross_revenue}, Customers={metric.total_customers_served}")
+    
+    logger.info(f"DEBUG: Final revenue_trend data: {revenue_trend}")
+    
+    # Convert revenue_trend to JSON string for template
+    revenue_trend_json = json.dumps(revenue_trend)
+    logger.info(f"DEBUG: Revenue trend JSON: {revenue_trend_json}")
     
     # Active goals
     active_goals = BusinessGoal.objects.filter(
@@ -180,7 +205,7 @@ def dashboard_view(request):
     ][:6]
     
     # Get pending items that need attention
-    pending_items = get_pending_dashboard_items(employee)
+    pending_items = get_pending_dashboard_items(employee, request)
     
     # Performance comparison (this month vs last month)
     current_month_start = today.replace(day=1)
@@ -243,10 +268,21 @@ def dashboard_view(request):
     # Get recent activities
     recent_activities = get_recent_activities(employee, limit=10)
     
+    # Get current timezone info
+    current_tz = timezone.get_current_timezone()
+    try:
+        if hasattr(current_tz, 'zone'):
+            timezone_name = current_tz.zone.replace('_', ' ').split('/')[-1]
+        else:
+            timezone_name = str(current_tz).split('/')[-1] if '/' in str(current_tz) else str(current_tz)
+    except Exception:
+        timezone_name = "UTC"  # fallback
+
     context = {
         'today_metrics': today_metrics,
         'quick_stats': quick_stats,
         'revenue_trend': revenue_trend,
+        'revenue_trend_json': revenue_trend_json,
         'active_goals': active_goals,
         'recent_alerts': recent_alerts,
         'quick_actions': available_actions,
@@ -258,6 +294,7 @@ def dashboard_view(request):
         'title': f'{business.name} Dashboard',
         'business': business,
         'employee': employee,
+        'timezone_name': timezone_name,
         # Add counts for sidebar badges
         'pending_orders_count': pending_items.get('pending_orders', 0),
         'active_queue_count': pending_items.get('active_queue', 0),
@@ -293,23 +330,47 @@ def get_business_insights():
         total_orders = ServiceOrder.objects.count()
         insights['total_orders'] = total_orders
         
-        # Average order value
+        # Average order value - Use ServiceOrder data primarily
         if total_orders > 0:
-            Payment = apps.get_model('payments', 'Payment')
-            total_revenue = Payment.objects.filter(
+            # Try to get from completed service orders first
+            completed_orders_revenue = ServiceOrder.objects.filter(
                 status='completed'
-            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+            
+            # Also try payments as backup
+            try:
+                Payment = apps.get_model('payments', 'Payment')
+                payment_revenue = Payment.objects.filter(
+                    status__in=['completed', 'paid', 'success']
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+                
+                # Use the higher value
+                total_revenue = max(completed_orders_revenue, payment_revenue)
+            except:
+                total_revenue = completed_orders_revenue
             
             if total_orders > 0:
                 insights['average_order_value'] = total_revenue / total_orders
         
-        # Monthly revenue
+        # Monthly revenue - Use ServiceOrder data primarily
         current_month_start = timezone.now().replace(day=1).date()
-        monthly_payments = Payment.objects.filter(
+        monthly_orders_revenue = ServiceOrder.objects.filter(
             created_at__date__gte=current_month_start,
             status='completed'
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-        insights['monthly_revenue'] = monthly_payments
+        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+        
+        # Also try payments as backup
+        try:
+            Payment = apps.get_model('payments', 'Payment')
+            monthly_payments_revenue = Payment.objects.filter(
+                created_at__date__gte=current_month_start,
+                status__in=['completed', 'paid', 'success']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            
+            # Use the higher value
+            insights['monthly_revenue'] = max(monthly_orders_revenue, monthly_payments_revenue)
+        except:
+            insights['monthly_revenue'] = monthly_orders_revenue
         
         # Top services
         Service = apps.get_model('services', 'Service')
@@ -456,119 +517,200 @@ def update_daily_metrics(metrics, user=None):
     from decimal import Decimal
     
     today = metrics.date
+    logger.info(f"=== DEBUG: Starting update_daily_metrics for {today} ===")
+    print(f"=== DEBUG: Starting update_daily_metrics for {today} ===")
     
     # Customer metrics
     try:
-        Customer = apps.get_model('customers', 'Customer')
-        new_customers_today = Customer.objects.filter(
-            created_at__date=today
-        ).count()
-        metrics.new_customers = new_customers_today
+        # Use utility function to get new customers
+        new_customers = get_customers_for_date(today)
+        new_customers_count = new_customers.count() if new_customers else 0
+        logger.info(f"DEBUG: New customers today: {new_customers_count}")
+        metrics.new_customers = new_customers_count
         
-        # Total customers served today (from service orders)
-        total_customers_today = 0
-        try:
-            ServiceOrder = apps.get_model('services', 'ServiceOrder')
-            served_today = ServiceOrder.objects.filter(
-                created_at__date=today,
-                status__in=['completed', 'in_progress', 'pending']
-            ).values('customer').distinct().count()
-            total_customers_today = served_today
-        except:
-            pass
+        # Get customers served today (from service orders)
+        customers_served_count = get_customers_served_for_date(today)
+        logger.info(f"DEBUG: Customers served today: {customers_served_count}")
         
-        metrics.total_customers_served = max(new_customers_today, total_customers_today)
+        metrics.total_customers_served = max(new_customers_count, customers_served_count)
+        logger.info(f"DEBUG: Final total customers served: {metrics.total_customers_served}")
         
-    except:
-        pass  # Customer app might not be ready
+    except Exception as e:
+        logger.error(f"DEBUG: Error in customer metrics: {e}")
     
-    # Service metrics
+    # Service metrics - use utility functions
     try:
-        ServiceOrder = apps.get_model('services', 'ServiceOrder')
-        service_orders_today = ServiceOrder.objects.filter(
-            created_at__date=today
-        )
+        # Debug order data for today
+        debug_order_data(today, "Service Metrics")
         
-        metrics.total_services = service_orders_today.count()
-        metrics.completed_services = service_orders_today.filter(status='completed').count()
-        metrics.cancelled_services = service_orders_today.filter(status='cancelled').count()
+        # Get all orders for today
+        service_orders_today = get_orders_for_date(today)
+        if service_orders_today is None:
+            logger.error("DEBUG: Could not get service orders for today")
+            return
+        
+        total_services = service_orders_today.count()
+        metrics.total_services = total_services
+        logger.info(f"DEBUG: Total services today: {total_services}")
+        
+        # Count completed services (including 'confirmed' status)
+        completed_statuses = get_completed_statuses()
+        completed_services = service_orders_today.filter(status__in=completed_statuses).count()
+        cancelled_services = service_orders_today.filter(status='cancelled').count()
+        
+        metrics.completed_services = completed_services
+        metrics.cancelled_services = cancelled_services
+        
+        logger.info(f"DEBUG: Completed services today (statuses: {completed_statuses}): {completed_services}")
+        logger.info(f"DEBUG: Cancelled services today: {cancelled_services}")
         
         # Calculate average service time
         completed_orders = service_orders_today.filter(
-            status='completed',
-            completed_at__isnull=False
+            status__in=completed_statuses,
+            actual_end_time__isnull=False,
+            actual_start_time__isnull=False
         )
         if completed_orders.exists():
             total_time = sum([
-                (order.completed_at - order.created_at).total_seconds() / 60
+                (order.actual_end_time - order.actual_start_time).total_seconds() / 60
                 for order in completed_orders
+                if order.actual_end_time and order.actual_start_time
             ])
-            metrics.average_service_time = Decimal(str(total_time / completed_orders.count()))
-    except:
-        pass
+            if total_time > 0:
+                metrics.average_service_time = Decimal(str(total_time / completed_orders.count()))
+    except Exception as e:
+        logger.error(f"DEBUG: Error in service metrics: {e}")
     
-    # Revenue metrics
+    # Revenue metrics - use utility functions
     try:
-        Payment = apps.get_model('payments', 'Payment')
-        payments_today = Payment.objects.filter(
-            created_at__date=today,
-            status='completed'
-        )
+        # Get revenue-eligible orders for today
+        revenue_statuses = get_revenue_eligible_statuses()
+        revenue_orders_today = get_orders_for_date(today, status_filter=revenue_statuses)
         
-        gross_revenue = payments_today.aggregate(
-            total=Sum('amount')
-        )['total'] or Decimal('0.00')
+        if revenue_orders_today is None:
+            logger.error("DEBUG: Could not get revenue orders for today")
+            return
+        
+        logger.info(f"DEBUG: Found {revenue_orders_today.count()} revenue-eligible orders (statuses: {revenue_statuses})")
+        
+        # Calculate revenue from orders
+        order_revenue = revenue_orders_today.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+        logger.info(f"DEBUG: Revenue from orders: {order_revenue}")
+        
+        # Also get all orders regardless of status to compare
+        all_orders_today = get_orders_for_date(today)
+        if all_orders_today:
+            all_orders_revenue = all_orders_today.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+            logger.info(f"DEBUG: Revenue from ALL orders today (any status): {all_orders_revenue}")
+        else:
+            all_orders_revenue = Decimal('0.00')
+        
+        # Use the higher value
+        gross_revenue = max(order_revenue, all_orders_revenue)
+        logger.info(f"DEBUG: Using gross revenue: {gross_revenue}")
         metrics.gross_revenue = gross_revenue
         
-        # Payment method breakdown
-        cash_payments = payments_today.filter(payment_method='cash').aggregate(
-            total=Sum('amount')
-        )['total'] or Decimal('0.00')
+        # Also try to get from payments if they exist
+        try:
+            payments_today = get_payments_for_date(today, status_filter=['completed', 'paid', 'success'])
+            
+            if payments_today:
+                logger.info(f"DEBUG: Found {payments_today.count()} payments for revenue")
+                
+                payment_revenue = payments_today.aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0.00')
+                
+                logger.info(f"DEBUG: Payment revenue: {payment_revenue}")
+                
+                # Use the higher value between order revenue and payment revenue
+                final_revenue = max(gross_revenue, payment_revenue)
+                metrics.gross_revenue = final_revenue
+                logger.info(f"DEBUG: Final gross revenue: {final_revenue}")
+                
+                # Payment method breakdown - fix the field lookup
+                cash_payments = payments_today.filter(payment_method='cash').aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0.00')
+                
+                card_payments = payments_today.filter(payment_method='card').aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0.00')
+                
+                mpesa_payments = payments_today.filter(payment_method='mpesa').aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0.00')
+                
+                # If no specific breakdown, try with different possible values
+                if cash_payments == 0 and card_payments == 0 and mpesa_payments == 0:
+                    # Try case-insensitive matching for common variations
+                    for payment in payments_today:
+                        method = str(payment.payment_method).lower() if payment.payment_method else ''
+                        if 'cash' in method:
+                            cash_payments += payment.amount or Decimal('0.00')
+                        elif 'card' in method or 'visa' in method or 'mastercard' in method:
+                            card_payments += payment.amount or Decimal('0.00')
+                        elif 'mpesa' in method or 'mobile' in method:
+                            mpesa_payments += payment.amount or Decimal('0.00')
+                        else:
+                            # Default unknown payments to mpesa
+                            mpesa_payments += payment.amount or Decimal('0.00')
+                
+                metrics.cash_payments = cash_payments
+                metrics.card_payments = card_payments
+                metrics.mpesa_payments = mpesa_payments
+            else:
+                logger.info("DEBUG: No payments found for today")
+                
+        except Exception as e:
+            logger.error(f"DEBUG: Error getting payment data: {e}")
+            # If payments table doesn't work, just use order totals
+            metrics.cash_payments = Decimal('0.00')
+            metrics.card_payments = Decimal('0.00') 
+            metrics.mpesa_payments = gross_revenue  # Assume all is mpesa if no payment breakdown
         
-        card_payments = payments_today.filter(payment_method='card').aggregate(
-            total=Sum('amount')
-        )['total'] or Decimal('0.00')
-        
-        mpesa_payments = payments_today.filter(payment_method='mpesa').aggregate(
-            total=Sum('amount')
-        )['total'] or Decimal('0.00')
-        
-        metrics.cash_payments = cash_payments
-        metrics.card_payments = card_payments
-        metrics.mpesa_payments = mpesa_payments
-        
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DEBUG: Error in revenue calculation: {e}")
     
-    # Employee attendance
+    # Employee attendance - improved calculation
     try:
-        Employee = apps.get_model('employees', 'Employee')
-        Attendance = apps.get_model('employees', 'Attendance')
+        total_employees = get_employees_active()
+        logger.info(f"DEBUG: Total active employees: {total_employees}")
         
-        attendance_today = Attendance.objects.filter(date=today)
-        present_count = attendance_today.filter(status='present').count()
-        total_employees = Employee.objects.filter(is_active=True).count()
-        absent_count = max(0, total_employees - present_count)
-        
-        metrics.total_employees_present = present_count
-        metrics.total_employees_absent = absent_count
-        
-        # Calculate working hours
-        total_hours = Decimal('0.00')
-        for attendance in attendance_today.filter(check_in_time__isnull=False):
-            if hasattr(attendance, 'hours_worked'):
-                total_hours += Decimal(str(attendance.hours_worked or 0))
-        metrics.total_working_hours = total_hours
-        
-        # Calculate attendance rate
-        if total_employees > 0:
-            attendance_rate = (present_count / total_employees) * 100
-        else:
-            attendance_rate = 0
-        metrics.employee_attendance_rate = Decimal(str(attendance_rate))
+        # Try to get attendance records if they exist
+        try:
+            Attendance = apps.get_model('employees', 'Attendance')
+            attendance_today = Attendance.objects.filter(date=today)
+            present_count = attendance_today.filter(status='present').count()
+            absent_count = attendance_today.filter(status='absent').count()
+            
+            logger.info(f"DEBUG: Present employees: {present_count}, Absent: {absent_count}")
+            
+            metrics.total_employees_present = present_count
+            metrics.total_employees_absent = absent_count
+            
+            # Calculate working hours if available
+            total_hours = Decimal('0.00')
+            for attendance in attendance_today.filter(check_in_time__isnull=False):
+                if hasattr(attendance, 'hours_worked'):
+                    total_hours += Decimal(str(attendance.hours_worked or 0))
+            metrics.total_working_hours = total_hours
+            
+            # Note: employee_attendance_rate is calculated automatically from present/absent counts
+            
+        except:
+            # If no attendance app/model, assume all active employees are present
+            metrics.total_employees_present = total_employees
+            metrics.total_employees_absent = 0
+            metrics.total_working_hours = Decimal(str(total_employees * 8))  # Assume 8 hours per employee
+            # Note: employee_attendance_rate is calculated automatically from present/absent counts
         
     except:
-        pass
+        # Default values if no employee model
+        metrics.total_employees_present = 1
+        metrics.total_employees_absent = 0
+        metrics.total_working_hours = Decimal('8.00')
+        # Note: employee_attendance_rate is calculated automatically from present/absent counts
     
     # Inventory metrics
     try:
@@ -590,33 +732,43 @@ def update_daily_metrics(metrics, user=None):
     
     # Expense metrics
     try:
-        Expense = apps.get_model('expenses', 'Expense')
-        expenses_today = Expense.objects.filter(
-            date=today,
-            status='approved'
-        )
+        expenses_today = get_expenses_for_date(today, status_filter=['approved'])
         
-        total_expenses = expenses_today.aggregate(
-            total=Sum('amount')
-        )['total'] or Decimal('0.00')
-        metrics.total_expenses = total_expenses
+        if expenses_today:
+            expenses_count = expenses_today.count()
+            logger.info(f"DEBUG: Found {expenses_count} approved expenses for {today}")
+            
+            total_expenses = expenses_today.aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0.00')
+            
+            logger.info(f"DEBUG: Total expenses: {total_expenses}")
+            metrics.total_expenses = total_expenses
+            
+            # Calculate profit margin
+            if metrics.gross_revenue > 0:
+                net_revenue = metrics.gross_revenue - total_expenses
+                profit_margin = (net_revenue / metrics.gross_revenue) * 100
+                metrics.net_revenue = net_revenue
+                metrics.profit_margin = Decimal(str(profit_margin))
+                logger.info(f"DEBUG: Net revenue: {net_revenue}, Profit margin: {profit_margin}%")
+        else:
+            logger.info("DEBUG: No approved expenses found for today")
         
-        # Calculate profit margin
-        if metrics.gross_revenue > 0:
-            net_revenue = metrics.gross_revenue - total_expenses
-            profit_margin = (net_revenue / metrics.gross_revenue) * 100
-            metrics.net_revenue = net_revenue
-            metrics.profit_margin = Decimal(str(profit_margin))
-        
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"DEBUG: Error in expense calculation: {e}")
     
     # Set updated_by safely when saving
     if user:
         metrics.set_updated_by(user)
+    
+    logger.info(f"DEBUG: Final metrics before save - Revenue: {metrics.gross_revenue}, Services: {metrics.completed_services}, Customers: {metrics.total_customers_served}")
+    logger.info(f"DEBUG: Employee attendance - Present: {metrics.total_employees_present}, Absent: {metrics.total_employees_absent}, Rate: {metrics.employee_attendance_rate}%")
+    
     metrics.save()
+    logger.info("=== DEBUG: Finished update_daily_metrics ===\n")
 
-def get_pending_dashboard_items(employee):
+def get_pending_dashboard_items(employee, request):
     """Get pending items that need attention"""
     from django.apps import apps
     
@@ -630,6 +782,9 @@ def get_pending_dashboard_items(employee):
     }
     
     try:
+        # Get tenant slug from request since employee doesn't have business field in tenant system
+        tenant_slug = request.tenant.slug
+        
         # Pending service orders
         ServiceOrder = apps.get_model('services', 'ServiceOrder')
         pending_orders = ServiceOrder.objects.filter(
@@ -643,7 +798,7 @@ def get_pending_dashboard_items(employee):
                 'created_at': timezone.now(),
                 'type': 'warning',
                 'icon': 'clock',
-                'url': f'/business/{employee.business.slug}/services/orders/?status=pending'
+                'url': f'/business/{tenant_slug}/services/orders/?status=pending'
             })
         
         # Active queue items
@@ -665,7 +820,7 @@ def get_pending_dashboard_items(employee):
                 'created_at': timezone.now(),
                 'type': 'info',
                 'icon': 'credit-card',
-                'url': f'/business/{employee.business.slug}/payments/?status=pending'
+                'url': f'/business/{tenant_slug}/payments/?status=pending'
             })
         
         # Low stock alerts (for managers and owners)
@@ -682,7 +837,7 @@ def get_pending_dashboard_items(employee):
                     'created_at': timezone.now(),
                     'type': 'danger',
                     'icon': 'exclamation-triangle',
-                    'url': f'/business/{employee.business.slug}/inventory/reports/low-stock/'
+                    'url': f'/business/{tenant_slug}/inventory/reports/low-stock/'
                 })
         
         # Pending employee requests (for owners and managers)
@@ -699,11 +854,11 @@ def get_pending_dashboard_items(employee):
                     'created_at': timezone.now(),
                     'type': 'primary',
                     'icon': 'user-check',
-                    'url': f'/business/{employee.business.slug}/employees/?status=pending'
+                    'url': f'/business/{tenant_slug}/employees/?status=pending'
                 })
         
     except Exception as e:
-        print(f"Error getting pending items: {e}")
+        logger.error(f"Error getting pending items: {e}")
     
     return pending_items
 

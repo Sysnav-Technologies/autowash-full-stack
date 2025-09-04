@@ -219,7 +219,7 @@
                     <div class="d-flex flex-wrap gap-3 small">
                         <div><i class="fas fa-calendar me-1"></i>{{ "now"|date:"l, F j, Y" }}</div>
                         <div><i class="fas fa-clock me-1"></i><span id="current-time">{{ "now"|time:"g:i A" }}</span></div>
-                        <div><i class="fas fa-map-marker-alt me-1"></i>{{ business.city|default:"Nairobi" }}, Kenya</div>
+                        <div><i class="fas fa-map-marker-alt me-1"></i>{{ business.city|default:timezone_name|default:"Current Location" }}</div>
                     </div>
                 </div>
                 <div class="col-lg-4 text-lg-end">
@@ -478,36 +478,8 @@
         <!-- Quick Actions -->
         
 
-        <!-- Pending Items -->
-        {% if pending_items %}
-        <div class="card dashboard-card mb-4">
-            <div class="card-header bg-white">
-                <h6 class="mb-0 fw-bold">
-                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>
-                    Items Requiring Attention
-                </h6>
-            </div>
-            <div class="card-body p-0">
-                {% for item in pending_items %}
-                <div class="d-flex align-items-center p-3 {% if not forloop.last %}border-bottom{% endif %}">
-                    <div class="activity-icon bg-{{ item.type|default:'warning' }} bg-opacity-10 text-{{ item.type|default:'warning' }}">
-                        <i class="fas fa-{{ item.icon|default:'exclamation-triangle' }}"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <p class="mb-0 fw-semibold">{{ item.title }}</p>
-                        <small class="text-muted">{{ item.created_at|timesince|default:"Just now" }} ago</small>
-                    </div>
-                    <a href="{{ item.url }}" class="btn btn-sm btn-outline-{{ item.type|default:'warning' }}">
-                        View
-                    </a>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
         <!-- Recent Activity -->
-        <div class="card dashboard-card">
+        <div class="card dashboard-card mb-4">
             <div class="card-header bg-white">
                 <h6 class="mb-0 fw-bold">Recent Activity</h6>
             </div>
@@ -534,6 +506,34 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- Pending Items -->
+        {% if pending_items %}
+        <div class="card dashboard-card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0 fw-bold">
+                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                    Items Requiring Attention
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                {% for item in pending_items %}
+                <div class="d-flex align-items-center p-3 {% if not forloop.last %}border-bottom{% endif %}">
+                    <div class="activity-icon bg-{{ item.type|default:'warning' }} bg-opacity-10 text-{{ item.type|default:'warning' }}">
+                        <i class="fas fa-{{ item.icon|default:'exclamation-triangle' }}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <p class="mb-0 fw-semibold">{{ item.title }}</p>
+                        <small class="text-muted">{{ item.created_at|timesince|default:"Just now" }} ago</small>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-sm btn-outline-{{ item.type|default:'warning' }}">
+                        View
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -541,7 +541,7 @@
 <script>
 // Dashboard data from Django
 const dashboardData = {
-    revenueData: {{ revenue_trend|safe|default:"[]" }},
+    revenueData: {{ revenue_trend_json|safe|default:"[]" }},
     currentMetrics: {
         revenue: {{ quick_stats.today_revenue|default:0 }},
         services: {{ quick_stats.today_services|default:0 }},

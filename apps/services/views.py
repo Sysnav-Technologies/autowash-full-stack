@@ -788,10 +788,10 @@ def order_detail_view(request, pk):
     # Get available service bays (filter by actual fields, not the property)
     available_bays = ServiceBay.objects.filter(is_active=True, is_occupied=False)
     
-    # Get available attendants
+    # Get available attendants (all service-related roles)
     from apps.employees.models import Employee
     available_attendants = Employee.objects.filter(
-        role__in=['attendant', 'supervisor'],
+        role__in=['attendant', 'supervisor', 'cleaner', 'manager'],
         is_active=True
     )
 
@@ -835,7 +835,7 @@ def start_service(request, order_id):
     # Validate that an attendant is assigned (either from form or already assigned)
     assigned_attendant_id = request.POST.get('assigned_attendant')
     if not assigned_attendant_id and not order.assigned_attendant:
-        messages.error(request, 'An attendant must be assigned before starting the service.')
+        messages.error(request, 'An employee must be assigned before starting the service.')
         return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     # Update order status
@@ -1447,12 +1447,12 @@ def _handle_payment_completion(self):
 @login_required
 @employee_required()
 def attendant_dashboard(request):
-    """Attendant dashboard with current assignments"""
-    # Get attendant's current assignments
+    """Attendant dashboard with orders created by the attendant"""
+    # Get orders created by the current employee (not assigned to them)
     my_orders = ServiceOrder.objects.filter(
-        assigned_attendant=request.employee,
+        created_by_id=request.user.id,
         status__in=['confirmed', 'in_progress']
-    ).select_related('customer', 'vehicle').order_by('-created_at')
+    ).select_related('customer', 'vehicle', 'assigned_attendant').order_by('-created_at')
     
     # Get queue entries for today
     today_queue = ServiceQueue.objects.filter(
@@ -1469,27 +1469,37 @@ def attendant_dashboard(request):
     # Statistics
     stats = {
         'orders_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
+            created_by_id=request.user.id,
             created_at__date=timezone.now().date()
         ).count(),
         'completed_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
+            created_by_id=request.user.id,
             status='completed',
             actual_end_time__date=timezone.now().date()
         ).count(),
         'in_progress': my_orders.filter(status='in_progress').count(),
         'total_revenue_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
+            created_by_id=request.user.id,
             status='completed',
             actual_end_time__date=timezone.now().date()
         ).aggregate(total=Sum('total_amount'))['total'] or 0
     }
+    
+    # Get current hour for greeting
+    current_hour = timezone.now().hour
+    if current_hour < 12:
+        greeting_time = "Morning"
+    elif current_hour < 17:
+        greeting_time = "Afternoon"
+    else:
+        greeting_time = "Evening"
     
     context = {
         'my_orders': my_orders,
         'today_queue': today_queue,
         'my_service_items': my_service_items,
         'stats': stats,
+        'greeting_time': greeting_time,
         'title': 'My Dashboard'
     }
     return render(request, 'services/attendant_dashboard.html', context)
@@ -1497,10 +1507,11 @@ def attendant_dashboard(request):
 @login_required
 @employee_required()
 def my_services_view(request):
-    """View attendant's assigned services"""
+    """View services/orders created by the current employee"""
+    # Filter orders created by the current employee (not assigned to them)
     my_orders = ServiceOrder.objects.filter(
-        assigned_attendant=request.employee
-    ).select_related('customer', 'vehicle').order_by('-created_at')
+        created_by_id=request.user.id
+    ).select_related('customer', 'vehicle', 'assigned_attendant').order_by('-created_at')
     
     # Filters
     status = request.GET.get('status')
@@ -2606,91 +2617,6 @@ def service_performance_report(request):
         'title': 'Performance Report'
     }
     return render(request, 'services/performance_report.html', context)
-
-# Attendant Dashboard Views
-@login_required
-@employee_required()
-def attendant_dashboard(request):
-    """Attendant dashboard with current assignments"""
-    my_orders = ServiceOrder.objects.filter(
-        assigned_attendant=request.employee,
-        status__in=['confirmed', 'in_progress']
-    ).select_related('customer', 'vehicle').order_by('-created_at')
-    
-    today_queue = ServiceQueue.objects.filter(
-        created_at__date=timezone.now().date(),
-        status__in=['waiting', 'in_service']
-    ).select_related('order', 'order__customer').order_by('queue_number')
-    
-    my_service_items = ServiceOrderItem.objects.filter(
-        assigned_to=request.employee,
-        completed_at__isnull=True
-    ).select_related('order', 'service', 'order__customer', 'order__vehicle').order_by('started_at', 'order__created_at')
-    
-    # Statistics
-    stats = {
-        'orders_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            created_at__date=timezone.now().date()
-        ).count(),
-        'completed_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            status='completed',
-            actual_end_time__date=timezone.now().date()
-        ).count(),
-        'in_progress': my_orders.filter(status='in_progress').count(),
-        'total_revenue_today': ServiceOrder.objects.filter(
-            assigned_attendant=request.employee,
-            status='completed',
-            actual_end_time__date=timezone.now().date()
-        ).aggregate(total=Sum('total_amount'))['total'] or 0
-    }
-    
-    context = {
-        'my_orders': my_orders,
-        'today_queue': today_queue,
-        'my_service_items': my_service_items,
-        'stats': stats,
-        'title': 'My Dashboard'
-    }
-    return render(request, 'services/attendant_dashboard.html', context)
-
-@login_required
-@employee_required()
-def my_services_view(request):
-    """View attendant's assigned services"""
-    my_orders = ServiceOrder.objects.filter(
-        assigned_attendant=request.employee
-    ).select_related('customer', 'vehicle').order_by('-created_at')
-    
-    # Filters
-    status = request.GET.get('status')
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
-    
-    if status:
-        my_orders = my_orders.filter(status=status)
-    if date_from:
-        my_orders = my_orders.filter(created_at__date__gte=date_from)
-    if date_to:
-        my_orders = my_orders.filter(created_at__date__lte=date_to)
-    
-    # Pagination
-    paginator = Paginator(my_orders, 20)
-    page = request.GET.get('page')
-    orders_page = paginator.get_page(page)
-    
-    context = {
-        'orders': orders_page,
-        'status_choices': ServiceOrder.STATUS_CHOICES,
-        'current_filters': {
-            'status': status,
-            'date_from': date_from,
-            'date_to': date_to
-        },
-        'title': 'My Services'
-    }
-    return render(request, 'services/my_services.html', context)
 
 # Quick Action Views
 @login_required
