@@ -4,9 +4,6 @@ from . import views
 app_name = 'reports'
 
 urlpatterns = [
-    # Reports interface
+    # Reports interface with export functionality
     path('', views.ReportsView.as_view(), name='reports'),
-    
-    # Download functionality
-    path('download/<str:report_type>/', views.ReportDownloadView.as_view(), name='download'),
 ]

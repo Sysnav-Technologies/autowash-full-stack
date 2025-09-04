@@ -923,11 +923,6 @@
                             <i class="fas fa-check"></i>
                             Complete Service
                         </button>
-                        
-                        <button class="btn btn-warning" onclick="pauseService()">
-                            <i class="fas fa-pause"></i>
-                            Pause Service
-                        </button>
                     {% endif %}
                     
                     {% if order.can_be_cancelled %}
@@ -1217,9 +1212,22 @@
             <h5 class="modal-title">Start Service</h5>
             <button type="button" class="modal-close" onclick="closeModal('startServiceModal')">&times;</button>
         </div>
-        <form method="post" action="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/start/">
+        <form id="startServiceForm" method="post" action="/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/start/" onsubmit="return validateStartServiceForm()">
             {% csrf_token %}
             <div class="modal-body">
+                <div class="form-group">
+                    <label for="startAssignedAttendant" class="form-label">Assign Attendant <span class="text-danger">*</span></label>
+                    <select class="form-control form-select" id="startAssignedAttendant" name="assigned_attendant" required>
+                        <option value="">Select an attendant...</option>
+                        {% for attendant in available_attendants %}
+                            <option value="{{ attendant.id }}" {% if order.assigned_attendant and order.assigned_attendant.id == attendant.id %}selected{% endif %}>
+                                {{ attendant.full_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">An attendant must be assigned to start the service.</small>
+                </div>
+                
                 <div class="form-group">
                     <label for="serviceBay" class="form-label">Assign Service Bay (Optional)</label>
                     <select class="form-control form-select" id="serviceBay" name="service_bay">
@@ -1434,32 +1442,21 @@ function startService() {
     openModal('startServiceModal');
 }
 
-function completeService() {
-    openModal('completeServiceModal');
+function validateStartServiceForm() {
+    const attendantSelect = document.getElementById('startAssignedAttendant');
+    const attendantValue = attendantSelect.value;
+    
+    if (!attendantValue || attendantValue === '') {
+        alert('Please assign an attendant before starting the service.');
+        attendantSelect.focus();
+        return false;
+    }
+    
+    return true;
 }
 
-function pauseService() {
-    if (confirm('Are you sure you want to pause this service?')) {
-        fetch("/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/pause/", {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json',
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => {
-            if (response.ok) {
-                location.reload();
-            } else {
-                alert('Failed to pause service. Please try again.');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred. Please try again.');
-        });
-    }
+function completeService() {
+    openModal('completeServiceModal');
 }
 
 function cancelService() {
