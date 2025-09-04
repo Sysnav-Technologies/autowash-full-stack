@@ -17,7 +17,7 @@ from apps.employees.models import Department, Employee
 from .models import BusinessMetrics, BusinessGoal, BusinessAlert, QuickAction, DashboardWidget
 from .utils import (
     get_orders_for_date, get_orders_for_date_range, get_completed_statuses,
-    get_revenue_eligible_statuses, debug_order_data, get_customers_for_date,
+    get_revenue_eligible_statuses, get_customers_for_date,
     get_customers_served_for_date, get_employees_active, get_payments_for_date,
     get_expenses_for_date
 )
@@ -144,14 +144,10 @@ def dashboard_view(request):
         'employee_attendance': today_metrics.employee_attendance_rate,
     }
     
-    logger.info(f"DEBUG: Dashboard quick_stats: {quick_stats}")
-    
     # Get recent performance data for charts
     last_7_days = BusinessMetrics.objects.filter(
         date__gte=today - timedelta(days=7)
     ).order_by('date')
-    
-    logger.info(f"DEBUG: Found {last_7_days.count()} metrics for last 7 days")
     
     # Revenue trend data
     revenue_trend = []
@@ -162,13 +158,9 @@ def dashboard_view(request):
             'customers': metric.total_customers_served
         }
         revenue_trend.append(trend_data)
-        logger.info(f"DEBUG: Chart data for {metric.date}: Revenue={metric.gross_revenue}, Customers={metric.total_customers_served}")
-    
-    logger.info(f"DEBUG: Final revenue_trend data: {revenue_trend}")
     
     # Convert revenue_trend to JSON string for template
     revenue_trend_json = json.dumps(revenue_trend)
-    logger.info(f"DEBUG: Revenue trend JSON: {revenue_trend_json}")
     
     # Active goals
     active_goals = BusinessGoal.objects.filter(

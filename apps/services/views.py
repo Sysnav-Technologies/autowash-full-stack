@@ -1447,42 +1447,66 @@ def _handle_payment_completion(self):
 @login_required
 @employee_required()
 def attendant_dashboard(request):
-    """Attendant dashboard with orders created by the attendant"""
-    # Get orders created by the current employee (not assigned to them)
+    """Attendant dashboard with comprehensive service data"""
+    from apps.businesses.utils import get_orders_for_date
+    
+    today = timezone.now().date()
+    employee = request.employee
+    
+    # Get orders assigned to this attendant OR created by them
     my_orders = ServiceOrder.objects.filter(
-        created_by_id=request.user.id,
+        Q(assigned_attendant=employee) | Q(created_by_id=request.user.id),
         status__in=['confirmed', 'in_progress']
     ).select_related('customer', 'vehicle', 'assigned_attendant').order_by('-created_at')
     
     # Get queue entries for today
     today_queue = ServiceQueue.objects.filter(
-        created_at__date=timezone.now().date(),
+        created_at__date=today,
         status__in=['waiting', 'in_service']
     ).select_related('order', 'order__customer').order_by('queue_number')
     
-    # Get my service items in progress
+    # Get my service items in progress (services specifically assigned to me)
     my_service_items = ServiceOrderItem.objects.filter(
-        assigned_to=request.employee,
+        assigned_to=employee,
         completed_at__isnull=True
     ).select_related('order', 'service', 'order__customer', 'order__vehicle').order_by('started_at', 'order__created_at')
     
-    # Statistics
+    # Enhanced Statistics - Show both personal and overall data
+    today_orders = get_orders_for_date(today)
+    
+    # Personal stats (orders I created or am assigned to) - use datetime range to avoid timezone issues
+    from django.utils import timezone as tz
+    today_start = tz.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + tz.timedelta(days=1)
+    
+    my_orders_today = ServiceOrder.objects.filter(
+        Q(assigned_attendant=employee) | Q(created_by_id=request.user.id),
+        created_at__range=[today_start, today_end]
+    )
+    
+    # Overall business stats for today (more relevant for dashboard)
     stats = {
-        'orders_today': ServiceOrder.objects.filter(
-            created_by_id=request.user.id,
-            created_at__date=timezone.now().date()
-        ).count(),
-        'completed_today': ServiceOrder.objects.filter(
-            created_by_id=request.user.id,
+        # Personal metrics
+        'orders_today': my_orders_today.count(),
+        'completed_today': my_orders_today.filter(
             status='completed',
-            actual_end_time__date=timezone.now().date()
+            actual_end_time__range=[today_start, today_end]
         ).count(),
-        'in_progress': my_orders.filter(status='in_progress').count(),
-        'total_revenue_today': ServiceOrder.objects.filter(
-            created_by_id=request.user.id,
-            status='completed',
-            actual_end_time__date=timezone.now().date()
-        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        'in_progress_today': my_orders.filter(status='in_progress').count(),
+        
+        # Business-wide revenue (more meaningful than just personal revenue)
+        'total_revenue_today': today_orders.filter(
+            status__in=['completed', 'confirmed']
+        ).aggregate(total=Sum('total_amount'))['total'] or 0,
+        
+        # Additional useful stats
+        'my_service_items_pending': my_service_items.count(),
+        'queue_length': today_queue.count(),
+        
+        # Overall business metrics for context
+        'total_orders_today': today_orders.count(),
+        'total_completed_today': today_orders.filter(status='completed').count(),
+        'total_in_progress': today_orders.filter(status='in_progress').count()
     }
     
     # Get current hour for greeting

@@ -36,10 +36,8 @@ def get_orders_for_date(date, status_filter=None):
         
         # Use whichever method finds more orders
         if orders_datetime_filter.count() > orders_date_filter.count():
-            logger.debug(f"Using datetime range filtering for {date} (found {orders_datetime_filter.count()} vs {orders_date_filter.count()})")
             orders = orders_datetime_filter
         else:
-            logger.debug(f"Using date filtering for {date} (found {orders_date_filter.count()} orders)")
             orders = orders_date_filter
         
         # Apply status filter if provided
@@ -110,52 +108,6 @@ def get_revenue_eligible_statuses():
         List of status strings
     """
     return ['completed', 'confirmed', 'in_progress', 'pending']
-
-def debug_order_data(date, context=""):
-    """
-    Debug function to log order information for a specific date.
-    
-    Args:
-        date: The date to check
-        context: Context string for logging
-    """
-    try:
-        ServiceOrder = apps.get_model('services', 'ServiceOrder')
-        
-        # Check all orders ever
-        all_orders = ServiceOrder.objects.all()
-        logger.info(f"DEBUG {context}: Found {all_orders.count()} total orders in database")
-        
-        if all_orders.exists():
-            latest_order = all_orders.order_by('-created_at').first()
-            logger.info(f"DEBUG {context}: Latest order: {latest_order.order_number} created {latest_order.created_at} (status: {latest_order.status})")
-        
-        # Check orders for the specific date
-        orders_today = get_orders_for_date(date)
-        if orders_today:
-            logger.info(f"DEBUG {context}: Found {orders_today.count()} orders for {date}")
-            
-            # Check all possible statuses for today
-            all_statuses = ServiceOrder.objects.values_list('status', flat=True).distinct()
-            logger.info(f"DEBUG {context}: All statuses in database: {list(all_statuses)}")
-            
-            # Check specific statuses for today
-            for status in ['pending', 'in_progress', 'completed', 'cancelled', 'paused', 'confirmed']:
-                status_count = orders_today.filter(status=status).count()
-                if status_count > 0:
-                    logger.info(f"DEBUG {context}: Orders with status '{status}' on {date}: {status_count}")
-            
-            # Check revenue
-            orders_with_revenue = orders_today.filter(total_amount__gt=0)
-            logger.info(f"DEBUG {context}: Orders with revenue > 0 on {date}: {orders_with_revenue.count()}")
-            
-            if orders_with_revenue.exists():
-                from django.db.models import Sum
-                total_revenue = orders_with_revenue.aggregate(total=Sum('total_amount'))['total'] or 0
-                logger.info(f"DEBUG {context}: Total revenue on {date}: {total_revenue}")
-        
-    except Exception as e:
-        logger.error(f"DEBUG {context}: Error in debug_order_data: {e}")
 
 def get_customers_for_date(date):
     """

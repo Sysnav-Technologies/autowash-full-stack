@@ -58,7 +58,10 @@
                         <p class="text-muted mb-1 fw-semibold">Orders Today</p>
                         <h3 class="fw-bold text-primary mb-0">{{ stats.orders_today }}</h3>
                         <small class="text-muted">
-                            <i class="fas fa-calendar-day text-info me-1"></i>Orders created
+                            <i class="fas fa-calendar-day text-info me-1"></i>My orders
+                            {% if stats.total_orders_today %}
+                                <span class="text-muted"> • {{ stats.total_orders_today }} total</span>
+                            {% endif %}
                         </small>
                     </div>
                     <div class="bg-primary bg-opacity-10 rounded-circle p-3">
@@ -77,7 +80,10 @@
                         <p class="text-muted mb-1 fw-semibold">Completed</p>
                         <h3 class="fw-bold text-success mb-0">{{ stats.completed_today }}</h3>
                         <small class="text-success">
-                            <i class="fas fa-check-circle me-1"></i>Finished today
+                            <i class="fas fa-check-circle me-1"></i>My completed
+                            {% if stats.total_completed_today %}
+                                <span class="text-muted"> • {{ stats.total_completed_today }} total</span>
+                            {% endif %}
                         </small>
                     </div>
                     <div class="bg-success bg-opacity-10 rounded-circle p-3">
@@ -94,9 +100,12 @@
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 fw-semibold">In Progress</p>
-                        <h3 class="fw-bold text-warning mb-0">{{ stats.in_progress }}</h3>
+                        <h3 class="fw-bold text-warning mb-0">{{ stats.in_progress_today }}</h3>
                         <small class="text-warning">
-                            <i class="fas fa-spinner me-1"></i>Active services
+                            <i class="fas fa-spinner me-1"></i>My active
+                            {% if stats.total_in_progress %}
+                                <span class="text-muted"> • {{ stats.total_in_progress }} queue</span>
+                            {% endif %}
                         </small>
                     </div>
                     <div class="bg-warning bg-opacity-10 rounded-circle p-3">
@@ -174,8 +183,18 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="fw-semibold">{{ order.vehicle.make }} {{ order.vehicle.model }}</div>
-                                        <div class="text-muted small">{{ order.vehicle.license_plate }}</div>
+                                        {% if order.vehicle %}
+                                            <div class="fw-semibold">
+                                                {% if order.vehicle.make or order.vehicle.model %}
+                                                    {{ order.vehicle.make|default:"Unknown" }} {{ order.vehicle.model|default:"Vehicle" }}
+                                                {% else %}
+                                                    Unknown Vehicle
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-muted small">{{ order.vehicle.license_plate|default:"No Plate" }}</div>
+                                        {% else %}
+                                            <div class="fw-semibold text-muted">No vehicle assigned</div>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if order.assigned_attendant %}
@@ -270,7 +289,12 @@
                             <small class="text-muted d-block">
                                 <i class="fas fa-user me-1"></i>{{ item.order.customer.full_name }}
                                 {% if item.order.vehicle %}
-                                | <i class="fas fa-car me-1"></i>{{ item.order.vehicle.make }} {{ item.order.vehicle.model }}
+                                    | <i class="fas fa-car me-1"></i>
+                                    {% if item.order.vehicle.make or item.order.vehicle.model %}
+                                        {{ item.order.vehicle.make|default:"Unknown" }} {{ item.order.vehicle.model|default:"Vehicle" }}
+                                    {% else %}
+                                        {{ item.order.vehicle.license_plate|default:"Unknown Vehicle" }}
+                                    {% endif %}
                                 {% endif %}
                             </small>
                             {% if item.started_at %}
