@@ -1,0 +1,635 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if category %}Edit Category{% else %}Create Category{% endif %} - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+<style>
+    .category-form-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .form-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+    
+    .form-header h2 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 2rem;
+    }
+    
+    .form-header p {
+        margin: 10px 0 0;
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+    
+    .form-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        overflow: hidden;
+    }
+    
+    .form-card-header {
+        background: #f8f9fa;
+        padding: 25px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .form-card-header h4 {
+        margin: 0;
+        color: #495057;
+        font-weight: 600;
+    }
+    
+    .form-card-body {
+        padding: 30px;
+    }
+    
+    .form-section {
+        margin-bottom: 35px;
+        padding-bottom: 30px;
+        border-bottom: 1px solid #f1f3f4;
+    }
+    
+    .form-section:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    
+    .section-title {
+        color: #495057;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .section-title i {
+        margin-right: 10px;
+        color: #667eea;
+    }
+    
+    .form-group {
+        margin-bottom: 25px;
+    }
+    
+    .form-label {
+        color: #495057;
+        font-weight: 500;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .form-label .required {
+        color: #dc3545;
+        margin-left: 4px;
+    }
+    
+    .form-control {
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 12px 15px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    
+    .form-text {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-top: 8px;
+    }
+    
+    .color-picker-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+        gap: 10px;
+        max-width: 400px;
+    }
+    
+    .color-option {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        border: 3px solid transparent;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .color-option:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .color-option.selected {
+        border-color: #333;
+        transform: scale(1.1);
+    }
+    
+    .color-option::after {
+        content: '✓';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .color-option.selected::after {
+        opacity: 1;
+    }
+    
+    .icon-picker-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+        gap: 10px;
+        max-width: 500px;
+    }
+    
+    .icon-option {
+        width: 60px;
+        height: 60px;
+        border-radius: 10px;
+        border: 2px solid #e9ecef;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #6c757d;
+    }
+    
+    .icon-option:hover {
+        border-color: #667eea;
+        background: #f0f8ff;
+        color: #667eea;
+        transform: scale(1.05);
+    }
+    
+    .icon-option.selected {
+        border-color: #667eea;
+        background: #667eea;
+        color: white;
+        transform: scale(1.05);
+    }
+    
+    .preview-card {
+        border: 2px solid #e9ecef;
+        border-radius: 15px;
+        overflow: hidden;
+        max-width: 300px;
+        margin: 20px auto;
+        transition: all 0.3s ease;
+    }
+    
+    .preview-header {
+        background: var(--preview-color, #667eea);
+        color: white;
+        padding: 20px;
+        position: relative;
+    }
+    
+    .preview-icon {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        font-size: 2rem;
+        opacity: 0.3;
+    }
+    
+    .preview-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    
+    .preview-description {
+        opacity: 0.9;
+        font-size: 0.9rem;
+    }
+    
+    .preview-stats {
+        padding: 15px 20px;
+        background: white;
+    }
+    
+    .preview-stat {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+    }
+    
+    .preview-stat:last-child {
+        margin-bottom: 0;
+    }
+    
+    .form-actions {
+        background: #f8f9fa;
+        padding: 25px;
+        border-top: 1px solid #e9ecef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border: none;
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #5a6fd8, #6a4c93);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #6c757d;
+        color: #6c757d;
+        padding: 10px 30px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-outline-secondary:hover {
+        background: #6c757d;
+        color: white;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid category-form-container">
+    <!-- Page Header -->
+    <div class="form-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2>
+                    {% if category %}
+                        <i class="fas fa-edit me-2"></i>Edit Category
+                    {% else %}
+                        <i class="fas fa-plus me-2"></i>Create New Category
+                    {% endif %}
+                </h2>
+                <p>
+                    {% if category %}
+                        Update the details of {{ category.name }}
+                    {% else %}
+                        Add a new category to organize your inventory items
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Form Card -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <h4>Category Details</h4>
+                </div>
+                
+                <div class="form-card-body">
+                    <form method="POST" id="categoryForm">
+                        {% csrf_token %}
+                        
+                        <!-- Basic Information -->
+                        <div class="form-section">
+                            <div class="section-title">
+                                <i class="fas fa-info-circle"></i>
+                                Basic Information
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Category Name <span class="required">*</span>
+                                </label>
+                                <input type="text" 
+                                       name="name" 
+                                       class="form-control" 
+                                       id="categoryName"
+                                       value="{% if category %}{{ category.name }}{% endif %}"
+                                       placeholder="Enter category name..."
+                                       required
+                                       onInput="updatePreview()">
+                                <div class="form-text">
+                                    Choose a descriptive name for this category
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" 
+                                          class="form-control" 
+                                          id="categoryDescription"
+                                          rows="3"
+                                          placeholder="Describe what items belong in this category..."
+                                          onInput="updatePreview()">{% if category %}{{ category.description }}{% endif %}</textarea>
+                                <div class="form-text">
+                                    Provide a brief description to help users understand this category
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Visual Customization -->
+                        <div class="form-section">
+                            <div class="section-title">
+                                <i class="fas fa-palette"></i>
+                                Visual Customization
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Category Color</label>
+                                <div class="color-picker-container">
+                                    {% for color in color_options %}
+                                    <div class="color-option {% if category.color == color.value or color.default and not category %}selected{% endif %}"
+                                         data-color="{{ color.value }}"
+                                         onclick="selectColor('{{ color.value }}')"
+                                         title="{{ color.name }}"
+                                         style="background-color: {{ color.value }};">
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <input type="hidden" name="color" id="selectedColor" value="{% if category %}{{ category.color }}{% else %}#667eea{% endif %}">
+                                <div class="form-text">
+                                    Choose a color to represent this category
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Category Icon</label>
+                                <div class="icon-picker-container">
+                                    {% for icon in icon_options %}
+                                    <div class="icon-option {% if category.icon == icon.class or icon.default and not category %}selected{% endif %}"
+                                         data-icon="{{ icon.class }}"
+                                         onclick="selectIcon('{{ icon.class }}')"
+                                         title="{{ icon.name }}">
+                                        <i class="{{ icon.class }}"></i>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <input type="hidden" name="icon" id="selectedIcon" value="{% if category %}{{ category.icon }}{% else %}fas fa-tag{% endif %}">
+                                <div class="form-text">
+                                    Select an icon to visually represent this category
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Settings -->
+                        <div class="form-section">
+                            <div class="section-title">
+                                <i class="fas fa-cog"></i>
+                                Settings
+                            </div>
+                            
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input type="checkbox" 
+                                           name="is_active" 
+                                           class="form-check-input" 
+                                           id="isActive"
+                                           {% if not category or category.is_active %}checked{% endif %}>
+                                    <label class="form-check-label" for="isActive">
+                                        Active Category
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Inactive categories will be hidden from item creation forms
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input type="checkbox" 
+                                           name="track_expiry" 
+                                           class="form-check-input" 
+                                           id="trackExpiry"
+                                           {% if category.track_expiry %}checked{% endif %}>
+                                    <label class="form-check-label" for="trackExpiry">
+                                        Track Item Expiry
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Enable expiry date tracking for items in this category
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input type="checkbox" 
+                                           name="require_serial" 
+                                           class="form-check-input" 
+                                           id="requireSerial"
+                                           {% if category.require_serial %}checked{% endif %}>
+                                    <label class="form-check-label" for="requireSerial">
+                                        Require Serial Numbers
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Make serial number field mandatory for items in this category
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="form-actions">
+                    <a href="/business/{{ request.tenant.slug }}/inventory/categories/" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Cancel
+                    </a>
+                    <button type="submit" form="categoryForm" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>
+                        {% if category %}Update Category{% else %}Create Category{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Preview Card -->
+            <div class="sticky-top" style="top: 20px;">
+                <h5 class="mb-3">
+                    <i class="fas fa-eye me-2"></i>Preview
+                </h5>
+                <div class="preview-card" id="previewCard">
+                    <div class="preview-header" id="previewHeader">
+                        <div class="preview-icon" id="previewIcon">
+                            <i class="fas fa-tag"></i>
+                        </div>
+                        <div class="preview-name" id="previewName">
+                            {% if category %}{{ category.name }}{% else %}Category Name{% endif %}
+                        </div>
+                        <div class="preview-description" id="previewDescription">
+                            {% if category %}{{ category.description|default:"No description provided" }}{% else %}Category description will appear here...{% endif %}
+                        </div>
+                    </div>
+                    <div class="preview-stats">
+                        <div class="preview-stat">
+                            <span>Total Items:</span>
+                            <span>{% if category %}{{ category.items_count|default:0 }}{% else %}0{% endif %}</span>
+                        </div>
+                        <div class="preview-stat">
+                            <span>In Stock:</span>
+                            <span>{% if category %}{{ category.in_stock_count|default:0 }}{% else %}0{% endif %}</span>
+                        </div>
+                        <div class="preview-stat">
+                            <span>Total Value:</span>
+                            <span>{% if category %}{{ category.total_value|default:0|floatformat:0 }}{% else %}0{% endif %}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if category %}
+                <!-- Quick Stats -->
+                <div class="mt-4">
+                    <h6>Quick Stats</h6>
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            Items Created
+                            <span class="badge bg-primary rounded-pill">{{ category.items_count|default:0 }}</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            Low Stock Items
+                            <span class="badge bg-warning rounded-pill">{{ category.low_stock_count|default:0 }}</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            Created On
+                            <small class="text-muted">{{ category.created_at|date:"M d, Y" }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Predefined colors and icons
+const colorOptions = [
+    '#667eea', '#764ba2', '#28a745', '#dc3545', '#ffc107', '#17a2b8',
+    '#6f42c1', '#e83e8c', '#fd7e14', '#20c997', '#6c757d', '#343a40'
+];
+
+const iconOptions = [
+    'fas fa-tag', 'fas fa-box', 'fas fa-tools', 'fas fa-car', 'fas fa-tint',
+    'fas fa-wrench', 'fas fa-cog', 'fas fa-spray-can', 'fas fa-shopping-bag',
+    'fas fa-cube', 'fas fa-boxes', 'fas fa-industry'
+];
+
+function selectColor(color) {
+    // Update hidden input
+    document.getElementById('selectedColor').value = color;
+    
+    // Update visual selection
+    document.querySelectorAll('.color-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    document.querySelector(`[data-color="${color}"]`).classList.add('selected');
+    
+    // Update preview
+    updatePreview();
+}
+
+function selectIcon(iconClass) {
+    // Update hidden input
+    document.getElementById('selectedIcon').value = iconClass;
+    
+    // Update visual selection
+    document.querySelectorAll('.icon-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    document.querySelector(`[data-icon="${iconClass}"]`).classList.add('selected');
+    
+    // Update preview
+    updatePreview();
+}
+
+function updatePreview() {
+    const name = document.getElementById('categoryName').value || 'Category Name';
+    const description = document.getElementById('categoryDescription').value || 'Category description will appear here...';
+    const color = document.getElementById('selectedColor').value;
+    const icon = document.getElementById('selectedIcon').value;
+    
+    // Update preview elements
+    document.getElementById('previewName').textContent = name;
+    document.getElementById('previewDescription').textContent = description;
+    document.getElementById('previewHeader').style.background = color;
+    document.getElementById('previewIcon').innerHTML = `<i class="${icon}"></i>`;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize preview
+    updatePreview();
+    
+    // Form validation
+    document.getElementById('categoryForm').addEventListener('submit', function(e) {
+        const name = document.getElementById('categoryName').value.trim();
+        
+        if (!name) {
+            e.preventDefault();
+            alert('Please enter a category name.');
+            document.getElementById('categoryName').focus();
+            return false;
+        }
+        
+        if (name.length < 2) {
+            e.preventDefault();
+            alert('Category name must be at least 2 characters long.');
+            document.getElementById('categoryName').focus();
+            return false;
+        }
+        
+        if (name.length > 50) {
+            e.preventDefault();
+            alert('Category name must be less than 50 characters.');
+            document.getElementById('categoryName').focus();
+            return false;
+        }
+    });
+    
+    // Auto-focus name field for new categories
+    {% if not category %}
+    document.getElementById('categoryName').focus();
+    {% endif %}
+});
+</script>
+{% endblock %}

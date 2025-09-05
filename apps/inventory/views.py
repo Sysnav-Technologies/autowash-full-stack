@@ -563,6 +563,7 @@ def item_search_ajax(request):
                 'sku': item.sku,
                 'current_stock': float(item.current_stock),
                 'unit': item.unit.name,
+                'unit_abbreviation': item.unit.abbreviation,
                 'unit_cost': float(item.unit_cost),
                 'category': item.category.name,
                 'stock_status': item.stock_status,
@@ -806,20 +807,25 @@ def stock_adjustment_view(request, item_id=None):
     item = get_object_or_404(InventoryItem, pk=item_id) if item_id else None
     
     if request.method == 'POST':
-        form = StockAdjustmentForm(request.POST, initial_item=item)
+        # Create a modified POST data with adjustment_type based on quantity
+        post_data = request.POST.copy()
+        quantity = float(post_data.get('quantity', 0))
+        
+        # Determine adjustment type based on quantity
+        if quantity > 0:
+            post_data['adjustment_type'] = 'manual'  # Increase
+        else:
+            post_data['adjustment_type'] = 'manual'  # Decrease
+            
+        form = StockAdjustmentForm(post_data, initial_item=item)
         if form.is_valid():
             try:
                 with transaction.atomic():
                     adjustment = form.save(commit=False)
                     adjustment.old_stock = adjustment.item.current_stock
                     
-                    # Handle quantity based on adjustment type
-                    if adjustment.adjustment_type == 'decrease':
-                        actual_quantity = -abs(adjustment.quantity)  # Make sure it's negative
-                    else:
-                        actual_quantity = abs(adjustment.quantity)   # Make sure it's positive
-                    
-                    adjustment.quantity = actual_quantity
+                    # Use the quantity as-is (positive for increase, negative for decrease)
+                    actual_quantity = adjustment.quantity
                     adjustment.new_stock = adjustment.old_stock + actual_quantity
                     adjustment.set_created_by(request.user)
                     adjustment.save()
@@ -828,26 +834,21 @@ def stock_adjustment_view(request, item_id=None):
                     adjustment.item.current_stock = adjustment.new_stock
                     adjustment.item.save()
                     
-                    # Auto-approve if user has permission
-                    employee = getattr(request, 'employee', None)
-                    if employee and employee.role in ['owner', 'manager']:
-                        adjustment.approve(request.user)
-                    else:
-                        # Create stock movement only if not auto-approved
-                        # (approve method will create it if auto-approved)
-                        stock_movement = StockMovement.objects.create(
-                            item=adjustment.item,
-                            movement_type='adjustment',
-                            quantity=actual_quantity,
-                            unit_cost=adjustment.unit_cost,
-                            old_stock=adjustment.old_stock,
-                            new_stock=adjustment.new_stock,
-                            reference_type='adjustment',
-                            reason=adjustment.reason,
-                        )
-                        # Set created_by user ID
-                        stock_movement.set_created_by(request.user)
-                        stock_movement.save()
+                    # Create stock movement
+                    movement_type = 'in' if actual_quantity > 0 else 'out'
+                    stock_movement = StockMovement.objects.create(
+                        item=adjustment.item,
+                        movement_type=movement_type,
+                        quantity=abs(actual_quantity),  # StockMovement quantity is always positive
+                        unit_cost=adjustment.unit_cost,
+                        old_stock=adjustment.old_stock,
+                        new_stock=adjustment.new_stock,
+                        reference_type='adjustment',
+                        reason=adjustment.reason,
+                    )
+                    # Set created_by user ID
+                    stock_movement.set_created_by(request.user)
+                    stock_movement.save()
                     
                     messages.success(request, 'Stock adjustment created successfully!')
                     try:
@@ -858,6 +859,11 @@ def stock_adjustment_view(request, item_id=None):
                     
             except Exception as e:
                 messages.error(request, f'Error creating adjustment: {str(e)}')
+        else:
+            # Add form errors to messages
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = StockAdjustmentForm(initial_item=item)
     
@@ -2191,3 +2197,37 @@ def create_purchase_orders_ajax(request):
         'success': False,
         'error': 'Invalid request method'
     })
+
+@login_required
+@employee_required()
+@ajax_required
+def recent_adjustments_ajax(request):
+    """Get recent adjustments for an item via AJAX"""
+    item_id = request.GET.get('item_id')
+    if not item_id:
+        return JsonResponse({'adjustments': []})
+    
+    try:
+        item = get_object_or_404(InventoryItem, pk=item_id)
+        recent_adjustments = StockAdjustment.objects.filter(
+            item=item
+        ).select_related('created_by').order_by('-created_at')[:10]
+        
+        adjustments_data = []
+        for adj in recent_adjustments:
+            adjustments_data.append({
+                'id': str(adj.id),
+                'quantity': float(adj.quantity),
+                'unit': adj.item.unit.abbreviation,
+                'reason': adj.reason,
+                'date': adj.created_at.strftime('%b %d, %Y'),
+                'time': adj.created_at.strftime('%H:%M'),
+                'created_by': adj.created_by.get_full_name() if adj.created_by else 'System',
+                'old_stock': float(adj.old_stock) if adj.old_stock else 0,
+                'new_stock': float(adj.new_stock) if adj.new_stock else 0,
+                'status': adj.status
+            })
+        
+        return JsonResponse({'adjustments': adjustments_data})
+    except Exception as e:
+        return JsonResponse({'adjustments': [], 'error': str(e)})

@@ -62,6 +62,7 @@ urlpatterns = [
     
     # AJAX endpoints
     path('ajax/items/search/', views.item_search_ajax, name='item_search'),
+    path('ajax/recent-adjustments/', views.recent_adjustments_ajax, name='recent_adjustments'),
     path('ajax/consumption/', views.item_consumption_ajax, name='item_consumption'),
     path('ajax/reconciliation/update/', views.ajax_update_reconciliation_item, name='ajax_update_reconciliation_item'),
     path('ajax/bay-status/', views.get_bay_status, name='get_bay_status'),
