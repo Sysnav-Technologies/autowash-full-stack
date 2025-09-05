@@ -99,6 +99,9 @@ class InventoryItemForm(forms.ModelForm):
         self.fields['category'].queryset = InventoryCategory.objects.filter(is_active=True)
         self.fields['unit'].queryset = Unit.objects.filter(is_active=True)
         
+        # Make SKU field not required - it will be auto-generated if empty
+        self.fields['sku'].required = False
+        
         # Filter active suppliers - FIXED to use correct filtering
         try:
             from apps.suppliers.models import Supplier

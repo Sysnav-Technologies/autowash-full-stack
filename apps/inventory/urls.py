@@ -11,7 +11,7 @@ urlpatterns = [
     path('items/', views.item_list_view, name='list'),
     path('items/create/', views.item_create_view, name='item_create'),
     path('items/<uuid:pk>/', views.item_detail_view, name='item_detail'),
-    # path('items/<uuid:pk>/edit/', views.item_edit_view, name='item_edit'),
+    path('items/<uuid:pk>/edit/', views.item_edit_view, name='item_edit'),
     
     # Stock Management
     path('stock/adjustments/', views.stock_adjustment_view, name='stock_adjustment'),

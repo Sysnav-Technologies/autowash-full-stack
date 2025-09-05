@@ -276,7 +276,17 @@ def item_create_view(request):
         if form.is_valid():
             item = form.save(commit=False)
             if not item.sku:
-                item.sku = generate_unique_code('ITM', 8)
+                # Generate unique SKU
+                import random
+                import string
+                while True:
+                    # Create SKU with format: ITM-XXXXXXXX
+                    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                    potential_sku = f"ITM-{random_part}"
+                    # Check if this SKU already exists
+                    if not InventoryItem.objects.filter(sku=potential_sku).exists():
+                        item.sku = potential_sku
+                        break
             item.created_by = request.user
             item.save()
             
@@ -302,6 +312,32 @@ def item_create_view(request):
     context = {
         'form': form,
         'title': 'Create Inventory Item',
+        'urls': get_inventory_urls(request),
+    }
+    return render(request, 'inventory/item_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def item_edit_view(request, pk):
+    """Edit inventory item"""
+    item = get_object_or_404(InventoryItem, pk=pk)
+    
+    if request.method == 'POST':
+        form = InventoryItemForm(request.POST, request.FILES, instance=item)
+        if form.is_valid():
+            updated_item = form.save(commit=False)
+            updated_item.updated_by = request.user
+            updated_item.save()
+            
+            messages.success(request, f'Inventory item "{updated_item.name}" updated successfully!')
+            return redirect(get_business_url(request, 'inventory:item_detail', pk=updated_item.pk))
+    else:
+        form = InventoryItemForm(instance=item)
+    
+    context = {
+        'form': form,
+        'item': item,
+        'title': f'Edit {item.name}',
         'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/item_form.html', context)
