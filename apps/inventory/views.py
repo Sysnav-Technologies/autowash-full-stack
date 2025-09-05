@@ -533,12 +533,124 @@ def category_create_view(request):
     else:
         form = InventoryCategoryForm()
     
+    # Color and icon options for the template
+    color_options = [
+        {'value': '#667eea', 'name': 'Blue', 'default': True},
+        {'value': '#764ba2', 'name': 'Purple'},
+        {'value': '#28a745', 'name': 'Green'},
+        {'value': '#dc3545', 'name': 'Red'},
+        {'value': '#ffc107', 'name': 'Yellow'},
+        {'value': '#17a2b8', 'name': 'Cyan'},
+        {'value': '#6f42c1', 'name': 'Indigo'},
+        {'value': '#e83e8c', 'name': 'Pink'},
+        {'value': '#fd7e14', 'name': 'Orange'},
+        {'value': '#20c997', 'name': 'Teal'},
+        {'value': '#6c757d', 'name': 'Gray'},
+        {'value': '#343a40', 'name': 'Dark'},
+    ]
+    
+    icon_options = [
+        {'class': 'fas fa-tag', 'name': 'Tag', 'default': True},
+        {'class': 'fas fa-box', 'name': 'Box'},
+        {'class': 'fas fa-tools', 'name': 'Tools'},
+        {'class': 'fas fa-car', 'name': 'Car'},
+        {'class': 'fas fa-tint', 'name': 'Liquid'},
+        {'class': 'fas fa-wrench', 'name': 'Wrench'},
+        {'class': 'fas fa-cog', 'name': 'Settings'},
+        {'class': 'fas fa-spray-can', 'name': 'Spray'},
+        {'class': 'fas fa-shopping-bag', 'name': 'Shopping'},
+        {'class': 'fas fa-cube', 'name': 'Cube'},
+        {'class': 'fas fa-boxes', 'name': 'Boxes'},
+        {'class': 'fas fa-industry', 'name': 'Industry'},
+    ]
+    
     context = {
         'form': form,
+        'color_options': color_options,
+        'icon_options': icon_options,
         'title': 'Create Category',
         'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/category_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_edit_view(request, pk):
+    """Edit inventory category"""
+    category = get_object_or_404(InventoryCategory, pk=pk)
+    
+    if request.method == 'POST':
+        form = InventoryCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            category = form.save()
+            messages.success(request, f'Category "{category.name}" updated successfully!')
+            return redirect(get_business_url(request, 'inventory:category_list'))
+    else:
+        form = InventoryCategoryForm(instance=category)
+    
+    # Color and icon options for the template
+    color_options = [
+        {'value': '#667eea', 'name': 'Blue', 'default': True},
+        {'value': '#764ba2', 'name': 'Purple'},
+        {'value': '#28a745', 'name': 'Green'},
+        {'value': '#dc3545', 'name': 'Red'},
+        {'value': '#ffc107', 'name': 'Yellow'},
+        {'value': '#17a2b8', 'name': 'Cyan'},
+        {'value': '#6f42c1', 'name': 'Indigo'},
+        {'value': '#e83e8c', 'name': 'Pink'},
+        {'value': '#fd7e14', 'name': 'Orange'},
+        {'value': '#20c997', 'name': 'Teal'},
+        {'value': '#6c757d', 'name': 'Gray'},
+        {'value': '#343a40', 'name': 'Dark'},
+    ]
+    
+    icon_options = [
+        {'class': 'fas fa-tag', 'name': 'Tag', 'default': True},
+        {'class': 'fas fa-box', 'name': 'Box'},
+        {'class': 'fas fa-tools', 'name': 'Tools'},
+        {'class': 'fas fa-car', 'name': 'Car'},
+        {'class': 'fas fa-tint', 'name': 'Liquid'},
+        {'class': 'fas fa-wrench', 'name': 'Wrench'},
+        {'class': 'fas fa-cog', 'name': 'Settings'},
+        {'class': 'fas fa-spray-can', 'name': 'Spray'},
+        {'class': 'fas fa-shopping-bag', 'name': 'Shopping'},
+        {'class': 'fas fa-cube', 'name': 'Cube'},
+        {'class': 'fas fa-boxes', 'name': 'Boxes'},
+        {'class': 'fas fa-industry', 'name': 'Industry'},
+    ]
+    
+    context = {
+        'form': form,
+        'category': category,
+        'color_options': color_options,
+        'icon_options': icon_options,
+        'title': f'Edit Category - {category.name}',
+        'urls': get_inventory_urls(request),
+    }
+    return render(request, 'inventory/category_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_delete_view(request, pk):
+    """Delete inventory category"""
+    category = get_object_or_404(InventoryCategory, pk=pk)
+    
+    if request.method == 'POST':
+        try:
+            # Check if category has items
+            items_count = category.inventory_items.count()
+            if items_count > 0:
+                messages.error(request, f'Cannot delete category "{category.name}" because it contains {items_count} items. Please move or delete the items first.')
+                return redirect(get_business_url(request, 'inventory:category_list'))
+            
+            category_name = category.name
+            category.delete()
+            messages.success(request, f'Category "{category_name}" deleted successfully!')
+            
+        except Exception as e:
+            messages.error(request, f'Error deleting category: {str(e)}')
+    
+    return redirect(get_business_url(request, 'inventory:category_list'))
 
 @login_required
 @employee_required()

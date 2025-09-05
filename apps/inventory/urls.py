@@ -35,7 +35,8 @@ urlpatterns = [
     # Categories
     path('categories/', views.category_list_view, name='category_list'),
     path('categories/create/', views.category_create_view, name='category_create'),
-    # path('categories/<uuid:pk>/edit/', views.category_edit_view, name='category_edit'),
+    path('categories/<uuid:pk>/edit/', views.category_edit_view, name='category_edit'),
+    path('categories/<uuid:pk>/delete/', views.category_delete_view, name='category_delete'),
     
     # Alerts
     path('alerts/', views.alerts_view, name='alerts'),
