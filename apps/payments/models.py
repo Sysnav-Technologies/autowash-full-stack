@@ -365,11 +365,40 @@ class Payment(TenantTimeStampedModel):
         self.send_payment_confirmation()
     
     def _process_inventory_deduction(self, user=None):
-        """Process inventory deduction for the first payment of an order"""
+        """
+        Process inventory deduction upon successful payment completion.
+        
+        Business Logic:
+        - ONLY for inventory-only orders: Deduct inventory at PAYMENT COMPLETION
+        - Service orders: Skip deduction (already deducted at order creation)
+        - This creates a dual flow system:
+          * Service orders (mixed): Inventory deducted at order creation
+          * Inventory-only orders: Inventory deducted at payment completion
+        """
         from apps.inventory.models import StockMovement
         import logging
         
         logger = logging.getLogger(__name__)
+        
+        # Check if this order contains services
+        if self.service_order.has_services:
+            logger.info(
+                f"Order {self.service_order.order_number} contains services. "
+                f"Skipping inventory deduction at payment - using old flow (deducted at order creation)."
+            )
+            return
+        
+        # For inventory-only orders, proceed with payment-time deduction
+        if not self.service_order.has_inventory_items:
+            logger.info(
+                f"Order {self.service_order.order_number} has no inventory items to deduct."
+            )
+            return
+        
+        logger.info(
+            f"Order {self.service_order.order_number} is inventory-only. "
+            f"Processing inventory deduction at payment completion."
+        )
         
         # Check if this is the first completed payment for this order
         completed_payments = Payment.objects.filter(
@@ -379,6 +408,9 @@ class Payment(TenantTimeStampedModel):
         
         if completed_payments:
             # Inventory has already been deducted by a previous payment
+            logger.info(
+                f"Inventory already deducted for order {self.service_order.order_number} by previous payment."
+            )
             return
         
         # Process inventory items in the order

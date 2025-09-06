@@ -697,8 +697,9 @@ def quick_order_view(request):
                                 assigned_to=getattr(request, 'employee', None)
                             )
                             
-                            # Note: Stock will be deducted when payment is processed
-                            # This allows for order cancellations without affecting stock
+                            # Note: Stock deduction timing depends on order type:
+                            # - Service orders: Deducted immediately after order creation (old flow)
+                            # - Inventory-only orders: Deducted when payment is completed (new flow)
                             
                             total_amount += (inventory_item.selling_price or inventory_item.unit_cost) * quantity
                             logger.info(f"Added inventory item: {inventory_item.name} x{quantity}")
@@ -714,6 +715,18 @@ def quick_order_view(request):
                 
                 # Check if this is an inventory-only order
                 is_inventory_only = order.is_inventory_only
+                
+                # Handle inventory deduction based on order type
+                # INVENTORY DEDUCTION LOGIC:
+                # 1. Service orders (mixed): Deduct inventory IMMEDIATELY at order creation
+                # 2. Inventory-only orders: Deduct inventory AT PAYMENT COMPLETION
+                if order.has_services and order.has_inventory_items:
+                    # Mixed order (services + inventory): Deduct inventory immediately (old flow)
+                    logger.info(f"Order {order.order_number} contains services. Deducting inventory immediately (old flow).")
+                    _process_order_inventory_deduction(order, request.user)
+                elif is_inventory_only:
+                    # Inventory-only order: Deduct on payment completion (new flow)
+                    logger.info(f"Inventory-only order {order.order_number} created, inventory will be deducted on payment completion")
                 
                 # For inventory-only orders, we can proceed directly to payment
                 if is_inventory_only:
@@ -860,6 +873,179 @@ def quick_order_view(request):
         'title': 'Quick Order (Walk-in Customer)'
     }
     return render(request, 'services/quick_order.html', context)
+
+"""
+INVENTORY DEDUCTION FLOW DOCUMENTATION
+
+The system implements a dual inventory deduction flow based on order type:
+
+1. SERVICE ORDERS (Mixed - contains both services and inventory):
+   - TIMING: Inventory deducted IMMEDIATELY at ORDER CREATION
+   - LOCATION: _process_order_inventory_deduction() function
+   - REASON: Maintains old flow where inventory is reserved upfront for service work
+   - CANCELLATION: Inventory restored via _restore_order_inventory()
+
+2. INVENTORY-ONLY ORDERS (No services, only inventory items):
+   - TIMING: Inventory deducted AT PAYMENT COMPLETION
+   - LOCATION: Payment._process_inventory_deduction() method
+   - REASON: Customer must pay first before receiving inventory items
+   - CANCELLATION: Inventory restored only if payment was completed
+
+3. CANCELLATION HANDLING:
+   - Service orders: Always restore inventory (was deducted at creation)
+   - Inventory-only: Restore only if payment was completed
+   - Restoration creates stock movement records for audit trail
+
+This dual flow ensures:
+- Service customers can start service immediately (old behavior preserved)
+- Inventory-only customers must pay first (new requirement)
+- Proper inventory tracking and restoration on cancellations
+"""
+
+def _process_order_inventory_deduction(order, user=None):
+    """
+    Process immediate inventory deduction for orders containing services (old flow).
+    
+    Business Logic:
+    - Called ONLY for service orders (mixed orders with services + inventory)
+    - Deducts inventory immediately at ORDER CREATION (before payment)
+    - This maintains the old flow for service orders where inventory is deducted upfront
+    - Inventory-only orders use payment-time deduction (handled in Payment model)
+    """
+    from apps.inventory.models import StockMovement
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Process inventory items in the order
+    inventory_items = order.order_items.filter(inventory_item__isnull=False)
+    
+    if not inventory_items.exists():
+        logger.info(f"No inventory items to deduct for order {order.order_number}")
+        return
+    
+    logger.info(f"Processing immediate inventory deduction for order {order.order_number} (service-containing order)")
+    
+    for order_item in inventory_items:
+        try:
+            inventory_item = order_item.inventory_item
+            quantity = order_item.quantity
+            
+            # Check if we have enough stock
+            if inventory_item.current_stock < quantity:
+                logger.warning(
+                    f"Insufficient stock for {inventory_item.name}. "
+                    f"Available: {inventory_item.current_stock}, Required: {quantity}"
+                )
+                # Adjust quantity to available stock
+                quantity = inventory_item.current_stock
+                order_item.quantity = quantity
+                order_item.save()
+            
+            # Deduct from inventory stock
+            old_stock = inventory_item.current_stock
+            inventory_item.current_stock -= quantity
+            inventory_item.save()
+            
+            # Create stock movement record
+            StockMovement.objects.create(
+                item=inventory_item,
+                movement_type='out',
+                quantity=quantity,
+                unit_cost=inventory_item.unit_cost,
+                old_stock=old_stock,
+                new_stock=inventory_item.current_stock,
+                reference_type='sale',
+                reference_number=order.order_number,
+                service_order=order,
+                reason=f'Sold in order {order.order_number} - Service order (immediate deduction)',
+                created_by_user_id=user.id if user else None
+            )
+            
+            logger.info(
+                f"Deducted {quantity} of {inventory_item.name} from stock immediately. "
+                f"New stock: {inventory_item.current_stock}"
+            )
+            
+        except Exception as e:
+            logger.error(
+                f"Error processing inventory deduction for item {order_item.id}: {str(e)}"
+            )
+
+def _restore_order_inventory(order, user=None, reason="Order cancelled"):
+    """
+    Restore inventory items when an order is cancelled.
+    
+    Business Logic:
+    - Service orders (mixed): Inventory was deducted at order creation, restore it
+    - Inventory-only orders: Only restore if payment was completed (inventory was deducted)
+    """
+    from apps.inventory.models import StockMovement
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Get inventory items from the order
+    inventory_items = order.order_items.filter(inventory_item__isnull=False)
+    
+    if not inventory_items.exists():
+        logger.info(f"No inventory items to restore for order {order.order_number}")
+        return
+    
+    # Check if we need to restore inventory
+    should_restore = False
+    
+    if order.has_services:
+        # Service orders: inventory was deducted at order creation, always restore
+        should_restore = True
+        logger.info(f"Service order {order.order_number} - restoring inventory (was deducted at order creation)")
+    elif order.is_inventory_only:
+        # Inventory-only orders: only restore if payment was completed
+        completed_payments = order.payments.filter(status='completed').exists()
+        if completed_payments:
+            should_restore = True
+            logger.info(f"Inventory-only order {order.order_number} - restoring inventory (payment was completed)")
+        else:
+            logger.info(f"Inventory-only order {order.order_number} - no payment completed, no inventory to restore")
+    
+    if not should_restore:
+        return
+    
+    # Restore inventory for each item
+    for order_item in inventory_items:
+        try:
+            inventory_item = order_item.inventory_item
+            quantity = order_item.quantity
+            
+            # Restore inventory stock
+            old_stock = inventory_item.current_stock
+            inventory_item.current_stock += quantity
+            inventory_item.save()
+            
+            # Create stock movement record for the restoration
+            StockMovement.objects.create(
+                item=inventory_item,
+                movement_type='in',
+                quantity=quantity,
+                unit_cost=inventory_item.unit_cost,
+                old_stock=old_stock,
+                new_stock=inventory_item.current_stock,
+                reference_type='cancellation',
+                reference_number=order.order_number,
+                service_order=order,
+                reason=f'Restored from cancelled order {order.order_number} - {reason}',
+                created_by_user_id=user.id if user else None
+            )
+            
+            logger.info(
+                f"Restored {quantity} of {inventory_item.name} to stock. "
+                f"New stock: {inventory_item.current_stock}"
+            )
+            
+        except Exception as e:
+            logger.error(
+                f"Error restoring inventory for item {order_item.id}: {str(e)}"
+            )
 
 def add_order_to_queue(order):
     """Add order to service queue"""
@@ -1372,7 +1558,7 @@ def category_edit_view(request, pk):
 @employee_required()
 @require_POST
 def cancel_service(request, order_id):
-    """Cancel service order"""
+    """Cancel service order and restore inventory if needed"""
     order = get_object_or_404(ServiceOrder, id=order_id)
     
     if not order.can_be_cancelled:
@@ -1380,6 +1566,9 @@ def cancel_service(request, order_id):
         return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     cancellation_reason = request.POST.get('reason', '')
+    
+    # Restore inventory before cancelling the order
+    _restore_order_inventory(order, request.user, cancellation_reason)
     
     order.status = 'cancelled'
     order.internal_notes += f"\nCancelled by {request.employee.full_name}: {cancellation_reason}"
@@ -2255,7 +2444,7 @@ def order_print_view(request, pk):
 @employee_required()
 @require_POST
 def cancel_service(request, order_id):
-    """Cancel service order"""
+    """Cancel service order and restore inventory if needed"""
     order = get_object_or_404(ServiceOrder, id=order_id)
     
     if not order.can_be_cancelled:
@@ -2263,6 +2452,9 @@ def cancel_service(request, order_id):
         return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     cancellation_reason = request.POST.get('reason', '')
+    
+    # Restore inventory before cancelling the order
+    _restore_order_inventory(order, request.user, cancellation_reason)
     
     order.status = 'cancelled'
     order.internal_notes += f"\nCancelled by {request.employee.full_name}: {cancellation_reason}"
