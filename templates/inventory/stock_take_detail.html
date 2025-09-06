@@ -1,0 +1,872 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load humanize %}
+{% load inventory_filters %}
+
+{% block title %}{{ stock_take.name }} - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+<style>
+    .stock-take-detail-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #6f42c1 0%, #6610f2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 25px rgba(111, 66, 193, 0.3);
+    }
+    
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-pending {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffc107;
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+    
+    .status-in_progress {
+        background: rgba(255, 255, 255, 0.2);
+        color: #17a2b8;
+        border: 1px solid rgba(23, 162, 184, 0.3);
+    }
+    
+    .status-completed {
+        background: rgba(255, 255, 255, 0.2);
+        color: #28a745;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+    
+    .status-cancelled {
+        background: rgba(255, 255, 255, 0.2);
+        color: #6c757d;
+        border: 1px solid rgba(108, 117, 125, 0.3);
+    }
+    
+    .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .overview-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .overview-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--accent-color, #6f42c1);
+    }
+    
+    .overview-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    }
+    
+    .overview-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 15px;
+        font-size: 1.5rem;
+        color: white;
+        background: var(--accent-color, #6f42c1);
+    }
+    
+    .overview-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    
+    .overview-label {
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.9rem;
+    }
+    
+    .progress-section {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .progress-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .progress-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .progress-percentage {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #6f42c1;
+    }
+    
+    .progress-bar-container {
+        height: 12px;
+        background: #e9ecef;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 15px;
+    }
+    
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #6f42c1, #6610f2);
+        transition: width 0.8s ease-in-out;
+        border-radius: 6px;
+    }
+    
+    .progress-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .progress-stat {
+        text-align: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .progress-stat-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .progress-stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-weight: 500;
+    }
+    
+    .items-section {
+        background: white;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        margin-bottom: 30px;
+    }
+    
+    .section-header {
+        background: #f8f9fa;
+        padding: 20px 30px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: between;
+        align-items: center;
+    }
+    
+    .section-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #333;
+        margin: 0;
+    }
+    
+    .items-filter {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .filter-select {
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        background: white;
+    }
+    
+    .items-table {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .items-table th {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 1px solid #dee2e6;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .items-table td {
+        padding: 15px 20px;
+        border-bottom: 1px solid #f1f3f4;
+        vertical-align: middle;
+    }
+    
+    .items-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .item-image {
+        width: 50px;
+        height: 50px;
+        border-radius: 8px;
+        object-fit: cover;
+        border: 2px solid #e9ecef;
+    }
+    
+    .item-name {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 3px;
+    }
+    
+    .item-sku {
+        font-size: 0.85rem;
+        color: #6c757d;
+        font-family: 'Courier New', monospace;
+    }
+    
+    .stock-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .current-stock {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .counted-stock {
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+    
+    .counted-stock.pending {
+        color: #6c757d;
+    }
+    
+    .counted-stock.counted {
+        color: #28a745;
+    }
+    
+    .discrepancy {
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    
+    .discrepancy.positive {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+    
+    .discrepancy.negative {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+    
+    .discrepancy.none {
+        background: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+    
+    .count-input {
+        width: 80px;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        text-align: center;
+        font-weight: 600;
+    }
+    
+    .count-input:focus {
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.25);
+    }
+    
+    .item-actions {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .btn-sm-action {
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-success-sm {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-success-sm:hover {
+        background: #218838;
+        color: white;
+    }
+    
+    .btn-outline-sm {
+        background: transparent;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+    }
+    
+    .btn-outline-sm:hover {
+        background: #f8f9fa;
+        color: #495057;
+    }
+    
+    .actions-section {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        text-align: center;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .btn-action {
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+    
+    .btn-primary-action {
+        background: #6f42c1;
+        color: white;
+    }
+    
+    .btn-primary-action:hover {
+        background: #6610f2;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .btn-success-action {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-success-action:hover {
+        background: #218838;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .btn-outline-action {
+        background: transparent;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+    }
+    
+    .btn-outline-action:hover {
+        background: #f8f9fa;
+        color: #495057;
+        border-color: #adb5bd;
+    }
+    
+    .alert {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 25px;
+        border: none;
+    }
+    
+    .alert-info {
+        background: rgba(23, 162, 184, 0.1);
+        color: #0c5460;
+        border-left: 4px solid #17a2b8;
+    }
+    
+    .alert-warning {
+        background: rgba(255, 193, 7, 0.1);
+        color: #856404;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .alert-success {
+        background: rgba(40, 167, 69, 0.1);
+        color: #155724;
+        border-left: 4px solid #28a745;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6c757d;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 20px;
+        opacity: 0.3;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid stock-take-detail-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h2>{{ stock_take.name }}</h2>
+                <p class="mb-3">{{ stock_take.description|default:"Stock take details and counting progress" }}</p>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="status-indicator status-{{ stock_take.status }}">
+                        {% if stock_take.status == 'pending' %}
+                            <i class="fas fa-clock"></i>
+                        {% elif stock_take.status == 'in_progress' %}
+                            <i class="fas fa-tasks"></i>
+                        {% elif stock_take.status == 'completed' %}
+                            <i class="fas fa-check-circle"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle"></i>
+                        {% endif %}
+                        {{ stock_take.get_status_display }}
+                    </span>
+                    <span class="text-light">
+                        Created {{ stock_take.created_at|date:"M d, Y" }}
+                        by {{ stock_take.created_by.get_full_name|default:stock_take.created_by.username }}
+                    </span>
+                </div>
+            </div>
+            <div>
+                <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/" class="btn btn-light">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to List
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="overview-grid">
+        <div class="overview-card">
+            <div class="overview-icon" style="background-color: #6f42c1;">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <div class="overview-value">{{ stock_take.total_items|default:0 }}</div>
+            <div class="overview-label">Total Items</div>
+        </div>
+        <div class="overview-card">
+            <div class="overview-icon" style="background-color: #28a745;">
+                <i class="fas fa-check"></i>
+            </div>
+            <div class="overview-value">{{ stock_take.counted_items|default:0 }}</div>
+            <div class="overview-label">Counted</div>
+        </div>
+        <div class="overview-card">
+            <div class="overview-icon" style="background-color: #ffc107;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="overview-value">{{ stock_take.discrepancies|default:0 }}</div>
+            <div class="overview-label">Discrepancies</div>
+        </div>
+        <div class="overview-card">
+            <div class="overview-icon" style="background-color: #17a2b8;">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="overview-value">{{ stock_take.progress_percent|default:0 }}%</div>
+            <div class="overview-label">Progress</div>
+        </div>
+    </div>
+
+    <!-- Progress Section -->
+    {% if stock_take.status == 'in_progress' %}
+    <div class="progress-section">
+        <div class="progress-header">
+            <h3 class="progress-title">Counting Progress</h3>
+            <div class="progress-percentage">{{ stock_take.progress_percent|default:0 }}%</div>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: {{ stock_take.progress_percent|default:0 }}%"></div>
+        </div>
+        <div class="progress-stats">
+            <div class="progress-stat">
+                <div class="progress-stat-value">{{ stock_take.counted_items|default:0 }}</div>
+                <div class="progress-stat-label">Counted</div>
+            </div>
+            <div class="progress-stat">
+                <div class="progress-stat-value">{{ stock_take.pending_items|default:0 }}</div>
+                <div class="progress-stat-label">Remaining</div>
+            </div>
+            <div class="progress-stat">
+                <div class="progress-stat-value">{{ stock_take.discrepancies|default:0 }}</div>
+                <div class="progress-stat-label">Discrepancies</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Items Section -->
+    {% if stock_take_items %}
+    <div class="items-section">
+        <div class="section-header">
+            <h3 class="section-title">Items to Count</h3>
+            <div class="items-filter">
+                <label for="statusFilter" class="form-label me-2">Filter:</label>
+                <select id="statusFilter" class="filter-select">
+                    <option value="">All Items</option>
+                    <option value="pending">Pending Count</option>
+                    <option value="counted">Counted</option>
+                    <option value="discrepancy">With Discrepancies</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Current Stock</th>
+                        <th>Counted Stock</th>
+                        <th>Discrepancy</th>
+                        {% if stock_take.status == 'in_progress' %}
+                        <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stock_take_items %}
+                    <tr data-status="{% if item.counted_quantity is not None %}counted{% else %}pending{% endif %}{% if item.has_discrepancy %} discrepancy{% endif %}">
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                {% if item.inventory_item.image %}
+                                <img src="{{ item.inventory_item.image.url }}" alt="{{ item.inventory_item.name }}" class="item-image">
+                                {% else %}
+                                <div class="item-image bg-light d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-box text-muted"></i>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <div class="item-name">{{ item.inventory_item.name }}</div>
+                                    <div class="item-sku">{{ item.inventory_item.sku }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="stock-info">
+                                <div class="current-stock">{{ item.expected_quantity|floatformat:0 }}</div>
+                                <small class="text-muted">{{ item.inventory_item.unit.name }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            {% if item.counted_quantity is not None %}
+                            <div class="counted-stock counted">{{ item.counted_quantity|floatformat:0 }}</div>
+                            {% else %}
+                            {% if stock_take.status == 'in_progress' %}
+                            <input type="number" class="count-input" 
+                                   data-item-id="{{ item.id }}" 
+                                   placeholder="0" 
+                                   min="0" 
+                                   step="1">
+                            {% else %}
+                            <div class="counted-stock pending">—</div>
+                            {% endif %}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.counted_quantity is not None %}
+                                {% with discrepancy=item.counted_quantity|subtract:item.expected_quantity %}
+                                {% if discrepancy > 0 %}
+                                <span class="discrepancy positive">+{{ discrepancy|floatformat:0 }}</span>
+                                {% elif discrepancy < 0 %}
+                                <span class="discrepancy negative">{{ discrepancy|floatformat:0 }}</span>
+                                {% else %}
+                                <span class="discrepancy none">0</span>
+                                {% endif %}
+                                {% endwith %}
+                            {% else %}
+                            <span class="discrepancy none">—</span>
+                            {% endif %}
+                        </td>
+                        {% if stock_take.status == 'in_progress' %}
+                        <td>
+                            <div class="item-actions">
+                                {% if item.counted_quantity is None %}
+                                <button class="btn-sm-action btn-success-sm" onclick="saveCount({{ item.id }})">
+                                    <i class="fas fa-check"></i>
+                                    Save
+                                </button>
+                                {% else %}
+                                <button class="btn-sm-action btn-outline-sm" onclick="editCount({{ item.id }}, {{ item.counted_quantity }})">
+                                    <i class="fas fa-edit"></i>
+                                    Edit
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Actions Section -->
+    <div class="actions-section">
+        {% if stock_take.status == 'pending' %}
+        <div class="alert alert-info">
+            <strong>Ready to start counting!</strong> Click "Start Stock Take" to begin the counting process.
+        </div>
+        <div class="action-buttons">
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/start/" 
+               class="btn-action btn-success-action">
+                <i class="fas fa-play"></i>
+                Start Stock Take
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/edit/" 
+               class="btn-action btn-outline-action">
+                <i class="fas fa-edit"></i>
+                Edit Details
+            </a>
+        </div>
+        
+        {% elif stock_take.status == 'in_progress' %}
+        <div class="alert alert-warning">
+            <strong>Stock take in progress.</strong> Continue counting items or complete the stock take when ready.
+        </div>
+        <div class="action-buttons">
+            {% if stock_take.can_complete %}
+            <button onclick="completeStockTake()" class="btn-action btn-success-action">
+                <i class="fas fa-check"></i>
+                Complete Stock Take
+            </button>
+            {% endif %}
+            <button onclick="pauseStockTake()" class="btn-action btn-outline-action">
+                <i class="fas fa-pause"></i>
+                Pause & Save Progress
+            </button>
+        </div>
+        
+        {% elif stock_take.status == 'completed' %}
+        <div class="alert alert-success">
+            <strong>Stock take completed!</strong> 
+            Completed on {{ stock_take.completed_at|date:"M d, Y \a\\t g:i A" }}.
+        </div>
+        <div class="action-buttons">
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/report/" 
+               class="btn-action btn-primary-action">
+                <i class="fas fa-file-alt"></i>
+                View Report
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/export/" 
+               class="btn-action btn-outline-action">
+                <i class="fas fa-download"></i>
+                Export Results
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Filter functionality
+document.getElementById('statusFilter').addEventListener('change', function() {
+    const filterValue = this.value;
+    const rows = document.querySelectorAll('.items-table tbody tr');
+    
+    rows.forEach(row => {
+        if (filterValue === '') {
+            row.style.display = '';
+        } else {
+            const hasClass = row.dataset.status.includes(filterValue);
+            row.style.display = hasClass ? '' : 'none';
+        }
+    });
+});
+
+// Save count functionality
+function saveCount(itemId) {
+    const input = document.querySelector(`input[data-item-id="${itemId}"]`);
+    const countedQuantity = parseFloat(input.value) || 0;
+    
+    if (countedQuantity < 0) {
+        alert('Quantity cannot be negative');
+        return;
+    }
+    
+    // AJAX call to save count
+    fetch('/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/save-count/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            item_id: itemId,
+            counted_quantity: countedQuantity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Refresh to show updated data
+        } else {
+            alert('Error saving count: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving count');
+    });
+}
+
+// Edit count functionality
+function editCount(itemId, currentQuantity) {
+    const row = document.querySelector(`tr:has(input[data-item-id="${itemId}"])`);
+    const countedCell = row.querySelector('td:nth-child(3)');
+    
+    countedCell.innerHTML = `
+        <input type="number" class="count-input" 
+               data-item-id="${itemId}" 
+               value="${currentQuantity}" 
+               min="0" 
+               step="1">
+    `;
+    
+    const actionsCell = row.querySelector('td:nth-child(5)');
+    actionsCell.innerHTML = `
+        <div class="item-actions">
+            <button class="btn-sm-action btn-success-sm" onclick="saveCount(${itemId})">
+                <i class="fas fa-check"></i>
+                Save
+            </button>
+        </div>
+    `;
+}
+
+// Complete stock take
+function completeStockTake() {
+    if (confirm('Complete this stock take? This will finalize all counts and cannot be undone.')) {
+        window.location.href = '/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/complete/';
+    }
+}
+
+// Pause stock take
+function pauseStockTake() {
+    // Save any pending changes first
+    const unsavedInputs = document.querySelectorAll('.count-input:not([readonly])');
+    if (unsavedInputs.length > 0) {
+        if (confirm('You have unsaved counts. Save them before pausing?')) {
+            // Save all pending counts
+            unsavedInputs.forEach(input => {
+                const itemId = input.dataset.itemId;
+                if (input.value) {
+                    saveCount(itemId);
+                }
+            });
+        }
+    }
+    
+    alert('Progress saved! You can continue this stock take later.');
+}
+
+// Animate progress bar on load
+document.addEventListener('DOMContentLoaded', function() {
+    const progressBar = document.querySelector('.progress-bar-fill');
+    if (progressBar) {
+        const width = progressBar.style.width;
+        progressBar.style.width = '0%';
+        setTimeout(() => {
+            progressBar.style.width = width;
+        }, 500);
+    }
+    
+    // Animate overview values
+    const overviewValues = document.querySelectorAll('.overview-value');
+    overviewValues.forEach(value => {
+        const finalValue = parseInt(value.textContent);
+        if (finalValue > 0) {
+            let currentValue = 0;
+            const increment = Math.ceil(finalValue / 20);
+            const timer = setInterval(() => {
+                currentValue += increment;
+                if (currentValue >= finalValue) {
+                    currentValue = finalValue;
+                    clearInterval(timer);
+                }
+                value.textContent = currentValue;
+            }, 50);
+        }
+    });
+});
+</script>
+{% endblock %}

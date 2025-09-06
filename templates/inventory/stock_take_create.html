@@ -1,0 +1,487 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load inventory_filters %}
+
+{% block title %}Create Stock Take - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+<style>
+    .stock-take-create-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #6f42c1 0%, #6610f2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 25px rgba(111, 66, 193, 0.3);
+    }
+    
+    .page-header h2 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 2rem;
+    }
+    
+    .page-header p {
+        margin: 10px 0 0;
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+    
+    .form-container {
+        background: white;
+        border-radius: 15px;
+        padding: 40px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .form-section {
+        margin-bottom: 40px;
+    }
+    
+    .form-section:last-child {
+        margin-bottom: 0;
+    }
+    
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 20px;
+        color: #333;
+        border-bottom: 2px solid #6f42c1;
+        padding-bottom: 10px;
+    }
+    
+    .form-group {
+        margin-bottom: 25px;
+    }
+    
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 8px;
+    }
+    
+    .form-control {
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        padding: 12px 16px;
+        transition: all 0.3s ease;
+        font-size: 1rem;
+    }
+    
+    .form-control:focus {
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.25);
+    }
+    
+    .form-select {
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        padding: 12px 16px;
+        transition: all 0.3s ease;
+        background-position: right 1rem center;
+    }
+    
+    .form-select:focus {
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.25);
+    }
+    
+    .form-check {
+        padding: 15px;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        background: #f8f9fa;
+        margin-bottom: 15px;
+        transition: all 0.3s ease;
+    }
+    
+    .form-check:hover {
+        background: #f1f3f4;
+    }
+    
+    .form-check-input:checked {
+        background-color: #6f42c1;
+        border-color: #6f42c1;
+    }
+    
+    .form-check-label {
+        font-weight: 500;
+        margin-left: 10px;
+    }
+    
+    .category-selection {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .category-card {
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        background: white;
+    }
+    
+    .category-card:hover {
+        border-color: #6f42c1;
+        box-shadow: 0 4px 15px rgba(111, 66, 193, 0.15);
+    }
+    
+    .category-card.selected {
+        border-color: #6f42c1;
+        background: rgba(111, 66, 193, 0.05);
+    }
+    
+    .category-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 15px;
+        font-size: 1.5rem;
+        color: white;
+        background: #6f42c1;
+    }
+    
+    .category-name {
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    
+    .category-items {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .btn-group-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 40px;
+        padding-top: 30px;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .btn-action {
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+    
+    .btn-primary-action {
+        background: #6f42c1;
+        color: white;
+    }
+    
+    .btn-primary-action:hover {
+        background: #6610f2;
+        transform: translateY(-2px);
+    }
+    
+    .btn-outline-action {
+        background: transparent;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+    }
+    
+    .btn-outline-action:hover {
+        background: #f8f9fa;
+        color: #495057;
+        border-color: #adb5bd;
+    }
+    
+    .help-text {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-top: 8px;
+        font-style: italic;
+    }
+    
+    .alert {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 25px;
+        border: none;
+    }
+    
+    .alert-info {
+        background: rgba(23, 162, 184, 0.1);
+        color: #0c5460;
+        border-left: 4px solid #17a2b8;
+    }
+    
+    .alert-warning {
+        background: rgba(255, 193, 7, 0.1);
+        color: #856404;
+        border-left: 4px solid #ffc107;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid stock-take-create-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h2>Create New Stock Take</h2>
+        <p>Set up a new inventory counting session</p>
+    </div>
+
+    <div class="form-container">
+        <form method="post" id="stockTakeForm">
+            {% csrf_token %}
+            
+            <!-- Basic Information -->
+            <div class="form-section">
+                <h3 class="section-title">Basic Information</h3>
+                
+                <div class="form-group">
+                    <label for="{{ form.name.id_for_label }}" class="form-label">
+                        Stock Take Name <span class="text-danger">*</span>
+                    </label>
+                    {{ form.name|add_class:"form-control" }}
+                    {% if form.name.help_text %}
+                    <div class="help-text">{{ form.name.help_text }}</div>
+                    {% endif %}
+                    {% if form.name.errors %}
+                    <div class="text-danger mt-1">{{ form.name.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                    {{ form.description|add_class:"form-control" }}
+                    {% if form.description.help_text %}
+                    <div class="help-text">{{ form.description.help_text }}</div>
+                    {% endif %}
+                    {% if form.description.errors %}
+                    <div class="text-danger mt-1">{{ form.description.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.scheduled_date.id_for_label }}" class="form-label">Scheduled Date</label>
+                            {{ form.scheduled_date|add_class:"form-control" }}
+                            {% if form.scheduled_date.help_text %}
+                            <div class="help-text">{{ form.scheduled_date.help_text }}</div>
+                            {% endif %}
+                            {% if form.scheduled_date.errors %}
+                            <div class="text-danger mt-1">{{ form.scheduled_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.type.id_for_label }}" class="form-label">
+                                Stock Take Type <span class="text-danger">*</span>
+                            </label>
+                            {{ form.type|add_class:"form-select" }}
+                            {% if form.type.help_text %}
+                            <div class="help-text">{{ form.type.help_text }}</div>
+                            {% endif %}
+                            {% if form.type.errors %}
+                            <div class="text-danger mt-1">{{ form.type.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scope Selection -->
+            <div class="form-section">
+                <h3 class="section-title">What to Count</h3>
+                
+                <div class="alert alert-info">
+                    <strong>Choose your counting scope:</strong> You can count all inventory items, or select specific categories to focus on.
+                </div>
+                
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="scope" id="scope_all" value="all" checked>
+                    <label class="form-check-label" for="scope_all">
+                        <strong>All Inventory Items</strong>
+                        <div class="help-text">Count all items in your inventory</div>
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="scope" id="scope_categories" value="categories">
+                    <label class="form-check-label" for="scope_categories">
+                        <strong>Selected Categories Only</strong>
+                        <div class="help-text">Choose specific categories to count</div>
+                    </label>
+                </div>
+                
+                <!-- Category Selection -->
+                <div id="categorySelection" class="category-selection" style="display: none;">
+                    {% for category in categories %}
+                    <div class="category-card" data-category-id="{{ category.id }}">
+                        <div class="category-icon">
+                            <i class="{{ category.icon|default:'fas fa-box' }}"></i>
+                        </div>
+                        <div class="category-name">{{ category.name }}</div>
+                        <div class="category-items">{{ category.item_count }} items</div>
+                        <input type="checkbox" name="categories" value="{{ category.id }}" class="d-none category-checkbox">
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                {% if not categories %}
+                <div class="alert alert-warning mt-3">
+                    <strong>No categories found!</strong> 
+                    <a href="/business/{{ request.tenant.slug }}/inventory/categories/create/">Create categories</a> first to organize your inventory items.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Options -->
+            <div class="form-section">
+                <h3 class="section-title">Options</h3>
+                
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="include_zero_stock" id="include_zero_stock" checked>
+                    <label class="form-check-label" for="include_zero_stock">
+                        <strong>Include Zero Stock Items</strong>
+                        <div class="help-text">Count items that currently show zero stock quantity</div>
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="auto_adjust" id="auto_adjust">
+                    <label class="form-check-label" for="auto_adjust">
+                        <strong>Auto-Adjust Stock Levels</strong>
+                        <div class="help-text">Automatically adjust stock levels after completing the count</div>
+                    </label>
+                </div>
+                
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notify_on_complete" id="notify_on_complete" checked>
+                    <label class="form-check-label" for="notify_on_complete">
+                        <strong>Notify When Complete</strong>
+                        <div class="help-text">Send notification when stock take is completed</div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="btn-group-actions">
+                <button type="submit" class="btn-action btn-primary-action">
+                    <i class="fas fa-check"></i>
+                    Create Stock Take
+                </button>
+                <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/" class="btn-action btn-outline-action">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle scope selection
+    const scopeRadios = document.querySelectorAll('input[name="scope"]');
+    const categorySelection = document.getElementById('categorySelection');
+    const categoryCards = document.querySelectorAll('.category-card');
+    const categoryCheckboxes = document.querySelectorAll('.category-checkbox');
+    
+    // Toggle category selection visibility
+    scopeRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'categories') {
+                categorySelection.style.display = 'grid';
+            } else {
+                categorySelection.style.display = 'none';
+                // Uncheck all categories
+                categoryCheckboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                categoryCards.forEach(card => {
+                    card.classList.remove('selected');
+                });
+            }
+        });
+    });
+    
+    // Handle category card selection
+    categoryCards.forEach(card => {
+        card.addEventListener('click', function() {
+            const categoryId = this.dataset.categoryId;
+            const checkbox = this.querySelector('.category-checkbox');
+            
+            checkbox.checked = !checkbox.checked;
+            this.classList.toggle('selected', checkbox.checked);
+        });
+    });
+    
+    // Generate stock take name based on current date
+    const nameInput = document.getElementById('id_name');
+    if (!nameInput.value) {
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        nameInput.value = `Stock Take - ${dateStr}`;
+    }
+    
+    // Set default scheduled date to today
+    const scheduledDateInput = document.getElementById('id_scheduled_date');
+    if (!scheduledDateInput.value) {
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        scheduledDateInput.value = dateStr;
+    }
+    
+    // Form validation
+    const form = document.getElementById('stockTakeForm');
+    form.addEventListener('submit', function(e) {
+        const scopeCategories = document.getElementById('scope_categories');
+        
+        if (scopeCategories.checked) {
+            const selectedCategories = document.querySelectorAll('.category-checkbox:checked');
+            if (selectedCategories.length === 0) {
+                e.preventDefault();
+                alert('Please select at least one category to count.');
+                return false;
+            }
+        }
+        
+        // Show loading state
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    });
+    
+    // Auto-resize textarea
+    const descriptionTextarea = document.getElementById('id_description');
+    if (descriptionTextarea) {
+        descriptionTextarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+    }
+});
+</script>
+{% endblock %}

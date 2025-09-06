@@ -1,0 +1,111 @@
+{% extends "base/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if unit %}Edit Unit{% else %}Add Unit{% endif %} | {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 10px 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .form-container {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+    
+    .form-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.5rem;
+    }
+    
+    .form-body {
+        padding: 2rem;
+    }
+    
+    .form-actions {
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+        padding: 1.5rem;
+        text-align: right;
+    }
+    
+    .purchase-order-link {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1.5rem;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="mb-0">
+                    <i class="fas fa-ruler-horizontal me-2"></i>
+                    {% if unit %}Edit Unit{% else %}Add New Unit{% endif %}
+                </h1>
+            </div>
+            <div class="col-auto">
+                <a href="/business/{{ request.tenant.slug }}/inventory/units/" class="btn btn-light">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    Back to Units
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="form-container">
+                <div class="form-header">
+                    <h3 class="mb-0">Unit Information</h3>
+                </div>
+
+                <div class="form-body">
+                    <form method="post" id="unit-form">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+
+                        <div class="purchase-order-link">
+                            <i class="fas fa-shopping-cart me-2"></i>
+                            <strong>Need to order items for this unit?</strong>
+                            <br>
+                            <a href="/business/{{ request.tenant.slug }}/suppliers/orders/create/?unit={{ unit.id|default:'' }}" 
+                               class="btn btn-outline-warning btn-sm mt-2">
+                                <i class="fas fa-cart-plus me-1"></i>
+                                Create Purchase Order
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="form-actions">
+                    <a href="/business/{{ request.tenant.slug }}/inventory/units/" class="btn btn-outline-secondary me-2">
+                        Cancel
+                    </a>
+                    <button type="submit" form="unit-form" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>
+                        {% if unit %}Update Unit{% else %}Create Unit{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

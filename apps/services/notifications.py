@@ -43,7 +43,12 @@ def send_service_notification_email(order, notification_type, attendant_name=Non
             'tenant': tenant,
             'notification_type': notification_type,
             'attendant_name': attendant_name or (order.assigned_attendant.full_name if order.assigned_attendant else 'Our Team'),
-            'order_items': order.order_items.all().select_related('service'),
+            'order_items': order.order_items.all().select_related('service', 'inventory_item'),
+            'service_items': order.service_items,
+            'inventory_items': order.inventory_items,
+            'has_services': order.has_services,
+            'has_inventory_items': order.has_inventory_items,
+            'is_inventory_only': order.is_inventory_only,
             'business_name': tenant.name if tenant else 'Autowash Service',
             'business_phone': getattr(tenant, 'phone', ''),
             'business_email': getattr(tenant, 'email', ''),
@@ -55,24 +60,35 @@ def send_service_notification_email(order, notification_type, attendant_name=Non
         logger.info(f"Business name in context: {context['business_name']}")
         
         # Determine subject and template based on notification type
+        if order.is_inventory_only:
+            order_type = "Purchase"
+        else:
+            order_type = "Service" if order.has_services else "Order"
+            
         if notification_type == 'started':
-            subject = f'Service Started - Order {order.order_number}'
+            if order.is_inventory_only:
+                subject = f'Purchase Ready for Pickup - Order {order.order_number}'
+            else:
+                subject = f'Service Started - Order {order.order_number}'
             html_template = 'emails/service_notification.html'
             text_template = 'emails/service_notification.txt'
         elif notification_type == 'completed':
-            subject = f'Service Completed - Order {order.order_number}'
+            if order.is_inventory_only:
+                subject = f'Items Ready for Pickup - Order {order.order_number}'
+            else:
+                subject = f'Service Completed - Order {order.order_number}'
             html_template = 'emails/service_notification.html'
             text_template = 'emails/service_notification.txt'
         elif notification_type == 'reminder':
-            subject = f'Service Reminder - Order {order.order_number}'
+            subject = f'{order_type} Reminder - Order {order.order_number}'
             html_template = 'emails/service_reminder.html'
             text_template = 'emails/service_reminder.txt'
         elif notification_type == 'created':
-            subject = f'Order Confirmed - {order.order_number}'
+            subject = f'{order_type} Confirmed - {order.order_number}'
             html_template = 'emails/service_notification.html'
             text_template = 'emails/service_notification.txt'
         else:
-            subject = f'Service Update - Order {order.order_number}'
+            subject = f'{order_type} Update - Order {order.order_number}'
             html_template = 'emails/service_notification.html'
             text_template = 'emails/service_notification.txt'
         

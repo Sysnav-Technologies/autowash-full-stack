@@ -302,22 +302,27 @@
         
         <div class="separator"></div>
         
-        <!-- Services -->
+        <!-- Order Items -->
+        {% if order.package %}
+        <div class="services-section">
+            <div class="center-text thermal-spacing section-title">
+                PACKAGE ORDERED
+            </div>
+            <div class="service-item">
+                <div class="service-name">Package: {{ order.package.name }}</div>
+            </div>
+        </div>
+        <div class="separator"></div>
+        {% endif %}
+        
+        {% if order.has_services %}
         <div class="services-section">
             <div class="center-text thermal-spacing section-title">
                 SERVICES ORDERED
             </div>
-            
-            {% if order.package %}
+            {% for item in order.service_items %}
             <div class="service-item">
-                <div class="service-name">Package: {{ order.package.name }}</div>
-            </div>
-            <div class="separator"></div>
-            {% endif %}
-            
-            {% for item in order_items %}
-            <div class="service-item">
-                <div class="service-name">{{ item.service.name }}</div>
+                <div class="service-name">{{ item.item_name }}</div>
                 <div class="service-details">
                     <span class="service-qty">Qty: {{ item.quantity }}</span>
                     <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
@@ -339,6 +344,34 @@
             </div>
             {% endfor %}
         </div>
+        <div class="separator"></div>
+        {% endif %}
+        
+        {% if order.has_inventory_items %}
+        <div class="services-section">
+            <div class="center-text thermal-spacing section-title">
+                ITEMS ORDERED
+            </div>
+            {% for item in order.inventory_items %}
+            <div class="service-item">
+                <div class="service-name">{{ item.item_name }}</div>
+                <div class="service-details">
+                    <span class="service-qty">Qty: {{ item.quantity }}</span>
+                    <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
+                    <div class="clear-float"></div>
+                </div>
+                <div class="service-details">
+                    {% if item.inventory_item.sku %}
+                    <span class="service-duration">SKU: {{ item.inventory_item.sku }}</span>
+                    {% endif %}
+                    <span class="service-status">✓ Ready</span>
+                    <div class="clear-float"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="separator"></div>
+        {% endif %}
         
         <div class="separator"></div>
         

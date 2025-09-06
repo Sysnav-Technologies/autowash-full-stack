@@ -221,7 +221,9 @@
                         <td>
                             <div class="services-summary">
                                 {% for item in order.order_items.all %}
-                                <span class="service-item">{{ item.service.name }}{% if item.quantity > 1 %} x{{ item.quantity }}{% endif %}</span>
+                                <span class="service-item">
+                                    {% if item.item_type == 'inventory' %}<i class="fas fa-box text-info"></i> {% endif %}{{ item.item_name }}{% if item.quantity > 1 %} x{{ item.quantity }}{% endif %}
+                                </span>
                                 {% endfor %}
                                 {% if order.order_items.count > 2 %}
                                 <span class="service-more">+{{ order.order_items.count|add:"-2" }} more</span>
@@ -241,7 +243,7 @@
                         
                         <td>
                             <span class="badge badge-{{ order.status|yesno:'success,warning,danger,info,secondary,dark' }}">
-                                {{ order.get_status_display }}
+                                {{ order.get_display_status }}
                             </span>
                         </td>
                         

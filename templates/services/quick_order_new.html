@@ -1,0 +1,524 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Quick Order - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_head %}
+<meta name="csrf-token" content="{{ csrf_token }}">
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" type="text/css" href="{% static 'css/quick_order.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i class="fas fa-bolt"></i>
+            Quick Order
+        </h1>
+        <p class="page-description">Create a new service order quickly</p>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'services:service_order_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-list"></i>
+            View All Orders
+        </a>
+    </div>
+</div>
+
+<div class="quick-order-container">
+    <!-- Progress Indicator -->
+    <div class="order-progress">
+        <div class="progress-step active" id="step1Progress">
+            <div class="progress-number">1</div>
+            <div class="progress-label">Order Type</div>
+        </div>
+        <div class="progress-step" id="step2Progress">
+            <div class="progress-number">2</div>
+            <div class="progress-label">Customer</div>
+        </div>
+        <div class="progress-step" id="step3Progress">
+            <div class="progress-number">3</div>
+            <div class="progress-label">Services</div>
+        </div>
+        <div class="progress-step" id="step4Progress">
+            <div class="progress-number">4</div>
+            <div class="progress-label">Review</div>
+        </div>
+    </div>
+
+    <form method="post" id="quickOrderForm">
+        {% csrf_token %}
+        <input type="hidden" id="orderType" name="order_type" value="">
+        <input type="hidden" id="selectedVehicleId" name="vehicle_id" value="">
+        <input type="hidden" id="selectedCustomerId" name="customer_id" value="">
+        <input type="hidden" id="selectedServices" name="selected_services" value="">
+        <input type="hidden" id="selectedInventoryItems" name="selected_inventory_items" value="">
+
+        <!-- Step 1: Order Type Selection -->
+        <div class="step-content active" id="step1">
+            <div class="form-card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-route"></i>
+                        How would you like to proceed?
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="order-type-options">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="order-type-card" onclick="selectOrderType('search_vehicle', this)">
+                                    <i class="fas fa-search"></i>
+                                    <h6>Search Vehicle</h6>
+                                    <p>Find an existing vehicle and customer</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="order-type-card" onclick="selectOrderType('register_vehicle', this)">
+                                    <i class="fas fa-plus-circle"></i>
+                                    <h6>Register Vehicle</h6>
+                                    <p>Add new vehicle and customer details</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="order-type-card" onclick="selectOrderType('items_only', this)">
+                                    <i class="fas fa-shopping-cart"></i>
+                                    <h6>Sell Items Only</h6>
+                                    <p>Sell inventory items without vehicle service</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Customer Selection/Registration -->
+        <div class="step-content" id="step2">
+            <!-- Search Vehicle Section -->
+            <div id="searchVehicleSection" class="d-none">
+                <div class="form-card">
+                    <div class="card-header">
+                        <h4 class="card-title">
+                            <i class="fas fa-car"></i>
+                            Search Vehicle
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="search-group">
+                            <div class="search-input">
+                                <input type="text" class="form-control" id="vehicleSearch" 
+                                       placeholder="Search by license plate, make, model, or owner name...">
+                                <button type="button" class="search-btn" onclick="searchVehicles()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="vehicleSearchResults" class="search-results d-none"></div>
+                        <div id="selectedVehicleDisplay" class="selected-vehicle d-none">
+                            <div class="selection-header">
+                                <strong>Selected Vehicle</strong>
+                                <button type="button" class="change-btn" onclick="changeVehicle()">Change</button>
+                            </div>
+                            <div id="vehicleDetails"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Register Vehicle Section -->
+            <div id="registerVehicleSection" class="d-none">
+                <div class="form-card">
+                    <div class="card-header">
+                        <h4 class="card-title">
+                            <i class="fas fa-user-plus"></i>
+                            Customer Information
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="search-group">
+                            <div class="search-input">
+                                <input type="text" class="form-control" id="customerSearch" 
+                                       placeholder="Search existing customer by name, phone, or email...">
+                                <button type="button" class="search-btn" onclick="searchCustomers()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="customerSearchResults" class="search-results d-none"></div>
+                        
+                        <div id="customerForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label required">First Name</label>
+                                        <input type="text" class="form-control" id="firstName" name="first_name">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label required">Last Name</label>
+                                        <input type="text" class="form-control" id="lastName" name="last_name">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label required">Phone</label>
+                                        <input type="tel" class="form-control" id="phone" name="phone">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="email" name="email">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-card">
+                    <div class="card-header">
+                        <h4 class="card-title">
+                            <i class="fas fa-car"></i>
+                            Vehicle Information
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label required">License Plate</label>
+                                    <input type="text" class="form-control" id="licensePlate" name="license_plate">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label required">Make</label>
+                                    <input type="text" class="form-control" id="make" name="make">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label required">Model</label>
+                                    <input type="text" class="form-control" id="model" name="model">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Year</label>
+                                    <input type="number" class="form-control" id="year" name="year" min="1990" max="2030">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Color</label>
+                                    <input type="text" class="form-control" id="color" name="color">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">VIN</label>
+                                    <input type="text" class="form-control" id="vin" name="vin">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items Only Customer Section -->
+            <div id="itemsOnlyCustomerSection" class="d-none">
+                <div class="form-card">
+                    <div class="card-header">
+                        <h4 class="card-title">
+                            <i class="fas fa-user"></i>
+                            Customer Type
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Choose customer type for this purchase:</p>
+                        <div class="items-only-customer-options">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <button type="button" class="btn btn-outline-primary w-100" onclick="selectItemsOnlyCustomerType('existing')">
+                                        <i class="fas fa-user"></i>
+                                        <span>Existing Customer</span>
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <button type="button" class="btn btn-outline-primary w-100" onclick="selectItemsOnlyCustomerType('walk_in')">
+                                        <i class="fas fa-walking"></i>
+                                        <span>Walk-in Customer</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Existing Customer Search -->
+                        <div id="existingCustomerSearch" class="d-none mt-3">
+                            <div class="search-group">
+                                <div class="search-input">
+                                    <input type="text" class="form-control" id="existingCustomerSearchInput" 
+                                           placeholder="Search customer by name, phone, or email...">
+                                    <button type="button" class="search-btn" onclick="searchExistingCustomers()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="existingCustomerResults" class="search-results d-none"></div>
+                        </div>
+
+                        <!-- Walk-in Customer Form -->
+                        <div id="walkInCustomerForm" class="d-none mt-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">First Name (Optional)</label>
+                                        <input type="text" class="form-control" id="walkInFirstName" name="walk_in_first_name">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">Last Name (Optional)</label>
+                                        <input type="text" class="form-control" id="walkInLastName" name="walk_in_last_name">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">Phone (Optional)</label>
+                                        <input type="tel" class="form-control" id="walkInPhone" name="walk_in_phone">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="form-label">Email (Optional)</label>
+                                        <input type="email" class="form-control" id="walkInEmail" name="walk_in_email">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="selectedItemsOnlyCustomerDisplay" class="selected-customer d-none">
+                            <div class="selection-header">
+                                <strong>Selected Customer</strong>
+                                <button type="button" class="change-btn" onclick="changeItemsOnlyCustomer()">Change</button>
+                            </div>
+                            <div id="itemsOnlyCustomerDetails"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Services and Inventory Selection -->
+        <div class="step-content" id="step3">
+            <div class="form-card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-concierge-bell"></i>
+                        Select Services & Items
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Service/Inventory Tabs -->
+                    <ul class="nav-tabs" role="tablist">
+                        <li class="nav-item" id="servicesTab">
+                            <a class="nav-link active" href="#services" onclick="showTab('services')">
+                                <i class="fas fa-tools"></i> Services
+                            </a>
+                        </li>
+                        <li class="nav-item" id="inventoryTab">
+                            <a class="nav-link" href="#inventory" onclick="showTab('inventory')">
+                                <i class="fas fa-boxes"></i> Inventory
+                            </a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Services Section -->
+                        <div id="services" class="tab-pane active">
+                            <div class="service-type-selector">
+                                <div class="form-group">
+                                    <label class="form-label">Service Type</label>
+                                    <select class="form-control" id="serviceTypeFilter" onchange="filterServices()">
+                                        <option value="">All Services</option>
+                                        {% for service_type in service_types %}
+                                            <option value="{{ service_type.id }}">{{ service_type.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="services-grid" id="servicesGrid">
+                                {% for service in services %}
+                                <div class="service-card" data-service-id="{{ service.id }}" data-service-type="{{ service.service_type_id }}" 
+                                     onclick="toggleService({{ service.id }}, '{{ service.name|escapejs }}', {{ service.price }})">
+                                    <div class="service-header">
+                                        <h6 class="service-name">{{ service.name }}</h6>
+                                        <span class="service-price">${{ service.price }}</span>
+                                    </div>
+                                    {% if service.description %}
+                                        <p class="service-description">{{ service.description }}</p>
+                                    {% endif %}
+                                    <div class="service-duration">
+                                        <i class="fas fa-clock"></i> 
+                                        {% if service.estimated_duration %}
+                                            {{ service.estimated_duration }} min
+                                        {% else %}
+                                            Duration varies
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="empty-state">
+                                    <i class="fas fa-tools"></i>
+                                    <p>No services available</p>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Inventory Section -->
+                        <div id="inventory" class="tab-pane">
+                            <div class="category-filter">
+                                <button type="button" class="category-btn active" onclick="filterInventory('')">All Items</button>
+                                {% for category in inventory_categories %}
+                                    <button type="button" class="category-btn" onclick="filterInventory('{{ category }}')">{{ category }}</button>
+                                {% endfor %}
+                            </div>
+
+                            <div class="inventory-grid" id="inventoryGrid">
+                                {% for item in inventory_items %}
+                                <div class="inventory-card" data-item-id="{{ item.id }}" 
+                                     data-category="{{ item.category }}"
+                                     data-available="{{ item.current_stock }}"
+                                     onclick="toggleInventoryItem({{ item.id }}, '{{ item.name|escapejs }}', {{ item.selling_price }})">
+                                    <div class="inventory-header">
+                                        <h6 class="inventory-name">{{ item.name }}</h6>
+                                        <span class="inventory-price">${{ item.selling_price }}</span>
+                                    </div>
+                                    {% if item.description %}
+                                        <p class="inventory-description">{{ item.description }}</p>
+                                    {% endif %}
+                                    <div class="text-muted">
+                                        <small>Stock: {{ item.current_stock }}</small>
+                                    </div>
+                                    <div class="inventory-quantity-controls" style="display: none;">
+                                        <button type="button" class="quantity-btn" onclick="changeInventoryQuantity({{ item.id }}, -1)">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                        <input type="number" class="quantity-input" id="quantity_{{ item.id }}" 
+                                               value="1" min="1" max="{{ item.current_stock }}">
+                                        <button type="button" class="quantity-btn" onclick="changeInventoryQuantity({{ item.id }}, 1)">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="empty-state">
+                                    <i class="fas fa-boxes"></i>
+                                    <p>No inventory items available</p>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Review and Confirmation -->
+        <div class="step-content" id="step4">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="form-card">
+                        <div class="card-header">
+                            <h4 class="card-title">
+                                <i class="fas fa-clipboard-check"></i>
+                                Order Review
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="orderReviewContent">
+                                <!-- Order review content will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="form-card order-summary">
+                        <div class="summary-header card-header">
+                            <h5 class="summary-title">Order Summary</h5>
+                        </div>
+                        <div class="summary-body card-body">
+                            <div id="summaryItems">
+                                <div class="empty-state">
+                                    <i class="fas fa-receipt"></i>
+                                    <p>No items selected</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step Navigation -->
+        <div class="step-navigation">
+            <button type="button" class="btn btn-outline-secondary" id="prevBtn" onclick="previousStep()" style="display: none;">
+                <i class="fas fa-arrow-left"></i> Previous
+            </button>
+            <div class="d-flex align-items-center gap-3">
+                <button type="button" class="btn btn-outline-secondary" onclick="saveAsDraft()" id="draftBtn" style="display: none;">
+                    <i class="fas fa-save"></i> Save as Draft
+                </button>
+                <button type="button" class="btn btn-primary" id="nextBtn" onclick="nextStep()">
+                    Next <i class="fas fa-arrow-right"></i>
+                </button>
+                <button type="submit" class="btn btn-success" id="submitBtn" style="display: none;">
+                    <i class="fas fa-check"></i> Create Order
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modals -->
+<!-- Customer Details Modal -->
+<div class="modal fade" id="customerDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Customer Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="customerDetailsContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="saveCustomerBtn">
+                    <i class="fas fa-save me-2"></i>Save Customer Details
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/quick_order.js' %}"></script>
+{% endblock %}

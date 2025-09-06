@@ -1,40 +1,43 @@
-Service {{ notification_type|title }} - {{ business_name|default:"Autowash Service" }}
+{% if order.is_inventory_only %}Purchase{% elif order.has_services %}Service{% else %}Order{% endif %} {{ notification_type|title }} - {{ business_name|default:"Autowash Service" }}
 
 Dear {{ customer.first_name }},
 
 {% if notification_type == 'created' %}
-Your service order has been confirmed!
+Your {% if order.is_inventory_only %}purchase{% else %}service{% endif %} order has been confirmed!
 {% elif notification_type == 'started' %}
-Great news! Your service has started.
+{% if order.is_inventory_only %}Great news! Your items are being prepared for pickup.{% else %}Great news! Your service has started.{% endif %}
 {% elif notification_type == 'completed' %}
-Excellent! Your service has been completed.
+{% if order.is_inventory_only %}Your items are ready for pickup!{% else %}Excellent! Your service has been completed.{% endif %}
 {% elif notification_type == 'reminder' %}
-This is a friendly reminder about your upcoming service appointment.
+This is a friendly reminder about your upcoming {% if order.is_inventory_only %}item pickup{% else %}service appointment{% endif %}.
 {% endif %}
 
 Order Details:
 - Order Number: {{ order.order_number }}
-- Vehicle: {{ vehicle.make }} {{ vehicle.model }} ({{ vehicle.registration_number }})
+{% if vehicle %}- Vehicle: {{ vehicle.make }} {{ vehicle.model }} ({{ vehicle.registration_number }}){% endif %}
 - Total Amount: KES {{ order.total_amount|floatformat:0 }}
-{% if attendant_name %}
-- Attendant: {{ attendant_name }}
+{% if attendant_name %}- Attendant: {{ attendant_name }}{% endif %}
+
+{% if service_items %}
+Services:
+{% for item in service_items %}
+- {{ item.item_name }} ({{ item.quantity }}x) - KES {{ item.total_price|floatformat:0 }}
+{% endfor %}
 {% endif %}
 
-Services:
-{% for item in order_items %}
-- {{ item.service.name }} ({{ item.quantity }}x) - KES {{ item.total_price|floatformat:0 }}
+{% if inventory_items %}
+Items Purchased:
+{% for item in inventory_items %}
+- {{ item.item_name }} ({{ item.quantity }}x) - KES {{ item.total_price|floatformat:0 }}
 {% endfor %}
+{% endif %}
 
 {% if notification_type == 'completed' %}
-Thank you for choosing {{ business_name|default:"Autowash Service" }}! We hope you're satisfied with our service.
+{% if order.is_inventory_only %}Thank you for your purchase! Your items are ready for pickup.{% else %}Thank you for choosing {{ business_name|default:"Autowash Service" }}! We hope you're satisfied with our service.{% endif %}
 {% endif %}
 
-{% if business_phone %}
-Contact us: {{ business_phone }}
-{% endif %}
-{% if business_email %}
-Email: {{ business_email }}
-{% endif %}
+{% if business_phone %}Contact us: {{ business_phone }}{% endif %}
+{% if business_email %}Email: {{ business_email }}{% endif %}
 
 Best regards,
 {{ business_name|default:"Autowash Service" }} Team

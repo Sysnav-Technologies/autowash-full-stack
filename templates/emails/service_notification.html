@@ -53,7 +53,13 @@
 
 <div class="info-card">
     <div class="info-card-header">
-        🚗 Service Information
+        {% if order.is_inventory_only %}
+            �️ Purchase Information
+        {% elif order.has_services %}
+            �🚗 Service Information
+        {% else %}
+            📋 Order Information
+        {% endif %}
     </div>
     
     <div class="info-row">
@@ -61,12 +67,23 @@
         <span class="info-value">{{ order.order_number }}</span>
     </div>
     
-    {% if order_items %}
+    {% if service_items %}
     <div class="info-row">
         <span class="info-label">Services: </span>
         <span class="info-value">
-            {% for item in order_items %}
-                {{ item.service.name }}{% if not forloop.last %}, {% endif %}
+            {% for item in service_items %}
+                {{ item.item_name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </span>
+    </div>
+    {% endif %}
+    
+    {% if inventory_items %}
+    <div class="info-row">
+        <span class="info-label">Items Purchased: </span>
+        <span class="info-value">
+            {% for item in inventory_items %}
+                {{ item.item_name }} ({{ item.quantity|default:1 }}){% if not forloop.last %}, {% endif %}
             {% endfor %}
         </span>
     </div>
@@ -112,11 +129,11 @@
         <span class="info-label">Status: </span>
         <span class="info-value">
             {% if order.status == "completed" %}
-                <span class="status-badge status-success">{{ order.get_status_display }}</span>
+                <span class="status-badge status-success">{{ order.get_display_status }}</span>
             {% elif order.status == "in_progress" %}
-                <span class="status-badge status-info">{{ order.get_status_display }}</span>
+                <span class="status-badge status-info">{{ order.get_display_status }}</span>
             {% else %}
-                <span class="status-badge status-warning">{{ order.get_status_display }}</span>
+                <span class="status-badge status-warning">{{ order.get_display_status }}</span>
             {% endif %}
         </span>
     </div>

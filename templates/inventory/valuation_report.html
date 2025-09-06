@@ -1,0 +1,790 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load humanize %}
+{% load inventory_filters %}
+
+{% block title %}Inventory Valuation Report - {{ request.tenant.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .valuation-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+    }
+    
+    .page-header h2 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 2rem;
+    }
+    
+    .page-header p {
+        margin: 10px 0 0;
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+    
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .summary-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .summary-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--accent-color, #28a745);
+    }
+    
+    .summary-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .summary-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 15px;
+        font-size: 1.5rem;
+        color: white;
+        background: var(--accent-color, #28a745);
+    }
+    
+    .summary-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    
+    .summary-label {
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.9rem;
+    }
+    
+    .filters-section {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .charts-section {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    
+    .chart-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 15px;
+    }
+    
+    .chart-tab {
+        padding: 10px 20px;
+        border-radius: 6px 6px 0 0;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-bottom: none;
+        color: #6c757d;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+    
+    .chart-tab.active {
+        background: white;
+        color: #28a745;
+        border-color: #28a745;
+    }
+    
+    .table-section {
+        background: white;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        margin-bottom: 30px;
+    }
+    
+    .table-header {
+        background: #f8f9fa;
+        padding: 20px 30px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: between;
+        align-items: center;
+    }
+    
+    .table-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #333;
+        margin: 0;
+    }
+    
+    .export-buttons {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn-export {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-decoration: none;
+        border: 1px solid #dee2e6;
+        background: white;
+        color: #6c757d;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-export:hover {
+        background: #f8f9fa;
+        color: #495057;
+        border-color: #adb5bd;
+    }
+    
+    .valuation-table {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .valuation-table th {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 1px solid #dee2e6;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .valuation-table td {
+        padding: 15px 20px;
+        border-bottom: 1px solid #f1f3f4;
+        vertical-align: middle;
+    }
+    
+    .valuation-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .item-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .item-image {
+        width: 50px;
+        height: 50px;
+        border-radius: 8px;
+        object-fit: cover;
+        border: 2px solid #e9ecef;
+    }
+    
+    .item-details {
+        flex-grow: 1;
+    }
+    
+    .item-name {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 3px;
+    }
+    
+    .item-meta {
+        display: flex;
+        gap: 15px;
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .category-tag {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .stock-info {
+        text-align: center;
+    }
+    
+    .stock-quantity {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 2px;
+    }
+    
+    .stock-unit {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .price-info {
+        text-align: right;
+    }
+    
+    .unit-price {
+        font-size: 1rem;
+        color: #6c757d;
+        margin-bottom: 3px;
+    }
+    
+    .total-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #28a745;
+    }
+    
+    .cost-price {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-decoration: line-through;
+    }
+    
+    .profit-margin {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-align: center;
+    }
+    
+    .margin-high {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+    
+    .margin-medium {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+    }
+    
+    .margin-low {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+    
+    .pagination {
+        padding: 25px;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+        display: flex;
+        justify-content: center;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #6c757d;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        opacity: 0.3;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid valuation-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2>Inventory Valuation Report</h2>
+                <p>Comprehensive analysis of your inventory value and profitability</p>
+            </div>
+            <div class="text-end">
+                <div class="text-light mb-2">
+                    <small>Report generated: {{ current_date|date:"M d, Y \a\\t g:i A" }}</small>
+                </div>
+                <a href="/business/{{ request.tenant.slug }}/inventory/" class="btn btn-light">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+        <div class="summary-card" style="--accent-color: #28a745">
+            <div class="summary-icon">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="summary-value">{{ total_inventory_value|currency }}</div>
+            <div class="summary-label">Total Inventory Value</div>
+        </div>
+        <div class="summary-card" style="--accent-color: #17a2b8">
+            <div class="summary-icon">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <div class="summary-value">{{ total_items }}</div>
+            <div class="summary-label">Total Items</div>
+        </div>
+        <div class="summary-card" style="--accent-color: #ffc107">
+            <div class="summary-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="summary-value">{{ average_margin|floatformat:1 }}%</div>
+            <div class="summary-label">Average Margin</div>
+        </div>
+        <div class="summary-card" style="--accent-color: #6f42c1">
+            <div class="summary-icon">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="summary-value">{{ potential_profit|currency }}</div>
+            <div class="summary-label">Potential Profit</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-section">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="category" class="form-label">Category</label>
+                <select name="category" id="category" class="form-select">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if current_filters.category == category.id|stringformat:"s" %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="sort_by" class="form-label">Sort By</label>
+                <select name="sort_by" id="sort_by" class="form-select">
+                    <option value="value_desc" {% if current_filters.sort_by == 'value_desc' %}selected{% endif %}>Highest Value</option>
+                    <option value="value_asc" {% if current_filters.sort_by == 'value_asc' %}selected{% endif %}>Lowest Value</option>
+                    <option value="quantity_desc" {% if current_filters.sort_by == 'quantity_desc' %}selected{% endif %}>Highest Stock</option>
+                    <option value="quantity_asc" {% if current_filters.sort_by == 'quantity_asc' %}selected{% endif %}>Lowest Stock</option>
+                    <option value="margin_desc" {% if current_filters.sort_by == 'margin_desc' %}selected{% endif %}>Highest Margin</option>
+                    <option value="margin_asc" {% if current_filters.sort_by == 'margin_asc' %}selected{% endif %}>Lowest Margin</option>
+                    <option value="name" {% if current_filters.sort_by == 'name' %}selected{% endif %}>Name (A-Z)</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="min_value" class="form-label">Min Value (KSH)</label>
+                <input type="number" name="min_value" id="min_value" class="form-control" 
+                       placeholder="0" min="0" step="0.01" value="{{ current_filters.min_value }}">
+            </div>
+            <div class="col-md-3 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i>
+                    Filter
+                </button>
+                <a href="/business/{{ request.tenant.slug }}/inventory/reports/valuation/" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                    Clear
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-section">
+        <div class="chart-tabs">
+            <div class="chart-tab active" data-chart="value">Value by Category</div>
+            <div class="chart-tab" data-chart="margin">Margin Analysis</div>
+            <div class="chart-tab" data-chart="trend">Value Trend</div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="valuationChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    {% if inventory_items %}
+    <div class="table-section">
+        <div class="table-header">
+            <h3 class="table-title">Detailed Valuation</h3>
+            <div class="export-buttons">
+                <a href="?{{ request.GET.urlencode }}&export=excel" class="btn-export">
+                    <i class="fas fa-file-excel"></i>
+                    Excel
+                </a>
+                <a href="?{{ request.GET.urlencode }}&export=pdf" class="btn-export">
+                    <i class="fas fa-file-pdf"></i>
+                    PDF
+                </a>
+                <a href="?{{ request.GET.urlencode }}&export=csv" class="btn-export">
+                    <i class="fas fa-file-csv"></i>
+                    CSV
+                </a>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="valuation-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Stock Qty</th>
+                        <th>Unit Price</th>
+                        <th>Cost Price</th>
+                        <th>Total Value</th>
+                        <th>Margin</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inventory_items %}
+                    <tr>
+                        <td>
+                            <div class="item-info">
+                                {% if item.image %}
+                                <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-image">
+                                {% else %}
+                                <div class="item-image bg-light d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-box text-muted"></i>
+                                </div>
+                                {% endif %}
+                                <div class="item-details">
+                                    <div class="item-name">{{ item.name }}</div>
+                                    <div class="item-meta">
+                                        <span>SKU: {{ item.sku }}</span>
+                                        <span class="category-tag">{{ item.category.name }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="stock-info">
+                                <div class="stock-quantity">{{ item.current_stock|floatformat:0 }}</div>
+                                <div class="stock-unit">{{ item.unit.name }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="price-info">
+                                <div class="unit-price">{{ item.selling_price|currency }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="price-info">
+                                <div class="cost-price">{{ item.unit_cost|currency }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="price-info">
+                                <div class="total-value">{{ item.total_value|currency }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            {% with margin=item.profit_margin %}
+                            <div class="profit-margin {% if margin >= 30 %}margin-high{% elif margin >= 15 %}margin-medium{% else %}margin-low{% endif %}">
+                                {{ margin|floatformat:1 }}%
+                            </div>
+                            {% endwith %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8f9fa; font-weight: 600;">
+                        <td colspan="4"><strong>TOTALS</strong></td>
+                        <td>
+                            <div class="price-info">
+                                <div class="total-value">{{ total_inventory_value|currency }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="profit-margin margin-medium">
+                                {{ average_margin|floatformat:1 }}%
+                            </div>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if inventory_items.has_other_pages %}
+        <div class="pagination">
+            <nav aria-label="Valuation report pagination">
+                <ul class="pagination">
+                    {% if inventory_items.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ inventory_items.previous_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                Previous
+                            </a>
+                        </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ inventory_items.number }} of {{ inventory_items.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if inventory_items.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ inventory_items.next_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                Next
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+        
+    {% else %}
+    <div class="table-section">
+        <div class="empty-state">
+            <i class="fas fa-chart-bar"></i>
+            <h3>No Items Found</h3>
+            <p>No inventory items match your current filters</p>
+            <a href="/business/{{ request.tenant.slug }}/inventory/items/create/" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus"></i>
+                Add Inventory Items
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Chart data from backend
+    const chartData = {
+        categories: {{ category_chart_data|default:"[]"|safe }},
+        margins: {{ margin_chart_data|default:"[]"|safe }},
+        trends: {{ trend_chart_data|default:"[]"|safe }}
+    };
+    
+    let currentChart = null;
+    
+    // Initialize with value chart
+    showChart('value');
+    
+    // Chart tab functionality
+    document.querySelectorAll('.chart-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            showChart(this.dataset.chart);
+        });
+    });
+    
+    function showChart(type) {
+        const ctx = document.getElementById('valuationChart').getContext('2d');
+        
+        if (currentChart) {
+            currentChart.destroy();
+        }
+        
+        switch(type) {
+            case 'value':
+                currentChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: chartData.categories.map(item => item.name),
+                        datasets: [{
+                            data: chartData.categories.map(item => item.value),
+                            backgroundColor: [
+                                '#28a745', '#17a2b8', '#ffc107', '#6f42c1', 
+                                '#fd7e14', '#e83e8c', '#20c997', '#6c757d'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Inventory Value by Category'
+                            },
+                            legend: {
+                                position: 'right'
+                            }
+                        }
+                    }
+                });
+                break;
+                
+            case 'margin':
+                currentChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: chartData.margins.map(item => item.name),
+                        datasets: [{
+                            label: 'Profit Margin %',
+                            data: chartData.margins.map(item => item.margin),
+                            backgroundColor: function(context) {
+                                const margin = context.raw;
+                                if (margin >= 30) return '#28a745';
+                                if (margin >= 15) return '#ffc107';
+                                return '#dc3545';
+                            },
+                            borderColor: '#fff',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Profit Margin Analysis'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Margin %'
+                                }
+                            }
+                        }
+                    }
+                });
+                break;
+                
+            case 'trend':
+                currentChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.trends.map(item => item.date),
+                        datasets: [{
+                            label: 'Inventory Value',
+                            data: chartData.trends.map(item => item.value),
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Inventory Value Trend (Last 30 Days)'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Value (KSH)'
+                                }
+                            }
+                        }
+                    }
+                });
+                break;
+        }
+    }
+    
+    // Auto-submit form when filters change
+    const filterSelects = document.querySelectorAll('#category, #sort_by');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+    
+    // Animate summary values
+    const summaryValues = document.querySelectorAll('.summary-value');
+    summaryValues.forEach(value => {
+        const text = value.textContent;
+        const numericPart = parseFloat(text.replace(/[^\d.]/g, ''));
+        
+        if (numericPart > 0) {
+            let currentValue = 0;
+            const increment = numericPart / 30;
+            const suffix = text.replace(/[\d.,]/g, '');
+            
+            const timer = setInterval(() => {
+                currentValue += increment;
+                if (currentValue >= numericPart) {
+                    currentValue = numericPart;
+                    clearInterval(timer);
+                }
+                
+                if (suffix.includes('KSH')) {
+                    value.textContent = 'KSH ' + currentValue.toLocaleString('en-KE', {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                    });
+                } else if (suffix.includes('%')) {
+                    value.textContent = currentValue.toFixed(1) + '%';
+                } else {
+                    value.textContent = Math.round(currentValue).toLocaleString();
+                }
+            }, 50);
+        }
+    });
+});
+</script>
+{% endblock %}

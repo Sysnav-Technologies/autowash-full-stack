@@ -178,11 +178,19 @@ def send_order_completed_notification(order, attendant_name=None, tenant=None):
         'customer': order.customer,
         'vehicle': order.vehicle,
         'services': order.order_items.all(),
+        'service_items': order.service_items,
+        'inventory_items': order.inventory_items,
+        'has_services': order.has_services,
+        'has_inventory_items': order.has_inventory_items,
+        'is_inventory_only': order.is_inventory_only,
         'attendant_name': attendant_name,
         'notification_type': 'completed'
     }
     
-    subject = f"Service Completed - {order.order_number}"
+    if order.is_inventory_only:
+        subject = f"Items Ready for Pickup - {order.order_number}"
+    else:
+        subject = f"Service Completed - {order.order_number}"
     
     success = send_notification_email(
         to_email=order.customer.email,
@@ -195,7 +203,13 @@ def send_order_completed_notification(order, attendant_name=None, tenant=None):
     # Also send SMS
     if order.customer.phone and getattr(order.customer, 'receive_service_reminders', True):
         tenant_name = tenant.name if tenant else "Autowash"
-        sms_message = f"Hi {order.customer.first_name}, your service {order.order_number} is complete at {tenant_name}! Please collect your {order.vehicle.make} {order.vehicle.model}. Total: KES {order.total_amount}"
+        if order.is_inventory_only:
+            if order.vehicle:
+                sms_message = f"Hi {order.customer.first_name}, your items from order {order.order_number} are ready for pickup at {tenant_name}! Total: KES {order.total_amount}"
+            else:
+                sms_message = f"Hi {order.customer.first_name}, your items from order {order.order_number} are ready for pickup at {tenant_name}! Total: KES {order.total_amount}"
+        else:
+            sms_message = f"Hi {order.customer.first_name}, your service {order.order_number} is complete at {tenant_name}! Please collect your {order.vehicle.make} {order.vehicle.model}. Total: KES {order.total_amount}"
         send_sms_notification(str(order.customer.phone), sms_message)
     
     return success

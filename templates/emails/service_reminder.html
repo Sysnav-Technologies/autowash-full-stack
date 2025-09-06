@@ -48,14 +48,15 @@
         </div>
     </div>
 
-    <!-- Services List -->
+    <!-- Services and Items List -->
+    {% if service_items %}
     <div class="card">
-        <h3 style="color: #1a202c; margin: 0 0 16px 0; font-size: 18px;">Selected Services</h3>
+        <h3 style="color: #1a202c; margin: 0 0 16px 0; font-size: 18px;">🚗 Selected Services</h3>
         
-        {% for item in order_items %}
+        {% for item in service_items %}
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
             <div>
-                <div style="font-weight: 600; color: #1a202c;">{{ item.service.name }}</div>
+                <div style="font-weight: 600; color: #1a202c;">{{ item.item_name }}</div>
                 {% if item.service.description %}
                 <div style="color: #64748b; font-size: 14px; margin-top: 4px;">{{ item.service.description|truncatewords:15 }}</div>
                 {% endif %}
@@ -69,15 +70,43 @@
         </div>
         {% endfor %}
     </div>
+    {% endif %}
+    
+    {% if inventory_items %}
+    <div class="card">
+        <h3 style="color: #1a202c; margin: 0 0 16px 0; font-size: 18px;">🛍️ Items to Pickup</h3>
+        
+        {% for item in inventory_items %}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+            <div>
+                <div style="font-weight: 600; color: #1a202c;">{{ item.item_name }}</div>
+                {% if item.inventory_item.description %}
+                <div style="color: #64748b; font-size: 14px; margin-top: 4px;">{{ item.inventory_item.description|truncatewords:15 }}</div>
+                {% endif %}
+            </div>
+            <div style="text-align: right;">
+                <div style="font-weight: 600; color: #0066cc;">KES {{ item.total_price|floatformat:0 }}</div>
+                <div style="color: #64748b; font-size: 14px;">{{ item.quantity }}x @ KES {{ item.unit_price|floatformat:0 }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- Preparation Instructions -->
     <div class="card">
         <h3 style="color: #1a202c; margin: 0 0 16px 0; font-size: 18px;">📋 Please Prepare</h3>
         
         <ul style="color: #64748b; margin: 0; padding-left: 20px;">
+            {% if has_services %}
             <li style="margin-bottom: 8px;">Ensure your vehicle is accessible and unlocked</li>
             <li style="margin-bottom: 8px;">Remove any valuable items from the vehicle</li>
             <li style="margin-bottom: 8px;">Have your vehicle keys ready</li>
+            {% endif %}
+            {% if has_inventory_items %}
+            <li style="margin-bottom: 8px;">Have valid identification for item pickup</li>
+            <li style="margin-bottom: 8px;">Bring payment confirmation/receipt</li>
+            {% endif %}
             <li style="margin-bottom: 8px;">Inform us of any special requirements or concerns</li>
         </ul>
     </div>
