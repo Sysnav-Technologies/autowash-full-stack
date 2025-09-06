@@ -973,17 +973,16 @@
                             </a>
                         {% endif %}
                     {% else %}
-                        <!-- Service order actions -->
+                        <!-- Service order actions (includes mixed orders with services + inventory) -->
                         {% if order.status == 'pending' or order.status == 'confirmed' %}
-                            {% if order.payment_status == 'paid' %}
-                                <button class="btn btn-success" onclick="startService()">
-                                    <i class="fas fa-play"></i>
-                                    Start Service
-                                </button>
-                            {% else %}
-                                <a href="/business/{{ request.tenant.slug }}/payments/process/{{ order.id }}/" class="btn btn-success">
+                            <button class="btn btn-success" onclick="startService()">
+                                <i class="fas fa-play"></i>
+                                Start Service
+                            </button>
+                            {% if order.payment_status != 'paid' %}
+                                <a href="/business/{{ request.tenant.slug }}/payments/process/{{ order.id }}/" class="btn btn-outline-primary ms-2">
                                     <i class="fas fa-credit-card"></i>
-                                    Process Payment First
+                                    Process Payment
                                 </a>
                             {% endif %}
                         {% endif %}
