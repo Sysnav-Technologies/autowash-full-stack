@@ -1,575 +1,499 @@
-{% extends 'base/base.html' %}
+{% extends "base/base.html" %}
 {% load static %}
-{% load humanize %}
-{% load math_filters %}
+{% load crispy_forms_tags %}
+{% load inventory_filters %}
 
-{% block title %}Inventory Items - {{ request.tenant.name }}{% endblock %}
+{% block title %}Inventory Items - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
 <style>
-    .filter-section {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        border: 1px solid #e9ecef;
-    }
-    
-    .stats-bar {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    
-    .stats-bar .stat-item {
-        text-align: center;
-    }
-    
-    .stats-bar .stat-value {
-        font-size: 1.8rem;
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-    
-    .stats-bar .stat-label {
-        font-size: 0.9rem;
-        opacity: 0.9;
-    }
-    
-    .items-table-container {
-        background: white;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        border: 1px solid #e9ecef;
-    }
-    
-    .table {
-        margin-bottom: 0;
-    }
-    
-    .table thead th {
-        background: #f8f9fa;
-        border-bottom: 2px solid #dee2e6;
-        font-weight: 600;
-        color: #495057;
-        padding: 15px 12px;
-        vertical-align: middle;
-    }
-    
-    .table tbody td {
-        padding: 15px 12px;
-        vertical-align: middle;
-        border-bottom: 1px solid #f1f3f4;
-    }
-    
-    .table tbody tr:hover {
-        background-color: #f8f9fa;
-    }
-    
-    .item-image {
-        width: 50px;
-        height: 50px;
-        object-fit: cover;
-        border-radius: 8px;
-        border: 2px solid #e9ecef;
-    }
-    
-    .item-placeholder {
-        width: 50px;
-        height: 50px;
-        border-radius: 8px;
-        border: 2px solid #e9ecef;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .stock-status {
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .stock-status.normal {
-        background: #d1f2eb;
-        color: #0c5460;
-        border: 1px solid #b6f7d8;
-    }
-    
-    .stock-status.low {
-        background: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeaa7;
-    }
-    
-    .stock-status.out {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-    }
-    
-    .stock-status.over {
-        background: #cce5ff;
-        color: #004085;
-        border: 1px solid #b3d7ff;
-    }
-    
-    .btn-group-sm .btn {
-        padding: 6px 10px;
-        font-size: 0.8rem;
-    }
-    
-    .expand-section {
-        background: #f8f9fa;
-        padding: 15px;
-        text-align: center;
-        border-top: 1px solid #dee2e6;
-    }
-    
-    .expand-btn {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 25px;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-    
-    .expand-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        color: white;
-    }
-    
-    .additional-item {
-        animation: fadeIn 0.5s ease-in-out;
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    .no-items-container {
-        background: white;
-        border-radius: 10px;
-        padding: 60px 20px;
-        text-align: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        border: 1px solid #e9ecef;
-    }
-    
-    .search-form .form-control, .search-form .form-select {
-        border-radius: 8px;
-        border: 1px solid #d1d3e2;
-        padding: 10px 15px;
-    }
-    
-    .search-form .form-control:focus, .search-form .form-select:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-    }
+.inventory-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.search-filters {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.item-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid #e5e7eb;
+}
+
+.item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.item-image {
+    width: 100%;
+    height: 180px;
+    background: #f9fafb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.stock-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-in-stock { background-color: #d1fae5; color: #065f46; }
+.badge-low-stock { background-color: #fef3c7; color: #92400e; }
+.badge-out-of-stock { background-color: #fee2e2; color: #991b1b; }
+
+.item-details {
+    padding: 20px;
+}
+
+.item-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.item-sku {
+    font-size: 12px;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
+.item-category {
+    font-size: 13px;
+    color: #3b82f6;
+    margin-bottom: 10px;
+}
+
+.item-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 8px;
+    background: #f9fafb;
+    border-radius: 6px;
+}
+
+.stat-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 2px;
+}
+
+.item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: 6px;
+    border: none;
+    transition: all 0.2s;
+    text-decoration: none;
+    text-align: center;
+}
+
+.btn-primary-action {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-primary-action:hover {
+    background: #2563eb;
+    color: white;
+    text-decoration: none;
+}
+
+.btn-secondary-action {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.btn-secondary-action:hover {
+    background: #e5e7eb;
+    color: #374151;
+    text-decoration: none;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.view-toggle {
+    display: flex;
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 20px;
+    width: fit-content;
+}
+
+.toggle-btn {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggle-btn.active {
+    background: white;
+    color: #3b82f6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1 class="page-title">
-            <i class="fas fa-list"></i>
-            Inventory Items
-        </h1>
-        <div class="page-actions">
-            <a href="/business/{{ request.tenant.slug }}/inventory/items/create/" class="btn btn-primary">
-                <i class="fas fa-plus"></i>
-                Add Item
-            </a>
-            <div class="dropdown">
-                <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                    <i class="fas fa-download"></i>
-                    Export
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/inventory/reports/export/csv/">
-                        <i class="fas fa-file-csv"></i> Export to CSV
-                    </a></li>
-                </ul>
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="inventory-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h3 mb-2">Inventory Items</h1>
+                <p class="mb-0 opacity-90">Manage your stock items and monitor levels</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="/business/{{ request.tenant.slug }}/inventory/items/create/" class="btn btn-light btn-lg">
+                    <i class="fas fa-plus me-2"></i>Add New Item
+                </a>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-cog me-2"></i>Actions
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/">
+                            <i class="fas fa-adjust me-2"></i>Stock Adjustment
+                        </a></li>
+                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/inventory/reports/export/csv/">
+                            <i class="fas fa-download me-2"></i>Export CSV
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/inventory/categories/">
+                            <i class="fas fa-tags me-2"></i>Manage Categories
+                        </a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Quick Stats -->
-{% if filtered_stats %}
-<div class="stats-bar">
-    <div class="row">
-        <div class="col-md-3 stat-item">
-            <div class="stat-value">{{ filtered_stats.total_items|default:0 }}</div>
-            <div class="stat-label">Total Items</div>
+    <!-- Search and Filters -->
+    <div class="search-filters">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="search" class="form-label">Search Items</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="search" name="search" 
+                           value="{{ request.GET.search }}" placeholder="Name, SKU, or description">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label for="category" class="form-label">Category</label>
+                <select class="form-select" id="category" name="category">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:"s" %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="status" class="form-label">Stock Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All Status</option>
+                    <option value="in_stock" {% if request.GET.status == 'in_stock' %}selected{% endif %}>In Stock</option>
+                    <option value="low_stock" {% if request.GET.status == 'low_stock' %}selected{% endif %}>Low Stock</option>
+                    <option value="out_of_stock" {% if request.GET.status == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="sort" class="form-label">Sort By</label>
+                <select class="form-select" id="sort" name="sort">
+                    <option value="name" {% if request.GET.sort == 'name' or not request.GET.sort %}selected{% endif %}>Name A-Z</option>
+                    <option value="-name" {% if request.GET.sort == '-name' %}selected{% endif %}>Name Z-A</option>
+                    <option value="current_stock" {% if request.GET.sort == 'current_stock' %}selected{% endif %}>Stock Low-High</option>
+                    <option value="-current_stock" {% if request.GET.sort == '-current_stock' %}selected{% endif %}>Stock High-Low</option>
+                    <option value="-created_at" {% if request.GET.sort == '-created_at' %}selected{% endif %}>Newest First</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter me-1"></i>Filter
+                </button>
+                <a href="/business/{{ request.tenant.slug }}/inventory/items/" class="btn btn-outline-secondary">
+                    <i class="fas fa-times me-1"></i>Clear
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="view-toggle">
+            <button class="toggle-btn active" id="gridViewBtn">
+                <i class="fas fa-th-large me-1"></i>Grid
+            </button>
+            <button class="toggle-btn" id="listViewBtn">
+                <i class="fas fa-list me-1"></i>List
+            </button>
         </div>
-        <div class="col-md-3 stat-item">
-            <div class="stat-value">KES {{ filtered_stats.total_value|default:0|floatformat:0|intcomma }}</div>
-            <div class="stat-label">Total Value</div>
-        </div>
-        <div class="col-md-3 stat-item">
-            <div class="stat-value">{{ filtered_stats.avg_stock|default:0|floatformat:1 }}</div>
-            <div class="stat-label">Avg Stock</div>
-        </div>
-        <div class="col-md-3 stat-item">
-            <a href="/business/{{ request.tenant.slug }}/inventory/reports/low-stock/" class="btn btn-light btn-sm">
-                <i class="fas fa-exclamation-triangle"></i> Low Stock Report
-            </a>
+        <div class="text-muted">
+            Showing {{ items.start_index }}-{{ items.end_index }} of {{ items.paginator.count }} items
         </div>
     </div>
-</div>
-{% endif %}
 
-<!-- Filters -->
-<div class="filter-section">
-    <form method="get" class="search-form row g-3">
-        <div class="col-md-3">
-            <label for="search" class="form-label">Search Items</label>
-            <input type="text" name="search" id="search" class="form-control" 
-                   placeholder="Name, SKU, or description..."
-                   value="{{ request.GET.search }}">
+    <!-- Items Grid -->
+    <div id="gridView" class="inventory-grid">
+        {% for item in items %}
+        <div class="item-card">
+            <div class="item-image">
+                {% if item.image %}
+                <img src="{{ item.image.url }}" alt="{{ item.name }}">
+                {% else %}
+                <i class="fas fa-box fa-3x text-muted"></i>
+                {% endif %}
+                
+                <span class="stock-badge {% if item.is_out_of_stock %}badge-out-of-stock{% elif item.is_low_stock %}badge-low-stock{% else %}badge-in-stock{% endif %}">
+                    {% if item.is_out_of_stock %}Out of Stock{% elif item.is_low_stock %}Low Stock{% else %}In Stock{% endif %}
+                </span>
+            </div>
+            
+            <div class="item-details">
+                <h3 class="item-title">{{ item.name }}</h3>
+                <span class="item-sku">{{ item.sku }}</span>
+                
+                <div class="item-category">
+                    <i class="fas fa-tag me-1"></i>{{ item.category.name }}
+                </div>
+                
+                <div class="item-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ item.current_stock|floatformat:0 }}</div>
+                        <div class="stat-label">Current Stock</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ item.selling_price|currency }}</div>
+                        <div class="stat-label">Selling Price</div>
+                    </div>
+                </div>
+                
+                <div class="item-actions">
+                    <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.pk }}/" class="btn-action btn-primary-action">
+                        <i class="fas fa-eye me-1"></i>View
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.pk }}/" class="btn-action btn-secondary-action">
+                        <i class="fas fa-edit me-1"></i>Adjust
+                    </a>
+                </div>
+            </div>
         </div>
-        <div class="col-md-2">
-            <label for="category" class="form-label">Category</label>
-            {{ search_form.category }}
-        </div>
-        <div class="col-md-2">
-            <label for="stock_status" class="form-label">Stock Status</label>
-            <select name="stock_status" id="stock_status" class="form-select">
-                <option value="">All Status</option>
-                <option value="normal" {% if request.GET.stock_status == 'normal' %}selected{% endif %}>Normal</option>
-                <option value="low_stock" {% if request.GET.stock_status == 'low_stock' %}selected{% endif %}>Low Stock</option>
-                <option value="out_of_stock" {% if request.GET.stock_status == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
-                <option value="overstock" {% if request.GET.stock_status == 'overstock' %}selected{% endif %}>Overstock</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label for="item_type" class="form-label">Type</label>
-            <select name="item_type" id="item_type" class="form-select">
-                <option value="">All Types</option>
-                <option value="product" {% if request.GET.item_type == 'product' %}selected{% endif %}>Product</option>
-                <option value="material" {% if request.GET.item_type == 'material' %}selected{% endif %}>Material</option>
-                <option value="tool" {% if request.GET.item_type == 'tool' %}selected{% endif %}>Tool</option>
-                <option value="consumable" {% if request.GET.item_type == 'consumable' %}selected{% endif %}>Consumable</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label for="sort" class="form-label">Sort By</label>
-            <select name="sort" id="sort" class="form-select">
-                <option value="name" {% if request.GET.sort == 'name' or not request.GET.sort %}selected{% endif %}>Name</option>
-                <option value="sku" {% if request.GET.sort == 'sku' %}selected{% endif %}>SKU</option>
-                <option value="current_stock" {% if request.GET.sort == 'current_stock' %}selected{% endif %}>Stock Level</option>
-                <option value="unit_cost" {% if request.GET.sort == 'unit_cost' %}selected{% endif %}>Unit Cost</option>
-                <option value="created_at" {% if request.GET.sort == 'created_at' %}selected{% endif %}>Date Added</option>
-            </select>
-        </div>
-        <div class="col-md-1">
-            <label class="form-label">&nbsp;</label>
-            <div class="btn-group w-100">
-                <button type="submit" class="btn btn-primary" title="Search">
-                    <i class="fas fa-search"></i>
-                </button>
-                <a href="/business/{{ request.tenant.slug }}/inventory/items/" class="btn btn-outline-secondary" title="Clear Filters">
-                    <i class="fas fa-times"></i>
+        {% empty %}
+        <div class="col-12">
+            <div class="empty-state">
+                <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted mb-3">No items found</h4>
+                <p class="text-muted mb-4">
+                    {% if request.GET.search or request.GET.category or request.GET.status %}
+                        Try adjusting your search filters or 
+                    {% endif %}
+                    start by adding your first inventory item.
+                </p>
+                <a href="/business/{{ request.tenant.slug }}/inventory/items/create/" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus me-2"></i>Add Your First Item
                 </a>
             </div>
         </div>
-    </form>
-</div>
+        {% endfor %}
+    </div>
 
-<!-- Items Table -->
-{% if items %}
-    <div class="items-table-container">
+    <!-- Items List View (Hidden by default) -->
+    <div id="listView" class="d-none">
         <div class="table-responsive">
-            <table class="table">
-                <thead>
+            <table class="table table-hover bg-white rounded shadow-sm">
+                <thead class="table-light">
                     <tr>
-                        <th width="8%">Image</th>
-                        <th width="25%">Item Details</th>
-                        <th width="12%">SKU</th>
-                        <th width="15%">Category</th>
-                        <th width="15%">Stock Status</th>
-                        <th width="10%">Unit Cost</th>
-                        <th width="10%">Total Value</th>
-                        <th width="10%">Actions</th>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Current Stock</th>
+                        <th>Min Level</th>
+                        <th>Unit Cost</th>
+                        <th>Selling Price</th>
+                        <th>Stock Value</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="items-table-body">
-                    {% for item in items|slice:":10" %}
-                        <tr class="item-row">
-                            <td>
-                                {% if item.image %}
-                                    <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-image">
-                                {% else %}
-                                    <div class="item-placeholder">
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    {% if item.image %}
+                                    <img src="{{ item.image.url }}" alt="{{ item.name }}" class="rounded" width="40" height="40">
+                                    {% else %}
+                                    <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
                                         <i class="fas fa-box text-muted"></i>
                                     </div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="fw-bold mb-1">
-                                    <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/" class="text-decoration-none text-primary">
-                                        {{ item.name }}
-                                    </a>
-                                </div>
-                                {% if item.description %}
-                                    <small class="text-muted">{{ item.description|truncatewords:10 }}</small>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <code class="text-dark bg-light px-2 py-1 rounded">{{ item.sku }}</code>
-                            </td>
-                            <td>
-                                <span class="badge bg-light text-dark border">
-                                    {{ item.category.name|default:"Uncategorized" }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="mb-1">
-                                    <strong>{{ item.current_stock }} {{ item.unit.abbreviation }}</strong>
-                                </div>
-                                <span class="stock-status 
-                                    {% if item.current_stock <= 0 %}out
-                                    {% elif item.current_stock <= item.minimum_stock_level %}low
-                                    {% elif item.current_stock >= item.maximum_stock_level %}over
-                                    {% else %}normal{% endif %}">
-                                    {% if item.current_stock <= 0 %}
-                                        Out of Stock
-                                    {% elif item.current_stock <= item.minimum_stock_level %}
-                                        Low Stock
-                                    {% elif item.current_stock >= item.maximum_stock_level %}
-                                        Overstock
-                                    {% else %}
-                                        In Stock
                                     {% endif %}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="fw-bold">KES {{ item.unit_cost|floatformat:2 }}</span>
-                            </td>
-                            <td>
-                                <span class="fw-bold text-success">
-                                    KES {{ item.current_stock|mul:item.unit_cost|floatformat:0|intcomma }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/" 
-                                       class="btn btn-outline-primary" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.id }}/" 
-                                       class="btn btn-outline-success" title="Adjust Stock">
-                                        <i class="fas fa-exchange-alt"></i>
-                                    </a>
                                 </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    
-                    <!-- Hidden rows for additional items -->
-                    {% for item in items|slice:"10:" %}
-                        <tr class="additional-item" style="display: none;">
-                            <td>
-                                {% if item.image %}
-                                    <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-image">
-                                {% else %}
-                                    <div class="item-placeholder">
-                                        <i class="fas fa-box text-muted"></i>
-                                    </div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="fw-bold mb-1">
-                                    <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/" class="text-decoration-none text-primary">
-                                        {{ item.name }}
-                                    </a>
+                                <div>
+                                    <div class="fw-medium">{{ item.name }}</div>
+                                    <small class="text-muted">{{ item.sku }}</small>
                                 </div>
-                                {% if item.description %}
-                                    <small class="text-muted">{{ item.description|truncatewords:10 }}</small>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <code class="text-dark bg-light px-2 py-1 rounded">{{ item.sku }}</code>
-                            </td>
-                            <td>
-                                <span class="badge bg-light text-dark border">
-                                    {{ item.category.name|default:"Uncategorized" }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="mb-1">
-                                    <strong>{{ item.current_stock }} {{ item.unit.abbreviation }}</strong>
-                                </div>
-                                <span class="stock-status 
-                                    {% if item.current_stock <= 0 %}out
-                                    {% elif item.current_stock <= item.minimum_stock_level %}low
-                                    {% elif item.current_stock >= item.maximum_stock_level %}over
-                                    {% else %}normal{% endif %}">
-                                    {% if item.current_stock <= 0 %}
-                                        Out of Stock
-                                    {% elif item.current_stock <= item.minimum_stock_level %}
-                                        Low Stock
-                                    {% elif item.current_stock >= item.maximum_stock_level %}
-                                        Overstock
-                                    {% else %}
-                                        In Stock
-                                    {% endif %}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="fw-bold">KES {{ item.unit_cost|floatformat:2 }}</span>
-                            </td>
-                            <td>
-                                <span class="fw-bold text-success">
-                                    KES {{ item.current_stock|mul:item.unit_cost|floatformat:0|intcomma }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.id }}/" 
-                                       class="btn btn-outline-primary" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.id }}/" 
-                                       class="btn btn-outline-success" title="Adjust Stock">
-                                        <i class="fas fa-exchange-alt"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
+                            </div>
+                        </td>
+                        <td>{{ item.category.name }}</td>
+                        <td>{{ item.current_stock|floatformat:0 }} {{ item.unit.abbreviation }}</td>
+                        <td>{{ item.minimum_stock_level|floatformat:0 }}</td>
+                        <td>{{ item.unit_cost|currency }}</td>
+                        <td>{{ item.selling_price|currency }}</td>
+                        <td>{{ item.stock_value|currency }}</td>
+                        <td>
+                            <span class="badge {% if item.is_out_of_stock %}bg-danger{% elif item.is_low_stock %}bg-warning{% else %}bg-success{% endif %}">
+                                {% if item.is_out_of_stock %}Out of Stock{% elif item.is_low_stock %}Low Stock{% else %}In Stock{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ item.pk }}/" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.pk }}/" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        
-        <!-- Show More/Less Button -->
-        {% if items|length > 10 %}
-            <div class="expand-section">
-                <button id="toggle-items-btn" class="expand-btn" onclick="toggleItems()">
-                    <i class="fas fa-chevron-down me-2"></i>
-                    Show {{ items|length|add:"-10" }} More Items
-                </button>
-            </div>
-        {% endif %}
-        
-        <!-- Pagination -->
-        {% if items.has_other_pages %}
-            <div class="expand-section">
-                <nav aria-label="Items pagination">
-                    <ul class="pagination justify-content-center mb-0">
-                        {% if items.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.stock_status %}&stock_status={{ request.GET.stock_status }}{% endif %}{% if request.GET.item_type %}&item_type={{ request.GET.item_type }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">
-                                First
-                            </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ items.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.stock_status %}&stock_status={{ request.GET.stock_status }}{% endif %}{% if request.GET.item_type %}&item_type={{ request.GET.item_type }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">
-                                Previous
-                            </a>
-                            </li>
-                        {% endif %}
-                        
-                        <li class="page-item active">
-                            <span class="page-link">
-                                Page {{ items.number }} of {{ items.paginator.num_pages }}
-                            </span>
-                        </li>
-                        
-                        {% if items.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ items.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.stock_status %}&stock_status={{ request.GET.stock_status }}{% endif %}{% if request.GET.item_type %}&item_type={{ request.GET.item_type }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">
-                                Next
-                            </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ items.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.stock_status %}&stock_status={{ request.GET.stock_status }}{% endif %}{% if request.GET.item_type %}&item_type={{ request.GET.item_type }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">
-                                Last
-                            </a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            </div>
-        {% endif %}
     </div>
-{% else %}
-    <div class="no-items-container">
-        <i class="fas fa-box fa-4x text-muted mb-4"></i>
-        <h4 class="text-muted mb-3">No Items Found</h4>
-        <p class="text-muted mb-4">
-            {% if request.GET.search or request.GET.category or request.GET.stock_status or request.GET.item_type %}
-                No items match your current filters. Try adjusting your search criteria.
-            {% else %}
-                Start building your inventory by adding your first item.
-            {% endif %}
-        </p>
-        {% if request.GET.search or request.GET.category or request.GET.stock_status or request.GET.item_type %}
-            <a href="/business/{{ request.tenant.slug }}/inventory/items/" class="btn btn-outline-primary me-2">
-                <i class="fas fa-times"></i> Clear Filters
-            </a>
-        {% endif %}
-        <a href="/business/{{ request.tenant.slug }}/inventory/items/create/" class="btn btn-primary">
-            <i class="fas fa-plus"></i>
-            {% if request.GET.search or request.GET.category or request.GET.stock_status or request.GET.item_type %}
-                Add New Item
-            {% else %}
-                Add First Item
-            {% endif %}
-        </a>
+
+    <!-- Pagination -->
+    {% if items.has_other_pages %}
+    <div class="pagination-wrapper">
+        <nav aria-label="Inventory items pagination">
+            <ul class="pagination">
+                {% if items.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ items.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+                
+                {% for num in items.paginator.page_range %}
+                {% if items.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% else %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+                
+                {% if items.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ items.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
     </div>
-{% endif %}
+    {% endif %}
+</div>
 
-{% endblock %}
-
-{% block extra_js %}
 <script>
-    // Auto-submit form on select change
-    document.addEventListener('DOMContentLoaded', function() {
-        const selects = document.querySelectorAll('#category, #stock_status, #item_type, #sort');
-        selects.forEach(select => {
-            select.addEventListener('change', function() {
-                this.form.submit();
-            });
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    const gridViewBtn = document.getElementById('gridViewBtn');
+    const listViewBtn = document.getElementById('listViewBtn');
+    const gridView = document.getElementById('gridView');
+    const listView = document.getElementById('listView');
+
+    gridViewBtn.addEventListener('click', function() {
+        gridViewBtn.classList.add('active');
+        listViewBtn.classList.remove('active');
+        gridView.classList.remove('d-none');
+        listView.classList.add('d-none');
     });
-    
-    // Toggle additional items visibility
-    function toggleItems() {
-        const additionalItems = document.querySelectorAll('.additional-item');
-        const toggleBtn = document.getElementById('toggle-items-btn');
-        const icon = toggleBtn.querySelector('i');
-        
-        const isHidden = additionalItems[0].style.display === 'none';
-        
-        additionalItems.forEach(item => {
-            item.style.display = isHidden ? 'table-row' : 'none';
-        });
-        
-        if (isHidden) {
-            icon.className = 'fas fa-chevron-up me-2';
-            toggleBtn.innerHTML = '<i class="fas fa-chevron-up me-2"></i>Show Less Items';
-        } else {
-            icon.className = 'fas fa-chevron-down me-2';
-            const totalHidden = additionalItems.length;
-            toggleBtn.innerHTML = `<i class="fas fa-chevron-down me-2"></i>Show ${totalHidden} More Items`;
-        }
-    }
+
+    listViewBtn.addEventListener('click', function() {
+        listViewBtn.classList.add('active');
+        gridViewBtn.classList.remove('active');
+        listView.classList.remove('d-none');
+        gridView.classList.add('d-none');
+    });
+});
 </script>
 {% endblock %}

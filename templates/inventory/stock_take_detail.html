@@ -1,513 +1,463 @@
 {% extends 'base/base.html' %}
 {% load static %}
-{% load math_filters %}
+{% load humanize %}
+{% load inventory_filters %}
 
-{% block title %}
-    {{ stock_take.name }} - Stock Take Detail - Inventory - {{ request.tenant.name }}
-{% endblock %}
+{% block title %}{{ stock_take.name }} - {{ request.tenant.name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/inventory.css' %}">
 <style>
-    .stock-take-container {
-        max-width: 1400px;
+    .stock-take-detail-container {
+        max-width: 1200px;
         margin: 0 auto;
     }
     
-    .header-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .page-header {
+        background: linear-gradient(135deg, #6f42c1 0%, #6610f2 100%);
         color: white;
-        border-radius: 20px;
+        border-radius: 15px;
         padding: 30px;
         margin-bottom: 30px;
-        position: relative;
-        overflow: hidden;
+        box-shadow: 0 8px 25px rgba(111, 66, 193, 0.3);
     }
     
-    .header-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 200px;
-        height: 200px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 50%;
-        transform: translate(50px, -50px);
-    }
-    
-    .header-content {
-        position: relative;
-        z-index: 2;
-    }
-    
-    .header-title {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 10px;
-        display: flex;
+    .status-indicator {
+        display: inline-flex;
         align-items: center;
-        gap: 15px;
-    }
-    
-    .status-badge {
+        gap: 8px;
         padding: 8px 16px;
         border-radius: 20px;
         font-size: 0.9rem;
-        font-weight: 600;
+        font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
     
-    .status-planned {
-        background: rgba(255, 193, 7, 0.2);
+    .status-pending {
+        background: rgba(255, 255, 255, 0.2);
         color: #ffc107;
-        border: 2px solid rgba(255, 193, 7, 0.3);
+        border: 1px solid rgba(255, 193, 7, 0.3);
     }
     
     .status-in_progress {
-        background: rgba(0, 123, 255, 0.2);
-        color: #007bff;
-        border: 2px solid rgba(0, 123, 255, 0.3);
+        background: rgba(255, 255, 255, 0.2);
+        color: #17a2b8;
+        border: 1px solid rgba(23, 162, 184, 0.3);
     }
     
     .status-completed {
-        background: rgba(40, 167, 69, 0.2);
+        background: rgba(255, 255, 255, 0.2);
         color: #28a745;
-        border: 2px solid rgba(40, 167, 69, 0.3);
+        border: 1px solid rgba(40, 167, 69, 0.3);
     }
     
     .status-cancelled {
-        background: rgba(220, 53, 69, 0.2);
-        color: #dc3545;
-        border: 2px solid rgba(220, 53, 69, 0.3);
+        background: rgba(255, 255, 255, 0.2);
+        color: #6c757d;
+        border: 1px solid rgba(108, 117, 125, 0.3);
     }
     
-    .header-meta {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-        margin-top: 20px;
-    }
-    
-    .meta-item {
-        background: rgba(255,255,255,0.1);
-        padding: 15px;
-        border-radius: 10px;
-        backdrop-filter: blur(10px);
-    }
-    
-    .meta-label {
-        font-size: 0.9rem;
-        opacity: 0.9;
-        margin-bottom: 5px;
-    }
-    
-    .meta-value {
-        font-size: 1.1rem;
-        font-weight: 600;
-    }
-    
-    .action-buttons {
-        display: flex;
-        gap: 15px;
-        margin-top: 20px;
-        flex-wrap: wrap;
-    }
-    
-    .stats-grid {
+    .overview-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         gap: 20px;
         margin-bottom: 30px;
     }
     
-    .stat-card {
+    .overview-card {
         background: white;
-        border-radius: 15px;
+        border-radius: 12px;
         padding: 25px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         border: 1px solid #e9ecef;
+        text-align: center;
+        transition: all 0.3s ease;
         position: relative;
         overflow: hidden;
     }
     
-    .stat-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 4px;
-        height: 100%;
-        background: var(--accent-color, #667eea);
-    }
-    
-    .stat-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px;
-    }
-    
-    .stat-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #6c757d;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .stat-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        color: white;
-    }
-    
-    .stat-value {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #2c3e50;
-        margin-bottom: 5px;
-    }
-    
-    .stat-subtitle {
-        font-size: 0.85rem;
-        color: #6c757d;
-    }
-    
-    .progress-card {
-        background: white;
-        border-radius: 15px;
-        padding: 25px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        border: 1px solid #e9ecef;
-        margin-bottom: 30px;
-    }
-    
-    .progress-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    
-    .progress-title {
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #2c3e50;
-    }
-    
-    .progress-percentage {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #667eea;
-    }
-    
-    .progress-bar-container {
-        background: #e9ecef;
-        border-radius: 10px;
-        height: 20px;
-        overflow: hidden;
-        margin-bottom: 15px;
-    }
-    
-    .progress-bar {
-        height: 100%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 10px;
-        transition: width 0.3s ease;
-        position: relative;
-    }
-    
-    .progress-bar::after {
+    .overview-card::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        bottom: 0;
-        background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%);
-        animation: shimmer 2s infinite;
+        height: 4px;
+        background: var(--accent-color, #6f42c1);
     }
     
-    @keyframes shimmer {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
+    .overview-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
     }
     
-    .progress-details {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.9rem;
-        color: #6c757d;
-    }
-    
-    .content-tabs {
-        margin-bottom: 30px;
-    }
-    
-    .nav-tabs {
-        border: none;
-        background: #f8f9fa;
-        border-radius: 15px;
-        padding: 5px;
-    }
-    
-    .nav-tabs .nav-link {
-        border: none;
-        border-radius: 10px;
-        color: #6c757d;
-        font-weight: 600;
-        margin: 0 2px;
-        transition: all 0.3s ease;
-    }
-    
-    .nav-tabs .nav-link.active {
-        background: white;
-        color: #667eea;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    
-    .tab-content {
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        border: 1px solid #e9ecef;
-    }
-    
-    .items-table {
-        margin: 0;
-    }
-    
-    .table {
-        margin: 0;
-    }
-    
-    .table thead th {
-        background: #f8f9fa;
-        border: none;
-        padding: 20px;
-        font-weight: 700;
-        color: #2c3e50;
-        font-size: 0.9rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .table tbody td {
-        padding: 20px;
-        border-top: 1px solid #f8f9fa;
-        vertical-align: middle;
-    }
-    
-    .table tbody tr:hover {
-        background: #f8f9fa;
-    }
-    
-    .item-info {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-    }
-    
-    .item-avatar {
-        width: 50px;
-        height: 50px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .overview-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
+        margin: 0 auto 15px;
+        font-size: 1.5rem;
         color: white;
+        background: var(--accent-color, #6f42c1);
+    }
+    
+    .overview-value {
+        font-size: 2.5rem;
         font-weight: 700;
-        font-size: 1.2rem;
+        margin-bottom: 5px;
+        color: #333;
     }
     
-    .item-details h6 {
-        margin: 0 0 5px 0;
+    .overview-label {
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.9rem;
+    }
+    
+    .progress-section {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .progress-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .progress-title {
+        font-size: 1.3rem;
         font-weight: 600;
-        color: #2c3e50;
+        color: #333;
     }
     
-    .item-category {
+    .progress-percentage {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #6f42c1;
+    }
+    
+    .progress-bar-container {
+        height: 12px;
+        background: #e9ecef;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 15px;
+    }
+    
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #6f42c1, #6610f2);
+        transition: width 0.8s ease-in-out;
+        border-radius: 6px;
+    }
+    
+    .progress-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .progress-stat {
+        text-align: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .progress-stat-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .progress-stat-label {
         font-size: 0.85rem;
         color: #6c757d;
-    }
-    
-    .quantity-input {
-        width: 120px;
-        text-align: center;
-        border: 2px solid #e9ecef;
-        border-radius: 8px;
-        padding: 8px 12px;
-        font-weight: 600;
-    }
-    
-    .quantity-input:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.15);
-        outline: none;
-    }
-    
-    .variance-positive {
-        color: #28a745;
-        font-weight: 600;
-    }
-    
-    .variance-negative {
-        color: #dc3545;
-        font-weight: 600;
-    }
-    
-    .variance-neutral {
-        color: #6c757d;
-        font-weight: 600;
-    }
-    
-    .discrepancy-badge {
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        font-weight: 600;
         text-transform: uppercase;
+        font-weight: 500;
     }
     
-    .discrepancy-high {
-        background: #f8d7da;
-        color: #721c24;
+    .items-section {
+        background: white;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        margin-bottom: 30px;
     }
     
-    .discrepancy-low {
-        background: #d1ecf1;
-        color: #0c5460;
-    }
-    
-    .discrepancy-none {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .btn {
-        padding: 10px 20px;
-        border-radius: 8px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        border: none;
-        cursor: pointer;
-        font-size: 0.9rem;
-        text-decoration: none;
-        display: inline-flex;
+    .section-header {
+        background: #f8f9fa;
+        padding: 20px 30px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: between;
         align-items: center;
+    }
+    
+    .section-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #333;
+        margin: 0;
+    }
+    
+    .items-filter {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .filter-select {
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        background: white;
+    }
+    
+    .items-table {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .items-table th {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 1px solid #dee2e6;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .items-table td {
+        padding: 15px 20px;
+        border-bottom: 1px solid #f1f3f4;
+        vertical-align: middle;
+    }
+    
+    .items-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .item-image {
+        width: 50px;
+        height: 50px;
+        border-radius: 8px;
+        object-fit: cover;
+        border: 2px solid #e9ecef;
+    }
+    
+    .item-name {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 3px;
+    }
+    
+    .item-sku {
+        font-size: 0.85rem;
+        color: #6c757d;
+        font-family: 'Courier New', monospace;
+    }
+    
+    .stock-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .current-stock {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .counted-stock {
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+    
+    .counted-stock.pending {
+        color: #6c757d;
+    }
+    
+    .counted-stock.counted {
+        color: #28a745;
+    }
+    
+    .discrepancy {
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    
+    .discrepancy.positive {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+    
+    .discrepancy.negative {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+    
+    .discrepancy.none {
+        background: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+    
+    .count-input {
+        width: 80px;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        text-align: center;
+        font-weight: 600;
+    }
+    
+    .count-input:focus {
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.25);
+    }
+    
+    .item-actions {
+        display: flex;
         gap: 8px;
     }
     
-    .btn-primary {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    .btn-sm-action {
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
     }
     
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-        color: white;
-    }
-    
-    .btn-success {
+    .btn-success-sm {
         background: #28a745;
         color: white;
     }
     
-    .btn-success:hover {
+    .btn-success-sm:hover {
         background: #218838;
-        transform: translateY(-1px);
         color: white;
     }
     
-    .btn-warning {
-        background: #ffc107;
-        color: #212529;
-    }
-    
-    .btn-warning:hover {
-        background: #e0a800;
-        transform: translateY(-1px);
-        color: #212529;
-    }
-    
-    .btn-danger {
-        background: #dc3545;
-        color: white;
-    }
-    
-    .btn-danger:hover {
-        background: #c82333;
-        transform: translateY(-1px);
-        color: white;
-    }
-    
-    .btn-outline-primary {
+    .btn-outline-sm {
         background: transparent;
-        color: #667eea;
-        border: 2px solid #667eea;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
     }
     
-    .btn-outline-primary:hover {
-        background: #667eea;
-        color: white;
+    .btn-outline-sm:hover {
+        background: #f8f9fa;
+        color: #495057;
     }
     
-    .btn-sm {
-        padding: 6px 12px;
-        font-size: 0.8rem;
-    }
-    
-    .search-filter-bar {
+    .actions-section {
         background: white;
         border-radius: 15px;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        padding: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         border: 1px solid #e9ecef;
+        text-align: center;
     }
     
-    .filter-row {
+    .action-buttons {
         display: flex;
         gap: 15px;
-        align-items: center;
+        justify-content: center;
         flex-wrap: wrap;
     }
     
-    .filter-group {
-        flex: 1;
-        min-width: 200px;
-    }
-    
-    .filter-label {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #6c757d;
-        margin-bottom: 5px;
-        display: block;
-    }
-    
-    .filter-input {
-        width: 100%;
-        border: 2px solid #e9ecef;
+    .btn-action {
+        padding: 12px 24px;
         border-radius: 8px;
-        padding: 10px 15px;
-        font-size: 0.9rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
     }
     
-    .filter-input:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.15);
-        outline: none;
+    .btn-primary-action {
+        background: #6f42c1;
+        color: white;
+    }
+    
+    .btn-primary-action:hover {
+        background: #6610f2;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .btn-success-action {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-success-action:hover {
+        background: #218838;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .btn-outline-action {
+        background: transparent;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+    }
+    
+    .btn-outline-action:hover {
+        background: #f8f9fa;
+        color: #495057;
+        border-color: #adb5bd;
+    }
+    
+    .alert {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 25px;
+        border: none;
+    }
+    
+    .alert-info {
+        background: rgba(23, 162, 184, 0.1);
+        color: #0c5460;
+        border-left: 4px solid #17a2b8;
+    }
+    
+    .alert-warning {
+        background: rgba(255, 193, 7, 0.1);
+        color: #856404;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .alert-success {
+        background: rgba(40, 167, 69, 0.1);
+        color: #155724;
+        border-left: 4px solid #28a745;
     }
     
     .empty-state {
@@ -516,761 +466,406 @@
         color: #6c757d;
     }
     
-    .empty-icon {
-        font-size: 4rem;
+    .empty-state i {
+        font-size: 3rem;
         margin-bottom: 20px;
-        opacity: 0.5;
-    }
-    
-    .empty-title {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin-bottom: 10px;
-    }
-    
-    .empty-subtitle {
-        font-size: 1rem;
-        margin-bottom: 30px;
-    }
-    
-    @media (max-width: 768px) {
-        .header-meta {
-            grid-template-columns: 1fr;
-        }
-        
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .action-buttons {
-            flex-direction: column;
-        }
-        
-        .filter-row {
-            flex-direction: column;
-        }
-        
-        .table-responsive {
-            font-size: 0.9rem;
-        }
-        
-        .item-info {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 10px;
-        }
+        opacity: 0.3;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <div class="page-breadcrumb">
-            <a href="/business/{{ request.tenant.slug }}/inventory/" class="breadcrumb-link">Inventory</a>
-            <i class="fas fa-chevron-right"></i>
-            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/" class="breadcrumb-link">Stock Takes</a>
-            <i class="fas fa-chevron-right"></i>
-            <span class="breadcrumb-current">{{ stock_take.name }}</span>
-        </div>
-    </div>
-</div>
-
-<div class="stock-take-container">
-    <!-- Header Card -->
-    <div class="header-card">
-        <div class="header-content">
-            <div class="header-title">
-                <i class="fas fa-clipboard-list"></i>
-                {{ stock_take.name }}
-                <span class="status-badge status-{{ stock_take.status }}">{{ stock_take.get_status_display }}</span>
-            </div>
-            
-            {% if stock_take.description %}
-                <p class="mb-3" style="opacity: 0.9;">{{ stock_take.description }}</p>
-            {% endif %}
-            
-            <div class="header-meta">
-                <div class="meta-item">
-                    <div class="meta-label">Scheduled Date</div>
-                    <div class="meta-value">{{ stock_take.scheduled_date|date:"M d, Y" }}</div>
-                </div>
-                
-                {% if stock_take.started_at %}
-                    <div class="meta-item">
-                        <div class="meta-label">Started</div>
-                        <div class="meta-value">{{ stock_take.started_at|date:"M d, Y H:i" }}</div>
-                    </div>
-                {% endif %}
-                
-                {% if stock_take.completed_at %}
-                    <div class="meta-item">
-                        <div class="meta-label">Completed</div>
-                        <div class="meta-value">{{ stock_take.completed_at|date:"M d, Y H:i" }}</div>
-                    </div>
-                {% endif %}
-                
-                {% if stock_take.supervisor %}
-                    <div class="meta-item">
-                        <div class="meta-label">Supervisor</div>
-                        <div class="meta-value">{{ stock_take.supervisor.user.get_full_name|default:stock_take.supervisor.user.username }}</div>
-                    </div>
-                {% endif %}
-            </div>
-            
-            <div class="action-buttons">
-                {% if stock_take.status == 'planned' %}
-                    <form method="post" action="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.pk }}/start/" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to start this stock take?')">
-                            <i class="fas fa-play"></i>
-                            Start Stock Take
-                        </button>
-                    </form>
-                {% endif %}
-                
-                {% if stock_take.status == 'in_progress' %}
-                    <form method="post" action="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.pk }}/complete/" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to complete this stock take?')">
-                            <i class="fas fa-check"></i>
-                            Complete Stock Take
-                        </button>
-                    </form>
-                {% endif %}
-                
-                {% if stock_take.status == 'planned' %}
-                    <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.pk }}/edit/" 
-                       class="btn btn-outline-primary">
-                        <i class="fas fa-edit"></i>
-                        Edit
-                    </a>
-                {% endif %}
-                
-                <button type="button" class="btn btn-outline-primary" onclick="window.print()">
-                    <i class="fas fa-print"></i>
-                    Print Report
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Statistics Grid -->
-    <div class="stats-grid">
-        <div class="stat-card" style="--accent-color: #667eea">
-            <div class="stat-header">
-                <div class="stat-title">Total Items</div>
-                <div class="stat-icon" style="background: #667eea;">
-                    <i class="fas fa-boxes"></i>
-                </div>
-            </div>
-            <div class="stat-value">{{ total_items }}</div>
-            <div class="stat-subtitle">Items to count</div>
-        </div>
-        
-        <div class="stat-card" style="--accent-color: #28a745">
-            <div class="stat-header">
-                <div class="stat-title">Counted Items</div>
-                <div class="stat-icon" style="background: #28a745;">
-                    <i class="fas fa-check"></i>
-                </div>
-            </div>
-            <div class="stat-value">{{ counted_items }}</div>
-            <div class="stat-subtitle">Items counted</div>
-        </div>
-        
-        <div class="stat-card" style="--accent-color: #ffc107">
-            <div class="stat-header">
-                <div class="stat-title">Discrepancies</div>
-                <div class="stat-icon" style="background: #ffc107;">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-            </div>
-            <div class="stat-value">{{ discrepancies.count }}</div>
-            <div class="stat-subtitle">Items with variance</div>
-        </div>
-        
-        <div class="stat-card" style="--accent-color: #dc3545">
-            <div class="stat-header">
-                <div class="stat-title">Total Variance</div>
-                <div class="stat-icon" style="background: #dc3545;">
-                    <i class="fas fa-chart-line"></i>
-                </div>
-            </div>
-            <div class="stat-value">KES {{ stock_take.total_variance_value|floatformat:2 }}</div>
-            <div class="stat-subtitle">Value difference</div>
-        </div>
-    </div>
-
-    <!-- Progress Card -->
-    <div class="progress-card">
-        <div class="progress-header">
-            <div class="progress-title">Counting Progress</div>
-            <div class="progress-percentage">{{ progress_percentage|floatformat:1 }}%</div>
-        </div>
-        
-        <div class="progress-bar-container">
-            <div class="progress-bar" style="width: {{ progress_percentage }}%"></div>
-        </div>
-        
-        <div class="progress-details">
-            <span>{{ counted_items }} of {{ total_items }} items counted</span>
-            <span>Remaining: <span id="remainingCount"></span></span>
-        </div>
-    </div>
-
-    <!-- Content Tabs -->
-    <div class="content-tabs">
-        <ul class="nav nav-tabs" id="stockTakeTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="all-items-tab" data-bs-toggle="tab" 
-                        data-bs-target="#all-items" type="button" role="tab">
-                    <i class="fas fa-list"></i>
-                    All Items ({{ total_items }})
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="discrepancies-tab" data-bs-toggle="tab" 
-                        data-bs-target="#discrepancies" type="button" role="tab">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    Discrepancies ({{ discrepancies.count }})
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="pending-tab" data-bs-toggle="tab" 
-                        data-bs-target="#pending" type="button" role="tab">
-                    <i class="fas fa-clock"></i>
-                    Pending (<span id="pendingCount"></span>)
-                </button>
-            </li>
-        </ul>
-        
-        <div class="tab-content" id="stockTakeTabContent">
-            <!-- All Items Tab -->
-            <div class="tab-pane fade show active" id="all-items" role="tabpanel">
-                {% if count_records %}
-                    <!-- Search and Filter Bar -->
-                    <div class="search-filter-bar">
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label class="filter-label">Search Items</label>
-                                <input type="text" class="filter-input" id="itemSearch" 
-                                       placeholder="Search by item name or category...">
-                            </div>
-                            <div class="filter-group">
-                                <label class="filter-label">Status Filter</label>
-                                <select class="filter-input" id="statusFilter">
-                                    <option value="">All Items</option>
-                                    <option value="counted">Counted</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="discrepancy">With Discrepancy</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <label class="filter-label">Category</label>
-                                <select class="filter-input" id="categoryFilter">
-                                    <option value="">All Categories</option>
-                                    {% regroup count_records by item.category as category_groups %}
-                                    {% for category_group in category_groups %}
-                                        <option value="{{ category_group.grouper.name }}">{{ category_group.grouper.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="table-responsive items-table">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th>System Qty</th>
-                                    <th>Counted Qty</th>
-                                    <th>Variance</th>
-                                    <th>Value Variance</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="itemsTableBody">
-                                {% for count in count_records %}
-                                    <tr class="item-row" 
-                                        data-item-name="{{ count.item.name|lower }}"
-                                        data-category="{{ count.item.category.name }}"
-                                        data-status="{% if count.counted_quantity > 0 %}counted{% else %}pending{% endif %}"
-                                        data-has-discrepancy="{% if count.has_discrepancy %}true{% else %}false{% endif %}">
-                                        <td>
-                                            <div class="item-info">
-                                                <div class="item-avatar">
-                                                    {{ count.item.name|first|upper }}
-                                                </div>
-                                                <div class="item-details">
-                                                    <h6>{{ count.item.name }}</h6>
-                                                    <div class="item-category">{{ count.item.category.name }}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <strong>{{ count.system_quantity }} {{ count.item.unit.abbreviation }}</strong>
-                                        </td>
-                                        <td>
-                                            {% if stock_take.status == 'in_progress' %}
-                                                <input type="number" 
-                                                       class="quantity-input" 
-                                                       value="{{ count.counted_quantity }}"
-                                                       data-count-id="{{ count.id }}"
-                                                       min="0" 
-                                                       step="0.01"
-                                                       onchange="updateCount(this)">
-                                            {% else %}
-                                                <strong>{{ count.counted_quantity }} {{ count.item.unit.abbreviation }}</strong>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if count.variance_quantity > 0 %}
-                                                <span class="variance-positive">
-                                                    +{{ count.variance_quantity }} {{ count.item.unit.abbreviation }}
-                                                </span>
-                                            {% elif count.variance_quantity < 0 %}
-                                                <span class="variance-negative">
-                                                    {{ count.variance_quantity }} {{ count.item.unit.abbreviation }}
-                                                </span>
-                                            {% else %}
-                                                <span class="variance-neutral">
-                                                    {{ count.variance_quantity }} {{ count.item.unit.abbreviation }}
-                                                </span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if count.variance_value > 0 %}
-                                                <span class="variance-positive">+KES {{ count.variance_value|floatformat:2 }}</span>
-                                            {% elif count.variance_value < 0 %}
-                                                <span class="variance-negative">KES {{ count.variance_value|floatformat:2 }}</span>
-                                            {% else %}
-                                                <span class="variance-neutral">KES {{ count.variance_value|floatformat:2 }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if count.counted_quantity > 0 %}
-                                                {% if count.has_discrepancy %}
-                                                    <span class="discrepancy-badge discrepancy-high">Discrepancy</span>
-                                                {% else %}
-                                                    <span class="discrepancy-badge discrepancy-none">Counted</span>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="discrepancy-badge discrepancy-low">Pending</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if count.notes %}
-                                                <button type="button" class="btn btn-sm btn-outline-primary" 
-                                                        data-bs-toggle="tooltip" title="{{ count.notes }}">
-                                                    <i class="fas fa-sticky-note"></i>
-                                                </button>
-                                            {% endif %}
-                                            
-                                            {% if count.counted_by %}
-                                                <button type="button" class="btn btn-sm btn-outline-primary" 
-                                                        data-bs-toggle="tooltip" 
-                                                        title="Counted by {{ count.counted_by.user.get_full_name|default:count.counted_by.user.username }} on {{ count.count_date|date:'M d, H:i' }}">
-                                                    <i class="fas fa-user"></i>
-                                                </button>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <i class="fas fa-clipboard-list"></i>
-                        </div>
-                        <div class="empty-title">No Items to Count</div>
-                        <div class="empty-subtitle">This stock take has no items assigned yet.</div>
-                    </div>
-                {% endif %}
-            </div>
-            
-            <!-- Discrepancies Tab -->
-            <div class="tab-pane fade" id="discrepancies" role="tabpanel">
-                {% if discrepancies %}
-                    <div class="table-responsive items-table">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th>System Qty</th>
-                                    <th>Counted Qty</th>
-                                    <th>Variance</th>
-                                    <th>Value Variance</th>
-                                    <th>Counter</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for count in discrepancies %}
-                                    <tr>
-                                        <td>
-                                            <div class="item-info">
-                                                <div class="item-avatar">
-                                                    {{ count.item.name|first|upper }}
-                                                </div>
-                                                <div class="item-details">
-                                                    <h6>{{ count.item.name }}</h6>
-                                                    <div class="item-category">{{ count.item.category.name }}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td><strong>{{ count.system_quantity }} {{ count.item.unit.abbreviation }}</strong></td>
-                                        <td><strong>{{ count.counted_quantity }} {{ count.item.unit.abbreviation }}</strong></td>
-                                        <td>
-                                            {% if count.variance_quantity > 0 %}
-                                                <span class="variance-positive">+{{ count.variance_quantity }} {{ count.item.unit.abbreviation }}</span>
-                                            {% else %}
-                                                <span class="variance-negative">{{ count.variance_quantity }} {{ count.item.unit.abbreviation }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if count.variance_value > 0 %}
-                                                <span class="variance-positive">+KES {{ count.variance_value|floatformat:2 }}</span>
-                                            {% else %}
-                                                <span class="variance-negative">KES {{ count.variance_value|floatformat:2 }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if count.counted_by %}
-                                                {{ count.counted_by.user.get_full_name|default:count.counted_by.user.username }}
-                                                <br><small class="text-muted">{{ count.count_date|date:"M d, H:i" }}</small>
-                                            {% else %}
-                                                <span class="text-muted">Not recorded</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="empty-state">
-                        <div class="empty-icon">
+<div class="container-fluid stock-take-detail-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h2>{{ stock_take.name }}</h2>
+                <p class="mb-3">{{ stock_take.description|default:"Stock take details and counting progress" }}</p>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="status-indicator status-{{ stock_take.status }}">
+                        {% if stock_take.status == 'pending' %}
+                            <i class="fas fa-clock"></i>
+                        {% elif stock_take.status == 'in_progress' %}
+                            <i class="fas fa-tasks"></i>
+                        {% elif stock_take.status == 'completed' %}
                             <i class="fas fa-check-circle"></i>
-                        </div>
-                        <div class="empty-title">No Discrepancies Found</div>
-                        <div class="empty-subtitle">All counted items match the system quantities.</div>
-                    </div>
-                {% endif %}
+                        {% else %}
+                            <i class="fas fa-times-circle"></i>
+                        {% endif %}
+                        {{ stock_take.get_status_display }}
+                    </span>
+                    <span class="text-light">
+                        Created {{ stock_take.created_at|date:"M d, Y" }}
+                        by {{ stock_take.created_by.get_full_name|default:stock_take.created_by.username }}
+                    </span>
+                </div>
             </div>
-            
-            <!-- Pending Tab -->
-            <div class="tab-pane fade" id="pending" role="tabpanel">
-                {% with pending_items=count_records|length %}
-                    {% if pending_items > 0 %}
-                        <div class="table-responsive items-table">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>System Qty</th>
-                                        <th>Expected Value</th>
-                                        {% if stock_take.status == 'in_progress' %}
-                                            <th>Quick Count</th>
-                                        {% endif %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for count in count_records %}
-                                        {% if count.counted_quantity == 0 %}
-                                            <tr>
-                                                <td>
-                                                    <div class="item-info">
-                                                        <div class="item-avatar">
-                                                            {{ count.item.name|first|upper }}
-                                                        </div>
-                                                        <div class="item-details">
-                                                            <h6>{{ count.item.name }}</h6>
-                                                            <div class="item-category">{{ count.item.category.name }}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td><strong>{{ count.system_quantity }} {{ count.item.unit.abbreviation }}</strong></td>
-                                                <td><strong>KES {{ count.system_quantity|mul:count.item.unit_cost|floatformat:2 }}</strong></td>
-                                                {% if stock_take.status == 'in_progress' %}
-                                                    <td>
-                                                        <input type="number" 
-                                                               class="quantity-input" 
-                                                               value="{{ count.counted_quantity }}"
-                                                               data-count-id="{{ count.id }}"
-                                                               min="0" 
-                                                               step="0.01"
-                                                               placeholder="Enter count"
-                                                               onchange="updateCount(this)">
-                                                    </td>
-                                                {% endif %}
-                                            </tr>
-                                        {% endif %}
-                                    {% empty %}
-                                        <tr>
-                                            <td colspan="{% if stock_take.status == 'in_progress' %}4{% else %}3{% endif %}">
-                                                <div class="empty-state">
-                                                    <div class="empty-icon">
-                                                        <i class="fas fa-clipboard-check"></i>
-                                                    </div>
-                                                    <div class="empty-title">All Items Counted</div>
-                                                    <div class="empty-subtitle">Great job! All items have been counted.</div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="empty-state">
-                            <div class="empty-icon">
-                                <i class="fas fa-clipboard-check"></i>
-                            </div>
-                            <div class="empty-title">All Items Counted</div>
-                            <div class="empty-subtitle">Great job! All items have been counted.</div>
-                        </div>
-                    {% endif %}
-                {% endwith %}
+            <div>
+                <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/" class="btn btn-light">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to List
+                </a>
             </div>
         </div>
     </div>
-</div>
 
+    <!-- Overview Cards -->
+    <div class="overview-grid">
+        <div class="overview-card">
+            <div class="overview-icon" style="background-color: #6f42c1;">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <div class="overview-value">{{ stock_take.total_items|default:0 }}</div>
+            <div class="overview-label">Total Items</div>
+        </div>
+        <div class="overview-card">
+            <div class="overview-icon" style="background-color: #28a745;">
+                <i class="fas fa-check"></i>
+            </div>
+            <div class="overview-value">{{ stock_take.counted_items|default:0 }}</div>
+            <div class="overview-label">Counted</div>
+        </div>
+        <div class="overview-card">
+            <div class="overview-icon" style="background-color: #ffc107;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="overview-value">{{ stock_take.discrepancies|default:0 }}</div>
+            <div class="overview-label">Discrepancies</div>
+        </div>
+        <div class="overview-card">
+            <div class="overview-icon" style="background-color: #17a2b8;">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="overview-value">{{ stock_take.progress_percent|default:0 }}%</div>
+            <div class="overview-label">Progress</div>
+        </div>
+    </div>
+
+    <!-- Progress Section -->
+    {% if stock_take.status == 'in_progress' %}
+    <div class="progress-section">
+        <div class="progress-header">
+            <h3 class="progress-title">Counting Progress</h3>
+            <div class="progress-percentage">{{ stock_take.progress_percent|default:0 }}%</div>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: {{ stock_take.progress_percent|default:0 }}%"></div>
+        </div>
+        <div class="progress-stats">
+            <div class="progress-stat">
+                <div class="progress-stat-value">{{ stock_take.counted_items|default:0 }}</div>
+                <div class="progress-stat-label">Counted</div>
+            </div>
+            <div class="progress-stat">
+                <div class="progress-stat-value">{{ stock_take.pending_items|default:0 }}</div>
+                <div class="progress-stat-label">Remaining</div>
+            </div>
+            <div class="progress-stat">
+                <div class="progress-stat-value">{{ stock_take.discrepancies|default:0 }}</div>
+                <div class="progress-stat-label">Discrepancies</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Items Section -->
+    {% if stock_take_items %}
+    <div class="items-section">
+        <div class="section-header">
+            <h3 class="section-title">Items to Count</h3>
+            <div class="items-filter">
+                <label for="statusFilter" class="form-label me-2">Filter:</label>
+                <select id="statusFilter" class="filter-select">
+                    <option value="">All Items</option>
+                    <option value="pending">Pending Count</option>
+                    <option value="counted">Counted</option>
+                    <option value="discrepancy">With Discrepancies</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Current Stock</th>
+                        <th>Counted Stock</th>
+                        <th>Discrepancy</th>
+                        {% if stock_take.status == 'in_progress' %}
+                        <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stock_take_items %}
+                    <tr data-status="{% if item.counted_quantity is not None %}counted{% else %}pending{% endif %}{% if item.has_discrepancy %} discrepancy{% endif %}">
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                {% if item.inventory_item.image %}
+                                <img src="{{ item.inventory_item.image.url }}" alt="{{ item.inventory_item.name }}" class="item-image">
+                                {% else %}
+                                <div class="item-image bg-light d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-box text-muted"></i>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <div class="item-name">{{ item.inventory_item.name }}</div>
+                                    <div class="item-sku">{{ item.inventory_item.sku }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="stock-info">
+                                <div class="current-stock">{{ item.expected_quantity|floatformat:0 }}</div>
+                                <small class="text-muted">{{ item.inventory_item.unit.name }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            {% if item.counted_quantity is not None %}
+                            <div class="counted-stock counted">{{ item.counted_quantity|floatformat:0 }}</div>
+                            {% else %}
+                            {% if stock_take.status == 'in_progress' %}
+                            <input type="number" class="count-input" 
+                                   data-item-id="{{ item.id }}" 
+                                   placeholder="0" 
+                                   min="0" 
+                                   step="1">
+                            {% else %}
+                            <div class="counted-stock pending">—</div>
+                            {% endif %}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.counted_quantity is not None %}
+                                {% with discrepancy=item.counted_quantity|subtract:item.expected_quantity %}
+                                {% if discrepancy > 0 %}
+                                <span class="discrepancy positive">+{{ discrepancy|floatformat:0 }}</span>
+                                {% elif discrepancy < 0 %}
+                                <span class="discrepancy negative">{{ discrepancy|floatformat:0 }}</span>
+                                {% else %}
+                                <span class="discrepancy none">0</span>
+                                {% endif %}
+                                {% endwith %}
+                            {% else %}
+                            <span class="discrepancy none">—</span>
+                            {% endif %}
+                        </td>
+                        {% if stock_take.status == 'in_progress' %}
+                        <td>
+                            <div class="item-actions">
+                                {% if item.counted_quantity is None %}
+                                <button class="btn-sm-action btn-success-sm" onclick="saveCount({{ item.id }})">
+                                    <i class="fas fa-check"></i>
+                                    Save
+                                </button>
+                                {% else %}
+                                <button class="btn-sm-action btn-outline-sm" onclick="editCount({{ item.id }}, {{ item.counted_quantity }})">
+                                    <i class="fas fa-edit"></i>
+                                    Edit
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Actions Section -->
+    <div class="actions-section">
+        {% if stock_take.status == 'pending' %}
+        <div class="alert alert-info">
+            <strong>Ready to start counting!</strong> Click "Start Stock Take" to begin the counting process.
+        </div>
+        <div class="action-buttons">
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/start/" 
+               class="btn-action btn-success-action">
+                <i class="fas fa-play"></i>
+                Start Stock Take
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/edit/" 
+               class="btn-action btn-outline-action">
+                <i class="fas fa-edit"></i>
+                Edit Details
+            </a>
+        </div>
+        
+        {% elif stock_take.status == 'in_progress' %}
+        <div class="alert alert-warning">
+            <strong>Stock take in progress.</strong> Continue counting items or complete the stock take when ready.
+        </div>
+        <div class="action-buttons">
+            {% if stock_take.can_complete %}
+            <button onclick="completeStockTake()" class="btn-action btn-success-action">
+                <i class="fas fa-check"></i>
+                Complete Stock Take
+            </button>
+            {% endif %}
+            <button onclick="pauseStockTake()" class="btn-action btn-outline-action">
+                <i class="fas fa-pause"></i>
+                Pause & Save Progress
+            </button>
+        </div>
+        
+        {% elif stock_take.status == 'completed' %}
+        <div class="alert alert-success">
+            <strong>Stock take completed!</strong> 
+            Completed on {{ stock_take.completed_at|date:"M d, Y \a\\t g:i A" }}.
+        </div>
+        <div class="action-buttons">
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/report/" 
+               class="btn-action btn-primary-action">
+                <i class="fas fa-file-alt"></i>
+                View Report
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/export/" 
+               class="btn-action btn-outline-action">
+                <i class="fas fa-download"></i>
+                Export Results
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Calculate remaining and pending items
-    const totalItems = {{ total_items }};
-    const countedItems = {{ counted_items }};
-    const remainingItems = totalItems - countedItems;
+// Filter functionality
+document.getElementById('statusFilter').addEventListener('change', function() {
+    const filterValue = this.value;
+    const rows = document.querySelectorAll('.items-table tbody tr');
     
-    // Update the remaining count displays
-    const remainingCountElement = document.getElementById('remainingCount');
-    const pendingCountElement = document.getElementById('pendingCount');
+    rows.forEach(row => {
+        if (filterValue === '') {
+            row.style.display = '';
+        } else {
+            const hasClass = row.dataset.status.includes(filterValue);
+            row.style.display = hasClass ? '' : 'none';
+        }
+    });
+});
+
+// Save count functionality
+function saveCount(itemId) {
+    const input = document.querySelector(`input[data-item-id="${itemId}"]`);
+    const countedQuantity = parseFloat(input.value) || 0;
     
-    if (remainingCountElement) {
-        remainingCountElement.textContent = remainingItems;
+    if (countedQuantity < 0) {
+        alert('Quantity cannot be negative');
+        return;
     }
     
-    if (pendingCountElement) {
-        pendingCountElement.textContent = remainingItems;
+    // AJAX call to save count
+    fetch('/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/save-count/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            item_id: itemId,
+            counted_quantity: countedQuantity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Refresh to show updated data
+        } else {
+            alert('Error saving count: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving count');
+    });
+}
+
+// Edit count functionality
+function editCount(itemId, currentQuantity) {
+    const row = document.querySelector(`tr:has(input[data-item-id="${itemId}"])`);
+    const countedCell = row.querySelector('td:nth-child(3)');
+    
+    countedCell.innerHTML = `
+        <input type="number" class="count-input" 
+               data-item-id="${itemId}" 
+               value="${currentQuantity}" 
+               min="0" 
+               step="1">
+    `;
+    
+    const actionsCell = row.querySelector('td:nth-child(5)');
+    actionsCell.innerHTML = `
+        <div class="item-actions">
+            <button class="btn-sm-action btn-success-sm" onclick="saveCount(${itemId})">
+                <i class="fas fa-check"></i>
+                Save
+            </button>
+        </div>
+    `;
+}
+
+// Complete stock take
+function completeStockTake() {
+    if (confirm('Complete this stock take? This will finalize all counts and cannot be undone.')) {
+        window.location.href = '/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.id }}/complete/';
     }
-    
-    // Initialize tooltips if Bootstrap is available
-    if (typeof bootstrap !== 'undefined') {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    }
-    
-    // Search and filter functionality
-    const itemSearch = document.getElementById('itemSearch');
-    const statusFilter = document.getElementById('statusFilter');
-    const categoryFilter = document.getElementById('categoryFilter');
-    const itemRows = document.querySelectorAll('.item-row');
-    
-    function filterItems() {
-        const searchTerm = itemSearch.value.toLowerCase();
-        const statusFilter_value = statusFilter.value;
-        const categoryFilter_value = categoryFilter.value;
-        
-        itemRows.forEach(row => {
-            const itemName = row.dataset.itemName;
-            const category = row.dataset.category;
-            const status = row.dataset.status;
-            const hasDiscrepancy = row.dataset.hasDiscrepancy === 'true';
-            
-            let showRow = true;
-            
-            // Search filter
-            if (searchTerm && !itemName.includes(searchTerm) && !category.toLowerCase().includes(searchTerm)) {
-                showRow = false;
-            }
-            
-            // Status filter
-            if (statusFilter_value) {
-                if (statusFilter_value === 'counted' && status !== 'counted') {
-                    showRow = false;
-                } else if (statusFilter_value === 'pending' && status !== 'pending') {
-                    showRow = false;
-                } else if (statusFilter_value === 'discrepancy' && !hasDiscrepancy) {
-                    showRow = false;
+}
+
+// Pause stock take
+function pauseStockTake() {
+    // Save any pending changes first
+    const unsavedInputs = document.querySelectorAll('.count-input:not([readonly])');
+    if (unsavedInputs.length > 0) {
+        if (confirm('You have unsaved counts. Save them before pausing?')) {
+            // Save all pending counts
+            unsavedInputs.forEach(input => {
+                const itemId = input.dataset.itemId;
+                if (input.value) {
+                    saveCount(itemId);
                 }
-            }
-            
-            // Category filter
-            if (categoryFilter_value && category !== categoryFilter_value) {
-                showRow = false;
-            }
-            
-            row.style.display = showRow ? '' : 'none';
-        });
-    }
-    
-    // Attach event listeners
-    if (itemSearch) itemSearch.addEventListener('input', filterItems);
-    if (statusFilter) statusFilter.addEventListener('change', filterItems);
-    if (categoryFilter) categoryFilter.addEventListener('change', filterItems);
-    
-    // Auto-save count updates
-    let saveTimeout;
-    
-    window.updateCount = function(input) {
-        const countId = input.dataset.countId;
-        const newQuantity = parseFloat(input.value) || 0;
-        
-        // Clear previous timeout
-        clearTimeout(saveTimeout);
-        
-        // Show loading state
-        input.style.borderColor = '#ffc107';
-        
-        // Save after 1 second of no changes
-        saveTimeout = setTimeout(() => {
-            const csrfTokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
-            const csrfToken = csrfTokenElement ? csrfTokenElement.value : getCookie('csrftoken');
-            
-            fetch(`/business/{{ request.tenant.slug }}/inventory/stock-takes/{{ stock_take.pk }}/count/${countId}/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({
-                    counted_quantity: newQuantity
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    input.style.borderColor = '#28a745';
-                    
-                    // Update variance displays in the same row
-                    const row = input.closest('tr');
-                    updateRowVariance(row, data);
-                    
-                    // Reset border color after 2 seconds
-                    setTimeout(() => {
-                        input.style.borderColor = '#e9ecef';
-                    }, 2000);
-                } else {
-                    input.style.borderColor = '#dc3545';
-                    alert('Failed to save count: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                input.style.borderColor = '#dc3545';
-                console.error('Error:', error);
-                alert('Failed to save count. Please try again.');
             });
-        }, 1000);
-    };
-    
-    // Helper function to get CSRF token
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    
-    // Update row variance display
-    function updateRowVariance(row, data) {
-        if (data.variance_quantity !== undefined) {
-            const varianceCell = row.cells[3]; // Variance column
-            const valueVarianceCell = row.cells[4]; // Value variance column
-            const statusCell = row.cells[5]; // Status column
-            
-            // Update quantity variance
-            let varianceClass = 'variance-neutral';
-            let varianceText = data.variance_quantity + ' ' + data.unit;
-            
-            if (data.variance_quantity > 0) {
-                varianceClass = 'variance-positive';
-                varianceText = '+' + varianceText;
-            } else if (data.variance_quantity < 0) {
-                varianceClass = 'variance-negative';
-            }
-            
-            varianceCell.innerHTML = `<span class="${varianceClass}">${varianceText}</span>`;
-            
-            // Update value variance
-            let valueVarianceClass = 'variance-neutral';
-            let valueVarianceText = 'KES ' + data.variance_value.toFixed(2);
-            
-            if (data.variance_value > 0) {
-                valueVarianceClass = 'variance-positive';
-                valueVarianceText = '+' + valueVarianceText;
-            } else if (data.variance_value < 0) {
-                valueVarianceClass = 'variance-negative';
-            }
-            
-            valueVarianceCell.innerHTML = `<span class="${valueVarianceClass}">${valueVarianceText}</span>`;
-            
-            // Update status
-            let statusBadge = '';
-            if (data.counted_quantity > 0) {
-                if (data.has_discrepancy) {
-                    statusBadge = '<span class="discrepancy-badge discrepancy-high">Discrepancy</span>';
-                } else {
-                    statusBadge = '<span class="discrepancy-badge discrepancy-none">Counted</span>';
-                }
-            } else {
-                statusBadge = '<span class="discrepancy-badge discrepancy-low">Pending</span>';
-            }
-            
-            statusCell.innerHTML = statusBadge;
         }
     }
     
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-        // Ctrl + F to focus search
-        if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            if (itemSearch) {
-                itemSearch.focus();
-            }
-        }
-        
-        // Escape to clear search
-        if (e.key === 'Escape') {
-            if (itemSearch) {
-                itemSearch.value = '';
-                filterItems();
-            }
-        }
-    });
+    alert('Progress saved! You can continue this stock take later.');
+}
+
+// Animate progress bar on load
+document.addEventListener('DOMContentLoaded', function() {
+    const progressBar = document.querySelector('.progress-bar-fill');
+    if (progressBar) {
+        const width = progressBar.style.width;
+        progressBar.style.width = '0%';
+        setTimeout(() => {
+            progressBar.style.width = width;
+        }, 500);
+    }
     
-    // Print styles
-    window.addEventListener('beforeprint', function() {
-        // Hide action buttons and input fields when printing
-        document.querySelectorAll('.action-buttons, .quantity-input, .search-filter-bar').forEach(el => {
-            el.style.display = 'none';
-        });
-    });
-    
-    window.addEventListener('afterprint', function() {
-        // Restore elements after printing
-        document.querySelectorAll('.action-buttons, .quantity-input, .search-filter-bar').forEach(el => {
-            el.style.display = '';
-        });
+    // Animate overview values
+    const overviewValues = document.querySelectorAll('.overview-value');
+    overviewValues.forEach(value => {
+        const finalValue = parseInt(value.textContent);
+        if (finalValue > 0) {
+            let currentValue = 0;
+            const increment = Math.ceil(finalValue / 20);
+            const timer = setInterval(() => {
+                currentValue += increment;
+                if (currentValue >= finalValue) {
+                    currentValue = finalValue;
+                    clearInterval(timer);
+                }
+                value.textContent = currentValue;
+            }, 50);
+        }
     });
 });
 </script>

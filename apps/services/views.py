@@ -412,11 +412,28 @@ def quick_order_view(request):
                 # Import here to avoid circular imports
                 from apps.customers.models import Customer, Vehicle
                 
-                # Step 1: Handle Vehicle (now first step)
+                # Step 1: Handle Vehicle (optional when selling inventory items only)
                 existing_vehicle_id = request.POST.get('selected_vehicle_id')
                 vehicle = None
+                skip_vehicle = request.POST.get('skip_vehicle', 'false') == 'true'
                 
-                if existing_vehicle_id:
+                # Initialize vehicle variables to avoid UnboundLocalError
+                vehicle_registration = ''
+                vehicle_make = 'Unknown'
+                vehicle_model = 'Unknown'
+                vehicle_color = 'Unknown'
+                vehicle_type = 'car'
+                vehicle_year = '2020'
+                
+                # Check if only inventory items are being sold (no services)
+                selected_services = request.POST.getlist('selected_services')
+                selected_inventory_items = request.POST.getlist('selected_inventory_items')
+                inventory_only = not selected_services and selected_inventory_items
+                
+                if skip_vehicle or inventory_only:
+                    # Skip vehicle creation for inventory-only orders
+                    vehicle = None
+                elif existing_vehicle_id:
                     # Existing vehicle selected
                     try:
                         vehicle = Vehicle.objects.get(id=existing_vehicle_id, is_active=True)
@@ -560,8 +577,19 @@ def quick_order_view(request):
                     )
                     logger.info(f"Created new customer: {customer.full_name}")
                 
-                # Create vehicle if it's new and assign to customer
-                if not vehicle:
+                # If skipping vehicle and no customer specified, create walk-in customer
+                if (skip_vehicle or inventory_only) and not customer:
+                    customer = Customer.objects.create(
+                        first_name='Walk-in',
+                        last_name='Customer',
+                        customer_id=generate_unique_code('WALK', 6),
+                        is_walk_in=True,
+                        created_by_user_id=request.user.id
+                    )
+                    logger.info("Created walk-in customer for inventory-only order")
+                
+                # Create vehicle if it's new and assign to customer (only if not skipping vehicle)
+                if not vehicle and not skip_vehicle and not inventory_only and vehicle_registration:
                     vehicle = Vehicle.objects.create(
                         customer=customer,
                         registration_number=vehicle_registration,
@@ -573,7 +601,7 @@ def quick_order_view(request):
                         created_by_user_id=request.user.id
                     )
                     logger.info(f"Created new vehicle: {vehicle.registration_number}")
-                elif request.POST.get('add_vehicle_to_customer') == 'on' and customer != vehicle.customer:
+                elif not skip_vehicle and not inventory_only and request.POST.get('add_vehicle_to_customer') == 'on' and vehicle and customer != vehicle.customer:
                     # Add existing vehicle to new customer (transfer ownership)
                     old_customer = vehicle.customer
                     vehicle.customer = customer
@@ -620,11 +648,15 @@ def quick_order_view(request):
                     except ServicePackage.DoesNotExist:
                         raise ValueError("Selected package not found")
                 else:
-                    # Handle individual services
+                    # Handle individual services and inventory items
                     selected_services = request.POST.getlist('selected_services')
-                    if not selected_services:
-                        raise ValueError("At least one service must be selected")
+                    selected_inventory_items = request.POST.getlist('selected_inventory_items')
                     
+                    # Validate that at least one service or inventory item is selected
+                    if not selected_services and not selected_inventory_items:
+                        raise ValueError("At least one service or inventory item must be selected")
+                    
+                    # Process selected services
                     for service_id in selected_services:
                         try:
                             service = Service.objects.get(id=service_id, is_active=True)
@@ -641,13 +673,55 @@ def quick_order_view(request):
                             logger.warning(f"Service {service_id} not found, skipping")
                             continue
                 
+                # Handle inventory items (new feature)
+                selected_inventory_items = request.POST.getlist('selected_inventory_items')
+                if selected_inventory_items:
+                    from apps.inventory.models import InventoryItem, StockMovement
+                    for item_id in selected_inventory_items:
+                        try:
+                            inventory_item = InventoryItem.objects.get(id=item_id, is_active=True)
+                            quantity_field = f'inventory_quantity_{item_id}'
+                            quantity = Decimal(request.POST.get(quantity_field, '1'))
+                            
+                            # Check stock availability
+                            if inventory_item.current_stock < quantity:
+                                logger.warning(f"Insufficient stock for {inventory_item.name}")
+                                continue
+                            
+                            # Create service order item for inventory item
+                            ServiceOrderItem.objects.create(
+                                order=order,
+                                inventory_item=inventory_item,
+                                quantity=quantity,
+                                unit_price=inventory_item.selling_price or inventory_item.unit_cost,
+                                assigned_to=getattr(request, 'employee', None)
+                            )
+                            
+                            # Note: Stock will be deducted when payment is processed
+                            # This allows for order cancellations without affecting stock
+                            
+                            total_amount += (inventory_item.selling_price or inventory_item.unit_cost) * quantity
+                            logger.info(f"Added inventory item: {inventory_item.name} x{quantity}")
+                            
+                        except (InventoryItem.DoesNotExist, ValueError, TypeError):
+                            logger.warning(f"Inventory item {item_id} not found or invalid quantity, skipping")
+                            continue
+                
                 # Calculate totals
                 order.subtotal = total_amount
                 order.calculate_totals()
                 order.save()
                 
-                # Add to queue
-                add_order_to_queue(order)
+                # Check if this is an inventory-only order
+                is_inventory_only = order.is_inventory_only
+                
+                # For inventory-only orders, we can proceed directly to payment
+                if is_inventory_only:
+                    # No need to add to service queue for inventory-only orders
+                    logger.info(f"Inventory-only order {order.order_number} created, ready for payment")
+                else:
+                    # Add service orders to queue
+                    add_order_to_queue(order)
                 
                 # Send order created notification
                 from apps.core.database_router import set_current_tenant
@@ -665,15 +739,25 @@ def quick_order_view(request):
                 
                 # Return appropriate response
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({
+                    response_data = {
                         'success': True,
                         'message': f'Order {order.order_number} created successfully!',
                         'order_id': str(order.id),
                         'order_number': order.order_number,
+                        'is_inventory_only': is_inventory_only,
                         'redirect_url': get_business_url(request, 'services:order_detail', pk=order.id)
-                    })
+                    }
+                    
+                    # For inventory-only orders, update the message
+                    if is_inventory_only:
+                        response_data['message'] = f'Inventory order {order.order_number} created successfully!'
+                    
+                    return JsonResponse(response_data)
                 else:
-                    messages.success(request, f'Quick order {order.order_number} created successfully!')
+                    if is_inventory_only:
+                        messages.success(request, f'Inventory order {order.order_number} created successfully!')
+                    else:
+                        messages.success(request, f'Quick order {order.order_number} created successfully!')
                     return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
                 
         except ValueError as e:
@@ -729,11 +813,50 @@ def quick_order_view(request):
         active_service_count=models.Count('services', filter=models.Q(services__is_active=True))
     ).filter(active_service_count__gt=0)
     
+    # Handle inventory items integration
+    from apps.inventory.models import InventoryItem, Unit
+    selected_items = []
+    selected_unit = None
+    
+    # Check for add_item parameter
+    add_item_id = request.GET.get('add_item')
+    if add_item_id:
+        try:
+            item = InventoryItem.objects.get(id=add_item_id, is_active=True)
+            selected_items.append(item)
+        except InventoryItem.DoesNotExist:
+            messages.warning(request, 'Selected inventory item not found.')
+    
+    # Check for add_unit parameter
+    add_unit_id = request.GET.get('add_unit')
+    if add_unit_id:
+        try:
+            selected_unit = Unit.objects.get(id=add_unit_id, is_active=True)
+        except Unit.DoesNotExist:
+            messages.warning(request, 'Selected unit not found.')
+    
+    # Get available inventory items for the quick order
+    inventory_items = InventoryItem.objects.filter(
+        is_active=True,
+        current_stock__gt=0  # Only show items with stock
+    ).select_related('category', 'unit').order_by('name')[:20]
+    
+    # Get inventory categories that have items with stock
+    from apps.inventory.models import InventoryCategory
+    inventory_categories = InventoryCategory.objects.filter(
+        items__is_active=True,
+        items__current_stock__gt=0
+    ).distinct().order_by('name')
+    
     context = {
         'popular_services': popular_services,
         'all_services': all_services,
         'categories': categories,
-        'service_packages': service_packages, 
+        'service_packages': service_packages,
+        'inventory_items': inventory_items,
+        'inventory_categories': inventory_categories,
+        'selected_items': selected_items,
+        'selected_unit': selected_unit,
         'title': 'Quick Order (Walk-in Customer)'
     }
     return render(request, 'services/quick_order.html', context)
@@ -1858,7 +1981,7 @@ def service_edit_view(request, pk):
         if form.is_valid():
             service = form.save()
             messages.success(request, f'Service "{service.name}" updated successfully!')
-            return redirect('services:detail', pk=service.pk)
+            return redirect(get_business_url(request, 'services:detail', pk=service.pk))
     else:
         form = ServiceForm(instance=service)
     
@@ -2137,7 +2260,7 @@ def cancel_service(request, order_id):
     
     if not order.can_be_cancelled:
         messages.error(request, 'This order cannot be cancelled.')
-        return redirect('services:order_detail', pk=order.pk)
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     cancellation_reason = request.POST.get('reason', '')
     
@@ -2157,7 +2280,7 @@ def cancel_service(request, order_id):
         queue_entry.save()
     
     messages.success(request, f'Order {order.order_number} cancelled successfully.')
-    return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 @login_required
 @employee_required()
@@ -2168,13 +2291,13 @@ def pause_service(request, order_id):
     
     if order.status != 'in_progress':
         messages.error(request, 'Service is not in progress.')
-        return redirect('services:order_detail', pk=order.pk)
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
     order.save()
     
     messages.success(request, 'Service paused.')
-    return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 @login_required
 @employee_required()
@@ -2185,13 +2308,13 @@ def resume_service(request, order_id):
     
     if order.status != 'in_progress':
         messages.error(request, 'Service is not paused.')
-        return redirect('services:order_detail', pk=order.pk)
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     order.internal_notes += f"\nResumed by {request.employee.full_name} at {timezone.now()}"
     order.save()
     
     messages.success(request, 'Service resumed.')
-    return redirect('services:order_detail', pk=order.pk)
+    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 # Payment Views
 @login_required
@@ -2449,7 +2572,7 @@ def assign_bay(request, pk):
             return JsonResponse({'success': True, 'message': message})
         
         messages.success(request, message)
-        return redirect('services:order_detail', pk=order.pk)
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
         
     except ServiceOrder.DoesNotExist:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -2505,7 +2628,7 @@ def rate_service(request, order_id):
     
     if order.status != 'completed':
         messages.error(request, 'Order must be completed to rate.')
-        return redirect('services:order_detail', pk=order.pk)
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
     if request.method == 'POST':
         form = ServiceRatingForm(request.POST)
@@ -2515,7 +2638,7 @@ def rate_service(request, order_id):
             order.save()
             
             messages.success(request, 'Thank you for your feedback!')
-            return redirect('services:order_detail', pk=order.pk)
+            return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     else:
         form = ServiceRatingForm()
     
@@ -2796,7 +2919,7 @@ def quick_service_assign(request):
                 add_order_to_queue(order)
                 
                 messages.success(request, f'Service assigned successfully! Order: {order.order_number}')
-                return redirect('services:order_detail', pk=order.pk)
+                return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
                 
         except Exception as e:
             messages.error(request, f'Error assigning service: {str(e)}')

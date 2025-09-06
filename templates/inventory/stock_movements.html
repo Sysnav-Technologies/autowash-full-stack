@@ -1,7 +1,7 @@
 {% extends 'base/base.html' %}
 {% load static %}
 {% load humanize %}
-{% load math_filters %}
+{% load inventory_filters %}
 
 {% block title %}Stock Movements - {{ request.tenant.name }}{% endblock %}
 
@@ -31,11 +31,12 @@
     
     .stat-item {
         text-align: center;
+        padding: 10px;
     }
     
     .stat-value {
-        font-size: 1.8rem;
-        font-weight: bold;
+        font-size: 2rem;
+        font-weight: 600;
         margin-bottom: 5px;
     }
     
@@ -44,254 +45,278 @@
         opacity: 0.9;
     }
     
-    .form-control, .form-select {
-        border-radius: 8px;
-        border: 1px solid #d1d3e2;
-        padding: 10px 15px;
+    .movements-table {
+        margin: 0;
     }
     
-    .form-control:focus, .form-select:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-    }
-    
-    .table {
-        margin-bottom: 0;
-    }
-    
-    .table thead th {
+    .movements-table th {
         background: #f8f9fa;
-        border-bottom: 2px solid #dee2e6;
+        border: none;
         font-weight: 600;
-        color: #495057;
         padding: 15px 12px;
-        vertical-align: middle;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #495057;
     }
     
-    .table tbody td {
+    .movements-table td {
         padding: 15px 12px;
         vertical-align: middle;
         border-bottom: 1px solid #f1f3f4;
     }
     
-    .table tbody tr:hover {
-        background-color: #f8f9fa;
+    .movements-table tr:hover {
+        background: #f8f9fa;
     }
     
     .movement-badge {
         padding: 6px 12px;
         border-radius: 20px;
         font-size: 0.8rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        font-weight: 500;
+        text-transform: capitalize;
     }
     
     .movement-badge.in {
-        background: #d1f2eb;
-        color: #0c5460;
-        border: 1px solid #b6f7d8;
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+        border: 1px solid rgba(40, 167, 69, 0.2);
     }
     
     .movement-badge.out {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+        border: 1px solid rgba(220, 53, 69, 0.2);
     }
     
     .movement-badge.adjustment {
-        background: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeaa7;
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+        border: 1px solid rgba(255, 193, 7, 0.2);
     }
     
     .movement-badge.transfer {
-        background: #cce5ff;
-        color: #004085;
-        border: 1px solid #b3d7ff;
-    }
-    
-    .quantity-display {
-        font-weight: bold;
-        font-size: 1.1rem;
+        background: rgba(23, 162, 184, 0.1);
+        color: #17a2b8;
+        border: 1px solid rgba(23, 162, 184, 0.2);
     }
     
     .quantity-display.positive {
         color: #28a745;
+        font-weight: 600;
     }
     
     .quantity-display.negative {
         color: #dc3545;
+        font-weight: 600;
     }
     
     .item-link {
-        color: #667eea;
         text-decoration: none;
+        color: #495057;
         font-weight: 500;
     }
     
     .item-link:hover {
-        color: #764ba2;
+        color: #667eea;
         text-decoration: underline;
     }
     
-    .no-movements {
+    .filter-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    
+    .btn-export {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-export:hover {
+        background: linear-gradient(135deg, #20c997, #28a745);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        color: white;
+    }
+    
+    .export-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 25px;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .movements-empty {
         text-align: center;
         padding: 60px 20px;
         color: #6c757d;
     }
     
-    .export-section {
-        background: #f8f9fa;
-        padding: 15px 25px;
-        border-top: 1px solid #dee2e6;
-        display: flex;
-        justify-content: between;
-        align-items: center;
+    .movements-empty i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        opacity: 0.3;
     }
     
-    .btn-export {
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        border: none;
-        color: white;
-        padding: 8px 15px;
-        border-radius: 6px;
-        font-size: 0.9rem;
+    .movements-empty h3 {
+        margin-bottom: 10px;
+        color: #495057;
     }
     
-    .pagination {
-        margin-bottom: 0;
+    .movements-empty p {
+        margin-bottom: 25px;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <div class="page-breadcrumb">
-            <a href="/business/{{ request.tenant.slug }}/inventory/" class="breadcrumb-link">Inventory</a>
-            <i class="fas fa-chevron-right"></i>
-            <span class="breadcrumb-current">Stock Movements</span>
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Stock Movements</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="/business/{{ request.tenant.slug }}/dashboard/">Dashboard</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="/business/{{ request.tenant.slug }}/inventory/">Inventory</a>
+                    </li>
+                    <li class="breadcrumb-item active">Stock Movements</li>
+                </ol>
+            </nav>
         </div>
-        <h1 class="page-title">
-            <i class="fas fa-exchange-alt"></i>
-            Stock Movements
-        </h1>
-        <div class="page-actions">
+        <div class="d-flex gap-2">
+            <a href="/business/{{ request.tenant.slug }}/inventory/" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i>
+                Back to Inventory
+            </a>
             <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/" class="btn btn-primary">
                 <i class="fas fa-plus"></i>
                 New Adjustment
             </a>
         </div>
     </div>
-</div>
 
-<div class="movements-container">
-    <!-- Statistics -->
-    {% if totals %}
-    <div class="stats-section">
-        <div class="row">
-            <div class="col-md-3 stat-item">
-                <div class="stat-value">{{ movements.paginator.count }}</div>
-                <div class="stat-label">Total Movements</div>
-            </div>
-            <div class="col-md-3 stat-item">
-                <div class="stat-value">{{ totals.total_in|default:0 }}</div>
-                <div class="stat-label">Total Stock In</div>
-            </div>
-            <div class="col-md-3 stat-item">
-                <div class="stat-value">{{ totals.total_out|default:0 }}</div>
-                <div class="stat-label">Total Stock Out</div>
-            </div>
-            <div class="col-md-3 stat-item">
-                <div class="stat-value">KES {{ totals.total_value|default:0|floatformat:0|intcomma }}</div>
-                <div class="stat-label">Total Value</div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    
-    <!-- Filters -->
-    <div class="filter-section">
-        <form method="get" class="row g-3">
-            <div class="col-md-3">
-                <label for="item" class="form-label">Item</label>
-                <select name="item" id="item" class="form-select">
-                    <option value="">All Items</option>
-                    {% for item_option in items %}
-                        <option value="{{ item_option.id }}" {% if current_filters.item == item_option.id|stringformat:"s" %}selected{% endif %}>
-                            {{ item_option.name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label for="movement_type" class="form-label">Movement Type</label>
-                <select name="movement_type" id="movement_type" class="form-select">
-                    <option value="">All Types</option>
-                    {% for value, label in movement_types %}
-                        <option value="{{ value }}" {% if current_filters.movement_type == value %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label for="date_from" class="form-label">From Date</label>
-                <input type="date" 
-                       id="date_from"
-                       name="date_from" 
-                       class="form-control" 
-                       value="{{ current_filters.date_from }}">
-            </div>
-            <div class="col-md-2">
-                <label for="date_to" class="form-label">To Date</label>
-                <input type="date" 
-                       id="date_to"
-                       name="date_to" 
-                       class="form-control" 
-                       value="{{ current_filters.date_to }}">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">&nbsp;</label>
-                <div class="btn-group w-100">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> Filter
-                    </button>
-                    <a href="/business/{{ request.tenant.slug }}/inventory/stock/movements/" class="btn btn-outline-secondary">
-                        <i class="fas fa-times"></i> Clear
-                    </a>
+    <div class="movements-container">
+        <!-- Statistics -->
+        {% if totals %}
+        <div class="stats-section">
+            <div class="row">
+                <div class="col-md-3 stat-item">
+                    <div class="stat-value">{{ movements.paginator.count }}</div>
+                    <div class="stat-label">Total Movements</div>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-value">{{ totals.total_in|default:0 }}</div>
+                    <div class="stat-label">Total Stock In</div>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-value">{{ totals.total_out|default:0 }}</div>
+                    <div class="stat-label">Total Stock Out</div>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-value">{{ totals.total_value|default:0|currency }}</div>
+                    <div class="stat-label">Total Value</div>
                 </div>
             </div>
-        </form>
-    </div>
+        </div>
+        {% endif %}
+        
+        <!-- Filters -->
+        <div class="filter-section">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="item" class="form-label">Item</label>
+                    <select name="item" id="item" class="form-select">
+                        <option value="">All Items</option>
+                        {% for item_option in items %}
+                            <option value="{{ item_option.id }}" {% if current_filters.item == item_option.id|stringformat:"s" %}selected{% endif %}>
+                                {{ item_option.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="movement_type" class="form-label">Movement Type</label>
+                    <select name="movement_type" id="movement_type" class="form-select">
+                        <option value="">All Types</option>
+                        {% for type_value, type_label in movement_types %}
+                            <option value="{{ type_value }}" {% if current_filters.movement_type == type_value %}selected{% endif %}>
+                                {{ type_label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="date_from" class="form-label">Date From</label>
+                    <input type="date" name="date_from" id="date_from" class="form-control" value="{{ current_filters.date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="date_to" class="form-label">Date To</label>
+                    <input type="date" name="date_to" id="date_to" class="form-control" value="{{ current_filters.date_to }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i>
+                        Filter
+                    </button>
+                    <a href="/business/{{ request.tenant.slug }}/inventory/stock/movements/" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                        Clear
+                    </a>
+                </div>
+            </form>
+        </div>
 
-    <!-- Movements List -->
-    {% if movements %}
+        {% if movements %}
+        <!-- Movements Table -->
         <div class="table-responsive">
-            <table class="table">
+            <table class="table movements-table">
                 <thead>
                     <tr>
-                        <th width="20%">Item</th>
-                        <th width="12%">Type</th>
-                        <th width="10%">Quantity</th>
-                        <th width="12%">Unit Cost</th>
-                        <th width="12%">Total Value</th>
-                        <th width="15%">Reason</th>
-                        <th width="12%">Date</th>
-                        <th width="10%">By</th>
+                        <th>Item</th>
+                        <th>Type</th>
+                        <th>Quantity</th>
+                        <th>Unit Cost</th>
+                        <th>Total Value</th>
+                        <th>Stock Before</th>
+                        <th>Stock After</th>
+                        <th>Reason</th>
+                        <th>Date</th>
+                        <th>Created By</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for movement in movements %}
                         <tr>
                             <td>
-                                <div class="fw-bold">
-                                    <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ movement.item.id }}/" class="item-link">
-                                        {{ movement.item.name }}
-                                    </a>
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                            <i class="fas fa-box text-muted"></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="fw-medium">
+                                            <a href="/business/{{ request.tenant.slug }}/inventory/items/{{ movement.item.id }}/" class="item-link">
+                                                {{ movement.item.name }}
+                                            </a>
+                                        </div>
+                                        <small class="text-muted">{{ movement.item.sku }}</small>
+                                    </div>
                                 </div>
-                                <small class="text-muted">{{ movement.item.sku }}</small>
                             </td>
                             <td>
                                 <span class="movement-badge {{ movement.movement_type }}">
@@ -304,11 +329,13 @@
                                 </span>
                             </td>
                             <td>
-                                <span class="fw-bold">KES {{ movement.unit_cost|floatformat:2 }}</span>
+                                <span class="fw-bold">{{ movement.unit_cost|currency }}</span>
                             </td>
                             <td>
-                                <span class="fw-bold">KES {{ movement.quantity|mul:movement.unit_cost|floatformat:2|intcomma }}</span>
+                                <span class="fw-bold">{{ movement.quantity|multiply:movement.unit_cost|currency }}</span>
                             </td>
+                            <td>{{ movement.old_stock|default:"-" }} {{ movement.item.unit.abbreviation }}</td>
+                            <td>{{ movement.new_stock|default:"-" }} {{ movement.item.unit.abbreviation }}</td>
                             <td>
                                 <div class="text-truncate" style="max-width: 150px;" title="{{ movement.reason }}">
                                     {{ movement.reason|default:"No reason provided" }}
@@ -372,52 +399,45 @@
                 </nav>
             {% endif %}
         </div>
-    {% else %}
-        <div class="no-movements">
-            <i class="fas fa-exchange-alt fa-4x mb-4"></i>
-            <h5>No Stock Movements Found</h5>
-            <p class="mb-4">
-                {% if current_filters.item or current_filters.movement_type or current_filters.date_from or current_filters.date_to %}
-                    No movements match your current filters.
-                {% else %}
-                    No stock movements have been recorded yet.
-                {% endif %}
-            </p>
-            {% if current_filters.item or current_filters.movement_type or current_filters.date_from or current_filters.date_to %}
-                <a href="/business/{{ request.tenant.slug }}/inventory/stock/movements/" class="btn btn-outline-primary">
-                    Clear Filters
-                </a>
-            {% else %}
-                <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Create First Movement
-                </a>
-            {% endif %}
+        
+        {% else %}
+        <!-- Empty State -->
+        <div class="movements-empty">
+            <i class="fas fa-exchange-alt"></i>
+            <h3>No Stock Movements</h3>
+            <p>There are no stock movements matching your criteria.</p>
+            <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                Create First Adjustment
+            </a>
         </div>
-    {% endif %}
+        {% endif %}
+    </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-submit form on select change
-    const selects = document.querySelectorAll('#item, #movement_type');
-    selects.forEach(select => {
+    // Set default date filter to last 30 days if no filters are set
+    const dateFrom = document.getElementById('date_from');
+    const dateTo = document.getElementById('date_to');
+    
+    if (!dateFrom.value && !dateTo.value) {
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        // Uncomment the next lines to auto-set date range
+        // dateFrom.value = thirtyDaysAgo.toISOString().split('T')[0];
+        // dateTo.value = today.toISOString().split('T')[0];
+    }
+    
+    // Auto-submit form when filters change
+    const filterSelects = document.querySelectorAll('#item, #movement_type');
+    filterSelects.forEach(select => {
         select.addEventListener('change', function() {
             this.form.submit();
-        });
-    });
-    
-    // Auto-submit form on date change (with small delay)
-    const dateInputs = document.querySelectorAll('#date_from, #date_to');
-    let dateTimeout;
-    dateInputs.forEach(input => {
-        input.addEventListener('change', function() {
-            clearTimeout(dateTimeout);
-            dateTimeout = setTimeout(() => {
-                this.form.submit();
-            }, 500);
         });
     });
 });

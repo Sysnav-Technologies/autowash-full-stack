@@ -636,17 +636,25 @@
                 {% if order.status == 'pending' %}
                     <i class="fas fa-clock"></i>
                 {% elif order.status == 'confirmed' %}
-                    <i class="fas fa-check"></i>
+                    {% if order.is_inventory_only %}
+                        <i class="fas fa-box"></i>
+                    {% else %}
+                        <i class="fas fa-check"></i>
+                    {% endif %}
                 {% elif order.status == 'in_progress' %}
                     <i class="fas fa-play"></i>
                 {% elif order.status == 'completed' %}
-                    <i class="fas fa-check-circle"></i>
+                    {% if order.is_inventory_only %}
+                        <i class="fas fa-box-check"></i>
+                    {% else %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
                 {% elif order.status == 'cancelled' %}
                     <i class="fas fa-times-circle"></i>
                 {% elif order.status == 'no_show' %}
                     <i class="fas fa-user-times"></i>
                 {% endif %}
-                {{ order.get_status_display }}
+                {{ order.get_display_status }}
             </span>
             
             <span class="priority-badge priority-{{ order.priority }}">
@@ -716,12 +724,12 @@
             </div>
         </div>
 
-        <!-- Services -->
+        <!-- Services & Inventory Items -->
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title">
                     <i class="fas fa-list-check"></i>
-                    Services
+                    Order Items
                     {% if order.package %}
                         - {{ order.package.name }}
                     {% endif %}
@@ -730,7 +738,7 @@
                     {% if order.status == 'pending' or order.status == 'confirmed' %}
                         <button class="btn btn-outline-primary btn-sm" onclick="editServices()">
                             <i class="fas fa-edit"></i>
-                            Edit Services
+                            Edit Items
                         </button>
                     {% endif %}
                 </div>
@@ -749,7 +757,17 @@
                 {% for item in order_items %}
                     <div class="service-item">
                         <div class="service-header">
-                            <h6 class="service-name">{{ item.service.name }}</h6>
+                            <h6 class="service-name">
+                                {% if item.item_type == 'inventory' %}
+                                    <i class="fas fa-box text-info"></i>
+                                {% else %}
+                                    <i class="fas fa-tools text-primary"></i>
+                                {% endif %}
+                                {{ item.item_name }}
+                                {% if item.item_type == 'inventory' %}
+                                    <span class="badge bg-info">Inventory Item</span>
+                                {% endif %}
+                            </h6>
                             <span class="service-price">
                                 {% if item.quantity > 1 %}
                                     {{ item.quantity }} × KES {{ item.unit_price }} = 
@@ -759,7 +777,12 @@
                         </div>
                         
                         <div class="service-details">
-                            <span><i class="fas fa-clock"></i> {{ item.service.estimated_duration }} min</span>
+                            {% if item.service %}
+                                <span><i class="fas fa-clock"></i> {{ item.service.estimated_duration }} min</span>
+                            {% elif item.inventory_item %}
+                                <span><i class="fas fa-tag"></i> SKU: {{ item.inventory_item.sku|default:"N/A" }}</span>
+                            {% endif %}
+                            
                             {% if item.assigned_to %}
                                 <span><i class="fas fa-user"></i> {{ item.assigned_to.full_name }}</span>
                             {% endif %}
@@ -771,19 +794,28 @@
                             {% endif %}
                         </div>
                         
-                        {% if item.started_at and not item.completed_at %}
-                            <div class="service-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 60%;"></div>
+                        {% if item.service %}
+                            {% if item.started_at and not item.completed_at %}
+                                <div class="service-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 60%;"></div>
+                                    </div>
+                                    <span class="progress-text">In Progress</span>
                                 </div>
-                                <span class="progress-text">In Progress</span>
-                            </div>
-                        {% elif item.completed_at %}
+                            {% elif item.completed_at %}
+                                <div class="service-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 100%;"></div>
+                                    </div>
+                                    <span class="progress-text text-success">Completed</span>
+                                </div>
+                            {% endif %}
+                        {% elif item.inventory_item %}
                             <div class="service-progress">
                                 <div class="progress-bar">
                                     <div class="progress-fill" style="width: 100%;"></div>
                                 </div>
-                                <span class="progress-text text-success">Completed</span>
+                                <span class="progress-text text-info">Ready for Pickup</span>
                             </div>
                         {% endif %}
                         
@@ -802,7 +834,7 @@
                 {% empty %}
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i>
-                        No services added to this order yet.
+                        No services or items added to this order yet.
                     </div>
                 {% endfor %}
             </div>
@@ -921,39 +953,69 @@
             </div>
             <div class="card-body">
                 <div class="d-grid" style="gap: 0.75rem;">
-                    {% if order.status == 'pending' or order.status == 'confirmed' %}
-                        <button class="btn btn-success" onclick="startService()">
-                            <i class="fas fa-play"></i>
-                            Start Service
-                        </button>
+                    {% if order.is_inventory_only %}
+                        <!-- Inventory-only order actions -->
+                        {% if order.payment_status != 'paid' %}
+                            <a href="/business/{{ request.tenant.slug }}/payments/process/{{ order.id }}/" class="btn btn-success">
+                                <i class="fas fa-credit-card"></i>
+                                Process Payment
+                            </a>
+                        {% endif %}
+                        
+                        {% if order.payment_status == 'paid' %}
+                            <div class="alert alert-success mb-3">
+                                <i class="fas fa-check-circle"></i>
+                                Items ready for pickup
+                            </div>
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-outline-primary">
+                                <i class="fas fa-receipt"></i>
+                                Print Receipt
+                            </a>
+                        {% endif %}
+                    {% else %}
+                        <!-- Service order actions -->
+                        {% if order.status == 'pending' or order.status == 'confirmed' %}
+                            {% if order.payment_status == 'paid' %}
+                                <button class="btn btn-success" onclick="startService()">
+                                    <i class="fas fa-play"></i>
+                                    Start Service
+                                </button>
+                            {% else %}
+                                <a href="/business/{{ request.tenant.slug }}/payments/process/{{ order.id }}/" class="btn btn-success">
+                                    <i class="fas fa-credit-card"></i>
+                                    Process Payment First
+                                </a>
+                            {% endif %}
+                        {% endif %}
+                        
+                        {% if order.status == 'in_progress' %}
+                            <button class="btn btn-primary" onclick="completeService()">
+                                <i class="fas fa-check"></i>
+                                Complete Service
+                            </button>
+                        {% endif %}
+                        
+                        {% if order.status == 'completed' and order.payment_status != 'paid' %}
+                            <a href="/business/{{ request.tenant.slug }}/payments/process/{{ order.id }}/" class="btn btn-success">
+                                <i class="fas fa-credit-card"></i>
+                                Process Payment
+                            </a>
+                        {% endif %}
+                        
+                        {% if order.status == 'completed' %}
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-outline-primary">
+                                <i class="fas fa-receipt"></i>
+                                Print Receipt
+                            </a>
+                        {% endif %}
                     {% endif %}
                     
-                    {% if order.status == 'in_progress' %}
-                        <button class="btn btn-primary" onclick="completeService()">
-                            <i class="fas fa-check"></i>
-                            Complete Service
-                        </button>
-                    {% endif %}
-                    
+                    <!-- Common actions for both types -->
                     {% if order.can_be_cancelled %}
                         <button class="btn btn-danger" onclick="cancelService()">
                             <i class="fas fa-times"></i>
                             Cancel Order
                         </button>
-                    {% endif %}
-                    
-                    {% if order.status == 'completed' and order.payment_status != 'paid' %}
-                        <a href="/business/{{ request.tenant.slug }}/payments/process/{{ order.id }}/" class="btn btn-success">
-                            <i class="fas fa-credit-card"></i>
-                            Process Payment
-                        </a>
-                    {% endif %}
-                    
-                    {% if order.status == 'completed' %}
-                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-outline-primary">
-                            <i class="fas fa-receipt"></i>
-                            Print Receipt
-                        </a>
                     {% endif %}
                     
                     <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/print/" class="btn btn-outline-secondary" target="_blank">

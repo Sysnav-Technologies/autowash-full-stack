@@ -342,6 +342,10 @@ class Payment(TenantTimeStampedModel):
             # Store user ID instead of user object
             self.updated_by_user_id = user.id
         self.save()
+
+        # Process inventory deduction if this is the first completed payment for the order
+        if self.service_order:
+            self._process_inventory_deduction(user)
         
         # Check if this is a walk-in customer and we have transaction details
         if (self.customer and hasattr(self.customer, 'is_walk_in') and 
@@ -359,6 +363,71 @@ class Payment(TenantTimeStampedModel):
         
         # Send confirmation notifications
         self.send_payment_confirmation()
+    
+    def _process_inventory_deduction(self, user=None):
+        """Process inventory deduction for the first payment of an order"""
+        from apps.inventory.models import StockMovement
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # Check if this is the first completed payment for this order
+        completed_payments = Payment.objects.filter(
+            service_order=self.service_order,
+            status='completed'
+        ).exclude(id=self.id).exists()
+        
+        if completed_payments:
+            # Inventory has already been deducted by a previous payment
+            return
+        
+        # Process inventory items in the order
+        inventory_items = self.service_order.order_items.filter(inventory_item__isnull=False)
+        
+        for order_item in inventory_items:
+            try:
+                inventory_item = order_item.inventory_item
+                quantity = order_item.quantity
+                
+                # Check if we have enough stock
+                if inventory_item.current_stock < quantity:
+                    logger.warning(
+                        f"Insufficient stock for {inventory_item.name}. "
+                        f"Available: {inventory_item.current_stock}, Required: {quantity}"
+                    )
+                    # You might want to handle this case differently
+                    # For now, we'll continue with the available stock
+                    quantity = inventory_item.current_stock
+                
+                # Deduct from inventory stock
+                old_stock = inventory_item.current_stock
+                inventory_item.current_stock -= quantity
+                inventory_item.save()
+                
+                # Create stock movement record
+                StockMovement.objects.create(
+                    item=inventory_item,
+                    movement_type='out',
+                    quantity=quantity,
+                    unit_cost=inventory_item.unit_cost,
+                    old_stock=old_stock,
+                    new_stock=inventory_item.current_stock,
+                    reference_type='sale',
+                    reference_number=self.service_order.order_number,
+                    service_order=self.service_order,
+                    reason=f'Sold in order {self.service_order.order_number} - Payment {self.payment_id}',
+                    created_by_user_id=user.id if user else None
+                )
+                
+                logger.info(
+                    f"Deducted {quantity} of {inventory_item.name} from stock. "
+                    f"New stock: {inventory_item.current_stock}"
+                )
+                
+            except Exception as e:
+                logger.error(
+                    f"Error processing inventory deduction for item {order_item.id}: {str(e)}"
+                )
     
     def create_customer_save_suggestion(self):
         """Create a suggestion to save walk-in customer details"""

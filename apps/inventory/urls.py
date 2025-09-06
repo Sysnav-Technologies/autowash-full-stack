@@ -11,7 +11,8 @@ urlpatterns = [
     path('items/', views.item_list_view, name='list'),
     path('items/create/', views.item_create_view, name='item_create'),
     path('items/<uuid:pk>/', views.item_detail_view, name='item_detail'),
-    # path('items/<uuid:pk>/edit/', views.item_edit_view, name='item_edit'),
+    path('items/<uuid:pk>/edit/', views.item_edit_view, name='item_edit'),
+    path('items/<uuid:pk>/barcode/', views.generate_barcode, name='generate_barcode'),
     
     # Stock Management
     path('stock/adjustments/', views.stock_adjustment_view, name='stock_adjustment'),
@@ -35,7 +36,8 @@ urlpatterns = [
     # Categories
     path('categories/', views.category_list_view, name='category_list'),
     path('categories/create/', views.category_create_view, name='category_create'),
-    # path('categories/<uuid:pk>/edit/', views.category_edit_view, name='category_edit'),
+    path('categories/<uuid:pk>/edit/', views.category_edit_view, name='category_edit'),
+    path('categories/<uuid:pk>/delete/', views.category_delete_view, name='category_delete'),
     
     # Alerts
     path('alerts/', views.alerts_view, name='alerts'),
@@ -62,6 +64,7 @@ urlpatterns = [
     
     # AJAX endpoints
     path('ajax/items/search/', views.item_search_ajax, name='item_search'),
+    path('ajax/recent-adjustments/', views.recent_adjustments_ajax, name='recent_adjustments'),
     path('ajax/consumption/', views.item_consumption_ajax, name='item_consumption'),
     path('ajax/reconciliation/update/', views.ajax_update_reconciliation_item, name='ajax_update_reconciliation_item'),
     path('ajax/bay-status/', views.get_bay_status, name='get_bay_status'),

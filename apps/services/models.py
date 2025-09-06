@@ -255,7 +255,7 @@ class ServiceOrder(TenantTimeStampedModel):
     
     # Customer and vehicle
     customer = models.ForeignKey('customers.Customer', on_delete=models.CASCADE, related_name='service_orders')
-    vehicle = models.ForeignKey('customers.Vehicle', on_delete=models.CASCADE, related_name='service_orders')
+    vehicle = models.ForeignKey('customers.Vehicle', on_delete=models.CASCADE, related_name='service_orders', null=True, blank=True)
     
     # Service details
     services = models.ManyToManyField('Service', through='ServiceOrderItem')
@@ -623,6 +623,52 @@ class ServiceOrder(TenantTimeStampedModel):
         return 0
     
     @property
+    def is_inventory_only(self):
+        """Check if this order contains only inventory items (no services)"""
+        order_items = self.order_items.all()
+        if not order_items.exists():
+            return False
+        
+        # Check if any item is a service
+        has_services = order_items.filter(service__isnull=False).exists()
+        # Check if any item is inventory
+        has_inventory = order_items.filter(inventory_item__isnull=False).exists()
+        
+        return has_inventory and not has_services
+    
+    @property
+    def has_services(self):
+        """Check if this order contains any services"""
+        return self.order_items.filter(service__isnull=False).exists()
+    
+    @property
+    def has_inventory_items(self):
+        """Check if this order contains any inventory items"""
+        return self.order_items.filter(inventory_item__isnull=False).exists()
+    
+    @property
+    def service_items(self):
+        """Get only service items from this order"""
+        return self.order_items.filter(service__isnull=False)
+    
+    @property
+    def inventory_items(self):
+        """Get only inventory items from this order"""
+        return self.order_items.filter(inventory_item__isnull=False)
+    
+    def get_display_status(self):
+        """Get appropriate status display based on order type"""
+        if self.is_inventory_only:
+            # For inventory-only orders, once paid they're complete
+            if self.payment_status == 'paid':
+                return 'completed'
+            else:
+                return 'pending_payment'
+        else:
+            # Regular service orders follow normal status flow
+            return self.status
+    
+    @property
     def estimated_duration(self):
         """Calculate estimated duration from services"""
         if self.package:
@@ -630,7 +676,9 @@ class ServiceOrder(TenantTimeStampedModel):
         
         total_duration = 0
         for item in self.order_items.all():
-            total_duration += item.service.estimated_duration * item.quantity
+            if item.service:  # Only add duration for service items
+                total_duration += item.service.estimated_duration * item.quantity
+            # Inventory items don't contribute to service duration
         return total_duration
     
     @property
@@ -685,7 +733,8 @@ class ServiceOrder(TenantTimeStampedModel):
 class ServiceOrderItem(models.Model):
     """Individual items in a service order"""
     order = models.ForeignKey(ServiceOrder, on_delete=models.CASCADE, related_name='order_items')
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='order_items')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='order_items', null=True, blank=True)
+    inventory_item = models.ForeignKey('inventory.InventoryItem', on_delete=models.CASCADE, related_name='service_orders', null=True, blank=True)
     
     quantity = models.IntegerField(default=1)
     unit_price = models.DecimalField(max_digits=8, decimal_places=2)
@@ -743,14 +792,44 @@ class ServiceOrderItem(models.Model):
         help_text="Reference to the expense record for this commission"
     )
     
+    @property
+    def item_name(self):
+        """Get the name of the service or inventory item"""
+        if self.service:
+            return self.service.name
+        elif self.inventory_item:
+            return self.inventory_item.name
+        return "Unknown Item"
+    
+    @property 
+    def item_type(self):
+        """Get the type of item (service or inventory)"""
+        if self.service:
+            return "service"
+        elif self.inventory_item:
+            return "inventory"
+        return "unknown"
+    
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if not self.service and not self.inventory_item:
+            raise ValidationError("Either service or inventory item must be specified.")
+        if self.service and self.inventory_item:
+            raise ValidationError("Cannot specify both service and inventory item.")
+    
     def save(self, *args, **kwargs):
+        self.clean()
         if not self.unit_price:
-            self.unit_price = self.service.base_price
+            if self.service:
+                self.unit_price = self.service.base_price
+            elif self.inventory_item:
+                self.unit_price = self.inventory_item.selling_price or self.inventory_item.unit_cost
         self.total_price = self.quantity * self.unit_price
         
         # Calculate commission if assigned to employee and service is completed
         if self.assigned_to and self.completed_at and not self.commission_paid:
-            if not self.commission_rate and self.service.commission_rate:
+            # Only services have commission rates, not inventory items
+            if self.service and not self.commission_rate and self.service.commission_rate:
                 self.commission_rate = self.service.commission_rate
             
             if self.commission_rate > 0:
@@ -782,7 +861,7 @@ class ServiceOrderItem(models.Model):
             expense = Expense.objects.create(
                 category=commission_category,
                 amount=self.commission_amount,
-                description=f"Commission for {self.service.name} - Order #{self.order.order_number}",
+                description=f"Commission for {self.item_name} - Order #{self.order.order_number}",
                 date=timezone.now().date(),
                 status='pending',
                 employee=self.assigned_to,

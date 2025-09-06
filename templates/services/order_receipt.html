@@ -440,14 +440,15 @@
                 <div class="separator"></div>
                 {% endif %}
                 
-                <!-- Service Items -->
+                <!-- Services and Items -->
+                {% if service_order.has_services %}
                 <div class="info-section">
                     <div class="center-text thermal-spacing service-section-title">
                         SERVICES PROVIDED
                     </div>
-                    {% for item in service_order.order_items.all %}
+                    {% for item in service_order.service_items %}
                     <div class="service-item">
-                        <div class="service-name">{{ item.service.name }}</div>
+                        <div class="service-name">{{ item.item_name }}</div>
                         <div class="service-details">
                             <span class="service-qty">Qty: {{ item.quantity|default:1 }}</span>
                             <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
@@ -457,6 +458,30 @@
                     {% endfor %}
                 </div>
                 <div class="separator"></div>
+                {% endif %}
+                
+                {% if service_order.has_inventory_items %}
+                <div class="info-section">
+                    <div class="center-text thermal-spacing service-section-title">
+                        ITEMS PROVIDED
+                    </div>
+                    {% for item in service_order.inventory_items %}
+                    <div class="service-item">
+                        <div class="service-name">{{ item.item_name }}
+                            {% if item.inventory_item.sku %}
+                            <div class="item-sku">SKU: {{ item.inventory_item.sku }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="service-details">
+                            <span class="service-qty">Qty: {{ item.quantity|default:1 }}</span>
+                            <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
+                            <div class="clear-float"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="separator"></div>
+                {% endif %}
                 
                 <!-- Order Totals -->
                 <div class="amount-section">
@@ -660,13 +685,14 @@
                 <div class="preview-separator"></div>
                 {% endif %}
                 
-                <!-- Service Items -->
+                <!-- Order Items -->
+                {% if service_order.has_services %}
                 <div class="preview-info">
-                    <h6 class="text-center mb-2">Services Provided</h6>
-                    {% for item in service_order.order_items.all %}
+                    <h6 class="text-center mb-2"><i class="fas fa-tools me-2"></i>Services Provided</h6>
+                    {% for item in service_order.service_items %}
                     <div class="mb-2">
                         <div class="preview-row">
-                            <span><strong>{{ item.service.name }}</strong></span>
+                            <span><strong>{{ item.item_name }}</strong></span>
                             <strong>KES {{ item.total_price|floatformat:2 }}</strong>
                         </div>
                         <div class="preview-row">
@@ -676,8 +702,33 @@
                     </div>
                     {% endfor %}
                 </div>
-                
                 <div class="preview-separator"></div>
+                {% endif %}
+                
+                {% if service_order.has_inventory_items %}
+                <div class="preview-info">
+                    <h6 class="text-center mb-2"><i class="fas fa-box me-2"></i>Items Provided</h6>
+                    {% for item in service_order.inventory_items %}
+                    <div class="mb-2">
+                        <div class="preview-row">
+                            <span><strong>{{ item.item_name }}</strong></span>
+                            <strong>KES {{ item.total_price|floatformat:2 }}</strong>
+                        </div>
+                        <div class="preview-row">
+                            <span><small>Qty: {{ item.quantity|default:1 }}</small></span>
+                            <span><small>@ KES {{ item.unit_price|floatformat:2 }}</small></span>
+                        </div>
+                        {% if item.inventory_item.sku %}
+                        <div class="preview-row">
+                            <span><small>SKU: {{ item.inventory_item.sku }}</small></span>
+                            <span><small>Inventory Item</small></span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="preview-separator"></div>
+                {% endif %}
                 
                 <!-- Order Totals -->
                 <div class="preview-info">

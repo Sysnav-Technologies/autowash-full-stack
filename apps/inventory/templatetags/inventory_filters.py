@@ -1,9 +1,76 @@
 # Create this file: apps/inventory/templatetags/inventory_filters.py
 
 from django import template
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+import locale
 
 register = template.Library()
+
+@register.filter
+def currency(value):
+    """Format value as Kenyan Shilling"""
+    if value is None:
+        return "KSH 0.00"
+    
+    try:
+        # Convert to decimal for precise formatting
+        if isinstance(value, str):
+            value = Decimal(value)
+        elif not isinstance(value, Decimal):
+            value = Decimal(str(value))
+        
+        # Format with 2 decimal places and thousand separators
+        formatted = "{:,.2f}".format(float(value))
+        return f"KSH {formatted}"
+    except (ValueError, TypeError, InvalidOperation):
+        return "KSH 0.00"
+
+@register.filter
+def ksh(value):
+    """Shorthand for currency filter"""
+    return currency(value)
+
+@register.filter
+def subtract(value, arg):
+    """Subtract arg from value"""
+    try:
+        return float(value) - float(arg)
+    except (ValueError, TypeError):
+        return 0
+
+@register.filter
+def divide(value, arg):
+    """Divide value by arg"""
+    try:
+        if float(arg) == 0:
+            return 0
+        return float(value) / float(arg)
+    except (ValueError, TypeError):
+        return 0
+
+@register.filter
+def multiply(value, arg):
+    """Multiply value by arg"""
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return 0
+
+@register.filter
+def profit_margin(selling_price, unit_cost):
+    """Calculate profit margin percentage"""
+    try:
+        selling_price = float(selling_price or 0)
+        unit_cost = float(unit_cost or 0)
+        
+        if selling_price <= 0:
+            return 0
+        
+        profit = selling_price - unit_cost
+        margin = (profit / selling_price) * 100
+        return round(margin, 1)
+    except (ValueError, TypeError):
+        return 0
 
 @register.filter
 def sum_reorder_value(items):

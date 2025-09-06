@@ -77,8 +77,8 @@ class InventoryItem(TenantSoftDeleteModel):
     item_type = models.CharField(max_length=20, choices=ITEM_TYPES, default='product')
     
     # Identification
-    sku = models.CharField(max_length=50, unique=True, help_text="Stock Keeping Unit")
-    barcode = models.CharField(max_length=100, blank=True, unique=True)
+    sku = models.CharField(max_length=50, unique=True, help_text="Stock Keeping Unit - Will be auto-generated if not provided")
+    barcode = models.CharField(max_length=100, blank=True, null=True, unique=True)
     
     # Measurement
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE)

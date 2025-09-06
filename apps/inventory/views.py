@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods, require_POST
 from django.db import transaction
-from django.db.models import Q, Count, Sum, Avg, F
+from django.db.models import Q, Count, Sum, Avg, F, Max, Case, When, Value, FloatField, IntegerField
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
@@ -276,7 +276,17 @@ def item_create_view(request):
         if form.is_valid():
             item = form.save(commit=False)
             if not item.sku:
-                item.sku = generate_unique_code('ITM', 8)
+                # Generate unique SKU
+                import random
+                import string
+                while True:
+                    # Create SKU with format: ITM-XXXXXXXX
+                    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                    potential_sku = f"ITM-{random_part}"
+                    # Check if this SKU already exists
+                    if not InventoryItem.objects.filter(sku=potential_sku).exists():
+                        item.sku = potential_sku
+                        break
             item.created_by = request.user
             item.save()
             
@@ -305,6 +315,43 @@ def item_create_view(request):
         'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/item_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def item_edit_view(request, pk):
+    """Edit inventory item"""
+    item = get_object_or_404(InventoryItem, pk=pk)
+    
+    if request.method == 'POST':
+        form = InventoryItemForm(request.POST, request.FILES, instance=item)
+        if form.is_valid():
+            updated_item = form.save(commit=False)
+            updated_item.updated_by = request.user
+            updated_item.save()
+            
+            messages.success(request, f'Inventory item "{updated_item.name}" updated successfully!')
+            return redirect(get_business_url(request, 'inventory:item_detail', pk=updated_item.pk))
+    else:
+        form = InventoryItemForm(instance=item)
+    
+    context = {
+        'form': form,
+        'item': item,
+        'title': f'Edit {item.name}',
+        'urls': get_inventory_urls(request),
+    }
+    return render(request, 'inventory/item_form.html', context)
+
+@login_required
+@employee_required()
+def generate_barcode(request, pk):
+    """Generate barcode for an inventory item"""
+    item = get_object_or_404(InventoryItem, pk=pk)
+    
+    # For now, redirect back to item detail
+    # TODO: Implement actual barcode generation
+    messages.info(request, f"Barcode generation for {item.name} coming soon!")
+    return redirect(get_business_url(request, 'inventory:item_detail', pk=pk))
 
 @login_required
 @employee_required(['owner', 'manager'])
@@ -346,42 +393,80 @@ def complete_stock_take(request, pk):
 @employee_required()
 def alerts_view(request):
     """Inventory alerts dashboard"""
-    alerts = InventoryAlert.objects.filter(
-        is_active=True
-    ).select_related('item').order_by('-created_at')
-    
-    # Filter by alert type
-    alert_type = request.GET.get('type')
-    if alert_type:
-        alerts = alerts.filter(alert_type=alert_type)
-    
-    # Filter by priority
+    # Get current filters
+    alert_type = request.GET.get('alert_type')
+    category_id = request.GET.get('category')
     priority = request.GET.get('priority')
-    if priority:
-        alerts = alerts.filter(priority=priority)
     
-    # Separate resolved and unresolved
-    unresolved_alerts = alerts.filter(is_resolved=False)
-    resolved_alerts = alerts.filter(is_resolved=True)[:20]
+    # Get low stock items
+    low_stock_items = InventoryItem.objects.filter(
+        is_active=True,
+        current_stock__lte=F('reorder_point')
+    ).select_related('category', 'unit').exclude(current_stock=0)
     
-    # Group alerts by type
-    alert_counts = {}
-    for alert in unresolved_alerts:
-        alert_type = alert.alert_type
-        if alert_type not in alert_counts:
-            alert_counts[alert_type] = 0
-        alert_counts[alert_type] += 1
+    # Get out of stock items
+    out_of_stock_items = InventoryItem.objects.filter(
+        is_active=True,
+        current_stock=0
+    ).select_related('category', 'unit').annotate(
+        out_of_stock_since=Max('stock_movements__created_at')
+    )
+    
+    # Get expired items (if you have expiry date field)
+    expired_items_list = InventoryItem.objects.filter(
+        is_active=True,
+        expiry_date__lt=timezone.now().date()
+    ).select_related('category', 'unit') if hasattr(InventoryItem, 'expiry_date') else InventoryItem.objects.none()
+    
+    # Get expiring soon items (within 30 days)
+    from datetime import timedelta
+    thirty_days_from_now = timezone.now().date() + timedelta(days=30)
+    expiring_soon_items = InventoryItem.objects.filter(
+        is_active=True,
+        expiry_date__gte=timezone.now().date(),
+        expiry_date__lte=thirty_days_from_now
+    ).select_related('category', 'unit') if hasattr(InventoryItem, 'expiry_date') else InventoryItem.objects.none()
+    
+    # Apply filters
+    if category_id:
+        low_stock_items = low_stock_items.filter(category_id=category_id)
+        out_of_stock_items = out_of_stock_items.filter(category_id=category_id)
+        expired_items_list = expired_items_list.filter(category_id=category_id)
+        expiring_soon_items = expiring_soon_items.filter(category_id=category_id)
+    
+    # Count alerts by type
+    critical_alerts = out_of_stock_items.count() + expired_items_list.count()
+    warning_alerts = low_stock_items.count() + expiring_soon_items.count()
+    expired_items = expired_items_list.count()
+    total_alerts = critical_alerts + warning_alerts
+    
+    # Get categories for filter
+    categories = InventoryCategory.objects.filter(is_active=True).order_by('name')
+    
+    # Alert settings (you might want to store these in a model)
+    alert_settings = {
+        'low_stock_threshold': 20,
+        'expiry_warning_days': 30,
+        'email_notifications': True,
+        'refresh_interval': 5,
+    }
     
     context = {
-        'unresolved_alerts': unresolved_alerts,
-        'resolved_alerts': resolved_alerts,
-        'alert_counts': alert_counts,
-        'alert_types': InventoryAlert.ALERT_TYPES,
-        'priority_levels': InventoryAlert.PRIORITY_LEVELS,
+        'low_stock_items': low_stock_items[:50],  # Limit for performance
+        'out_of_stock_items': out_of_stock_items[:50],
+        'expired_items_list': expired_items_list[:50],
+        'expiring_soon_items': expiring_soon_items[:50],
+        'critical_alerts': critical_alerts,
+        'warning_alerts': warning_alerts,
+        'expired_items': expired_items,
+        'total_alerts': total_alerts,
+        'categories': categories,
         'current_filters': {
-            'type': alert_type,
-            'priority': priority
+            'alert_type': alert_type,
+            'category': category_id,
+            'priority': priority,
         },
+        'alert_settings': alert_settings,
         'title': 'Inventory Alerts',
         'urls': get_inventory_urls(request),
     }
@@ -497,12 +582,124 @@ def category_create_view(request):
     else:
         form = InventoryCategoryForm()
     
+    # Color and icon options for the template
+    color_options = [
+        {'value': '#667eea', 'name': 'Blue', 'default': True},
+        {'value': '#764ba2', 'name': 'Purple'},
+        {'value': '#28a745', 'name': 'Green'},
+        {'value': '#dc3545', 'name': 'Red'},
+        {'value': '#ffc107', 'name': 'Yellow'},
+        {'value': '#17a2b8', 'name': 'Cyan'},
+        {'value': '#6f42c1', 'name': 'Indigo'},
+        {'value': '#e83e8c', 'name': 'Pink'},
+        {'value': '#fd7e14', 'name': 'Orange'},
+        {'value': '#20c997', 'name': 'Teal'},
+        {'value': '#6c757d', 'name': 'Gray'},
+        {'value': '#343a40', 'name': 'Dark'},
+    ]
+    
+    icon_options = [
+        {'class': 'fas fa-tag', 'name': 'Tag', 'default': True},
+        {'class': 'fas fa-box', 'name': 'Box'},
+        {'class': 'fas fa-tools', 'name': 'Tools'},
+        {'class': 'fas fa-car', 'name': 'Car'},
+        {'class': 'fas fa-tint', 'name': 'Liquid'},
+        {'class': 'fas fa-wrench', 'name': 'Wrench'},
+        {'class': 'fas fa-cog', 'name': 'Settings'},
+        {'class': 'fas fa-spray-can', 'name': 'Spray'},
+        {'class': 'fas fa-shopping-bag', 'name': 'Shopping'},
+        {'class': 'fas fa-cube', 'name': 'Cube'},
+        {'class': 'fas fa-boxes', 'name': 'Boxes'},
+        {'class': 'fas fa-industry', 'name': 'Industry'},
+    ]
+    
     context = {
         'form': form,
+        'color_options': color_options,
+        'icon_options': icon_options,
         'title': 'Create Category',
         'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/category_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_edit_view(request, pk):
+    """Edit inventory category"""
+    category = get_object_or_404(InventoryCategory, pk=pk)
+    
+    if request.method == 'POST':
+        form = InventoryCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            category = form.save()
+            messages.success(request, f'Category "{category.name}" updated successfully!')
+            return redirect(get_business_url(request, 'inventory:category_list'))
+    else:
+        form = InventoryCategoryForm(instance=category)
+    
+    # Color and icon options for the template
+    color_options = [
+        {'value': '#667eea', 'name': 'Blue', 'default': True},
+        {'value': '#764ba2', 'name': 'Purple'},
+        {'value': '#28a745', 'name': 'Green'},
+        {'value': '#dc3545', 'name': 'Red'},
+        {'value': '#ffc107', 'name': 'Yellow'},
+        {'value': '#17a2b8', 'name': 'Cyan'},
+        {'value': '#6f42c1', 'name': 'Indigo'},
+        {'value': '#e83e8c', 'name': 'Pink'},
+        {'value': '#fd7e14', 'name': 'Orange'},
+        {'value': '#20c997', 'name': 'Teal'},
+        {'value': '#6c757d', 'name': 'Gray'},
+        {'value': '#343a40', 'name': 'Dark'},
+    ]
+    
+    icon_options = [
+        {'class': 'fas fa-tag', 'name': 'Tag', 'default': True},
+        {'class': 'fas fa-box', 'name': 'Box'},
+        {'class': 'fas fa-tools', 'name': 'Tools'},
+        {'class': 'fas fa-car', 'name': 'Car'},
+        {'class': 'fas fa-tint', 'name': 'Liquid'},
+        {'class': 'fas fa-wrench', 'name': 'Wrench'},
+        {'class': 'fas fa-cog', 'name': 'Settings'},
+        {'class': 'fas fa-spray-can', 'name': 'Spray'},
+        {'class': 'fas fa-shopping-bag', 'name': 'Shopping'},
+        {'class': 'fas fa-cube', 'name': 'Cube'},
+        {'class': 'fas fa-boxes', 'name': 'Boxes'},
+        {'class': 'fas fa-industry', 'name': 'Industry'},
+    ]
+    
+    context = {
+        'form': form,
+        'category': category,
+        'color_options': color_options,
+        'icon_options': icon_options,
+        'title': f'Edit Category - {category.name}',
+        'urls': get_inventory_urls(request),
+    }
+    return render(request, 'inventory/category_form.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def category_delete_view(request, pk):
+    """Delete inventory category"""
+    category = get_object_or_404(InventoryCategory, pk=pk)
+    
+    if request.method == 'POST':
+        try:
+            # Check if category has items
+            items_count = category.inventory_items.count()
+            if items_count > 0:
+                messages.error(request, f'Cannot delete category "{category.name}" because it contains {items_count} items. Please move or delete the items first.')
+                return redirect(get_business_url(request, 'inventory:category_list'))
+            
+            category_name = category.name
+            category.delete()
+            messages.success(request, f'Category "{category_name}" deleted successfully!')
+            
+        except Exception as e:
+            messages.error(request, f'Error deleting category: {str(e)}')
+    
+    return redirect(get_business_url(request, 'inventory:category_list'))
 
 @login_required
 @employee_required()
@@ -527,6 +724,7 @@ def item_search_ajax(request):
                 'sku': item.sku,
                 'current_stock': float(item.current_stock),
                 'unit': item.unit.name,
+                'unit_abbreviation': item.unit.abbreviation,
                 'unit_cost': float(item.unit_cost),
                 'category': item.category.name,
                 'stock_status': item.stock_status,
@@ -626,38 +824,145 @@ def item_consumption_ajax(request):
 @employee_required()
 def inventory_valuation_report(request):
     """Inventory valuation report"""
-    items = InventoryItem.objects.filter(
-        is_active=True,
-        current_stock__gt=0
-    ).select_related('category', 'unit').order_by('category__name', 'name')
+    # Get all active inventory items with filtering
+    items_queryset = InventoryItem.objects.filter(
+        is_active=True
+    ).select_related('category', 'unit')
     
-    # Group by category
-    categories = {}
-    total_value = 0
+    # Apply filters
+    category_id = request.GET.get('category')
+    sort_by = request.GET.get('sort_by', 'value_desc')
+    min_value = request.GET.get('min_value')
     
-    for item in items:
-        category_name = item.category.name
-        if category_name not in categories:
-            categories[category_name] = {
-                'items': [],
-                'total_value': 0,
-                'total_quantity': 0
-            }
-        
-        item_value = item.current_stock * item.unit_cost
-        categories[category_name]['items'].append({
-            'item': item,
-            'value': item_value
+    if category_id:
+        items_queryset = items_queryset.filter(category_id=category_id)
+    
+    if min_value:
+        try:
+            min_val = float(min_value)
+            items_queryset = items_queryset.annotate(
+                total_value=F('current_stock') * F('selling_price')
+            ).filter(total_value__gte=min_val)
+        except ValueError:
+            pass
+    
+    # Annotate with calculated fields
+    items_queryset = items_queryset.annotate(
+        total_value=F('current_stock') * F('selling_price'),
+        profit_margin=Case(
+            When(unit_cost__gt=0, then=(F('selling_price') - F('unit_cost')) / F('unit_cost') * 100),
+            default=Value(0),
+            output_field=FloatField()
+        )
+    )
+    
+    # Apply sorting
+    if sort_by == 'value_desc':
+        items_queryset = items_queryset.order_by('-total_value')
+    elif sort_by == 'value_asc':
+        items_queryset = items_queryset.order_by('total_value')
+    elif sort_by == 'quantity_desc':
+        items_queryset = items_queryset.order_by('-current_stock')
+    elif sort_by == 'quantity_asc':
+        items_queryset = items_queryset.order_by('current_stock')
+    elif sort_by == 'margin_desc':
+        items_queryset = items_queryset.order_by('-profit_margin')
+    elif sort_by == 'margin_asc':
+        items_queryset = items_queryset.order_by('profit_margin')
+    elif sort_by == 'name':
+        items_queryset = items_queryset.order_by('name')
+    else:
+        items_queryset = items_queryset.order_by('name')
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(items_queryset, 25)
+    page = request.GET.get('page')
+    inventory_items = paginator.get_page(page)
+    
+    # Calculate summary statistics
+    all_items = InventoryItem.objects.filter(is_active=True).annotate(
+        total_value=F('current_stock') * F('selling_price'),
+        profit_margin=Case(
+            When(unit_cost__gt=0, then=(F('selling_price') - F('unit_cost')) / F('unit_cost') * 100),
+            default=Value(0),
+            output_field=FloatField()
+        )
+    )
+    
+    # Calculate totals
+    total_inventory_value = all_items.aggregate(
+        total=Sum('total_value')
+    )['total'] or 0
+    
+    total_items = all_items.count()
+    
+    average_margin = all_items.filter(
+        unit_cost__gt=0, selling_price__gt=0
+    ).aggregate(
+        avg=Avg('profit_margin')
+    )['avg'] or 0
+    
+    potential_profit = all_items.aggregate(
+        total=Sum((F('selling_price') - F('unit_cost')) * F('current_stock'))
+    )['total'] or 0
+    
+    # Get categories for filter dropdown
+    categories = InventoryCategory.objects.filter(is_active=True).order_by('name')
+    
+    # Chart data for categories
+    category_chart_data = []
+    category_stats = all_items.values('category__name').annotate(
+        total_value=Sum('total_value'),
+        item_count=Count('id')
+    ).filter(total_value__gt=0).order_by('-total_value')
+    
+    for cat in category_stats:
+        category_chart_data.append({
+            'name': cat['category__name'],
+            'value': float(cat['total_value'] or 0),
+            'items': cat['item_count']
         })
-        categories[category_name]['total_value'] += item_value
-        categories[category_name]['total_quantity'] += item.current_stock
-        total_value += item_value
+    
+    # Chart data for margins
+    margin_chart_data = []
+    margin_stats = all_items.filter(
+        unit_cost__gt=0, selling_price__gt=0
+    ).values('name', 'profit_margin').order_by('-profit_margin')[:10]
+    
+    for item in margin_stats:
+        margin_chart_data.append({
+            'name': item['name'][:20],
+            'margin': float(item['profit_margin'] or 0)
+        })
+    
+    # Trend data (mock for now - you can implement actual trend tracking)
+    import datetime
+    trend_chart_data = []
+    for i in range(30, 0, -1):
+        date = datetime.datetime.now() - datetime.timedelta(days=i)
+        # This would be actual historical data in production
+        trend_chart_data.append({
+            'date': date.strftime('%b %d'),
+            'value': float(total_inventory_value) * (0.95 + (i * 0.001))  # Mock trend
+        })
     
     context = {
+        'inventory_items': inventory_items,
+        'total_inventory_value': float(total_inventory_value) if total_inventory_value else 0.0,
+        'total_items': total_items,
+        'average_margin': float(average_margin) if average_margin else 0.0,
+        'potential_profit': float(potential_profit) if potential_profit else 0.0,
         'categories': categories,
-        'total_value': total_value,
-        'total_items': items.count(),
-        'report_date': timezone.now(),
+        'current_date': timezone.now(),
+        'current_filters': {
+            'category': category_id,
+            'sort_by': sort_by,
+            'min_value': min_value,
+        },
+        'category_chart_data': category_chart_data,
+        'margin_chart_data': margin_chart_data,
+        'trend_chart_data': trend_chart_data,
         'title': 'Inventory Valuation Report',
         'urls': get_inventory_urls(request),
     }
@@ -770,20 +1075,25 @@ def stock_adjustment_view(request, item_id=None):
     item = get_object_or_404(InventoryItem, pk=item_id) if item_id else None
     
     if request.method == 'POST':
-        form = StockAdjustmentForm(request.POST, initial_item=item)
+        # Create a modified POST data with adjustment_type based on quantity
+        post_data = request.POST.copy()
+        quantity = float(post_data.get('quantity', 0))
+        
+        # Determine adjustment type based on quantity
+        if quantity > 0:
+            post_data['adjustment_type'] = 'manual'  # Increase
+        else:
+            post_data['adjustment_type'] = 'manual'  # Decrease
+            
+        form = StockAdjustmentForm(post_data, initial_item=item)
         if form.is_valid():
             try:
                 with transaction.atomic():
                     adjustment = form.save(commit=False)
                     adjustment.old_stock = adjustment.item.current_stock
                     
-                    # Handle quantity based on adjustment type
-                    if adjustment.adjustment_type == 'decrease':
-                        actual_quantity = -abs(adjustment.quantity)  # Make sure it's negative
-                    else:
-                        actual_quantity = abs(adjustment.quantity)   # Make sure it's positive
-                    
-                    adjustment.quantity = actual_quantity
+                    # Use the quantity as-is (positive for increase, negative for decrease)
+                    actual_quantity = adjustment.quantity
                     adjustment.new_stock = adjustment.old_stock + actual_quantity
                     adjustment.set_created_by(request.user)
                     adjustment.save()
@@ -792,26 +1102,21 @@ def stock_adjustment_view(request, item_id=None):
                     adjustment.item.current_stock = adjustment.new_stock
                     adjustment.item.save()
                     
-                    # Auto-approve if user has permission
-                    employee = getattr(request, 'employee', None)
-                    if employee and employee.role in ['owner', 'manager']:
-                        adjustment.approve(request.user)
-                    else:
-                        # Create stock movement only if not auto-approved
-                        # (approve method will create it if auto-approved)
-                        stock_movement = StockMovement.objects.create(
-                            item=adjustment.item,
-                            movement_type='adjustment',
-                            quantity=actual_quantity,
-                            unit_cost=adjustment.unit_cost,
-                            old_stock=adjustment.old_stock,
-                            new_stock=adjustment.new_stock,
-                            reference_type='adjustment',
-                            reason=adjustment.reason,
-                        )
-                        # Set created_by user ID
-                        stock_movement.set_created_by(request.user)
-                        stock_movement.save()
+                    # Create stock movement
+                    movement_type = 'in' if actual_quantity > 0 else 'out'
+                    stock_movement = StockMovement.objects.create(
+                        item=adjustment.item,
+                        movement_type=movement_type,
+                        quantity=abs(actual_quantity),  # StockMovement quantity is always positive
+                        unit_cost=adjustment.unit_cost,
+                        old_stock=adjustment.old_stock,
+                        new_stock=adjustment.new_stock,
+                        reference_type='adjustment',
+                        reason=adjustment.reason,
+                    )
+                    # Set created_by user ID
+                    stock_movement.set_created_by(request.user)
+                    stock_movement.save()
                     
                     messages.success(request, 'Stock adjustment created successfully!')
                     try:
@@ -822,6 +1127,11 @@ def stock_adjustment_view(request, item_id=None):
                     
             except Exception as e:
                 messages.error(request, f'Error creating adjustment: {str(e)}')
+        else:
+            # Add form errors to messages
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = StockAdjustmentForm(initial_item=item)
     
@@ -2155,3 +2465,37 @@ def create_purchase_orders_ajax(request):
         'success': False,
         'error': 'Invalid request method'
     })
+
+@login_required
+@employee_required()
+@ajax_required
+def recent_adjustments_ajax(request):
+    """Get recent adjustments for an item via AJAX"""
+    item_id = request.GET.get('item_id')
+    if not item_id:
+        return JsonResponse({'adjustments': []})
+    
+    try:
+        item = get_object_or_404(InventoryItem, pk=item_id)
+        recent_adjustments = StockAdjustment.objects.filter(
+            item=item
+        ).select_related('created_by').order_by('-created_at')[:10]
+        
+        adjustments_data = []
+        for adj in recent_adjustments:
+            adjustments_data.append({
+                'id': str(adj.id),
+                'quantity': float(adj.quantity),
+                'unit': adj.item.unit.abbreviation,
+                'reason': adj.reason,
+                'date': adj.created_at.strftime('%b %d, %Y'),
+                'time': adj.created_at.strftime('%H:%M'),
+                'created_by': adj.created_by.get_full_name() if adj.created_by else 'System',
+                'old_stock': float(adj.old_stock) if adj.old_stock else 0,
+                'new_stock': float(adj.new_stock) if adj.new_stock else 0,
+                'status': adj.status
+            })
+        
+        return JsonResponse({'adjustments': adjustments_data})
+    except Exception as e:
+        return JsonResponse({'adjustments': [], 'error': str(e)})
