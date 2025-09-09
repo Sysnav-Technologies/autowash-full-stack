@@ -414,6 +414,54 @@
     border: 1px solid var(--gray-200);
 }
 
+.payment-item {
+    padding: 1rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+    background: var(--gray-50);
+}
+
+.payment-item:last-child {
+    margin-bottom: 0;
+}
+
+.payment-header {
+    margin-bottom: 0.5rem;
+}
+
+.payment-amount {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.payment-meta {
+    margin-top: 0.25rem;
+}
+
+.refund-info .alert {
+    margin-bottom: 0.5rem;
+}
+
+.refund-item {
+    padding: 0.5rem 0;
+    border-left: 2px solid var(--warning-300);
+    padding-left: 1rem;
+    margin-left: 1rem;
+    margin-top: 0.5rem;
+}
+
+.payment-actions {
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.payment-summary {
+    background: var(--primary-50);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+}
+
 .alert {
     padding: 1rem;
     border-radius: var(--radius-md);
@@ -1222,6 +1270,110 @@
                             </button>
                         </div>
                     {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Payments Information -->
+        {% if order.has_payments %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-credit-card"></i>
+                        Payments
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for payment in order.get_payments %}
+                        <div class="payment-item">
+                            <div class="payment-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ payment.payment_id }}</strong>
+                                        <span class="badge payment-status payment-{{ payment.status }} ms-2">
+                                            {{ payment.get_status_display }}
+                                        </span>
+                                    </div>
+                                    <div class="payment-amount">
+                                        <strong>KES {{ payment.amount|floatformat:2 }}</strong>
+                                    </div>
+                                </div>
+                                <div class="payment-meta">
+                                    <small class="text-muted">
+                                        {{ payment.created_at|date:"M d, Y g:i A" }} • {{ payment.payment_method.name }}
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <!-- Refund Information -->
+                            {% if payment.total_refunded > 0 %}
+                                <div class="refund-info mt-2">
+                                    <div class="alert alert-warning py-2">
+                                        <i class="fas fa-undo me-2"></i>
+                                        <strong>Refunded:</strong> KES {{ payment.total_refunded|floatformat:2 }}
+                                        {% if payment.status == 'refunded' %}
+                                            <span class="badge bg-warning text-dark ms-2">FULLY REFUNDED</span>
+                                        {% elif payment.refundable_amount > 0 %}
+                                            <br><small>Remaining: KES {{ payment.refundable_amount|floatformat:2 }}</small>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Show individual refunds -->
+                                    {% for refund in payment.refunds.all %}
+                                        <div class="refund-item">
+                                            <small>
+                                                <i class="fas fa-arrow-left text-warning me-1"></i>
+                                                Refund {{ refund.refund_id }}: KES {{ refund.amount|floatformat:2 }}
+                                                <span class="text-muted">• {{ refund.created_at|date:"M d, g:i A" }}</span>
+                                                {% if refund.reason %}
+                                                    <br><em class="text-muted">{{ refund.reason }}</em>
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Payment Actions -->
+                            {% if payment.can_be_refunded and order.payment_status != 'refunded' %}
+                                <div class="payment-actions mt-2">
+                                    <a href="/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/refund/" 
+                                       class="btn btn-outline-warning btn-sm">
+                                        <i class="fas fa-undo me-1"></i>
+                                        Process Refund
+                                        <small>({{ payment.refund_time_remaining }} left)</small>
+                                    </a>
+                                </div>
+                            {% elif payment.refund_time_remaining == "Expired" and payment.refundable_amount > 0 %}
+                                <div class="payment-actions mt-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Refund period expired (72 hours limit)
+                                    </small>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if not forloop.last %}
+                            <hr class="my-3">
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <!-- Payment Summary -->
+                    <div class="payment-summary mt-3 pt-3 border-top">
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Total Paid:</strong>
+                                <div class="text-success">KES {{ order.total_paid|floatformat:2 }}</div>
+                            </div>
+                            <div class="col-6">
+                                <strong>Outstanding:</strong>
+                                <div class="{% if order.outstanding_amount > 0 %}text-danger{% else %}text-success{% endif %}">
+                                    KES {{ order.outstanding_amount|floatformat:2 }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         {% endif %}

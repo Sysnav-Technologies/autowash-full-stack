@@ -150,6 +150,18 @@ class MPesaPaymentForm(forms.Form):
         help_text="Enter the customer's M-Pesa registered phone number"
     )
     
+    # Optional payment code field for businesses without gateway
+    payment_code = forms.CharField(
+        max_length=50,
+        required=False,
+        label="M-Pesa Payment Code (Optional)",
+        widget=forms.TextInput(attrs={
+            'placeholder': 'e.g. NLJ7RT61SX',
+            'class': 'form-control form-control-lg'
+        }),
+        help_text="Enter the M-Pesa transaction code if payment was made manually"
+    )
+    
     def __init__(self, *args, **kwargs):
         # Extract initial phone number if provided
         initial_phone = kwargs.pop('initial_phone', None)
@@ -162,15 +174,15 @@ class MPesaPaymentForm(forms.Form):
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Field('phone_number', css_class='mb-3'),
+            Field('payment_code', css_class='mb-3'),
             HTML('<div class="alert alert-info mt-3 mb-4">'),
             HTML('<i class="fas fa-info-circle me-2"></i> '),
-            HTML('<strong>What happens next:</strong><br>'),
-            HTML('• The customer will receive an M-Pesa prompt on their phone<br>'),
-            HTML('• They need to enter their M-Pesa PIN to complete payment<br>'),
-            HTML('• Payment confirmation will appear here automatically'),
+            HTML('<strong>Two payment options:</strong><br>'),
+            HTML('• <strong>With Gateway:</strong> Leave payment code empty - customer will receive M-Pesa prompt<br>'),
+            HTML('• <strong>Manual Payment:</strong> Ask customer to pay to your till number, then enter the M-Pesa code here'),
             HTML('</div>'),
             FormActions(
-                Submit('submit', 'Send M-Pesa Request', css_class='btn btn-success btn-lg w-100 py-3'),
+                Submit('submit', 'Process M-Pesa Payment', css_class='btn btn-success btn-lg w-100 py-3'),
                 HTML('<a href="javascript:history.back()" class="btn btn-outline-secondary mt-2 w-100">Cancel</a>')
             )
         )
@@ -254,6 +266,10 @@ class PaymentRefundForm(forms.ModelForm):
             max_refund = self.payment.amount - self.payment.total_refunded
             self.fields['amount'].widget.attrs['max'] = str(max_refund)
             self.fields['amount'].help_text = f"Maximum refund amount: KES {max_refund}"
+            
+            # Auto-fill with full refundable amount if not already set
+            if not self.data and not self.initial.get('amount'):
+                self.fields['amount'].initial = max_refund
         
         self.helper = FormHelper()
         self.helper.layout = Layout(

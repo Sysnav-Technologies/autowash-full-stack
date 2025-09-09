@@ -283,6 +283,20 @@ class Payment(TenantTimeStampedModel):
         if self.status not in ['completed', 'verified']:
             return False
         
+        # Check if payment is within 72 hours
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        if self.completed_at:
+            time_limit = self.completed_at + timedelta(hours=72)
+            if timezone.now() > time_limit:
+                return False
+        else:
+            # If no completion time, use creation time
+            time_limit = self.created_at + timedelta(hours=72)
+            if timezone.now() > time_limit:
+                return False
+        
         # Can be refunded if there's still refundable amount
         return self.refundable_amount > 0
     
@@ -297,6 +311,24 @@ class Payment(TenantTimeStampedModel):
     def refundable_amount(self):
         """Get amount available for refund"""
         return self.amount - self.total_refunded
+    
+    @property
+    def refund_time_remaining(self):
+        """Get time remaining for refund eligibility"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        if self.completed_at:
+            time_limit = self.completed_at + timedelta(hours=72)
+        else:
+            time_limit = self.created_at + timedelta(hours=72)
+        
+        remaining = time_limit - timezone.now()
+        if remaining.total_seconds() > 0:
+            hours = int(remaining.total_seconds() // 3600)
+            minutes = int((remaining.total_seconds() % 3600) // 60)
+            return f"{hours}h {minutes}m"
+        return "Expired"
     
     @property
     def payment_type_display(self):
