@@ -1006,30 +1006,50 @@ def payment_refund_view(request, payment_id):
     payment = get_object_or_404(Payment, payment_id=payment_id)
     
     if not payment.can_be_refunded:
-        messages.error(request, 'This payment cannot be refunded.')
-        return redirect('payments:detail', payment_id=payment_id)
+        if payment.refund_time_remaining == "Expired":
+            messages.error(request, 'This payment cannot be refunded. The 72-hour refund period has expired.')
+        else:
+            messages.error(request, 'This payment cannot be refunded.')
+        return redirect(f'/business/{request.tenant.slug}/payments/{payment_id}/')
     
     if request.method == 'POST':
         form = PaymentRefundForm(request.POST, payment=payment)
+        
         if form.is_valid():
             try:
+                amount = form.cleaned_data['amount']
+                reason = form.cleaned_data['reason']
+                
                 with transaction.atomic():
-                    refund = form.save(commit=False)
-                    refund.original_payment = payment
-                    refund.processed_by = request.employee
-                    refund.save()
+                    # Create refund record
+                    refund = PaymentRefund.objects.create(
+                        original_payment=payment,
+                        amount=amount,
+                        reason=reason,
+                        status='completed',
+                        processed_by=getattr(request.user, 'employee_profile', None) if request.user.is_authenticated else None,
+                        processed_at=timezone.now(),
+                        refund_id=generate_unique_code('REF', 8)
+                    )
                     
-                    # Process refund (this would integrate with payment gateways)
-                    refund.process_refund(request.user)
+                    # Update payment status if fully refunded
+                    if payment.total_refunded + amount >= payment.amount:
+                        payment.status = 'refunded'
+                        payment.save()
                     
-                    messages.success(request, f'Refund {refund.refund_id} processed successfully!')
-                    return redirect('payments:detail', payment_id=payment_id)
+                    messages.success(request, f'Refund {refund.refund_id} of KES {amount} processed successfully!')
+                    return redirect(f'/business/{request.tenant.slug}/payments/{payment_id}/')
                     
             except Exception as e:
+                logger.error(f"Refund processing error: {e}")
                 messages.error(request, f'Error processing refund: {str(e)}')
+        else:
+            # Form validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field.title()}: {error}")
     else:
-        # Pre-fill with payment amount
-        form = PaymentRefundForm(payment=payment, initial={'amount': payment.amount})
+        form = PaymentRefundForm(payment=payment)
     
     context = {
         'payment': payment,

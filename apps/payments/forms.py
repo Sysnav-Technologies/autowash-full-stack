@@ -266,6 +266,10 @@ class PaymentRefundForm(forms.ModelForm):
             max_refund = self.payment.amount - self.payment.total_refunded
             self.fields['amount'].widget.attrs['max'] = str(max_refund)
             self.fields['amount'].help_text = f"Maximum refund amount: KES {max_refund}"
+            
+            # Auto-fill with full refundable amount if not already set
+            if not self.data and not self.initial.get('amount'):
+                self.fields['amount'].initial = max_refund
         
         self.helper = FormHelper()
         self.helper.layout = Layout(
