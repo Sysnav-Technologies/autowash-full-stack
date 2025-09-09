@@ -28,6 +28,54 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def process_manual_mpesa_payment(request, payment, phone_number, payment_code):
+    """Process manual M-Pesa payment with transaction code"""
+    try:
+        # Update payment with manual M-Pesa details
+        payment.customer_phone = phone_number
+        payment.transaction_id = payment_code
+        payment.status = 'completed'
+        payment.completed_at = timezone.now()
+        payment.processed_by_user_id = request.user.id if request.user.is_authenticated else None
+        payment.notes = f"Manual M-Pesa payment processed with code: {payment_code}"
+        payment.save()
+        
+        # Create M-Pesa transaction record for tracking
+        try:
+            from .models import MPesaTransaction
+            mpesa_transaction = MPesaTransaction.objects.create(
+                payment=payment,
+                phone_number=phone_number,
+                mpesa_receipt_number=payment_code,
+                status='completed',
+                response_data={'manual_entry': True, 'processed_by': request.user.id}
+            )
+        except Exception as e:
+            logger.warning(f"Could not create MPesaTransaction record: {e}")
+        
+        messages.success(request, 
+            f'M-Pesa payment processed successfully! Transaction code: {payment_code}')
+        
+        # Check if this completes a service order
+        if payment.service_order:
+            # Calculate total payments for this order
+            from django.db.models import Sum
+            total_paid = payment.service_order.payments.filter(
+                status__in=['completed', 'verified']
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+            
+            # If order is fully paid, redirect to order receipt
+            if total_paid >= payment.service_order.total_amount:
+                return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/receipt/')
+        
+        # Otherwise redirect to payment receipt
+        return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/receipt/?print=true')
+        
+    except Exception as e:
+        logger.error(f"Error processing manual M-Pesa payment: {e}")
+        messages.error(request, f'Error processing payment: {str(e)}')
+        return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/mpesa/')
+
 def get_payment_urls(request):
     """Generate all payment URLs for templates with tenant slug."""
     tenant_slug = request.tenant.slug
@@ -777,7 +825,8 @@ def process_mpesa_payment_view(request, payment_id):
         form = MPesaPaymentForm(request.POST)
         if form.is_valid():
             phone_number = form.cleaned_data['phone_number']
-            logger.info(f"Form valid, phone: {phone_number}")
+            payment_code = form.cleaned_data.get('payment_code', '').strip()
+            logger.info(f"Form valid, phone: {phone_number}, payment_code: {payment_code}")
             
             # Validate phone number
             is_valid, formatted_phone = validate_mpesa_phone(phone_number)
@@ -791,6 +840,31 @@ def process_mpesa_payment_view(request, payment_id):
                 })
             
             try:
+                # Check if gateway is available
+                mpesa_gateway = PaymentGateway.objects.filter(
+                    gateway_type='mpesa', 
+                    is_active=True
+                ).first()
+                
+                # If payment code is provided, process as manual payment
+                if payment_code:
+                    return process_manual_mpesa_payment(
+                        request, payment, formatted_phone, payment_code
+                    )
+                
+                # If no gateway available but no payment code, show error
+                if not mpesa_gateway:
+                    messages.error(request, 
+                        'M-Pesa gateway not configured. Please ask customer to send payment to your '
+                        'till number and enter the M-Pesa transaction code in the payment code field.')
+                    return render(request, 'payments/process_mpesa.html', {
+                        'payment': payment,
+                        'form': form,
+                        'title': f'M-Pesa Payment - {payment.payment_id}',
+                        'no_gateway': True
+                    })
+                
+                # Process with gateway (existing logic)
                 logger.info(f"Initializing M-Pesa service for payment {payment_id}")
                 # Initialize M-Pesa service
                 mpesa_service = MPesaService()
@@ -827,11 +901,19 @@ def process_mpesa_payment_view(request, payment_id):
         
         form = MPesaPaymentForm(initial_phone=initial_phone)
     
+    # Check if gateway is available
+    mpesa_gateway = PaymentGateway.objects.filter(
+        gateway_type='mpesa', 
+        is_active=True
+    ).first()
+    
     context = {
         'payment': payment,
         'form': form,
         'title': f'M-Pesa Payment - {payment.payment_id}',
-        'initial_phone': initial_phone  # Pass to template
+        'initial_phone': initial_phone,  # Pass to template
+        'has_gateway': mpesa_gateway is not None,
+        'mpesa_gateway': mpesa_gateway
     }
     
     return render(request, 'payments/process_mpesa.html', context)

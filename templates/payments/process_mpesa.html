@@ -94,6 +94,32 @@
         margin: 1rem 0;
     }
     
+    .option-card {
+        border: 2px solid #e5e7eb !important;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .option-card:hover {
+        border-color: #10b981 !important;
+        background-color: #f0fdf4;
+    }
+    
+    .option-card.selected {
+        border-color: #10b981 !important;
+        background-color: #f0fdf4;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    }
+    
+    .payment-code-field {
+        transition: all 0.3s ease;
+    }
+    
+    .payment-code-field.hidden {
+        opacity: 0.3;
+        pointer-events: none;
+    }
+    
     .status-icon {
         font-size: 3rem;
         margin-bottom: 1rem;
@@ -147,17 +173,76 @@
                     <form method="post" id="mpesaForm">
                         {% csrf_token %}
                         
+                        {% if has_gateway %}
                         <div class="attendant-note">
                             <h6 class="text-primary mb-2">
-                                <i class="fas fa-user-tie me-2"></i>Attendant Instructions
+                                <i class="fas fa-user-tie me-2"></i>Payment Options Available
                             </h6>
-                            <ol class="mb-0 small">
-                                <li>Enter customer's M-Pesa phone number below</li>
-                                <li>Click "Send Request" - payment prompt will be sent to customer's phone</li>
-                                <li>Ask customer to check their phone and enter M-Pesa PIN</li>
-                                <li>Wait for payment confirmation on this screen</li>
-                            </ol>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="option-card border rounded p-3 mb-3" id="automaticOption" onclick="selectPaymentMode('automatic')">
+                                        <h6 class="text-success"><i class="fas fa-mobile-alt me-2"></i>Automatic (Gateway)</h6>
+                                        <ol class="mb-0 small">
+                                            <li>Enter customer's M-Pesa number</li>
+                                            <li>Leave payment code empty</li>
+                                            <li>Customer receives prompt on phone</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="option-card border rounded p-3 mb-3" id="manualOption" onclick="selectPaymentMode('manual')">
+                                        <h6 class="text-info"><i class="fas fa-keyboard me-2"></i>Manual Entry</h6>
+                                        <ol class="mb-0 small">
+                                            <li>Customer pays to your till number</li>
+                                            <li>Customer gets confirmation SMS with code</li>
+                                            <li>Enter the transaction code here</li>
+                                            <li>Payment processed immediately</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        {% else %}
+                        <div class="attendant-note">
+                            <h6 class="text-warning mb-2">
+                                <i class="fas fa-keyboard me-2"></i>Manual Payment Required
+                            </h6>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="option-card border rounded p-3 mb-3 selected" id="manualOption">
+                                        <h6 class="text-warning"><i class="fas fa-keyboard me-2"></i>Manual Entry (Only Option)</h6>
+                                        <ol class="mb-0 small">
+                                            <li>Customer pays to your till number</li>
+                                            <li>Customer gets confirmation SMS with code</li>
+                                            <li>Enter the transaction code here</li>
+                                            <li>Payment processed immediately</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if not has_gateway %}
+                        <div class="attendant-note">
+                            <h6 class="text-warning mb-2">
+                                <i class="fas fa-exclamation-triangle me-2"></i>No Gateway Configured
+                            </h6>
+                            <div class="alert alert-warning">
+                                <strong>Manual payment process:</strong>
+                                <ol class="mb-2 mt-2">
+                                    <li><strong>Ask customer to send payment</strong> via M-Pesa to your till number</li>
+                                    <li><strong>Customer will receive confirmation SMS</strong> with transaction code (e.g., NLJ7RT61SX)</li>
+                                    <li><strong>Get the transaction code from customer</strong> and enter it below</li>
+                                    <li><strong>Click process</strong> to complete the payment</li>
+                                </ol>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    The transaction code is required to verify the payment was made
+                                </small>
+                            </div>
+                        </div>
+                        {% endif %}
                         
                         <div class="mb-4">
                             <div class="form-floating">
@@ -167,12 +252,29 @@
                                        title="Enter customer's M-Pesa phone number">
                                 <label><i class="fas fa-mobile-alt me-2"></i>Customer's M-Pesa Phone Number</label>
                             </div>
-                            <small class="text-muted">Format: 254xxxxxxxxx or 0xxxxxxxxx (10 digits for 0, 12 digits for 254)</small>
+                            <small class="text-muted">Format: 254xxxxxxxxx or 0xxxxxxxxx</small>
+                        </div>
+                        
+                        <div class="mb-4" id="paymentCodeField">
+                            <div class="form-floating">
+                                <input type="text" class="form-control form-control-lg" id="paymentCode" name="payment_code" 
+                                       placeholder="NLJ7RT61SX" 
+                                       {% if not has_gateway %}required{% endif %}
+                                       title="Enter M-Pesa transaction code">
+                                <label><i class="fas fa-receipt me-2"></i>M-Pesa Transaction Code {% if not has_gateway %}<span class="text-danger">*</span>{% else %}<span class="text-muted">(Optional)</span>{% endif %}</label>
+                            </div>
+                            <small class="text-muted" id="paymentCodeHelp">
+                                {% if has_gateway %}
+                                Leave empty to send automatic payment request, or enter code for manual processing
+                                {% else %}
+                                Enter the M-Pesa transaction code from customer's payment confirmation SMS
+                                {% endif %}
+                            </small>
                         </div>
                         
                         <div class="text-center">
                             <button type="submit" class="btn btn-mpesa btn-lg px-5 py-3 w-100">
-                                <i class="fas fa-paper-plane me-2"></i>Send Payment Request
+                                <i class="fas fa-paper-plane me-2"></i>Process M-Pesa Payment
                             </button>
                         </div>
                     </form>
@@ -239,14 +341,75 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endif %}
 
 <script>
+let currentPaymentMode = 'automatic'; // Default mode
+
+function selectPaymentMode(mode) {
+    currentPaymentMode = mode;
+    
+    const automaticOption = document.getElementById('automaticOption');
+    const manualOption = document.getElementById('manualOption');
+    const paymentCodeField = document.getElementById('paymentCodeField');
+    const paymentCodeInput = document.getElementById('paymentCode');
+    const paymentCodeHelp = document.getElementById('paymentCodeHelp');
+    const submitBtn = document.querySelector('button[type="submit"]');
+    
+    // Remove selected class from both options
+    automaticOption.classList.remove('selected');
+    manualOption.classList.remove('selected');
+    
+    if (mode === 'automatic') {
+        // Select automatic mode
+        automaticOption.classList.add('selected');
+        paymentCodeField.classList.add('payment-code-field', 'hidden');
+        paymentCodeInput.required = false;
+        paymentCodeInput.value = '';
+        paymentCodeHelp.textContent = 'Payment code not needed - customer will receive STK push';
+        submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Send Payment Request';
+    } else {
+        // Select manual mode
+        manualOption.classList.add('selected');
+        paymentCodeField.classList.remove('hidden');
+        paymentCodeField.classList.add('payment-code-field');
+        paymentCodeInput.required = true;
+        paymentCodeHelp.textContent = 'Enter the M-Pesa transaction code from customer\'s payment confirmation SMS';
+        submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Process Manual Payment';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('mpesaForm');
     
     if (form) {
-        form.addEventListener('submit', function(e) {
-            const phoneInput = this.querySelector('input[name="phone_number"]');
-            const submitBtn = this.querySelector('button[type="submit"]');
+        const phoneInput = form.querySelector('input[name="phone_number"]');
+        const paymentCodeInput = form.querySelector('input[name="payment_code"]');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const hasGateway = {% if has_gateway %}true{% else %}false{% endif %};
+        
+        // Set initial mode based on gateway availability
+        if (hasGateway) {
+            // Gateway available - default to automatic mode
+            selectPaymentMode('automatic');
+        } else {
+            // No gateway available - force manual mode only
+            currentPaymentMode = 'manual';
+            const paymentCodeField = document.getElementById('paymentCodeField');
+            const paymentCodeInput = document.getElementById('paymentCode');
+            const submitBtn = document.querySelector('button[type="submit"]');
             
+            // Set manual mode permanently
+            paymentCodeField.classList.remove('hidden');
+            paymentCodeField.classList.add('payment-code-field');
+            paymentCodeInput.required = true;
+            submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Process Manual Payment';
+            
+            // Mark the manual option as selected
+            const manualOption = document.getElementById('manualOption');
+            if (manualOption) {
+                manualOption.classList.add('selected');
+            }
+        }
+        
+        form.addEventListener('submit', function(e) {
             if (!phoneInput.value.trim()) {
                 e.preventDefault();
                 alert('Please enter customer\'s M-Pesa phone number');
@@ -254,13 +417,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Disable button and show processing state
+            if (currentPaymentMode === 'manual' && !paymentCodeInput.value.trim()) {
+                e.preventDefault();
+                alert('Manual Payment Process:\n\n1. Ask customer to send money to your M-Pesa till number\n2. Customer will receive an M-Pesa confirmation SMS with transaction code\n3. Enter that transaction code here to complete the payment\n\nPlease get the transaction code from the customer before proceeding.');
+                paymentCodeInput.focus();
+                return;
+            }
+            
+            if (!hasGateway && !paymentCodeInput.value.trim()) {
+                e.preventDefault();
+                alert('No payment gateway configured. Please:\n\n1. Ask customer to send payment to your M-Pesa till number\n2. Get the M-Pesa transaction code from customer\n3. Enter the code below to complete payment');
+                paymentCodeInput.focus();
+                return;
+            }
+            
+            // Update button based on whether it's manual or automatic processing
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending Request...';
+            if (currentPaymentMode === 'manual' || paymentCodeInput.value.trim()) {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing Manual Payment...';
+            } else {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending Payment Request...';
+            }
         });
         
         // Format phone number as user types
-        const phoneInput = form.querySelector('input[name="phone_number"]');
         phoneInput.addEventListener('input', function() {
             let value = this.value.replace(/\D/g, ''); // Remove non-digits
             
@@ -271,6 +451,18 @@ document.addEventListener('DOMContentLoaded', function() {
             
             this.value = value;
         });
+        
+        // Update button text based on payment code presence (only if gateway available)
+        if (paymentCodeInput && hasGateway) {
+            paymentCodeInput.addEventListener('input', function() {
+                const hasCode = this.value.trim().length > 0;
+                if (hasCode && currentPaymentMode === 'automatic') {
+                    selectPaymentMode('manual');
+                } else if (!hasCode && currentPaymentMode === 'manual') {
+                    selectPaymentMode('automatic');
+                }
+            });
+        }
     }
 });
 </script>
