@@ -138,31 +138,33 @@
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
-                            <th>Order ID</th>
+                            <th>Payment ID</th>
+                            <th>Order Number</th>
                             <th>Customer</th>
-                            <th>Attendant</th>
+                            <th>Payment Method</th>
                             <th>Amount</th>
                             <th>Status</th>
-                            <th>Date</th>
+                            <th>Payment Date</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for order in report_data.items %}
+                        {% for payment in report_data.items %}
                         <tr>
-                            <td>#{{ order.order_number|default:order.id }}</td>
-                            <td>{{ order.customer.full_name|default:"N/A" }}</td>
-                            <td>{{ order.assigned_attendant.full_name|default:"Unassigned" }}</td>
-                            <td>KES {{ order.total_amount|floatformat:2 }}</td>
+                            <td>#{{ payment.payment_id|default:payment.id }}</td>
+                            <td>{{ payment.service_order.order_number|default:"N/A" }}</td>
+                            <td>{{ payment.service_order.customer.full_name|default:"N/A" }}</td>
+                            <td>{{ payment.payment_method.name|default:"Unknown" }}</td>
+                            <td><strong class="text-success">KES {{ payment.amount|floatformat:2 }}</strong></td>
                             <td>
-                                <span class="badge {% if order.status == 'completed' %}bg-success{% elif order.status == 'pending' %}bg-warning{% elif order.status == 'in_progress' %}bg-info{% else %}bg-secondary{% endif %}">
-                                    {{ order.get_status_display }}
+                                <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'verified' %}bg-info{% elif payment.status == 'processing' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ payment.get_status_display|default:payment.status|title }}
                                 </span>
                             </td>
-                            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+                            <td>{{ payment.completed_at|date:"M d, Y H:i" }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No orders found</td>
+                            <td colspan="7" class="text-center text-muted">No payments found for the selected period</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -223,9 +225,9 @@
                         <tr>
                             <th>Service</th>
                             <th>Category</th>
-                            <th>Price</th>
-                            <th>Orders</th>
-                            <th>Revenue</th>
+                            <th>Base Price</th>
+                            <th>Paid Orders</th>
+                            <th>Actual Revenue</th>
                             <th>Avg Rating</th>
                         </tr>
                     </thead>
@@ -235,8 +237,8 @@
                             <td>{{ service.name }}</td>
                             <td>{{ service.category.name|default:"Uncategorized" }}</td>
                             <td>KES {{ service.base_price|floatformat:2 }}</td>
-                            <td>{{ service.orders_count|default:0 }}</td>
-                            <td>KES {{ service.total_revenue|default:0|floatformat:2 }}</td>
+                            <td>{{ service.paid_orders_count|default:0 }}</td>
+                            <td><strong class="text-success">KES {{ service.actual_revenue|default:0|floatformat:2 }}</strong></td>
                             <td>
                                 {% if service.avg_rating %}
                                 {{ service.avg_rating|floatformat:1 }}/5
@@ -247,7 +249,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No services found</td>
+                            <td colspan="6" class="text-center text-muted">No services with payments found</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -261,9 +263,9 @@
                             <th>Customer</th>
                             <th>Email</th>
                             <th>Phone</th>
-                            <th>Orders</th>
-                            <th>Total Spent</th>
-                            <th>Last Order</th>
+                            <th>Payments</th>
+                            <th>Total Paid</th>
+                            <th>Last Payment</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -272,13 +274,11 @@
                             <td>{{ customer.full_name }}</td>
                             <td>{{ customer.email|default:"N/A" }}</td>
                             <td>{{ customer.phone_number|default:"N/A" }}</td>
-                            <td>{{ customer.total_orders|default:customer.orders_count|default:0 }}</td>
-                            <td>KES {{ customer.total_spent|default:customer.customer_total_spent|default:0|floatformat:2 }}</td>
+                            <td>{{ customer.payments_count|default:0 }}</td>
+                            <td><strong class="text-success">KES {{ customer.customer_total_spent|default:0|floatformat:2 }}</strong></td>
                             <td>
-                                {% if customer.last_order_date %}
-                                {{ customer.last_order_date|date:"M d, Y" }}
-                                {% elif customer.last_order %}
-                                {{ customer.last_order|date:"M d, Y" }}
+                                {% if customer.last_payment %}
+                                {{ customer.last_payment|date:"M d, Y" }}
                                 {% else %}
                                 N/A
                                 {% endif %}
@@ -286,15 +286,15 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No customers found</td>
+                            <td colspan="6" class="text-center text-muted">No customers with payments found</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     {% if report_data.items %}
                     <tfoot class="table-secondary">
                         <tr>
-                            <th colspan="4" class="text-end">Total Customer Value:</th>
-                            <th class="text-success">KES {{ report_data.summary.total_customer_value|default:0|floatformat:2 }}</th>
+                            <th colspan="4" class="text-end">Total Revenue:</th>
+                            <th class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</th>
                             <th></th>
                         </tr>
                     </tfoot>
@@ -308,10 +308,10 @@
                         <tr>
                             <th>Employee</th>
                             <th>Department</th>
-                            <th>Position</th>
-                            <th>Orders Handled</th>
+                            <th>Paid Orders</th>
+                            <th>Assigned Orders</th>
                             <th>Revenue Generated</th>
-                            <th>Completion Rate</th>
+                            <th>Conversion Rate</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -319,12 +319,12 @@
                         <tr>
                             <td>{{ employee.full_name }}</td>
                             <td>{{ employee.department.name|default:"N/A" }}</td>
-                            <td>{{ employee.position.title|default:"N/A" }}</td>
-                            <td>{{ employee.orders_handled|default:0 }}</td>
-                            <td>KES {{ employee.revenue_generated|default:0|floatformat:2 }}</td>
+                            <td>{{ employee.paid_orders_handled|default:0 }}</td>
+                            <td>{{ employee.total_orders_assigned|default:0 }}</td>
+                            <td><strong class="text-success">KES {{ employee.revenue_generated|default:0|floatformat:2 }}</strong></td>
                             <td>
-                                {% if employee.orders_handled and employee.completed_orders %}
-                                {{ employee.completed_orders|div:employee.orders_handled|mul:100|floatformat:1 }}%
+                                {% if employee.payment_conversion_rate %}
+                                {{ employee.payment_conversion_rate|floatformat:1 }}%
                                 {% else %}
                                 N/A
                                 {% endif %}
@@ -332,10 +332,19 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No employees found</td>
+                            <td colspan="6" class="text-center text-muted">No employees with payment data found</td>
                         </tr>
                         {% endfor %}
                     </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="4" class="text-end">Total Revenue:</th>
+                            <th class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
                 </table>
 
                 <!-- Payments Table -->
@@ -510,19 +519,49 @@
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
+                                        <h6 class="text-primary">Employee Information</h6>
                                         <table class="table table-sm">
-                                            <tr><td><strong>Employee ID:</strong></td><td>{{ report_data.employee.employee_id }}</td></tr>
-                                            <tr><td><strong>Department:</strong></td><td>{{ report_data.employee.department.name|default:"N/A" }}</td></tr>
-                                            <tr><td><strong>Position:</strong></td><td>{{ report_data.employee.position|default:"N/A" }}</td></tr>
+                                            <tr><td><strong>Employee ID:</strong></td><td>{{ report_data.employee_details.employee_id|default:"N/A" }}</td></tr>
+                                            <tr><td><strong>Department:</strong></td><td>{{ report_data.employee_details.department|default:"N/A" }}</td></tr>
+                                            <tr><td><strong>Position:</strong></td><td>{{ report_data.employee_details.position|default:"N/A" }}</td></tr>
+                                            <tr><td><strong>Email:</strong></td><td>{{ report_data.employee_details.email|default:"N/A" }}</td></tr>
+                                            <tr><td><strong>Phone:</strong></td><td>{{ report_data.employee_details.phone_number|default:"N/A" }}</td></tr>
+                                            <tr><td><strong>Status:</strong></td><td>
+                                                <span class="badge {% if report_data.employee_details.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                                    {% if report_data.employee_details.is_active %}Active{% else %}Inactive{% endif %}
+                                                </span>
+                                            </td></tr>
                                         </table>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
+                                        <h6 class="text-primary">Performance Metrics</h6>
                                         <table class="table table-sm">
-                                            <tr><td><strong>Orders Handled:</strong></td><td>{{ report_data.summary.orders_handled|default:0 }}</td></tr>
+                                            <tr><td><strong>Total Payments:</strong></td><td>{{ report_data.summary.total_payments|default:0 }}</td></tr>
                                             <tr><td><strong>Revenue Generated:</strong></td><td>KES {{ report_data.summary.revenue_generated|default:0|floatformat:2 }}</td></tr>
-                                            <tr><td><strong>Avg Order Value:</strong></td><td>KES {{ report_data.summary.avg_order_value|default:0|floatformat:2 }}</td></tr>
+                                            <tr><td><strong>Avg Payment Value:</strong></td><td>KES {{ report_data.summary.avg_payment_value|default:0|floatformat:2 }}</td></tr>
+                                            <tr><td><strong>Orders Assigned:</strong></td><td>{{ report_data.summary.total_orders_assigned|default:0 }}</td></tr>
+                                            <tr><td><strong>Payment Conversion Rate:</strong></td><td>{{ report_data.summary.payment_conversion_rate|default:0|floatformat:1 }}%</td></tr>
                                         </table>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6 class="text-primary">Attendance & Payment Methods</h6>
+                                        <table class="table table-sm">
+                                            <tr><td><strong>Attendance Rate:</strong></td><td>{{ report_data.summary.attendance_rate|default:0|floatformat:1 }}%</td></tr>
+                                            <tr><td><strong>Days Present:</strong></td><td>{{ report_data.summary.present_days|default:0 }}</td></tr>
+                                            <tr><td><strong>Total Days:</strong></td><td>{{ report_data.summary.total_attendance_days|default:0 }}</td></tr>
+                                        </table>
+                                        {% if report_data.payment_methods %}
+                                        <h6 class="text-secondary mt-3">Payment Methods Used</h6>
+                                        <div class="small">
+                                            {% for method in report_data.payment_methods %}
+                                            <div class="d-flex justify-content-between">
+                                                <span>{{ method.payment_method__name }}:</span>
+                                                <span>KES {{ method.total_amount|floatformat:0 }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -533,31 +572,31 @@
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
-                            <th>Date</th>
+                            <th>Payment Date</th>
                             <th>Order Number</th>
                             <th>Customer</th>
-                            <th>Service</th>
+                            <th>Payment Method</th>
                             <th>Amount</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for order in report_data.items %}
+                        {% for payment in report_data.items %}
                         <tr>
-                            <td>{{ order.created_at|date:"M d, Y" }}</td>
-                            <td>{{ order.order_number }}</td>
-                            <td>{{ order.customer.full_name|truncatechars:25 }}</td>
-                            <td>{{ order.assigned_attendant.full_name|default:"Various Services" }}</td>
-                            <td><strong class="text-success">KES {{ order.total_amount|floatformat:2 }}</strong></td>
+                            <td>{{ payment.completed_at|date:"M d, Y H:i" }}</td>
+                            <td>{{ payment.service_order.order_number|default:"N/A" }}</td>
+                            <td>{{ payment.service_order.customer.full_name|default:"N/A"|truncatechars:25 }}</td>
+                            <td>{{ payment.payment_method.name|default:"N/A" }}</td>
+                            <td><strong class="text-success">KES {{ payment.amount|floatformat:2 }}</strong></td>
                             <td>
-                                <span class="badge {% if order.status == 'completed' %}bg-success{% elif order.status == 'pending' %}bg-warning{% else %}bg-secondary{% endif %}">
-                                    {{ order.status|title }}
+                                <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'verified' %}bg-info{% else %}bg-secondary{% endif %}">
+                                    {{ payment.status|title }}
                                 </span>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No orders found for this employee</td>
+                            <td colspan="6" class="text-center text-muted">No payments found for this employee in the selected period</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -584,22 +623,24 @@
                     <thead class="table-primary">
                         <tr>
                             <th>Date</th>
-                            <th>Orders</th>
+                            <th>Payments</th>
                             <th>Revenue</th>
-                            <th>Completed Orders</th>
+                            <th>Unique Customers</th>
+                            <th>Orders Paid</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for day in report_data.items %}
                         <tr>
-                            <td>{{ day.created_at__date|date:"M d, Y" }}</td>
-                            <td>{{ day.orders_count }}</td>
+                            <td>{{ day.completed_at__date|date:"M d, Y" }}</td>
+                            <td>{{ day.payments_count }}</td>
                             <td><strong class="text-success">KES {{ day.revenue|floatformat:2 }}</strong></td>
-                            <td>{{ day.completed_orders }}</td>
+                            <td>{{ day.unique_customers }}</td>
+                            <td>{{ day.unique_orders }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted">No daily data found</td>
+                            <td colspan="5" class="text-center text-muted">No daily payment data found</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -607,9 +648,10 @@
                     <tfoot class="table-secondary">
                         <tr>
                             <th>Totals</th>
-                            <th>{{ report_data.summary.total_days }} days</th>
-                            <th class="text-success">KES {{ report_data.summary.avg_daily_revenue|floatformat:2 }} avg/day</th>
-                            <th>{{ report_data.summary.avg_daily_orders|floatformat:0 }} avg/day</th>
+                            <th>{{ report_data.summary.total_payments }} payments</th>
+                            <th class="text-success">KES {{ report_data.summary.total_revenue|floatformat:2 }}</th>
+                            <th>{{ report_data.summary.avg_daily_payments|floatformat:0 }} avg/day</th>
+                            <th>KES {{ report_data.summary.avg_payment_value|floatformat:2 }} avg value</th>
                         </tr>
                     </tfoot>
                     {% endif %}
@@ -722,6 +764,78 @@
                             <th colspan="3" class="text-end">Total Sales:</th>
                             <th class="text-success">KES {{ report_data.summary.total_sales_revenue|floatformat:2 }}</th>
                             <th>{{ report_data.summary.total_items_sold }} items</th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+
+                <!-- Vehicle Analysis Report -->
+                {% elif selected_report_type == 'vehicle_analysis' %}
+                <table class="table table-bordered table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Vehicle</th>
+                            <th>Customer</th>
+                            <th>License Plate</th>
+                            <th>Services Count</th>
+                            <th>Total Spent</th>
+                            <th>Last Service</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vehicle in report_data.items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">
+                                    {% if vehicle.make or vehicle.model %}
+                                        {{ vehicle.make|default:"" }} {{ vehicle.model|default:"" }}
+                                    {% else %}
+                                        Unknown Vehicle
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ vehicle.year|default:"" }}</small>
+                            </td>
+                            <td>
+                                {% if vehicle.customer %}
+                                    {{ vehicle.customer.full_name }}
+                                    {% if vehicle.customer.phone %}
+                                        <br><small class="text-muted">{{ vehicle.customer.phone }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">No Customer</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ vehicle.license_plate|default:"No Plate" }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ vehicle.paid_services_count|default:0 }}</span>
+                            </td>
+                            <td>
+                                <strong class="text-success">KES {{ vehicle.total_spent|default:0|floatformat:2 }}</strong>
+                            </td>
+                            <td>
+                                {% if vehicle.last_service %}
+                                    {{ vehicle.last_service|date:"M d, Y" }}
+                                    <br><small class="text-muted">{{ vehicle.last_service|timesince }} ago</small>
+                                {% else %}
+                                    <span class="text-muted">Never</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No vehicle data available for the selected period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="3">Summary</th>
+                            <th>{{ report_data.summary.total_vehicles|default:0 }} vehicles</th>
+                            <th class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</th>
+                            <th>{{ report_data.summary.avg_services_per_vehicle|default:0|floatformat:1 }} avg</th>
                         </tr>
                     </tfoot>
                     {% endif %}
