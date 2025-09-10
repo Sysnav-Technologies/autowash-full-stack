@@ -496,21 +496,16 @@ class ServiceOrder(TenantTimeStampedModel):
     def has_payments(self):
         """Check if order has any payments"""
         try:
-            from apps.payments.models import Payment
-            return Payment.objects.filter(service_order=self).exists()
-        except ImportError:
+            return self.payments.exists()
+        except AttributeError:
             return False
     
     @property
     def latest_payment(self):
         """Get the latest payment for this order"""
         try:
-            from apps.payments.models import Payment
-            return Payment.objects.filter(
-                service_order=self,
-                status__in=['completed', 'verified']
-            ).order_by('-completed_at').first()
-        except ImportError:
+            return self.payments.order_by('-created_at').first()
+        except AttributeError:
             return None
     
     @property
@@ -526,20 +521,17 @@ class ServiceOrder(TenantTimeStampedModel):
     def get_payments(self):
         """Get all payments for this order"""
         try:
-            from apps.payments.models import Payment
-            return Payment.objects.filter(service_order=self).order_by('-created_at')
-        except ImportError:
+            return self.payments.all().order_by('-created_at')
+        except AttributeError:
             return []
     
     def get_completed_payments(self):
         """Get only completed/verified payments for this order"""
         try:
-            from apps.payments.models import Payment
-            return Payment.objects.filter(
-                service_order=self,
+            return self.payments.filter(
                 status__in=['completed', 'verified']
             ).order_by('completed_at', 'created_at')  # Order by completion date, then creation date
-        except ImportError:
+        except AttributeError:
             return []
     
     def get_payment_breakdown(self):

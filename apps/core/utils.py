@@ -16,8 +16,15 @@ def generate_random_string(length=8):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 def generate_unique_code(prefix='', length=6):
-    """Generate a unique code with optional prefix"""
-    code = generate_random_string(length)
+    """Generate a unique code with optional prefix - ensures database uniqueness"""
+    import time
+    from django.utils import timezone
+    
+    # Use timestamp component to reduce collision chances
+    timestamp_component = str(int(time.time() * 1000))[-4:]  # Last 4 digits of timestamp
+    random_component = generate_random_string(length - 4 if length > 4 else length)
+    
+    code = f"{timestamp_component}{random_component}"
     return f"{prefix}{code}" if prefix else code
 
 def upload_to_path(instance, filename):

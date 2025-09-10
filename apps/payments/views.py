@@ -32,12 +32,12 @@ def process_manual_mpesa_payment(request, payment, phone_number, payment_code):
     """Process manual M-Pesa payment with transaction code"""
     try:
         # Update payment with manual M-Pesa details
-        payment.customer_phone = phone_number
-        payment.transaction_id = payment_code
+        payment.customer_phone = phone_number or payment.customer_phone
+        payment.transaction_id = payment_code or f"MANUAL_{payment.payment_id}"
         payment.status = 'completed'
         payment.completed_at = timezone.now()
-        payment.processed_by_user_id = request.user.id if request.user.is_authenticated else None
-        payment.notes = f"Manual M-Pesa payment processed with code: {payment_code}"
+        payment.processed_by = getattr(request.user, 'employee_profile', None) if request.user.is_authenticated else None
+        payment.notes = f"Manual M-Pesa payment processed with code: {payment_code or 'No code provided'}"
         payment.save()
         
         # Create M-Pesa transaction record for tracking
@@ -45,31 +45,52 @@ def process_manual_mpesa_payment(request, payment, phone_number, payment_code):
             from .models import MPesaTransaction
             mpesa_transaction = MPesaTransaction.objects.create(
                 payment=payment,
-                phone_number=phone_number,
-                mpesa_receipt_number=payment_code,
+                phone_number=phone_number or payment.customer_phone or '',
+                mpesa_receipt_number=payment_code or f"MANUAL_{payment.payment_id}",
                 status='completed',
-                response_data={'manual_entry': True, 'processed_by': request.user.id}
+                response_data={'manual_entry': True, 'processed_by': request.user.id if request.user.is_authenticated else None}
             )
         except Exception as e:
             logger.warning(f"Could not create MPesaTransaction record: {e}")
         
-        messages.success(request, 
-            f'M-Pesa payment processed successfully! Transaction code: {payment_code}')
-        
-        # Check if this completes a service order
+        # Update the service order payment status if linked
         if payment.service_order:
-            # Calculate total payments for this order
-            from django.db.models import Sum
-            total_paid = payment.service_order.payments.filter(
-                status__in=['completed', 'verified']
-            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-            
-            # If order is fully paid, redirect to order receipt
-            if total_paid >= payment.service_order.total_amount:
-                return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/receipt/')
+            try:
+                payment.service_order.update_payment_status()
+                if payment_code and phone_number:
+                    success_msg = f'M-Pesa payment processed successfully! Order payment status updated. Phone: {phone_number}, Code: {payment_code}'
+                elif payment_code:
+                    success_msg = f'M-Pesa payment processed successfully! Order payment status updated. Code: {payment_code}'
+                elif phone_number:
+                    success_msg = f'M-Pesa payment processed successfully! Order payment status updated. Phone: {phone_number}'
+                else:
+                    success_msg = 'M-Pesa payment processed successfully! Order payment status updated. (Manual entry without details)'
+                messages.success(request, success_msg)
+            except Exception as e:
+                logger.error(f"Error updating order payment status: {e}")
+                success_msg = f'M-Pesa payment processed successfully! Transaction: {payment_code or "Manual entry"}'
+                messages.success(request, success_msg)
+        else:
+            if payment_code and phone_number:
+                success_msg = f'M-Pesa payment processed successfully! Phone: {phone_number}, Code: {payment_code}'
+            elif payment_code:
+                success_msg = f'M-Pesa payment processed successfully! Code: {payment_code}'
+            elif phone_number:
+                success_msg = f'M-Pesa payment processed successfully! Phone: {phone_number}'
+            else:
+                success_msg = 'M-Pesa payment processed successfully! (Manual entry without details)'
+            messages.success(request, success_msg)
         
-        # Otherwise redirect to payment receipt
-        return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/receipt/?print=true')
+        # Check if this completes a service order and redirect appropriately
+        if payment.service_order:
+            # If order is fully paid, redirect to order receipt
+            if payment.service_order.payment_status == 'paid':
+                return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/receipt/')
+            else:
+                return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/')
+        
+        # Otherwise redirect to payment detail
+        return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/')
         
     except Exception as e:
         logger.error(f"Error processing manual M-Pesa payment: {e}")
@@ -824,11 +845,28 @@ def process_mpesa_payment_view(request, payment_id):
         logger.info(f"M-Pesa payment POST request for {payment_id}, data: {request.POST}")
         form = MPesaPaymentForm(request.POST)
         if form.is_valid():
-            phone_number = form.cleaned_data['phone_number']
+            phone_number = form.cleaned_data.get('phone_number', '').strip()
             payment_code = form.cleaned_data.get('payment_code', '').strip()
             logger.info(f"Form valid, phone: {phone_number}, payment_code: {payment_code}")
             
-            # Validate phone number
+            # For manual payments (with or without payment code), phone is optional
+            # If payment_code is provided OR if both fields are empty, treat as manual payment
+            if payment_code or (not phone_number and not payment_code):
+                # Process as manual payment - both fields are optional
+                return process_manual_mpesa_payment(
+                    request, payment, phone_number if phone_number else None, payment_code if payment_code else None
+                )
+            
+            # For automatic payments (phone provided, no payment code), phone number is required
+            if not phone_number:
+                messages.error(request, 'Phone number is required for automatic M-Pesa payments.')
+                return render(request, 'payments/process_mpesa.html', {
+                    'payment': payment,
+                    'form': form,
+                    'title': f'M-Pesa Payment - {payment.payment_id}'
+                })
+            
+            # Validate phone number for automatic payments
             is_valid, formatted_phone = validate_mpesa_phone(phone_number)
             if not is_valid:
                 logger.error(f"Phone validation failed: {formatted_phone}")
@@ -846,13 +884,7 @@ def process_mpesa_payment_view(request, payment_id):
                     is_active=True
                 ).first()
                 
-                # If payment code is provided, process as manual payment
-                if payment_code:
-                    return process_manual_mpesa_payment(
-                        request, payment, formatted_phone, payment_code
-                    )
-                
-                # If no gateway available but no payment code, show error
+                # If no gateway available, show error
                 if not mpesa_gateway:
                     messages.error(request, 
                         'M-Pesa gateway not configured. Please ask customer to send payment to your '
