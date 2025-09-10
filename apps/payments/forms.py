@@ -140,14 +140,15 @@ class MPesaPaymentForm(forms.Form):
     """M-Pesa payment form"""
     phone_number = forms.CharField(
         max_length=15,
-        label="M-Pesa Phone Number",
+        required=False,
+        label="M-Pesa Phone Number (Optional)",
         widget=forms.TextInput(attrs={
             'placeholder': '+254712345678',
             'pattern': r'(\+254|0)[17]\d{8}',
             'title': 'Enter a valid Kenyan mobile number',
             'class': 'form-control form-control-lg'
         }),
-        help_text="Enter the customer's M-Pesa registered phone number"
+        help_text="Enter the customer's M-Pesa registered phone number (required for automatic payments)"
     )
     
     # Optional payment code field for businesses without gateway
@@ -189,6 +190,11 @@ class MPesaPaymentForm(forms.Form):
     
     def clean_phone_number(self):
         phone_number = self.cleaned_data['phone_number']
+        
+        # If phone number is empty, it's okay for manual payments
+        if not phone_number:
+            return phone_number
+        
         is_valid, result = validate_mpesa_phone(phone_number)
         
         if not is_valid:

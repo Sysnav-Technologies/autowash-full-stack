@@ -248,27 +248,22 @@
                             <div class="form-floating">
                                 <input type="tel" class="form-control form-control-lg" id="mpesaPhone" name="phone_number" 
                                        value="{{ payment.customer_phone|default:'' }}" 
-                                       placeholder="254712345678" pattern="(254[0-9]\d{8}|0[0-9]\d{8})" required 
+                                       placeholder="254712345678"
                                        title="Enter customer's M-Pesa phone number">
-                                <label><i class="fas fa-mobile-alt me-2"></i>Customer's M-Pesa Phone Number</label>
+                                <label><i class="fas fa-mobile-alt me-2"></i>Customer's M-Pesa Phone Number <span id="phoneRequired">(Required)</span></label>
                             </div>
-                            <small class="text-muted">Format: 254xxxxxxxxx or 0xxxxxxxxx</small>
+                            <small class="text-muted">Format: 254xxxxxxxxx or 0xxxxxxxxx <span id="phoneOptional" style="display: none;">(Optional for manual payments)</span></small>
                         </div>
                         
                         <div class="mb-4" id="paymentCodeField">
                             <div class="form-floating">
                                 <input type="text" class="form-control form-control-lg" id="paymentCode" name="payment_code" 
                                        placeholder="NLJ7RT61SX" 
-                                       {% if not has_gateway %}required{% endif %}
                                        title="Enter M-Pesa transaction code">
-                                <label><i class="fas fa-receipt me-2"></i>M-Pesa Transaction Code {% if not has_gateway %}<span class="text-danger">*</span>{% else %}<span class="text-muted">(Optional)</span>{% endif %}</label>
+                                <label><i class="fas fa-receipt me-2"></i>M-Pesa Transaction Code <span class="text-muted">(Optional)</span></label>
                             </div>
                             <small class="text-muted" id="paymentCodeHelp">
-                                {% if has_gateway %}
-                                Leave empty to send automatic payment request, or enter code for manual processing
-                                {% else %}
-                                Enter the M-Pesa transaction code from customer's payment confirmation SMS
-                                {% endif %}
+                                Leave empty to process without transaction code, or enter code for verification
                             </small>
                         </div>
                         
@@ -352,6 +347,9 @@ function selectPaymentMode(mode) {
     const paymentCodeInput = document.getElementById('paymentCode');
     const paymentCodeHelp = document.getElementById('paymentCodeHelp');
     const submitBtn = document.querySelector('button[type="submit"]');
+    const phoneInput = document.getElementById('mpesaPhone');
+    const phoneRequired = document.getElementById('phoneRequired');
+    const phoneOptional = document.getElementById('phoneOptional');
     
     // Remove selected class from both options
     automaticOption.classList.remove('selected');
@@ -365,14 +363,26 @@ function selectPaymentMode(mode) {
         paymentCodeInput.value = '';
         paymentCodeHelp.textContent = 'Payment code not needed - customer will receive STK push';
         submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Send Payment Request';
+        
+        // Phone is required for automatic payments
+        phoneInput.required = true;
+        phoneInput.setAttribute('pattern', '(254[0-9]\\d{8}|0[0-9]\\d{8})');
+        phoneRequired.style.display = 'inline';
+        phoneOptional.style.display = 'none';
     } else {
         // Select manual mode
         manualOption.classList.add('selected');
         paymentCodeField.classList.remove('hidden');
         paymentCodeField.classList.add('payment-code-field');
-        paymentCodeInput.required = true;
-        paymentCodeHelp.textContent = 'Enter the M-Pesa transaction code from customer\'s payment confirmation SMS';
+        paymentCodeInput.required = false; // Made optional for manual payments
+        paymentCodeHelp.textContent = 'Leave empty to process without code, or enter M-Pesa transaction code for verification';
         submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Process Manual Payment';
+        
+        // Phone is optional for manual payments
+        phoneInput.required = false;
+        phoneInput.removeAttribute('pattern'); // Remove pattern validation for optional field
+        phoneRequired.style.display = 'none';
+        phoneOptional.style.display = 'inline';
     }
 }
 
@@ -395,12 +405,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const paymentCodeField = document.getElementById('paymentCodeField');
             const paymentCodeInput = document.getElementById('paymentCode');
             const submitBtn = document.querySelector('button[type="submit"]');
+            const phoneInput = document.getElementById('mpesaPhone');
+            const phoneRequired = document.getElementById('phoneRequired');
+            const phoneOptional = document.getElementById('phoneOptional');
             
-            // Set manual mode permanently
+            // Set manual mode permanently - all fields optional
             paymentCodeField.classList.remove('hidden');
             paymentCodeField.classList.add('payment-code-field');
-            paymentCodeInput.required = true;
+            paymentCodeInput.required = false; // Optional for no-gateway scenario
+            phoneInput.required = false; // Optional for manual payments
+            phoneInput.removeAttribute('pattern'); // Remove pattern validation
             submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Process Manual Payment';
+            
+            // Update phone field indicators
+            if (phoneRequired && phoneOptional) {
+                phoneRequired.style.display = 'none';
+                phoneOptional.style.display = 'inline';
+            }
             
             // Mark the manual option as selected
             const manualOption = document.getElementById('manualOption');
@@ -410,26 +431,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         form.addEventListener('submit', function(e) {
-            if (!phoneInput.value.trim()) {
+            // For automatic payments, phone number is required
+            if (currentPaymentMode === 'automatic' && !phoneInput.value.trim()) {
                 e.preventDefault();
-                alert('Please enter customer\'s M-Pesa phone number');
+                alert('Please enter customer\'s M-Pesa phone number for automatic payment');
                 phoneInput.focus();
                 return;
             }
             
-            if (currentPaymentMode === 'manual' && !paymentCodeInput.value.trim()) {
-                e.preventDefault();
-                alert('Manual Payment Process:\n\n1. Ask customer to send money to your M-Pesa till number\n2. Customer will receive an M-Pesa confirmation SMS with transaction code\n3. Enter that transaction code here to complete the payment\n\nPlease get the transaction code from the customer before proceeding.');
-                paymentCodeInput.focus();
-                return;
-            }
-            
-            if (!hasGateway && !paymentCodeInput.value.trim()) {
-                e.preventDefault();
-                alert('No payment gateway configured. Please:\n\n1. Ask customer to send payment to your M-Pesa till number\n2. Get the M-Pesa transaction code from customer\n3. Enter the code below to complete payment');
-                paymentCodeInput.focus();
-                return;
-            }
+            // For manual payments, both phone and payment code are optional
+            // The server will handle missing values with appropriate defaults
             
             // Update button based on whether it's manual or automatic processing
             submitBtn.disabled = true;
