@@ -391,9 +391,17 @@ def order_create_view(request):
     # Get services and categories for the form
     categories = ServiceCategory.objects.filter(is_active=True).prefetch_related('services')
     
+    # Get employees for assignment
+    from apps.employees.models import Employee
+    employees = Employee.objects.filter(
+        role__in=['attendant', 'supervisor', 'manager', 'cleaner'],
+        is_active=True
+    )
+    
     context = {
         'form': form,
         'categories': categories,
+        'employees': employees,
         'title': 'Create Service Order'
     }
     return render(request, 'services/order_form.html', context)
@@ -2413,7 +2421,7 @@ def order_edit_view(request, pk):
     # Get employees for assignment
     from apps.employees.models import Employee
     employees = Employee.objects.filter(
-        role__in=['attendant', 'supervisor', 'manager'],
+        role__in=['attendant', 'supervisor', 'manager', 'cleaner'],
         is_active=True
     )
     
@@ -3531,6 +3539,7 @@ def add_order_to_queue(order):
 @employee_required()
 def order_receipt_view(request, pk):
     """Service order receipt"""
+    """Generate service order receipt preview with download option"""
     order = get_object_or_404(ServiceOrder, id=pk)
     
     # Get all payments for this order
@@ -3549,9 +3558,291 @@ def order_receipt_view(request, pk):
         'balance_due': balance_due,
         'is_fully_paid': balance_due <= 0,
         'title': f'Receipt - {order.order_number}'
+        'title': f'Order Receipt - {order.order_number}'
     }
     
     return render(request, 'services/order_receipt.html', context)
+    # Check if user wants PDF download
+    if request.GET.get('format') == 'pdf':
+        return order_receipt_pdf(request, pk)
+    
+    return render(request, 'services/order_receipt_preview.html', context)
+
+
+def order_receipt_pdf(request, pk):
+    """Generate service order receipt as PDF for 80mm thermal printer (exact copy of HTML styling)"""
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from django.http import HttpResponse
+    import io
+    from django.utils import timezone
+    
+    order = get_object_or_404(ServiceOrder, id=pk)
+    
+    # Create the PDF response
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="order_receipt_{order.order_number}.pdf"'
+    
+    # Create a file-like buffer to receive PDF data
+    buffer = io.BytesIO()
+    
+    # Set up 80mm width (standard thermal printer width)
+    page_width = 80 * mm
+    page_height = 297 * mm  # A4 height, will auto-adjust
+    
+    # Create the PDF object using the buffer as its "file"
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=(page_width, page_height),
+        rightMargin=2*mm,
+        leftMargin=2*mm,
+        topMargin=3*mm,
+        bottomMargin=3*mm
+    )
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles for thermal printer (matching HTML styles exactly)
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=14,
+        alignment=TA_CENTER,
+        spaceAfter=4*mm,
+        fontName='Helvetica-Bold'
+    )
+    
+    business_name_style = ParagraphStyle(
+        'BusinessName',
+        parent=styles['Normal'],
+        fontSize=16,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold',
+        spaceAfter=2*mm
+    )
+    
+    business_details_style = ParagraphStyle(
+        'BusinessDetails',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=TA_CENTER,
+        spaceAfter=1*mm
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=11,
+        leading=12,
+        spaceAfter=2*mm
+    )
+    
+    small_style = ParagraphStyle(
+        'CustomSmall',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=11,
+        spaceAfter=1*mm
+    )
+    
+    amount_large_style = ParagraphStyle(
+        'AmountLarge',
+        parent=styles['Normal'],
+        fontSize=16,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold',
+        spaceAfter=4*mm,
+        spaceBefore=4*mm
+    )
+    
+    section_title_style = ParagraphStyle(
+        'SectionTitle',
+        parent=styles['Normal'],
+        fontSize=11,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold',
+        spaceAfter=2*mm,
+        spaceBefore=2*mm
+    )
+    
+    # Business header (exactly like HTML)
+    business_name = request.tenant.name if hasattr(request, 'tenant') else 'AutoWash'
+    elements.append(Paragraph(business_name.upper(), business_name_style))
+    
+    # Use the proper address fields from Address mixin and full_address property
+    if hasattr(request, 'tenant') and hasattr(request.tenant, 'full_address'):
+        full_address = request.tenant.full_address
+        if full_address and full_address.strip():
+            elements.append(Paragraph(full_address, business_details_style))
+    
+    # Use the phone field from ContactInfo mixin
+    if hasattr(request, 'tenant') and request.tenant.phone:
+        elements.append(Paragraph(f"Tel: {request.tenant.phone}", business_details_style))
+    
+    if hasattr(request, 'tenant') and request.tenant.email:
+        elements.append(Paragraph(request.tenant.email, business_details_style))
+        
+    # Add separator line
+    elements.append(Paragraph("." * 40, business_details_style))
+    elements.append(Spacer(1, 3*mm))
+    
+    elements.append(Paragraph("<b>SERVICE ORDER</b>", title_style))
+    
+    # Order Information section (matching HTML structure)
+    order_data = [
+        ['Order No:', order.order_number],
+        ['Date:', order.created_at.strftime('%d/%m/%Y')],
+        ['Time:', order.created_at.strftime('%H:%M')],
+        ['Customer:', order.customer.display_name if order.customer else 'Walk-in'],
+        ['Status:', order.get_status_display()],
+    ]
+    
+    if order.customer and order.customer.phone:
+        order_data.append(['Phone:', str(order.customer.phone)])
+    
+    if order.vehicle:
+        order_data.extend([
+            ['Vehicle:', f"{order.vehicle.make} {order.vehicle.model}"],
+            ['Reg. No:', order.vehicle.registration_number],
+        ])
+    
+    # Add assigned employees
+    attendants = order.attendants.all()
+    cleaners = order.cleaners.all()
+    if attendants:
+        attendant_names = ', '.join([emp.full_name for emp in attendants])
+        order_data.append(['Attendant:', attendant_names])
+    if cleaners:
+        cleaner_names = ', '.join([emp.full_name for emp in cleaners])
+        order_data.append(['Cleaner:', cleaner_names])
+        
+    order_table = Table(order_data, colWidths=[32*mm, 44*mm])
+    order_table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ('TOPPADDING', (0, 0), (-1, -1), 1),
+    ]))
+    
+    elements.append(order_table)
+    elements.append(Paragraph("-" * 40, small_style))
+    
+    # Services section (matching HTML logic exactly)
+    if order.order_items.exists():
+        elements.append(Paragraph("<b>SERVICES</b>", section_title_style))
+        
+        # Service items table header
+        service_data = [['Service', 'Qty', 'Price', 'Total']]
+        total_amount = 0
+        
+        for item in order.order_items.all():
+            item_total = item.quantity * item.unit_price
+            total_amount += item_total
+            service_data.append([
+                item.service.name,
+                str(item.quantity),
+                f'{item.unit_price:.0f}',
+                f'{item_total:.0f}'
+            ])
+        
+        service_table = Table(service_data, colWidths=[35*mm, 8*mm, 15*mm, 15*mm])
+        service_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        
+        elements.append(service_table)
+        elements.append(Spacer(1, 2*mm))
+        
+        # Total section
+        total_data = [
+            ['Subtotal:', f'KES {total_amount:.2f}'],
+            ['Total Amount:', f'KES {order.total_amount:.2f}'],
+        ]
+        
+        total_table = Table(total_data, colWidths=[45*mm, 31*mm])
+        total_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        
+        elements.append(total_table)
+        elements.append(Paragraph("=" * 40, small_style))
+        elements.append(Spacer(1, 3*mm))
+    
+    # Payment status
+    payments = order.payments.filter(status__in=['completed', 'verified'])
+    if payments.exists():
+        elements.append(Paragraph("<b>PAYMENT STATUS: PAID</b>", section_title_style))
+        total_paid = sum(payment.amount for payment in payments)
+        balance_due = order.total_amount - total_paid
+        
+        payment_data = [
+            ['Amount Paid:', f'KES {total_paid:.2f}']
+        ]
+        if balance_due > 0:
+            payment_data.append(['Balance Due:', f'KES {balance_due:.2f}'])
+            
+        payment_table = Table(payment_data, colWidths=[32*mm, 44*mm])
+        payment_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        
+        elements.append(payment_table)
+    else:
+        elements.append(Paragraph("<b>PAYMENT STATUS: PENDING</b>", section_title_style))
+    
+    elements.append(Spacer(1, 3*mm))
+    
+    # Special instructions
+    if order.special_instructions:
+        elements.append(Paragraph("-" * 40, small_style))
+        elements.append(Paragraph("<b>Special Instructions:</b>", normal_style))
+        elements.append(Paragraph(order.special_instructions, small_style))
+        elements.append(Spacer(1, 2*mm))
+    
+    elements.append(Paragraph("-" * 40, small_style))
+    
+    # Footer (exactly like HTML)
+    elements.append(Spacer(1, 3*mm))
+    elements.append(Paragraph("<b>Thank you for choosing our service!</b>", section_title_style))
+    elements.append(Paragraph(f"Created by: {order.created_by.full_name if order.created_by else 'System'}", business_details_style))
+    elements.append(Paragraph(f"Printed: {timezone.now().strftime('%d/%m/%Y %H:%M')}", business_details_style))
+    
+    # Cut line indicator for thermal printer (like HTML)
+    elements.append(Spacer(1, 5*mm))
+    elements.append(Paragraph("." * 40, business_details_style))
+    
+    # Build PDF
+    doc.build(elements)
+    
+    # Get the value of the BytesIO buffer and write it to the response
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
 
 
 @login_required
