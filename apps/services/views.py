@@ -1,6 +1,9 @@
 
 import csv
+import io
+import logging
 from decimal import Decimal
+from datetime import datetime, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -3557,11 +3560,9 @@ def order_receipt_view(request, pk):
         'total_paid': total_paid,
         'balance_due': balance_due,
         'is_fully_paid': balance_due <= 0,
-        'title': f'Receipt - {order.order_number}'
         'title': f'Order Receipt - {order.order_number}'
     }
     
-    return render(request, 'services/order_receipt.html', context)
     # Check if user wants PDF download
     if request.GET.get('format') == 'pdf':
         return order_receipt_pdf(request, pk)
