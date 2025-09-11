@@ -1,566 +1,267 @@
-<!-- templates/expenses/expense_list.html -->
 {% extends 'base/base.html' %}
 {% load static %}
-{% load math_filters %}
-{% load crispy_forms_tags %}
 
-{% block title %}Expenses - {{ block.super }}{% endblock %}
+{% block title %}All Expenses{% endblock %}
 
-{% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1 class="page-title">
-            <i class="fas fa-receipt text-danger"></i>
-            Expense Management
-        </h1>
-        <p class="page-description">Track and manage all business expenses</p>
-    </div>
+{% block extra_css %}
+<style>
+    .expense-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e3e6f0;
+        margin-bottom: 1.5rem;
+    }
     
-    <div class="page-actions">
-        <a href="{{ urls.create }}" class="btn btn-primary">
-            <i class="fas fa-plus"></i>
-            Add Expense
-        </a>
-        <div class="dropdown">
-            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                <i class="fas fa-ellipsis-h"></i>
-                More Actions
-            </button>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="{{ urls.export }}">
-                    <i class="fas fa-download"></i> Export Expenses
-                </a></li>
-                <li><a class="dropdown-item" href="{{ urls.vendor_list }}">
-                    <i class="fas fa-building"></i> Manage Vendors
-                </a></li>
-                <li><a class="dropdown-item" href="{{ urls.category_list }}">
-                    <i class="fas fa-tags"></i> Manage Categories
-                </a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="{{ urls.recurring_list }}">
-                    <i class="fas fa-redo"></i> Recurring Expenses
-                </a></li>
-            </ul>
-        </div>
-    </div>
-</div>
-
-<!-- Summary Stats -->
-<div class="stats-row">
-    <div class="stat-item">
-        <span class="stat-label">Total Expenses:</span>
-        <span class="stat-value text-danger">{{ totals.total_amount|default:0|currency }}</span>
-    </div>
-    <div class="stat-item">
-        <span class="stat-label">Count:</span>
-        <span class="stat-value">{{ totals.count|default:0 }}</span>
-    </div>
-    <div class="stat-item">
-        <span class="stat-label">Showing:</span>
-        <span class="stat-value">{{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }}</span>
-    </div>
-</div>
-
-<!-- Search and Filters -->
-<div class="content-card">
-    <div class="card-header">
-        <h5 class="card-title">
-            <i class="fas fa-filter"></i>
-            Search & Filter Expenses
-        </h5>
-        <div class="card-actions">
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleFilters()">
-                <i class="fas fa-sliders-h"></i>
-                Advanced Filters
-            </button>
-        </div>
-    </div>
-    <div class="card-body">
-        <form method="get" class="expense-search-form">
-            {% crispy search_form %}
-        </form>
-    </div>
-</div>
-
-<!-- Bulk Actions -->
-<div class="content-card">
-    <div class="card-header">
-        <h5 class="card-title">
-            <i class="fas fa-list"></i>
-            Expenses
-            {% if page_obj %}
-            <small class="text-muted">({{ page_obj.paginator.count }} total)</small>
-            {% endif %}
-        </h5>
-        <div class="card-actions">
-            <form method="post" action="/business/{{ request.tenant.slug }}/expenses/bulk-action/" id="bulkActionForm" style="display: none;">
-                {% csrf_token %}
-                {% crispy bulk_form %}
-                <button type="submit" class="btn btn-sm btn-warning">
-                    Apply Action
-                </button>
-            </form>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleBulkActions()">
-                <i class="fas fa-tasks"></i>
-                Bulk Actions
-            </button>
-        </div>
-    </div>
-    <div class="card-body">
-        {% if page_obj %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th width="40">
-                            <input type="checkbox" id="selectAll" onchange="toggleAllExpenses()">
-                        </th>
-                        <th>Title</th>
-                        <th>Category</th>
-                        <th>Vendor</th>
-                        <th>Amount</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th>Type</th>
-                        <th width="120">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for expense in page_obj %}
-                    <tr class="expense-row" data-expense-id="{{ expense.pk }}">
-                        <td>
-                            <input type="checkbox" class="expense-checkbox" value="{{ expense.pk }}" name="expense_ids">
-                        </td>
-                        <td>
-                            <div class="expense-title-cell">
-                                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" class="expense-title">
-                                    {{ expense.title }}
-                                </a>
-                                {% if expense.is_overdue %}
-                                <span class="badge bg-danger ms-2">Overdue</span>
-                                {% endif %}
-                                {% if expense.linked_object_name %}
-                                <div class="expense-link">
-                                    <i class="fas fa-link text-muted"></i>
-                                    <small class="text-muted">{{ expense.linked_object_name }}</small>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td>
-                            <span class="category-badge">{{ expense.category.name }}</span>
-                        </td>
-                        <td>
-                            {% if expense.vendor %}
-                                <a href="/business/{{ request.tenant.slug }}/expenses/vendors/{{ expense.vendor.pk }}/">
-                                    {{ expense.vendor.name }}
-                                </a>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="amount-cell">
-                                <span class="total-amount">{{ expense.total_amount|currency }}</span>
-                                {% if expense.tax_amount > 0 %}
-                                <div class="amount-breakdown">
-                                    <small class="text-muted">
-                                        Base: {{ expense.amount|currency }} + Tax: {{ expense.tax_amount|currency }}
-                                    </small>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td>
-                            <div class="date-cell">
-                                <span class="expense-date">{{ expense.expense_date|date:"M d, Y" }}</span>
-                                {% if expense.due_date %}
-                                <div class="due-date">
-                                    <small class="text-muted">Due: {{ expense.due_date|date:"M d" }}</small>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td>
-                            <span class="status-badge status-{{ expense.status }}">
-                                {{ expense.get_status_display }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="type-badge type-{{ expense.expense_type }}">
-                                {{ expense.get_expense_type_display }}
-                            </span>
-                        </td>
-                        <td>
-                            <div class="expense-actions">
-                                <div class="btn-group btn-group-sm">
-                                    <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" 
-                                       class="btn btn-outline-primary" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/edit/" 
-                                       class="btn btn-outline-secondary" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <div class="dropdown">
-                                        <button class="btn btn-outline-secondary dropdown-toggle-split" 
-                                                type="button" data-bs-toggle="dropdown" title="More Actions">
-                                            <i class="fas fa-ellipsis-v"></i>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end">
-                                            {% if expense.status == 'pending' %}
-                                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/approve/">
-                                                <i class="fas fa-check text-success"></i> Approve
-                                            </a></li>
-                                            {% endif %}
-                                            {% if expense.status in 'pending,approved' %}
-                                            <li><a class="dropdown-item" href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/pay/">
-                                                <i class="fas fa-money-check text-info"></i> Mark as Paid
-                                            </a></li>
-                                            {% endif %}
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><a class="dropdown-item text-danger" 
-                                                   href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/delete/"
-                                                   onclick="return confirm('Are you sure you want to delete this expense?')">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </a></li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pagination -->
-        {% if page_obj.has_other_pages %}
-        <nav aria-label="Expense pagination">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page=1">First</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
-                </li>
-                {% endif %}
-
-                {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                <li class="page-item active">
-                    <span class="page-link">{{ num }}</span>
-                </li>
-                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <li class="page-item">
-                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ num }}">{{ num }}</a>
-                </li>
-                {% endif %}
-                {% endfor %}
-
-                {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last</a>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-        {% endif %}
-
-        {% else %}
-        <div class="empty-state">
-            <div class="empty-state-content">
-                <i class="fas fa-receipt empty-state-icon"></i>
-                <h3>No Expenses Found</h3>
-                <p>You haven't added any expenses yet, or none match your current filters.</p>
-                <div class="empty-state-actions">
-                    <a href="{{ urls.create }}" class="btn btn-primary">
-                        <i class="fas fa-plus"></i>
-                        Add Your First Expense
-                    </a>
-                    {% if request.GET %}
-                    <a href="{{ urls.list }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-times"></i>
-                        Clear Filters
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-</div>
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-approved { background: #d4edda; color: #155724; }
+    .status-rejected { background: #f8d7da; color: #721c24; }
+    .status-paid { background: #d1ecf1; color: #0c5460; }
+    
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(0,123,255,.05);
+    }
+    
+    .btn-group-sm .btn {
+        font-size: 0.75rem;
+    }
+</style>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-function toggleFilters() {
-    const filterSection = document.querySelector('.expense-search-form');
-    filterSection.style.display = filterSection.style.display === 'none' ? 'block' : 'none';
-}
+{% block page_title %}
+    <h1 class="h3 mb-0 text-gray-800">
+        <i class="fas fa-list me-2"></i>All Expenses
+    </h1>
+{% endblock %}
 
-function toggleBulkActions() {
-    const bulkForm = document.getElementById('bulkActionForm');
-    bulkForm.style.display = bulkForm.style.display === 'none' ? 'block' : 'none';
-}
-
-function toggleAllExpenses() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.expense-checkbox');
+{% block content %}
+<!-- Action Buttons -->
+<div class="action-buttons">
+    <a href="/business/{{ request.tenant.slug }}/expenses/create/" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>
+        {% if user_role == 'attendant' %}Record Expense{% else %}Add Expense{% endif %}
+    </a>
     
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAll.checked;
-    });
+    {% if user_role and user_role in 'owner,manager,supervisor' %}
+    <a href="/business/{{ request.tenant.slug }}/expenses/approvals/" class="btn btn-warning">
+        <i class="fas fa-check-circle me-2"></i>Pending Approvals
+    </a>
     
-    updateBulkActionsVisibility();
-}
-
-function updateBulkActionsVisibility() {
-    const checkedBoxes = document.querySelectorAll('.expense-checkbox:checked');
-    const bulkForm = document.getElementById('bulkActionForm');
+    <a href="/business/{{ request.tenant.slug }}/expenses/categories/" class="btn btn-info">
+        <i class="fas fa-tags me-2"></i>Categories
+    </a>
     
-    if (checkedBoxes.length > 0) {
-        bulkForm.style.display = 'block';
-    }
-}
-
-// Add event listeners to individual checkboxes
-document.addEventListener('DOMContentLoaded', function() {
-    const checkboxes = document.querySelectorAll('.expense-checkbox');
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateBulkActionsVisibility);
-    });
+    <a href="/business/{{ request.tenant.slug }}/expenses/vendors/" class="btn btn-secondary">
+        <i class="fas fa-truck me-2"></i>Vendors
+    </a>
+    {% endif %}
     
-    // Auto-calculate total amount on amount and tax input
-    const amountInput = document.getElementById('id_amount');
-    const taxInput = document.getElementById('id_tax_amount');
-    const totalInput = document.getElementById('total_amount');
+    {% if user_role == 'attendant' %}
+    <a href="/business/{{ request.tenant.slug }}/expenses/my-expenses/" class="btn btn-info">
+        <i class="fas fa-user-check me-2"></i>My Expenses
+    </a>
+    {% endif %}
     
-    if (amountInput && taxInput && totalInput) {
-        function calculateTotal() {
-            const amount = parseFloat(amountInput.value) || 0;
-            const tax = parseFloat(taxInput.value) || 0;
-            totalInput.value = (amount + tax).toFixed(2);
-        }
-        
-        amountInput.addEventListener('input', calculateTotal);
-        taxInput.addEventListener('input', calculateTotal);
-        
-        // Calculate on page load
-        calculateTotal();
-    }
-});
+    <a href="/business/{{ request.tenant.slug }}/expenses/" class="btn btn-outline-secondary">
+        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+    </a>
+</div>
 
-// Handle bulk action form submission
-document.getElementById('bulkActionForm').addEventListener('submit', function(e) {
-    const checkedBoxes = document.querySelectorAll('.expense-checkbox:checked');
+<!-- Expenses List -->
+<div class="expense-card">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="mb-0">Expense Records</h5>
+        <small class="text-muted">
+            {% if expenses %}
+            Showing {{ expenses.paginator.count }} expenses
+            {% else %}
+            No expenses found
+            {% endif %}
+        </small>
+    </div>
     
-    if (checkedBoxes.length === 0) {
-        e.preventDefault();
-        alert('Please select at least one expense.');
-        return;
-    }
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Vendor</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    {% if user_role and user_role in 'owner,manager,supervisor' %}
+                    <th>Submitted By</th>
+                    {% endif %}
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if expenses %}
+                {% for expense in expenses %}
+                <tr>
+                    <td>{{ expense.expense_date|date:"M d, Y" }}</td>
+                    <td>
+                        <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" class="text-decoration-none">
+                            {{ expense.title|truncatechars:40 }}
+                        </a>
+                        {% if expense.description %}
+                        <br><small class="text-muted">{{ expense.description|truncatechars:50 }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ expense.category.name }}</td>
+                    <td>{{ expense.vendor.name|default:"-" }}</td>
+                    <td>
+                        <strong>KSh {{ expense.total_amount|floatformat:2 }}</strong>
+                        {% if expense.tax_amount > 0 %}
+                        <br><small class="text-muted">+KSh {{ expense.tax_amount|floatformat:2 }} tax</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ expense.status }}">
+                            {{ expense.get_status_display }}
+                        </span>
+                    </td>
+                    {% if user_role and user_role in 'owner,manager,supervisor' %}
+                    <td>
+                        {% if expense.created_by_user_id %}
+                        <small class="text-muted">{{ expense.creator_name }}</small>
+                        {% else %}
+                        <small class="text-muted">System</small>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" 
+                               class="btn btn-outline-primary" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            
+                            {% if user_role and user_role in 'owner,manager,supervisor' %}
+                                {% if expense.status == 'pending' %}
+                                <!-- Show approval buttons for all pending expenses -->
+                                <form method="post" action="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/approve/" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success" title="Approve" 
+                                            onclick="return confirm('Approve this expense?')">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/reject/" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger" title="Reject"
+                                            onclick="return confirm('Reject this expense?')">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/edit/" 
+                                   class="btn btn-outline-secondary" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                
+                                <!-- Delete Button for Owners and Managers -->
+                                {% if user_role == 'owner' and expense.status != 'paid' %}
+                                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/delete/confirm/" 
+                                   class="btn btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% elif user_role in 'manager,supervisor' and expense.status in 'pending,rejected' %}
+                                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/delete/confirm/" 
+                                   class="btn btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% endif %}
+                            {% elif user_role == 'attendant' and expense.created_by_user_id == user.id %}
+                                {% if expense.status == 'pending' %}
+                                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/edit/" 
+                                   class="btn btn-outline-secondary" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                
+                                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/delete/confirm/" 
+                                   class="btn btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="{% if user_role and user_role in 'owner,manager,supervisor' %}8{% else %}7{% endif %}" class="text-center py-5">
+                        <i class="fas fa-receipt fa-4x text-muted mb-3 d-block"></i>
+                        <h5 class="text-muted">No Expenses Found</h5>
+                        <p class="text-muted">There are no expense records to display.</p>
+                        <a href="/business/{{ request.tenant.slug }}/expenses/create/" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>
+                            {% if user_role == 'attendant' %}Record First Expense{% else %}Add First Expense{% endif %}
+                        </a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
     
-    // Add selected expense IDs to the form
-    checkedBoxes.forEach(checkbox => {
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'expense_ids';
-        hiddenInput.value = checkbox.value;
-        this.appendChild(hiddenInput);
-    });
-    
-    const action = this.querySelector('select[name="action"]').value;
-    if (!confirm(`Are you sure you want to ${action} ${checkedBoxes.length} expense(s)?`)) {
-        e.preventDefault();
-    }
-});
-</script>
-
-<style>
-.stats-row {
-    display: flex;
-    gap: 24px;
-    margin-bottom: 24px;
-    padding: 16px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.stat-item {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.stat-label {
-    font-size: 12px;
-    color: #666;
-    font-weight: 500;
-}
-
-.stat-value {
-    font-size: 18px;
-    font-weight: 600;
-}
-
-.expense-title-cell {
-    max-width: 200px;
-}
-
-.expense-title {
-    font-weight: 500;
-    text-decoration: none;
-    color: #333;
-}
-
-.expense-title:hover {
-    color: #007bff;
-}
-
-.expense-link {
-    margin-top: 4px;
-}
-
-.category-badge {
-    display: inline-block;
-    padding: 4px 8px;
-    background-color: #e9ecef;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.amount-cell {
-    text-align: right;
-}
-
-.total-amount {
-    font-weight: 600;
-    color: #dc3545;
-}
-
-.amount-breakdown {
-    margin-top: 2px;
-}
-
-.date-cell {
-    text-align: center;
-}
-
-.status-badge {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    text-transform: uppercase;
-}
-
-.status-pending {
-    background-color: #fff3cd;
-    color: #856404;
-}
-
-.status-approved {
-    background-color: #d1ecf1;
-    color: #0c5460;
-}
-
-.status-paid {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.status-rejected {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
-.status-cancelled {
-    background-color: #e2e3e5;
-    color: #383d41;
-}
-
-.type-badge {
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 8px;
-    font-size: 10px;
-    font-weight: 500;
-    text-transform: uppercase;
-}
-
-.type-manual {
-    background-color: #f8f9fa;
-    color: #6c757d;
-}
-
-.type-inventory {
-    background-color: #e7f3ff;
-    color: #0066cc;
-}
-
-.type-salary {
-    background-color: #fff2e7;
-    color: #cc6600;
-}
-
-.type-commission {
-    background-color: #e7ffe7;
-    color: #006600;
-}
-
-.expense-actions {
-    text-align: center;
-}
-
-.empty-state {
-    text-align: center;
-    padding: 60px 20px;
-}
-
-.empty-state-icon {
-    font-size: 64px;
-    color: #ccc;
-    margin-bottom: 16px;
-}
-
-.empty-state h3 {
-    margin-bottom: 8px;
-    color: #333;
-}
-
-.empty-state p {
-    color: #666;
-    margin-bottom: 24px;
-}
-
-.empty-state-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-}
-
-@media (max-width: 768px) {
-    .stats-row {
-        flex-direction: column;
-        gap: 12px;
-    }
-    
-    .table-responsive {
-        font-size: 14px;
-    }
-    
-    .expense-title-cell {
-        max-width: 150px;
-    }
-}
-</style>
+    <!-- Pagination -->
+    {% if expenses.has_other_pages %}
+    <nav aria-label="Expense pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if expenses.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ expenses.previous_page_number }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in expenses.paginator.page_range %}
+            {% if expenses.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > expenses.number|add:'-3' and num < expenses.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+            </li>
+            {% endif %}
+            {% endfor %}
+            
+            {% if expenses.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ expenses.next_page_number }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
 {% endblock %}

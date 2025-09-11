@@ -1,503 +1,580 @@
-<!-- templates/expenses/expense_form.html -->
 {% extends 'base/base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}
-{% if expense %}Edit Expense{% else %}Create Expense{% endif %} - {{ block.super }}
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .expense-form-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .form-card {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        border: 1px solid #e3e6f0;
+    }
+    
+    .form-section {
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid #f1f3f4;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .section-title i {
+        margin-right: 12px;
+        color: #3b82f6;
+    }
+    
+    .form-group {
+        margin-bottom: 24px;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+        display: block;
+    }
+    
+    .required-field::after {
+        content: "*";
+        color: #ef4444;
+        margin-left: 4px;
+    }
+    
+    .form-control, .form-select {
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        background-color: #ffffff;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        outline: none;
+    }
+    
+    .form-control:invalid {
+        border-color: #ef4444;
+    }
+    
+    .invalid-feedback {
+        color: #ef4444;
+        font-size: 13px;
+        margin-top: 4px;
+    }
+    
+    .attendant-notice {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border: 2px solid #f59e0b;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 32px;
+    }
+    
+    .attendant-notice-content {
+        display: flex;
+        align-items: center;
+    }
+    
+    .attendant-notice-icon {
+        font-size: 24px;
+        color: #d97706;
+        margin-right: 16px;
+        flex-shrink: 0;
+    }
+    
+    .attendant-notice-text h6 {
+        color: #92400e;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+    
+    .attendant-notice-text p {
+        color: #b45309;
+        margin: 0;
+        font-size: 14px;
+    }
+    
+    .form-actions {
+        display: flex;
+        gap: 16px;
+        justify-content: flex-end;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid #f1f3f4;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        border: none;
+        padding: 12px 32px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #1d4ed8, #1e40af);
+        transform: translateY(-1px);
+    }
+    
+    .btn-secondary {
+        background: #6b7280;
+        border: none;
+        padding: 12px 32px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-secondary:hover {
+        background: #4b5563;
+        transform: translateY(-1px);
+    }
+    
+    .total-display {
+        background: #f8fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-weight: 600;
+        color: #059669;
+        font-size: 16px;
+    }
+    
+    .help-text {
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    
+    .recurring-section {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 16px;
+    }
+    
+    @media (max-width: 768px) {
+        .form-card {
+            padding: 20px;
+            margin: 16px;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+        
+        .btn-primary, .btn-secondary {
+            width: 100%;
+            margin-bottom: 8px;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1 class="page-title">
-            <i class="fas fa-receipt text-danger"></i>
-            {% if expense %}Edit Expense{% else %}Create New Expense{% endif %}
+<div class="expense-form-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-{% if is_attendant %}user-plus{% else %}plus-circle{% endif %} me-2"></i>{{ title }}
         </h1>
-        <p class="page-description">
-            {% if expense %}
-            Update expense details and information
-            {% else %}
-            Add a new expense to your records
-            {% endif %}
-        </p>
-    </div>
-    
-    <div class="page-actions">
         <a href="/business/{{ request.tenant.slug }}/expenses/" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i>
-            Back to Expenses
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
         </a>
-        {% if expense %}
-        <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" class="btn btn-outline-info">
-            <i class="fas fa-eye"></i>
-            View Details
-        </a>
-        {% endif %}
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-lg-8">
-        <div class="content-card">
-            <div class="card-header">
-                <h5 class="card-title">
-                    <i class="fas fa-edit"></i>
-                    Expense Information
-                </h5>
-            </div>
-            <div class="card-body">
-                <form method="post" class="expense-form" novalidate>
-                    {% csrf_token %}
-                    {% crispy form %}
-                </form>
-            </div>
-        </div>
     </div>
     
-    <div class="col-lg-4">
-        <!-- Quick Actions -->
-        <div class="content-card">
-            <div class="card-header">
-                <h6 class="card-title">
-                    <i class="fas fa-zap"></i>
-                    Quick Actions
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="quick-actions">
-                    <a href="/business/{{ request.tenant.slug }}/expenses/vendors/create/" class="quick-action-btn" target="_blank">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>Add New Vendor</span>
-                    </a>
-                    <a href="/business/{{ request.tenant.slug }}/expenses/categories/create/" class="quick-action-btn" target="_blank">
-                        <i class="fas fa-tag"></i>
-                        <span>Add New Category</span>
-                    </a>
-                    {% if not expense %}
-                    <button type="button" class="quick-action-btn" onclick="fillSampleData()">
-                        <i class="fas fa-magic"></i>
-                        <span>Fill Sample Data</span>
-                    </button>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <!-- Tips & Guidelines -->
-        <div class="content-card">
-            <div class="card-header">
-                <h6 class="card-title">
-                    <i class="fas fa-lightbulb"></i>
-                    Tips & Guidelines
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="tips-list">
-                    <div class="tip-item">
-                        <i class="fas fa-check-circle text-success"></i>
-                        <div class="tip-content">
-                            <strong>Clear Titles:</strong>
-                            Use descriptive titles that clearly identify the expense
-                        </div>
-                    </div>
-                    <div class="tip-item">
-                        <i class="fas fa-check-circle text-success"></i>
-                        <div class="tip-content">
-                            <strong>Proper Categories:</strong>
-                            Choose the most appropriate category for better reporting
-                        </div>
-                    </div>
-                    <div class="tip-item">
-                        <i class="fas fa-check-circle text-success"></i>
-                        <div class="tip-content">
-                            <strong>Reference Numbers:</strong>
-                            Always include receipt/invoice numbers for tracking
-                        </div>
-                    </div>
-                    <div class="tip-item">
-                        <i class="fas fa-check-circle text-success"></i>
-                        <div class="tip-content">
-                            <strong>Due Dates:</strong>
-                            Set due dates for expenses that need to be paid later
-                        </div>
-                    </div>
-                    <div class="tip-item">
-                        <i class="fas fa-check-circle text-success"></i>
-                        <div class="tip-content">
-                            <strong>Recurring Expenses:</strong>
-                            Mark recurring expenses to automate future entries
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Expense Types Info -->
-        <div class="content-card">
-            <div class="card-header">
-                <h6 class="card-title">
+    <div class="form-card">
+        {% if is_attendant %}
+        <div class="attendant-notice">
+            <div class="attendant-notice-content">
+                <div class="attendant-notice-icon">
                     <i class="fas fa-info-circle"></i>
-                    Expense Types
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="expense-types-info">
-                    <div class="type-info">
-                        <span class="type-label type-manual">Manual</span>
-                        <span class="type-description">Regular business expenses entered manually</span>
-                    </div>
-                    <div class="type-info">
-                        <span class="type-label type-inventory">Inventory</span>
-                        <span class="type-description">Automatically linked from inventory purchases</span>
-                    </div>
-                    <div class="type-info">
-                        <span class="type-label type-salary">Salary</span>
-                        <span class="type-description">Employee salary payments</span>
-                    </div>
-                    <div class="type-info">
-                        <span class="type-label type-commission">Commission</span>
-                        <span class="type-description">Service commissions paid to employees</span>
-                    </div>
-                    <div class="type-info">
-                        <span class="type-label type-utility">Utility</span>
-                        <span class="type-description">Electricity, water, internet bills</span>
-                    </div>
-                    <div class="type-info">
-                        <span class="type-label type-maintenance">Maintenance</span>
-                        <span class="type-description">Equipment and facility maintenance</span>
-                    </div>
+                </div>
+                <div class="attendant-notice-text">
+                    <h6>Expense Recording Process</h6>
+                    <p>Your expense will be submitted for approval by management. You'll receive a notification once it's reviewed and processed.</p>
                 </div>
             </div>
         </div>
+        {% endif %}
+        
+        <form method="post" enctype="multipart/form-data" id="expense-form">
+            {% csrf_token %}
+            
+            <!-- Basic Information -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <i class="fas fa-info-circle"></i>
+                    Basic Information
+                </h3>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="form-group">
+                            <label for="{{ form.title.id_for_label }}" class="form-label required-field">
+                                Expense Title
+                            </label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.title.errors.0 }}
+                            </div>
+                            {% endif %}
+                            <div class="help-text">Enter a clear, descriptive title for this expense</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.expense_date.id_for_label }}" class="form-label required-field">
+                                Expense Date
+                            </label>
+                            {{ form.expense_date }}
+                            {% if form.expense_date.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.expense_date.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="{{ form.description.id_for_label }}" class="form-label">
+                        Description
+                    </label>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                    <div class="invalid-feedback d-block">
+                        {{ form.description.errors.0 }}
+                    </div>
+                    {% endif %}
+                    <div class="help-text">Provide additional details about this expense</div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.category.id_for_label }}" class="form-label required-field">
+                                Category
+                            </label>
+                            {{ form.category }}
+                            {% if form.category.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.category.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.expense_type.id_for_label }}" class="form-label">
+                                Expense Type
+                            </label>
+                            {{ form.expense_type }}
+                            {% if form.expense_type.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.expense_type.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="{{ form.vendor.id_for_label }}" class="form-label">
+                        Vendor/Supplier
+                    </label>
+                    {{ form.vendor }}
+                    {% if form.vendor.errors %}
+                    <div class="invalid-feedback d-block">
+                        {{ form.vendor.errors.0 }}
+                    </div>
+                    {% endif %}
+                    <div class="help-text">Select the vendor or supplier for this expense (optional)</div>
+                </div>
+            </div>
+            
+            <!-- Financial Details -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <i class="fas fa-money-bill-wave"></i>
+                    Financial Details
+                </h3>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.amount.id_for_label }}" class="form-label required-field">
+                                Amount (KSh)
+                            </label>
+                            {{ form.amount }}
+                            {% if form.amount.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.amount.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.tax_amount.id_for_label }}" class="form-label">
+                                Tax Amount (KSh)
+                            </label>
+                            {{ form.tax_amount }}
+                            {% if form.tax_amount.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.tax_amount.errors.0 }}
+                            </div>
+                            {% endif %}
+                            <div class="help-text">Enter tax amount if applicable</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label class="form-label">Total Amount</label>
+                            <div class="total-display" id="total-amount-display">
+                                KSh 0.00
+                            </div>
+                            <div class="help-text">Amount + Tax (auto-calculated)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payment & Reference -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <i class="fas fa-credit-card"></i>
+                    Payment & Reference
+                </h3>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.payment_method.id_for_label }}" class="form-label required-field">
+                                Payment Method
+                            </label>
+                            {{ form.payment_method }}
+                            {% if form.payment_method.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.payment_method.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.reference_number.id_for_label }}" class="form-label">
+                                Reference Number
+                            </label>
+                            {{ form.reference_number }}
+                            {% if form.reference_number.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.reference_number.errors.0 }}
+                            </div>
+                            {% endif %}
+                            <div class="help-text">Transaction or reference number</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.receipt_number.id_for_label }}" class="form-label">
+                                Receipt Number
+                            </label>
+                            {{ form.receipt_number }}
+                            {% if form.receipt_number.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.receipt_number.errors.0 }}
+                            </div>
+                            {% endif %}
+                            <div class="help-text">Receipt or invoice number</div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if form.due_date %}
+                <div class="form-group">
+                    <label for="{{ form.due_date.id_for_label }}" class="form-label">
+                        Due Date
+                    </label>
+                    {{ form.due_date }}
+                    {% if form.due_date.errors %}
+                    <div class="invalid-feedback d-block">
+                        {{ form.due_date.errors.0 }}
+                    </div>
+                    {% endif %}
+                    <div class="help-text">Payment due date (if applicable)</div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Recurring Settings -->
+            {% if not is_attendant %}
+            <div class="form-section">
+                <h3 class="section-title">
+                    <i class="fas fa-sync-alt"></i>
+                    Recurring Settings
+                </h3>
+                
+                <div class="form-check mb-3">
+                    {{ form.is_recurring }}
+                    <label class="form-check-label" for="{{ form.is_recurring.id_for_label }}">
+                        This is a recurring expense
+                    </label>
+                </div>
+                
+                <div class="recurring-section" id="recurring-options" style="display: none;">
+                    <div class="form-group">
+                        <label for="{{ form.recurring_frequency.id_for_label }}" class="form-label">
+                            Frequency
+                        </label>
+                        {{ form.recurring_frequency }}
+                        {% if form.recurring_frequency.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.recurring_frequency.errors.0 }}
+                        </div>
+                        {% endif %}
+                        <div class="help-text">How often should this expense repeat?</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Additional Notes -->
+            {% if form.notes %}
+            <div class="form-section">
+                <h3 class="section-title">
+                    <i class="fas fa-sticky-note"></i>
+                    Additional Notes
+                </h3>
+                
+                <div class="form-group">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label">
+                        Notes
+                    </label>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}
+                    <div class="invalid-feedback d-block">
+                        {{ form.notes.errors.0 }}
+                    </div>
+                    {% endif %}
+                    <div class="help-text">Any additional information or comments</div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <a href="/business/{{ request.tenant.slug }}/expenses/" class="btn btn-secondary">
+                    <i class="fas fa-times me-2"></i>Cancel
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>
+                    {% if is_attendant %}Submit for Approval{% else %}Save Expense{% endif %}
+                </button>
+            </div>
+        </form>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Auto-calculate total amount
-    const amountInput = document.getElementById('id_amount');
-    const taxInput = document.getElementById('id_tax_amount');
-    const totalInput = document.getElementById('total_amount');
+    const amountField = document.getElementById('{{ form.amount.id_for_label }}');
+    const taxField = document.getElementById('{{ form.tax_amount.id_for_label }}');
+    const totalDisplay = document.getElementById('total-amount-display');
     
-    if (amountInput && taxInput && totalInput) {
-        function calculateTotal() {
-            const amount = parseFloat(amountInput.value) || 0;
-            const tax = parseFloat(taxInput.value) || 0;
-            const total = amount + tax;
-            totalInput.value = total.toFixed(2);
-            
-            // Update the display with proper formatting
-            if (total > 0) {
-                totalInput.style.color = '#dc3545';
-                totalInput.style.fontWeight = 'bold';
-            }
-        }
+    function calculateTotal() {
+        const amount = parseFloat(amountField.value) || 0;
+        const tax = parseFloat(taxField.value) || 0;
+        const total = amount + tax;
         
-        amountInput.addEventListener('input', calculateTotal);
-        taxInput.addEventListener('input', calculateTotal);
-        
-        // Calculate on page load
-        calculateTotal();
-    }
-    
-    // Show/hide recurring frequency field based on recurring checkbox
-    const recurringCheckbox = document.getElementById('id_is_recurring');
-    const frequencyField = document.getElementById('id_recurring_frequency').closest('.form-group');
-    
-    if (recurringCheckbox && frequencyField) {
-        function toggleFrequencyField() {
-            if (recurringCheckbox.checked) {
-                frequencyField.style.display = 'block';
-                document.getElementById('id_recurring_frequency').required = true;
-            } else {
-                frequencyField.style.display = 'none';
-                document.getElementById('id_recurring_frequency').required = false;
-            }
-        }
-        
-        recurringCheckbox.addEventListener('change', toggleFrequencyField);
-        toggleFrequencyField(); // Set initial state
-    }
-    
-    // Auto-suggest based on expense type
-    const typeSelect = document.getElementById('id_expense_type');
-    const titleInput = document.getElementById('id_title');
-    const categorySelect = document.getElementById('id_category');
-    
-    if (typeSelect && titleInput) {
-        typeSelect.addEventListener('change', function() {
-            const selectedType = typeSelect.value;
-            
-            // Auto-suggest titles based on type
-            const suggestions = {
-                'inventory': 'Inventory Purchase - ',
-                'salary': 'Employee Salary - ',
-                'commission': 'Service Commission - ',
-                'utility': 'Utility Bill - ',
-                'rent': 'Rent Payment - ',
-                'maintenance': 'Maintenance - ',
-                'fuel': 'Fuel/Transportation - ',
-                'marketing': 'Marketing Expense - ',
-                'insurance': 'Insurance Premium - ',
-                'tax': 'Tax Payment - ',
-                'loan': 'Loan Payment - '
-            };
-            
-            if (suggestions[selectedType] && !titleInput.value) {
-                titleInput.value = suggestions[selectedType];
-                titleInput.focus();
-                titleInput.setSelectionRange(suggestions[selectedType].length, suggestions[selectedType].length);
-            }
+        totalDisplay.textContent = 'KSh ' + total.toLocaleString('en-KE', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
         });
     }
+    
+    if (amountField) amountField.addEventListener('input', calculateTotal);
+    if (taxField) taxField.addEventListener('input', calculateTotal);
+    
+    // Initial calculation
+    calculateTotal();
+    
+    {% if not is_attendant %}
+    // Toggle recurring options
+    const recurringCheckbox = document.getElementById('{{ form.is_recurring.id_for_label }}');
+    const recurringOptions = document.getElementById('recurring-options');
+    
+    if (recurringCheckbox) {
+        recurringCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                recurringOptions.style.display = 'block';
+            } else {
+                recurringOptions.style.display = 'none';
+            }
+        });
+        
+        // Check initial state
+        if (recurringCheckbox.checked) {
+            recurringOptions.style.display = 'block';
+        }
+    }
+    {% endif %}
     
     // Form validation
-    const form = document.querySelector('.expense-form');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const amount = parseFloat(document.getElementById('id_amount').value) || 0;
-            
-            if (amount <= 0) {
-                e.preventDefault();
-                alert('Please enter a valid amount greater than 0.');
-                document.getElementById('id_amount').focus();
-                return false;
-            }
-            
-            const title = document.getElementById('id_title').value.trim();
-            if (!title) {
-                e.preventDefault();
-                alert('Please enter a title for this expense.');
-                document.getElementById('id_title').focus();
-                return false;
-            }
-            
-            return true;
-        });
-    }
-});
-
-// Fill sample data for testing
-function fillSampleData() {
-    if (confirm('This will fill the form with sample data. Continue?')) {
-        document.getElementById('id_title').value = 'Office Supplies Purchase';
-        document.getElementById('id_description').value = 'Monthly office supplies including paper, pens, and cleaning materials';
-        document.getElementById('id_amount').value = '150.00';
-        document.getElementById('id_tax_amount').value = '15.00';
+    const form = document.getElementById('expense-form');
+    form.addEventListener('submit', function(e) {
+        const amount = parseFloat(amountField.value);
         
-        // Set expense date to today
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('id_expense_date').value = today;
+        if (!amount || amount <= 0) {
+            e.preventDefault();
+            amountField.focus();
+            alert('Please enter a valid amount greater than 0');
+            return false;
+        }
         
-        // Set due date to next month
-        const nextMonth = new Date();
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
-        document.getElementById('id_due_date').value = nextMonth.toISOString().split('T')[0];
-        
-        // Trigger calculation
-        document.getElementById('id_amount').dispatchEvent(new Event('input'));
-    }
-}
-
-// Auto-save draft functionality (optional)
-let autoSaveTimeout;
-
-function autoSaveDraft() {
-    clearTimeout(autoSaveTimeout);
-    autoSaveTimeout = setTimeout(function() {
-        const formData = new FormData(document.querySelector('.expense-form'));
-        const data = Object.fromEntries(formData.entries());
-        
-        // Save to localStorage as draft
-        localStorage.setItem('expenseDraft', JSON.stringify(data));
-        
-        // Show auto-save indicator
-        showAutoSaveIndicator();
-    }, 2000); // Save after 2 seconds of inactivity
-}
-
-function showAutoSaveIndicator() {
-    // You can implement a visual indicator here
-    console.log('Draft saved automatically');
-}
-
-// Add auto-save listeners to form inputs
-document.querySelectorAll('.expense-form input, .expense-form select, .expense-form textarea').forEach(input => {
-    input.addEventListener('input', autoSaveDraft);
-});
-
-// Load draft on page load if available
-window.addEventListener('load', function() {
-    const draft = localStorage.getItem('expenseDraft');
-    if (draft && confirm('A draft was found. Would you like to restore it?')) {
-        const data = JSON.parse(draft);
-        
-        Object.keys(data).forEach(key => {
-            const input = document.querySelector(`[name="${key}"]`);
-            if (input && !input.value) {
-                input.value = data[key];
-            }
-        });
-        
-        // Clear the draft after restoring
-        localStorage.removeItem('expenseDraft');
-    }
+        {% if not is_attendant %}
+        const recurringFreq = document.getElementById('{{ form.recurring_frequency.id_for_label }}');
+        if (recurringCheckbox.checked && !recurringFreq.value) {
+            e.preventDefault();
+            recurringFreq.focus();
+            alert('Please select a frequency for recurring expenses');
+            return false;
+        }
+        {% endif %}
+    });
 });
 </script>
-
-<style>
-.expense-form {
-    max-width: none;
-}
-
-.quick-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.quick-action-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    text-decoration: none;
-    color: #666;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    background: white;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.quick-action-btn:hover {
-    color: #007bff;
-    border-color: #007bff;
-    background-color: #f8f9ff;
-    text-decoration: none;
-}
-
-.tips-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.tip-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-}
-
-.tip-content {
-    font-size: 13px;
-    line-height: 1.4;
-}
-
-.tip-content strong {
-    color: #333;
-}
-
-.expense-types-info {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.type-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.type-label {
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 8px;
-    font-size: 10px;
-    font-weight: 500;
-    text-transform: uppercase;
-    width: fit-content;
-}
-
-.type-manual {
-    background-color: #f8f9fa;
-    color: #6c757d;
-}
-
-.type-inventory {
-    background-color: #e7f3ff;
-    color: #0066cc;
-}
-
-.type-salary {
-    background-color: #fff2e7;
-    color: #cc6600;
-}
-
-.type-commission {
-    background-color: #e7ffe7;
-    color: #006600;
-}
-
-.type-utility {
-    background-color: #fff0e6;
-    color: #b8860b;
-}
-
-.type-maintenance {
-    background-color: #f0e6ff;
-    color: #8b00ff;
-}
-
-.type-description {
-    font-size: 12px;
-    color: #666;
-    line-height: 1.3;
-}
-
-/* Form enhancements */
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-control:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-.invalid-feedback {
-    display: block;
-}
-
-/* Amount calculation styling */
-#total_amount {
-    background-color: #f8f9fa;
-    font-weight: bold;
-    color: #dc3545;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .page-actions {
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .quick-actions {
-        flex-direction: row;
-        flex-wrap: wrap;
-    }
-    
-    .quick-action-btn {
-        flex: 1;
-        min-width: 0;
-        justify-content: center;
-    }
-}
-</style>
 {% endblock %}

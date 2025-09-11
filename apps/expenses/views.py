@@ -126,7 +126,6 @@ def tenant_redirect(request, view_name, **kwargs):
 
 @employee_required()
 @login_required
-@employee_required(['owner', 'manager', 'supervisor'])
 def expense_dashboard_view(request):
     """Expense dashboard with overview and statistics"""
     
@@ -230,70 +229,45 @@ def expense_dashboard_view(request):
 
 @employee_required()
 @login_required
-@employee_required(['owner', 'manager', 'supervisor'])
 def expense_list_view(request):
-    """List all expenses with filtering and search"""
+    """List all expenses with filtering and pagination"""
     
-    expenses = Expense.objects.filter(is_active=True).select_related(
-        'category', 'vendor'
-    ).order_by('-expense_date', '-created_at')
+    # Base queryset
+    expenses = Expense.objects.filter(is_active=True).select_related('category', 'vendor')
     
-    # Apply search filters
-    search_form = ExpenseSearchForm(request.GET)
-    if search_form.is_valid():
-        filters = search_form.cleaned_data
-        
-        if filters.get('search'):
-            search_term = filters['search']
-            expenses = expenses.filter(
-                Q(title__icontains=search_term) |
-                Q(description__icontains=search_term) |
-                Q(vendor__name__icontains=search_term) |
-                Q(reference_number__icontains=search_term)
-            )
-        
-        if filters.get('category'):
-            expenses = expenses.filter(category=filters['category'])
-        
-        if filters.get('expense_type'):
-            expenses = expenses.filter(expense_type=filters['expense_type'])
-        
-        if filters.get('status'):
-            expenses = expenses.filter(status=filters['status'])
-        
-        if filters.get('vendor'):
-            expenses = expenses.filter(vendor=filters['vendor'])
-        
-        if filters.get('date_from'):
-            expenses = expenses.filter(expense_date__gte=filters['date_from'])
-        
-        if filters.get('date_to'):
-            expenses = expenses.filter(expense_date__lte=filters['date_to'])
-        
-        if filters.get('amount_min'):
-            expenses = expenses.filter(total_amount__gte=filters['amount_min'])
-        
-        if filters.get('amount_max'):
-            expenses = expenses.filter(total_amount__lte=filters['amount_max'])
+    # Filter by status
+    status_filter = request.GET.get('status', 'all')
+    if status_filter and status_filter != 'all':
+        expenses = expenses.filter(status=status_filter)
+    
+    # Filter for attendants (only their own expenses)
+    if hasattr(request, 'employee') and request.employee.role == 'attendant':
+        expenses = expenses.filter(created_by_user_id=request.user.id)
+    
+    # Search functionality
+    search_query = request.GET.get('search', '')
+    if search_query:
+        expenses = expenses.filter(
+            Q(title__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(category__name__icontains=search_query) |
+            Q(vendor__name__icontains=search_query)
+        )
+    
+    # Order by date
+    expenses = expenses.order_by('-expense_date', '-created_at')
     
     # Pagination
     paginator = Paginator(expenses, 25)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    # Calculate totals for current filter
-    totals = expenses.aggregate(
-        total_amount=Sum('total_amount'),
-        count=Count('id')
-    )
+    expenses_page = paginator.get_page(page_number)
     
     context = {
-        'page_obj': page_obj,
-        'search_form': search_form,
-        'totals': totals,
-        'bulk_form': BulkExpenseActionForm(),
+        'expenses': expenses_page,
+        'title': 'All Expenses',
         'urls': get_expense_urls(request),
-        'title': 'Expenses'
+        'status_filter': status_filter,
+        'search_query': search_query,
     }
     
     return render(request, 'expenses/expense_list.html', context)
@@ -301,32 +275,222 @@ def expense_list_view(request):
 
 @employee_required()
 @login_required
-@employee_required(['owner', 'manager', 'supervisor'])
 def expense_create_view(request):
-    """Create new expense"""
+    """Create new expense with approval workflow for attendants"""
     
     if request.method == 'POST':
         form = ExpenseForm(request.POST, user=request.user)
         if form.is_valid():
             expense = form.save(commit=False)
             expense.set_created_by(request.user)
+            
+            # Calculate total amount (this should be done in model save method)
+            expense.total_amount = expense.amount + (expense.tax_amount or Decimal('0.00'))
+            
+            # All expenses start as pending - no auto-approval
+            expense.status = 'pending'
+            
             expense.save()
             
-            messages.success(request, f'Expense "{expense.title}" created successfully.')
-            return tenant_redirect(request, 'expenses:detail', pk=expense.pk)
+            messages.success(request, f'Expense "{expense.title}" recorded successfully and sent for approval.')
+            
+            return redirect(f'/business/{request.tenant.slug}/expenses/')
     else:
         form = ExpenseForm(user=request.user)
     
     context = {
         'form': form,
-        'title': 'Create Expense',
+        'title': 'Record Expense' if hasattr(request, 'employee') and request.employee.role == 'attendant' else 'Create Expense',
         'urls': get_expense_urls(request),
+        'is_attendant': hasattr(request, 'employee') and request.employee.role == 'attendant',
     }
     
     return render(request, 'expenses/expense_form.html', context)
 
 
+@employee_required(['owner', 'manager', 'supervisor'])
+def expense_approval_list_view(request):
+    """List expenses pending approval"""
+    
+    pending_expenses = Expense.objects.filter(
+        status='pending',
+        is_active=True
+    ).select_related('category', 'vendor').order_by('-created_at')
+    
+    print(f"DEBUG: Found {pending_expenses.count()} pending expenses")
+    for expense in pending_expenses[:5]:  # Show first 5
+        print(f"DEBUG: Expense {expense.pk} - Status: {expense.status}, Title: {expense.title}")
+    
+    # Pagination
+    paginator = Paginator(pending_expenses, 25)
+    page_number = request.GET.get('page')
+    expenses = paginator.get_page(page_number)
+    
+    context = {
+        'expenses': expenses,
+        'title': 'Pending Expense Approvals',
+        'urls': get_expense_urls(request),
+        'total_pending': pending_expenses.count(),
+    }
+    
+    return render(request, 'expenses/approval_list.html', context)
+
+
+@require_POST
+@require_POST
+@employee_required(['owner', 'manager', 'supervisor'])
+def expense_approve_view(request, pk):
+    """Approve an expense"""
+    
+    print(f"DEBUG: APPROVAL VIEW CALLED - PK: {pk}")
+    
+    expense = get_object_or_404(Expense, pk=pk, is_active=True)
+    
+    print(f"DEBUG: Found expense {expense.pk}, status: {expense.status}")
+    
+    if expense.status != 'pending':
+        print(f"DEBUG: Expense already processed with status: {expense.status}")
+        messages.error(request, f'This expense has already been processed. Current status: {expense.status}')
+        return redirect(f'/business/{request.tenant.slug}/expenses/approvals/')
+    
+    print(f"DEBUG: Updating expense to approved")
+    expense.status = 'approved'
+    expense.approved_by_user_id = request.user.id
+    expense.approved_at = timezone.now()
+    expense.save()
+    
+    print(f"DEBUG: Expense saved successfully")
+    messages.success(request, f'Expense "{expense.title}" has been approved.')
+    return redirect(f'/business/{request.tenant.slug}/expenses/approvals/')
+
+
+@require_POST
+@employee_required(['owner', 'manager', 'supervisor'])
+def expense_reject_view(request, pk):
+    """Reject an expense"""
+    
+    expense = get_object_or_404(Expense, pk=pk, is_active=True)
+    
+    if expense.status != 'pending':
+        messages.error(request, 'This expense has already been processed.')
+        return redirect(f'/business/{request.tenant.slug}/expenses/approvals/')
+    
+    expense.status = 'rejected'
+    expense.save()
+    
+    messages.success(request, f'Expense "{expense.title}" has been rejected.')
+    return redirect(f'/business/{request.tenant.slug}/expenses/approvals/')
+
+
+@employee_required(['attendant'])
+def attendant_my_expenses_view(request):
+    """View attendant's own expenses"""
+    
+    my_expenses = Expense.objects.filter(
+        created_by_user_id=request.user.id,
+        is_active=True
+    ).select_related('category', 'vendor').order_by('-created_at')
+    
+    # Status filter
+    status_filter = request.GET.get('status', 'all')
+    if status_filter != 'all':
+        my_expenses = my_expenses.filter(status=status_filter)
+    
+    # Pagination
+    paginator = Paginator(my_expenses, 25)
+    page_number = request.GET.get('page')
+    expenses = paginator.get_page(page_number)
+    
+    # Stats
+    stats = {
+        'total': my_expenses.count(),
+        'pending': my_expenses.filter(status='pending').count(),
+        'approved': my_expenses.filter(status='approved').count(),
+        'rejected': my_expenses.filter(status='rejected').count(),
+        'total_amount': my_expenses.filter(status='approved').aggregate(
+            total=Sum('total_amount')
+        )['total'] or Decimal('0.00')
+    }
+    
+    context = {
+        'expenses': expenses,
+        'title': 'My Expenses',
+        'urls': get_expense_urls(request),
+        'stats': stats,
+        'status_filter': status_filter,
+        'status_choices': Expense.STATUS_CHOICES,
+    }
+    
+    return render(request, 'expenses/my_expenses.html', context)
+
+
 @employee_required()
+@login_required
+def expense_edit_view(request, pk):
+    """Edit expense with role-based permissions and status checks"""
+    
+    expense = get_object_or_404(Expense, pk=pk, is_active=True)
+    
+    # Check permissions based on role and status
+    can_edit = False
+    edit_reason = ""
+    
+    if request.employee.role == 'owner':
+        # Owners can edit any expense except paid ones
+        can_edit = expense.status != 'paid'
+        edit_reason = "Owners cannot edit paid expenses"
+    elif request.employee.role in ['manager', 'supervisor']:
+        # Managers can edit pending and approved expenses they didn't create
+        can_edit = expense.status in ['pending', 'approved']
+        edit_reason = "Managers can only edit pending or approved expenses"
+    elif request.employee.role == 'attendant':
+        # Attendants can only edit their own pending expenses
+        can_edit = (expense.created_by_user_id == request.user.id and 
+                   expense.status == 'pending')
+        edit_reason = "You can only edit your own pending expenses"
+    else:
+        edit_reason = "You do not have permission to edit expenses"
+    
+    if not can_edit:
+        messages.error(request, edit_reason)
+        return redirect(f'/business/{request.tenant.slug}/expenses/{pk}/')
+    
+    if request.method == 'POST':
+        form = ExpenseForm(request.POST, instance=expense, user=request.user)
+        if form.is_valid():
+            expense = form.save(commit=False)
+            expense.set_updated_by(request.user)
+            
+            # Calculate total amount
+            expense.total_amount = expense.amount + (expense.tax_amount or Decimal('0.00'))
+            
+            # Handle status changes based on role and current status
+            if expense.status == 'approved' and request.employee.role in ['manager', 'supervisor']:
+                # If manager/supervisor edits approved expense, reset to pending for re-approval
+                if request.employee.role != 'owner':
+                    expense.status = 'pending'
+                    expense.approved_by_user_id = None
+                    expense.approved_at = None
+                    messages.info(request, 'Expense has been reset to pending status for re-approval.')
+            
+            expense.save()
+            
+            messages.success(request, f'Expense "{expense.title}" updated successfully.')
+            return redirect(f'/business/{request.tenant.slug}/expenses/{pk}/')
+    else:
+        form = ExpenseForm(instance=expense, user=request.user)
+    
+    context = {
+        'form': form,
+        'expense': expense,
+        'title': f'Edit Expense - {expense.title}',
+        'urls': get_expense_urls(request),
+        'can_edit': can_edit,
+    }
+    
+    return render(request, 'expenses/expense_edit.html', context)
+
+
 @login_required
 @employee_required(['owner', 'manager', 'supervisor'])
 def expense_detail_view(request, pk):
@@ -338,14 +502,58 @@ def expense_detail_view(request, pk):
         is_active=True
     )
     
+    # Check if attendant can view this expense
+    if (request.employee.role == 'attendant' and 
+        expense.created_by_user_id != request.user.id):
+        messages.error(request, 'You can only view your own expenses.')
+        return redirect(f'/business/{request.tenant.slug}/expenses/my-expenses/')
+    
+    # Check permissions for editing
+    can_edit = False
+    edit_reason = ""
+    
+    if request.employee.role == 'owner':
+        # Owners can edit any expense except paid ones
+        can_edit = expense.status != 'paid'
+        edit_reason = "Cannot edit paid expenses"
+    elif request.employee.role in ['manager', 'supervisor']:
+        # Managers can edit pending and approved expenses (with re-approval logic)
+        can_edit = expense.status in ['pending', 'approved']
+        edit_reason = "Managers can only edit pending or approved expenses"
+    elif request.employee.role == 'attendant':
+        # Attendants can only edit their own pending expenses
+        can_edit = (expense.created_by_user_id == request.user.id and 
+                   expense.status == 'pending')
+        edit_reason = "You can only edit your own pending expenses"
+    else:
+        edit_reason = "You do not have permission to edit expenses"
+    
     # Get approval history
     approvals = expense.approvals.all().order_by('-created_at')
+    
+    # Get approver information if expense is approved
+    approver_name = None
+    if expense.approved_by_user_id:
+        try:
+            from django.contrib.auth.models import User
+            approver_user = User.objects.get(id=expense.approved_by_user_id)
+            try:
+                from apps.employees.models import Employee
+                approver_employee = Employee.objects.get(user_id=approver_user.id)
+                approver_name = approver_employee.full_name
+            except Employee.DoesNotExist:
+                approver_name = approver_user.get_full_name() or approver_user.username
+        except User.DoesNotExist:
+            approver_name = "Unknown User"
     
     context = {
         'expense': expense,
         'approvals': approvals,
         'urls': get_expense_urls(request),
-        'title': f'Expense - {expense.title}'
+        'title': f'Expense - {expense.title}',
+        'can_edit': can_edit,
+        'edit_reason': edit_reason,
+        'approver_name': approver_name,
     }
     
     return render(request, 'expenses/expense_detail.html', context)
@@ -354,33 +562,6 @@ def expense_detail_view(request, pk):
 @employee_required()
 @login_required
 @employee_required(['owner', 'manager', 'supervisor'])
-def expense_edit_view(request, pk):
-    """Edit expense"""
-    
-    expense = get_object_or_404(Expense, pk=pk, is_active=True)
-    
-    if request.method == 'POST':
-        form = ExpenseForm(request.POST, instance=expense, user=request.user)
-        if form.is_valid():
-            expense = form.save(commit=False)
-            expense.set_updated_by(request.user)
-            expense.save()
-            
-            messages.success(request, f'Expense "{expense.title}" updated successfully.')
-            return tenant_redirect(request, 'expenses:detail', pk=expense.pk)
-    else:
-        form = ExpenseForm(instance=expense, user=request.user)
-    
-    context = {
-        'expense': expense,
-        'form': form,
-        'title': f'Edit Expense - {expense.title}',
-        'urls': get_expense_urls(request),
-    }
-    
-    return render(request, 'expenses/expense_form.html', context)
-
-
 @employee_required()
 @require_POST
 @login_required
@@ -397,38 +578,7 @@ def expense_delete_view(request, pk):
     return tenant_redirect(request, 'expenses:list')
 
 
-@employee_required()
-@require_POST
-@login_required
-@employee_required(['owner', 'manager'])
-def expense_approve_view(request, pk):
-    """Approve/reject expense"""
-    
-    expense = get_object_or_404(Expense, pk=pk, is_active=True)
-    
-    if request.method == 'POST':
-        form = ExpenseApprovalForm(request.POST)
-        if form.is_valid():
-            approval = form.save(commit=False)
-            approval.expense = expense
-            approval.approver_user_id = request.user.id
-            approval.set_created_by(request.user)
-            
-            if approval.status == 'approved':
-                approval.approved_at = timezone.now()
-                expense.status = 'approved'
-                expense.approved_by_user_id = request.user.id
-                expense.approved_at = timezone.now()
-            elif approval.status == 'rejected':
-                expense.status = 'rejected'
-            
-            approval.save()
-            expense.save()
-            
-            messages.success(request, f'Expense {approval.status} successfully.')
-            return tenant_redirect(request, 'expenses:detail', pk=expense.pk)
-    
-    return tenant_redirect(request, 'expenses:detail', pk=pk)
+
 
 
 @employee_required()
@@ -638,8 +788,8 @@ def create_salary_expense(employee, salary_amount, pay_date):
         )
         
         expense = Expense.objects.create(
-            title=f'Salary - {employee.get_full_name()}',
-            description=f'Monthly salary payment for {employee.get_full_name()}',
+            title=f'Salary - {employee.full_name}',
+            description=f'Monthly salary payment for {employee.full_name}',
             category=category,
             amount=salary_amount,
             total_amount=salary_amount,
@@ -669,7 +819,7 @@ def create_commission_expense(service_order_item):
         )
         
         expense = Expense.objects.create(
-            title=f'Commission - {service_order_item.service.name} by {service_order_item.assigned_to.get_full_name()}',
+            title=f'Commission - {service_order_item.service.name} by {service_order_item.assigned_to.full_name}',
             description=f'Service commission for {service_order_item.service.name} - Order #{service_order_item.order.order_number}',
             category=category,
             amount=service_order_item.commission_amount,
@@ -702,7 +852,7 @@ def create_commission_expense_legacy(service, employee, commission_amount, servi
         )
         
         expense = Expense.objects.create(
-            title=f'Commission - {service.name} by {employee.get_full_name()}',
+            title=f'Commission - {service.name} by {employee.full_name}',
             description=f'Service commission for {service.name}',
             category=category,
             amount=commission_amount,
@@ -1332,3 +1482,88 @@ def expense_export_pdf_view(request):
     """Export expenses to PDF (placeholder)"""
     messages.info(request, 'PDF export feature coming soon!')
     return tenant_redirect(request, 'expenses:list')
+
+
+@employee_required()
+@login_required
+@require_POST
+def expense_delete_view(request, pk):
+    """Delete expense with role-based permissions and status checks"""
+    
+    expense = get_object_or_404(Expense, pk=pk, is_active=True)
+    
+    # Check permissions based on role and status
+    can_delete = False
+    delete_reason = ""
+    
+    if request.employee.role == 'owner':
+        # Owners can delete any expense except paid ones
+        can_delete = expense.status != 'paid'
+        delete_reason = "Cannot delete paid expenses"
+    elif request.employee.role in ['manager', 'supervisor']:
+        # Managers can delete pending and rejected expenses
+        can_delete = expense.status in ['pending', 'rejected']
+        delete_reason = "Managers can only delete pending or rejected expenses"
+    elif request.employee.role == 'attendant':
+        # Attendants can only delete their own pending expenses
+        can_delete = (expense.created_by_user_id == request.user.id and 
+                     expense.status == 'pending')
+        delete_reason = "You can only delete your own pending expenses"
+    else:
+        delete_reason = "You do not have permission to delete expenses"
+    
+    if not can_delete:
+        messages.error(request, delete_reason)
+        return redirect(f'/business/{request.tenant.slug}/expenses/{pk}/')
+    
+    # Soft delete the expense
+    expense_title = expense.title
+    expense.is_active = False
+    expense.save()
+    
+    messages.success(request, f'Expense "{expense_title}" has been deleted successfully.')
+    
+    # Redirect based on user role
+    if request.employee.role == 'attendant':
+        return redirect(f'/business/{request.tenant.slug}/expenses/my-expenses/')
+    else:
+        return redirect(f'/business/{request.tenant.slug}/expenses/list/')
+
+
+@employee_required()
+@login_required
+def expense_delete_confirm_view(request, pk):
+    """Confirm expense deletion"""
+    
+    expense = get_object_or_404(Expense, pk=pk, is_active=True)
+    
+    # Check permissions based on role and status
+    can_delete = False
+    delete_reason = ""
+    
+    if request.employee.role == 'owner':
+        can_delete = expense.status != 'paid'
+        delete_reason = "Cannot delete paid expenses"
+    elif request.employee.role in ['manager', 'supervisor']:
+        can_delete = expense.status in ['pending', 'rejected']
+        delete_reason = "Managers can only delete pending or rejected expenses"
+    elif request.employee.role == 'attendant':
+        can_delete = (expense.created_by_user_id == request.user.id and 
+                     expense.status == 'pending')
+        delete_reason = "You can only delete your own pending expenses"
+    else:
+        delete_reason = "You do not have permission to delete expenses"
+    
+    if not can_delete:
+        messages.error(request, delete_reason)
+        return redirect(f'/business/{request.tenant.slug}/expenses/{pk}/')
+    
+    context = {
+        'expense': expense,
+        'title': f'Delete Expense - {expense.title}',
+        'urls': get_expense_urls(request),
+        'can_delete': can_delete,
+        'delete_reason': delete_reason,
+    }
+    
+    return render(request, 'expenses/expense_confirm_delete.html', context)
