@@ -1,9 +1,10 @@
 // Nexus Components JavaScript
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize theme on page load
-    initializeTheme();
-    
-    // Sidebar elements
+// Make functions globally available
+window.toggleTheme = toggleTheme;
+window.initializeTheme = initializeTheme;
+window.applyTheme = applyTheme;
+window.updateThemeToggleButton = updateThemeToggleButton;    // Sidebar elements
     const mobileToggle = document.getElementById('mobileSidebarToggle');
     const desktopToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
@@ -413,9 +414,15 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Theme Toggle Function - Disabled to use main.js implementation
-/*
+// Theme Toggle Function - Re-enabled to work with main.js
 function toggleTheme() {
+    // Use the main.js implementation if available
+    if (window.toggleTheme && typeof window.toggleTheme === 'function') {
+        window.toggleTheme();
+        return;
+    }
+    
+    // Fallback implementation
     const currentTheme = localStorage.getItem('theme') || 'light';
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
     
@@ -427,8 +434,9 @@ function toggleTheme() {
     
     // Update theme toggle button
     updateThemeToggleButton(newTheme);
+    
+    console.log('Theme toggled to:', newTheme);
 }
-*/
 
 // Initialize Theme
 function initializeTheme() {
@@ -486,6 +494,19 @@ function updateThemeToggleButton(theme) {
             text.textContent = 'Dark Mode';
         }
     });
+    
+    console.log('Theme toggle button updated for theme:', theme);
+}
+    
+    otherThemeTexts.forEach(text => {
+        if (theme === 'dark') {
+            text.textContent = 'Light Mode';
+        } else {
+            text.textContent = 'Dark Mode';
+        }
+    });
+    
+    console.log('Theme toggle button updated for theme:', theme);
 }
 
 // Notification functionality
@@ -594,3 +615,6 @@ document.addEventListener('click', function(e) {
         }
     }
 });
+
+// Initialize theme and expose functions globally
+initializeTheme();

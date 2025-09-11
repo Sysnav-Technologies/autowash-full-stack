@@ -1,0 +1,110 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Offline - AutoWash{% endblock %}
+
+{% block content %}
+<div class="container-fluid min-vh-100 d-flex align-items-center justify-content-center">
+    <div class="text-center">
+        <div class="mb-4">
+            <i class="fas fa-wifi-slash fa-5x text-muted mb-3"></i>
+        </div>
+        
+        <h1 class="h2 mb-3">You're Offline</h1>
+        <p class="text-muted mb-4">
+            It looks like you've lost your internet connection. Don't worry, some features 
+            are still available while you're offline.
+        </p>
+        
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Available Offline
+                        </h5>
+                        <ul class="list-unstyled text-start">
+                            <li><i class="fas fa-dot-circle text-primary me-2"></i> View cached dashboard data</li>
+                            <li><i class="fas fa-dot-circle text-primary me-2"></i> Browse previously loaded customers</li>
+                            <li><i class="fas fa-dot-circle text-primary me-2"></i> View service information</li>
+                            <li><i class="fas fa-dot-circle text-primary me-2"></i> Access inventory data</li>
+                            <li><i class="fas fa-dot-circle text-primary me-2"></i> View reports (cached)</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                            Limited While Offline
+                        </h5>
+                        <ul class="list-unstyled text-start">
+                            <li><i class="fas fa-times-circle text-danger me-2"></i> Creating new records</li>
+                            <li><i class="fas fa-times-circle text-danger me-2"></i> Processing payments</li>
+                            <li><i class="fas fa-times-circle text-danger me-2"></i> Real-time synchronization</li>
+                            <li><i class="fas fa-times-circle text-danger me-2"></i> Sending notifications</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <button type="button" class="btn btn-primary me-2" onclick="window.location.reload()">
+                <i class="fas fa-sync-alt me-2"></i>Try Again
+            </button>
+            <a href="/" class="btn btn-outline-secondary">
+                <i class="fas fa-home me-2"></i>Go to Dashboard
+            </a>
+        </div>
+        
+        <div class="mt-3">
+            <small class="text-muted">
+                Your data will sync automatically when you're back online.
+            </small>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-reload when connection is restored
+window.addEventListener('online', function() {
+    window.location.reload();
+});
+
+// Show connection status
+function updateConnectionStatus() {
+    const statusEl = document.getElementById('connection-status');
+    if (statusEl) {
+        if (navigator.onLine) {
+            statusEl.innerHTML = '<i class="fas fa-wifi text-success"></i> Connected';
+            statusEl.className = 'badge bg-success';
+        } else {
+            statusEl.innerHTML = '<i class="fas fa-wifi-slash text-danger"></i> Offline';
+            statusEl.className = 'badge bg-danger';
+        }
+    }
+}
+
+// Check connection every few seconds
+setInterval(updateConnectionStatus, 3000);
+</script>
+
+<style>
+.min-vh-100 {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+}
+
+.fa-5x {
+    opacity: 0.3;
+}
+</style>
+{% endblock %}

@@ -102,6 +102,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('system-admin/', include('apps.system_admin.urls')),
     
+    # Core app URLs (PWA, manifest, etc.)
+    path('', include('apps.core.urls', namespace='core')),
+    
     # Authentication and accounts
     path('auth/', include('apps.accounts.urls')),
     path('accounts/', include('allauth.urls')),
