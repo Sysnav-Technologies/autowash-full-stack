@@ -249,6 +249,95 @@
                         {% endif %}
                     </ul>
                 </li>
+
+                <!-- Expenses Module with Dropdown -->
+                <li class="nav-item nav-dropdown" id="expenses-dropdown">
+                    <a class="nav-link nav-dropdown-toggle {% if 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                       href="#" onclick="toggleDropdown('expenses-dropdown')">
+                        <i class="nav-icon fas fa-receipt"></i>
+                        <span class="nav-text">Expenses</span>
+                        <i class="nav-arrow fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="nav-submenu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <span class="nav-text">Dashboard</span>
+                            </a>
+                        </li>
+                        
+                        {% if user_role and user_role in 'owner,manager,supervisor' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/list/">
+                                <i class="nav-icon fas fa-list"></i>
+                                <span class="nav-text">All Expenses</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <!-- All roles can record/create expenses -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/create/">
+                                <i class="nav-icon fas fa-plus-circle"></i>
+                                <span class="nav-text">
+                                    {% if user_role == 'attendant' %}Record Expense{% else %}Add Expense{% endif %}
+                                </span>
+                            </a>
+                        </li>
+                        
+                        {% if user_role and user_role in 'owner,manager,supervisor' %}
+                        <!-- Admin-only sections -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'approval_list' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/approvals/">
+                                <i class="nav-icon fas fa-check-circle"></i>
+                                <span class="nav-text">
+                                    Approve Expenses
+                                    <span class="badge bg-warning text-dark ms-1" id="pending-expenses-badge" style="display: none;"></span>
+                                </span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'category_list' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/categories/">
+                                <i class="nav-icon fas fa-tags"></i>
+                                <span class="nav-text">Categories</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'vendor_list' %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/vendors/">
+                                <i class="nav-icon fas fa-truck"></i>
+                                <span class="nav-text">Vendors</span>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reports' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/reports/">
+                                <i class="nav-icon fas fa-chart-bar"></i>
+                                <span class="nav-text">Reports</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% if user_role == 'attendant' %}
+                        <!-- Attendant-specific view: My Expenses -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'my_expenses' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
+                               href="/business/{{ request.tenant.slug }}/expenses/my-expenses/">
+                                <i class="nav-icon fas fa-user-check"></i>
+                                <span class="nav-text">My Expenses</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </li>
             </ul>
         </div>
         {% endif %}
@@ -402,57 +491,6 @@
                                 {% if active_alerts_count > 0 %}
                                 <span class="nav-badge nav-badge-danger">{{ active_alerts_count }}</span>
                                 {% endif %}
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-
-                <!-- Expenses Module with Dropdown -->
-                <li class="nav-item nav-dropdown" id="expenses-dropdown">
-                    <a class="nav-link nav-dropdown-toggle {% if 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
-                       href="#" onclick="toggleDropdown('expenses-dropdown')">
-                        <i class="nav-icon fas fa-receipt"></i>
-                        <span class="nav-text">Expenses</span>
-                        <i class="nav-arrow fas fa-chevron-down"></i>
-                    </a>
-                    <ul class="nav-submenu">
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/expenses/">
-                                <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <span class="nav-text">Dashboard</span>
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'list' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/expenses/list/">
-                                <i class="nav-icon fas fa-list"></i>
-                                <span class="nav-text">All Expenses</span>
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'create' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/expenses/create/">
-                                <i class="nav-icon fas fa-plus-circle"></i>
-                                <span class="nav-text">Add Expense</span>
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'category_list' and 'expenses' in request.resolver_match.namespace %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/expenses/categories/">
-                                <i class="nav-icon fas fa-tags"></i>
-                                <span class="nav-text">Categories</span>
-                            </a>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'vendor_list' %}active{% endif %}" 
-                               href="/business/{{ request.tenant.slug }}/expenses/vendors/">
-                                <i class="nav-icon fas fa-truck"></i>
-                                <span class="nav-text">Vendors</span>
                             </a>
                         </li>
                     </ul>

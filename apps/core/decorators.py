@@ -128,7 +128,11 @@ def employee_required(roles=None):
                             }
                         )
                         if created:
-                            print(f"Auto-created employee record for business owner: {request.user.username}")
+                            print(f"DEBUG: Auto-created employee record for business owner: {request.user.username}")
+                        else:
+                            print(f"DEBUG: Found existing employee record for owner: {employee.employee_id}")
+                        
+                        print(f"DEBUG: Owner employee role: {employee.role}, status: {employee.status}, active: {employee.is_active}")
                         request.employee = employee
                         return view_func(request, *args, **kwargs)
                     except Exception as e:
@@ -149,11 +153,14 @@ def employee_required(roles=None):
                     
                     # FIX: Use user_id and tenant-specific database for cross-schema compatibility
                     employee = Employee.objects.using(db_alias).get(user_id=request.user.id, is_active=True)
+                    print(f"DEBUG: Found regular employee: {employee.employee_id}, role: {employee.role}")
                 else:
                     # Fallback to default database if no tenant (shouldn't happen)
                     employee = Employee.objects.get(user_id=request.user.id, is_active=True)
+                    print(f"DEBUG: Found employee in default database: {employee.employee_id}")
                 
                 if not employee.is_active:
+                    print(f"DEBUG: Employee {employee.employee_id} is not active")
                     return render(request, 'errors/access_denied.html', {
                         'title': 'Account Inactive',
                         'message': 'Your employee account is inactive.',
@@ -187,6 +194,7 @@ def employee_required(roles=None):
                     }, status=403)
                 
                 if roles and employee.role not in roles:
+                    print(f"DEBUG: Role check failed. Required: {roles}, User has: {employee.role}")
                     return render(request, 'errors/access_denied.html', {
                         'title': 'Insufficient Permissions',
                         'message': f'You need {" or ".join(roles)} role to access this page. Your current role is "{employee.get_role_display()}".',
@@ -194,10 +202,12 @@ def employee_required(roles=None):
                         'employee': employee,
                     }, status=403)
                 
+                print(f"DEBUG: Role check passed. Required: {roles}, User has: {employee.role}")
                 request.employee = employee
                 return view_func(request, *args, **kwargs)
                 
             except Employee.DoesNotExist:
+                print(f"DEBUG: No employee record found for user {request.user.id} in tenant {request.tenant.slug}")
                 return render(request, 'errors/access_denied.html', {
                     'title': 'Not an Employee',
                     'message': 'You are not registered as an employee in this business.',

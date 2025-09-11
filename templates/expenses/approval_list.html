@@ -1,0 +1,382 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Pending Expense Approvals{% endblock %}
+
+{% block extra_css %}
+<style>
+    .approval-container {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e3e6f0;
+    }
+    
+    .approval-header {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+    }
+    
+    .pending-count {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+    
+    .expense-approval-item {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .expense-approval-item:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        transform: translateY(-2px);
+    }
+    
+    .expense-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 8px;
+    }
+    
+    .expense-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-bottom: 12px;
+    }
+    
+    .expense-amount {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #059669;
+    }
+    
+    .expense-tax {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .approval-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+    }
+    
+    .btn-approve {
+        background: linear-gradient(135deg, #10b981, #059669);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-approve:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        color: white;
+        transform: translateY(-1px);
+    }
+    
+    .btn-reject {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-reject:hover {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        color: white;
+        transform: translateY(-1px);
+    }
+    
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .empty-approvals {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6b7280;
+    }
+    
+    .empty-approvals i {
+        font-size: 4rem;
+        color: #10b981;
+        margin-bottom: 20px;
+    }
+    
+    .expense-description {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-bottom: 12px;
+        line-height: 1.5;
+    }
+    
+    .expense-notes {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 12px;
+        font-size: 0.875rem;
+        color: #4b5563;
+    }
+    
+    .quick-approve-all {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        margin-bottom: 24px;
+    }
+    
+    @media (max-width: 768px) {
+        .approval-container {
+            padding: 16px;
+            margin: 8px;
+        }
+        
+        .expense-approval-item {
+            padding: 16px;
+        }
+        
+        .approval-actions {
+            flex-direction: column;
+        }
+        
+        .btn-approve, .btn-reject {
+            width: 100%;
+        }
+        
+        .expense-meta {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0 text-gray-800">
+        <i class="fas fa-check-circle me-2"></i>Expense Approvals
+    </h1>
+    <div class="d-flex gap-2">
+        <a href="/business/{{ request.tenant.slug }}/expenses/create/" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Add Expense
+        </a>
+        <a href="/business/{{ request.tenant.slug }}/expenses/" class="btn btn-outline-secondary">
+            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Header -->
+<div class="approval-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="h4 mb-2">Pending Expense Approvals</h2>
+            <p class="mb-0 opacity-90">Review and approve expense submissions from your team</p>
+        </div>
+        <div class="pending-count">
+            {{ total_pending }} Pending
+        </div>
+    </div>
+</div>
+
+{% if expenses %}
+<!-- Quick Actions -->
+{% if total_pending > 1 %}
+<div class="mb-4">
+    <button class="quick-approve-all" onclick="approveAll()">
+        <i class="fas fa-check-double me-2"></i>Approve All ({{ total_pending }})
+    </button>
+</div>
+{% endif %}
+
+<!-- Approval List -->
+<div class="approval-container">
+    {% for expense in expenses %}
+    <div class="expense-approval-item">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="expense-title">{{ expense.title }}</div>
+                
+                {% if expense.description %}
+                <div class="expense-description">
+                    {{ expense.description|truncatechars:120 }}
+                </div>
+                {% endif %}
+                
+                <div class="expense-meta">
+                    <span><i class="fas fa-calendar-alt me-1"></i>{{ expense.expense_date|date:"F d, Y" }}</span>
+                    <span><i class="fas fa-tag me-1"></i>{{ expense.category.name }}</span>
+                    {% if expense.vendor %}
+                    <span><i class="fas fa-truck me-1"></i>{{ expense.vendor.name }}</span>
+                    {% endif %}
+                    <span><i class="fas fa-credit-card me-1"></i>{{ expense.get_payment_method_display }}</span>
+                </div>
+                
+                <div class="d-flex align-items-center">
+                    <span class="status-badge">{{ expense.get_status_display }}</span>
+                    <small class="text-muted ms-3">
+                        Submitted: {{ expense.created_at|date:"M d, Y H:i" }}
+                    </small>
+                </div>
+                
+                {% if expense.notes %}
+                <div class="expense-notes">
+                    <strong><i class="fas fa-sticky-note me-1"></i>Notes:</strong>
+                    {{ expense.notes }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="col-lg-4 text-lg-end">
+                <div class="expense-amount">KSh {{ expense.total_amount|floatformat:2 }}</div>
+                {% if expense.tax_amount > 0 %}
+                <div class="expense-tax">
+                    KSh {{ expense.amount|floatformat:2 }} + KSh {{ expense.tax_amount|floatformat:2 }} tax
+                </div>
+                {% endif %}
+                
+                <div class="approval-actions">
+                    <form method="post" action="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/approve/" class="d-inline flex-grow-1">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-approve w-100">
+                            <i class="fas fa-check me-2"></i>Approve
+                        </button>
+                    </form>
+                    
+                    <form method="post" action="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/reject/" class="d-inline flex-grow-1">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-reject w-100" 
+                                onclick="return confirm('Are you sure you want to reject this expense? This action cannot be undone.')">
+                            <i class="fas fa-times me-2"></i>Reject
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="mt-2">
+                    <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" 
+                       class="btn btn-outline-primary btn-sm w-100">
+                        <i class="fas fa-eye me-1"></i>View Details
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- Pagination -->
+    {% if expenses.has_other_pages %}
+    <nav aria-label="Approval pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if expenses.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ expenses.previous_page_number }}" title="Previous page">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in expenses.paginator.page_range %}
+            {% if expenses.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > expenses.number|add:'-3' and num < expenses.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+            </li>
+            {% endif %}
+            {% endfor %}
+            
+            {% if expenses.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ expenses.next_page_number }}" title="Next page">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="approval-container">
+    <div class="empty-approvals">
+        <i class="fas fa-check-circle"></i>
+        <h4>All Caught Up!</h4>
+        <p class="mb-4">There are no expenses pending approval at the moment.</p>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="/business/{{ request.tenant.slug }}/expenses/" class="btn btn-primary">
+                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/expenses/list/" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-2"></i>All Expenses
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function approveAll() {
+    if (confirm('Are you sure you want to approve all {{ total_pending }} pending expenses?')) {
+        // Create forms for each expense and submit them
+        const forms = document.querySelectorAll('form[action*="/approve/"]');
+        let approved = 0;
+        
+        forms.forEach(form => {
+            const formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+                }
+            }).then(response => {
+                if (response.ok) {
+                    approved++;
+                    if (approved === forms.length) {
+                        location.reload();
+                    }
+                }
+            });
+        });
+    }
+}
+</script>
+{% endblock %}

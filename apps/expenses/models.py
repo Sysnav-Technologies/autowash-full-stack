@@ -214,6 +214,23 @@ class Expense(TenantTimeStampedModel):
         return False
     
     @property
+    def creator_name(self):
+        """Get the name of the user who created this expense"""
+        if self.created_by_user_id:
+            try:
+                from django.contrib.auth.models import User
+                creator_user = User.objects.get(id=self.created_by_user_id)
+                try:
+                    from apps.employees.models import Employee
+                    creator_employee = Employee.objects.get(user_id=creator_user.id)
+                    return creator_employee.full_name
+                except Employee.DoesNotExist:
+                    return creator_user.get_full_name() or creator_user.username
+            except User.DoesNotExist:
+                return "Unknown User"
+        return "System"
+    
+    @property
     def linked_object_name(self):
         """Get name of linked object"""
         if self.expense_type == 'inventory' and self.linked_inventory_item_id:
@@ -227,7 +244,7 @@ class Expense(TenantTimeStampedModel):
             try:
                 from apps.employees.models import Employee
                 employee = Employee.objects.get(id=self.linked_employee_id)
-                return f"Employee: {employee.get_full_name()}"
+                return f"Employee: {employee.full_name}"
             except:
                 return "Linked Employee"
         elif self.expense_type == 'commission' and self.linked_service_order_item_id:

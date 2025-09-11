@@ -1,0 +1,237 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<style>
+.delete-confirmation {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 30px;
+}
+
+.danger-header {
+    text-align: center;
+    color: #dc3545;
+    margin-bottom: 20px;
+}
+
+.danger-icon {
+    font-size: 48px;
+    color: #dc3545;
+    margin-bottom: 15px;
+    display: block;
+}
+
+.expense-details {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.detail-value {
+    color: #212529;
+}
+
+.warning-text {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    padding: 15px;
+    margin: 20px 0;
+    color: #856404;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.btn {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-approved {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-rejected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-paid {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="delete-confirmation">
+        <div class="danger-header">
+            <span class="danger-icon">⚠️</span>
+            <h3>Confirm Expense Deletion</h3>
+        </div>
+
+        {% if not can_delete %}
+            <div class="alert alert-danger">
+                <strong>Cannot Delete:</strong> {{ delete_reason }}
+            </div>
+            <div class="action-buttons">
+                <a href="{{ urls.detail }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Details
+                </a>
+            </div>
+        {% else %}
+            <p class="text-center">Are you sure you want to delete this expense? This action cannot be undone.</p>
+
+            <div class="expense-details">
+                <h5 class="mb-3">Expense Details</h5>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Title:</span>
+                    <span class="detail-value">{{ expense.title }}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Amount:</span>
+                    <span class="detail-value">${{ expense.amount|floatformat:2 }}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Category:</span>
+                    <span class="detail-value">{{ expense.category.name|default:"No Category" }}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Vendor:</span>
+                    <span class="detail-value">{{ expense.vendor.name|default:"No Vendor" }}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Date:</span>
+                    <span class="detail-value">{{ expense.expense_date|date:"M d, Y" }}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Status:</span>
+                    <span class="detail-value">
+                        <span class="status-badge status-{{ expense.status }}">
+                            {{ expense.get_status_display }}
+                        </span>
+                    </span>
+                </div>
+                
+                {% if expense.description %}
+                <div class="detail-row">
+                    <span class="detail-label">Description:</span>
+                    <span class="detail-value">{{ expense.description|truncatewords:20 }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="warning-text">
+                <strong>Warning:</strong> Deleting this expense will permanently remove it from your records. 
+                This action cannot be undone and may affect your financial reports.
+            </div>
+
+            <div class="action-buttons">
+                <form method="post" action="{{ urls.delete }}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Yes, Delete Expense
+                    </button>
+                </form>
+                
+                <a href="{{ urls.detail }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add confirmation on delete button click
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteForm = document.querySelector('form[action="{{ urls.delete }}"]');
+    if (deleteForm) {
+        deleteForm.addEventListener('submit', function(e) {
+            if (!confirm('Are you absolutely sure you want to delete this expense? This action cannot be undone.')) {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

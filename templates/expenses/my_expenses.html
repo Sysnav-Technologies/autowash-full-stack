@@ -1,0 +1,444 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}My Expenses{% endblock %}
+
+{% block extra_css %}
+<style>
+    .my-expenses-container {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e3e6f0;
+    }
+    
+    .stats-overview {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 24px;
+        margin-top: 20px;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+    
+    .stat-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+    
+    .filter-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        padding: 4px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        overflow-x: auto;
+    }
+    
+    .filter-tab {
+        padding: 10px 20px;
+        background: transparent;
+        border: none;
+        color: #6b7280;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+    
+    .filter-tab:hover {
+        color: #3b82f6;
+        background: #e5e7eb;
+        text-decoration: none;
+    }
+    
+    .filter-tab.active {
+        color: white;
+        background: #3b82f6;
+    }
+    
+    .expense-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .expense-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        transform: translateY(-2px);
+    }
+    
+    .expense-header {
+        display: flex;
+        justify-content: between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+    
+    .expense-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 4px;
+        flex-grow: 1;
+    }
+    
+    .expense-amount {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #059669;
+        text-align: right;
+    }
+    
+    .expense-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .status-badge {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-pending { 
+        background: #fff3cd; 
+        color: #856404; 
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-approved { 
+        background: #d4edda; 
+        color: #155724; 
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-rejected { 
+        background: #f8d7da; 
+        color: #721c24; 
+        border: 1px solid #f5c6cb;
+    }
+    
+    .status-paid { 
+        background: #d1ecf1; 
+        color: #0c5460; 
+        border: 1px solid #bee5eb;
+    }
+    
+    .expense-description {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-bottom: 12px;
+        line-height: 1.5;
+    }
+    
+    .expense-notes {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 12px;
+        font-size: 0.875rem;
+        color: #4b5563;
+    }
+    
+    .expense-actions {
+        margin-top: 16px;
+        display: flex;
+        gap: 8px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6b7280;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        color: #d1d5db;
+        margin-bottom: 20px;
+    }
+    
+    .submission-time {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 8px;
+    }
+    
+    @media (max-width: 768px) {
+        .my-expenses-container {
+            padding: 16px;
+            margin: 8px;
+        }
+        
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        
+        .expense-header {
+            flex-direction: column;
+        }
+        
+        .expense-amount {
+            text-align: left;
+            margin-top: 8px;
+        }
+        
+        .expense-meta {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        
+        .filter-tabs {
+            justify-content: flex-start;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0 text-gray-800">
+        <i class="fas fa-user-check me-2"></i>My Expenses
+    </h1>
+    <div class="d-flex gap-2">
+        <a href="/business/{{ request.tenant.slug }}/expenses/create/" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Record Expense
+        </a>
+        <a href="/business/{{ request.tenant.slug }}/expenses/" class="btn btn-outline-secondary">
+            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Stats Overview -->
+<div class="stats-overview">
+    <h3 class="mb-0">Your Expense Summary</h3>
+    <p class="mb-0 opacity-90">Track your expense submissions and their status</p>
+    
+    <div class="stats-grid">
+        <div class="stat-item">
+            <div class="stat-number">{{ stats.total }}</div>
+            <div class="stat-label">Total Expenses</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ stats.pending }}</div>
+            <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ stats.approved }}</div>
+            <div class="stat-label">Approved</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">KSh {{ stats.total_amount|floatformat:2 }}</div>
+            <div class="stat-label">Total Amount</div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="filter-tabs">
+    <a href="?status=all" class="filter-tab {% if status_filter == 'all' %}active{% endif %}">
+        All ({{ stats.total }})
+    </a>
+    <a href="?status=pending" class="filter-tab {% if status_filter == 'pending' %}active{% endif %}">
+        Pending ({{ stats.pending }})
+    </a>
+    <a href="?status=approved" class="filter-tab {% if status_filter == 'approved' %}active{% endif %}">
+        Approved ({{ stats.approved }})
+    </a>
+    {% if stats.rejected > 0 %}
+    <a href="?status=rejected" class="filter-tab {% if status_filter == 'rejected' %}active{% endif %}">
+        Rejected ({{ stats.rejected }})
+    </a>
+    {% endif %}
+</div>
+
+<!-- Expense List -->
+<div class="my-expenses-container">
+    {% if expenses %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="mb-0">Your Expenses</h5>
+        <small class="text-muted">{{ expenses.paginator.count }} expenses found</small>
+    </div>
+    
+    {% for expense in expenses %}
+    <div class="expense-card">
+        <div class="expense-header">
+            <div class="flex-grow-1">
+                <div class="expense-title">{{ expense.title }}</div>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="status-badge status-{{ expense.status }}">
+                        {{ expense.get_status_display }}
+                    </span>
+                    {% if expense.status == 'pending' %}
+                    <small class="text-warning">
+                        <i class="fas fa-clock me-1"></i>Awaiting approval
+                    </small>
+                    {% elif expense.status == 'approved' %}
+                    <small class="text-success">
+                        <i class="fas fa-check me-1"></i>
+                        {% if approver_name %}
+                            Approved by {{ approver_name }}
+                        {% else %}
+                            Approved by management
+                        {% endif %}
+                    </small>
+                    {% elif expense.status == 'rejected' %}
+                    <small class="text-danger">
+                        <i class="fas fa-times me-1"></i>Rejected by management
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="expense-amount">KSh {{ expense.total_amount|floatformat:2 }}</div>
+        </div>
+        
+        {% if expense.description %}
+        <div class="expense-description">
+            {{ expense.description|truncatechars:100 }}
+        </div>
+        {% endif %}
+        
+        <div class="expense-meta">
+            <span><i class="fas fa-calendar-alt me-1"></i>{{ expense.expense_date|date:"F d, Y" }}</span>
+            <span><i class="fas fa-tag me-1"></i>{{ expense.category.name }}</span>
+            {% if expense.vendor %}
+            <span><i class="fas fa-truck me-1"></i>{{ expense.vendor.name }}</span>
+            {% endif %}
+            <span><i class="fas fa-credit-card me-1"></i>{{ expense.get_payment_method_display }}</span>
+            {% if expense.tax_amount > 0 %}
+            <span><i class="fas fa-receipt me-1"></i>+KSh {{ expense.tax_amount|floatformat:2 }} tax</span>
+            {% endif %}
+        </div>
+        
+        {% if expense.notes %}
+        <div class="expense-notes">
+            <strong><i class="fas fa-sticky-note me-1"></i>Your Notes:</strong>
+            {{ expense.notes }}
+        </div>
+        {% endif %}
+        
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="submission-time">
+                <i class="fas fa-clock me-1"></i>
+                Submitted: {{ expense.created_at|date:"M d, Y H:i" }}
+                {% if expense.approved_at %}
+                • Approved: {{ expense.approved_at|date:"M d, Y H:i" }}
+                {% endif %}
+            </div>
+            
+            <div class="expense-actions">
+                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" 
+                   class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-eye me-1"></i>View
+                </a>
+                {% if expense.status == 'pending' %}
+                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/edit/" 
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-edit me-1"></i>Edit
+                </a>
+                
+                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/delete/confirm/" 
+                   class="btn btn-outline-danger btn-sm">
+                    <i class="fas fa-trash me-1"></i>Delete
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- Pagination -->
+    {% if expenses.has_other_pages %}
+    <nav aria-label="My expenses pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if expenses.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ expenses.previous_page_number }}&status={{ status_filter }}" title="Previous page">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in expenses.paginator.page_range %}
+            {% if expenses.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > expenses.number|add:'-3' and num < expenses.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}&status={{ status_filter }}">{{ num }}</a>
+            </li>
+            {% endif %}
+            {% endfor %}
+            
+            {% if expenses.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ expenses.next_page_number }}&status={{ status_filter }}" title="Next page">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+    
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-receipt"></i>
+        <h4>No Expenses Found</h4>
+        <p class="mb-4">
+            {% if status_filter == 'all' %}
+            You haven't recorded any expenses yet.
+            {% else %}
+            No expenses found with status "{{ status_filter }}".
+            {% endif %}
+        </p>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="/business/{{ request.tenant.slug }}/expenses/create/" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Record Your First Expense
+            </a>
+            {% if status_filter != 'all' %}
+            <a href="?status=all" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-2"></i>View All Expenses
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

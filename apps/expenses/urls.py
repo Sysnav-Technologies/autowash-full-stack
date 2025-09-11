@@ -10,11 +10,19 @@ urlpatterns = [
     # Expense Management
     path('list/', views.expense_list_view, name='list'),
     path('create/', views.expense_create_view, name='create'),
-    path('<uuid:pk>/', views.expense_detail_view, name='detail'),
     path('<uuid:pk>/edit/', views.expense_edit_view, name='edit'),
     path('<uuid:pk>/delete/', views.expense_delete_view, name='delete'),
+    path('<uuid:pk>/delete/confirm/', views.expense_delete_confirm_view, name='delete_confirm'),
     path('<uuid:pk>/approve/', views.expense_approve_view, name='approve'),
+    path('<uuid:pk>/reject/', views.expense_reject_view, name='reject'),
     path('<uuid:pk>/pay/', views.expense_pay_view, name='pay'),
+    path('<uuid:pk>/', views.expense_detail_view, name='detail'),  # This should be last
+    
+    # Approval Management
+    path('approvals/', views.expense_approval_list_view, name='approval_list'),
+    
+    # Attendant Views
+    path('my-expenses/', views.attendant_my_expenses_view, name='my_expenses'),
     
     # Bulk Actions
     path('bulk-action/', views.expense_bulk_action_view, name='bulk_action'),

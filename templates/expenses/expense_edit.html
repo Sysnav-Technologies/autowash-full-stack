@@ -1,0 +1,343 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Edit Expense - {{ expense.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .expense-form {
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e3e6f0;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #d1d5db;
+        padding: 12px 16px;
+        transition: all 0.2s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .status-notice {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border: 1px solid #f59e0b;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .btn-group-actions {
+        gap: 12px;
+        margin-top: 24px;
+    }
+    
+    .required-field::after {
+        content: "*";
+        color: #ef4444;
+        margin-left: 4px;
+    }
+    
+    .breadcrumb-nav {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block page_title %}
+    <h1 class="h3 mb-0 text-gray-800">
+        <i class="fas fa-edit me-2"></i>Edit Expense
+    </h1>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Navigation -->
+<div class="breadcrumb-nav">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="/business/{{ request.tenant.slug }}/expenses/">
+                    <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/">{{ expense.title|truncatechars:20 }}</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">Edit</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="expense-form">
+            {% if expense.status == 'pending' %}
+            <div class="status-notice">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-info-circle fa-lg me-3 text-amber-600"></i>
+                    <div>
+                        <h6 class="mb-1 text-amber-800">Editing Pending Expense</h6>
+                        <p class="mb-0 text-amber-700 text-sm">
+                            This expense is currently pending approval. You can make changes before it's reviewed.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% elif expense.status == 'approved' and employee.role in 'owner,manager,supervisor' %}
+            <div class="status-notice">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-triangle fa-lg me-3 text-amber-600"></i>
+                    <div>
+                        <h6 class="mb-1 text-amber-800">Editing Approved Expense</h6>
+                        <p class="mb-0 text-amber-700 text-sm">
+                            This expense has been approved. Changes may require re-approval.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="form-group">
+                            <label for="{{ form.title.id_for_label }}" class="form-label required-field">
+                                Expense Title
+                            </label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.title.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.expense_date.id_for_label }}" class="form-label required-field">
+                                Expense Date
+                            </label>
+                            {{ form.expense_date }}
+                            {% if form.expense_date.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.expense_date.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="{{ form.description.id_for_label }}" class="form-label">
+                        Description
+                    </label>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                    <div class="invalid-feedback d-block">
+                        {{ form.description.errors.0 }}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.category.id_for_label }}" class="form-label required-field">
+                                Category
+                            </label>
+                            {{ form.category }}
+                            {% if form.category.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.category.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.vendor.id_for_label }}" class="form-label">
+                                Vendor/Supplier
+                            </label>
+                            {{ form.vendor }}
+                            {% if form.vendor.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.vendor.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.amount.id_for_label }}" class="form-label required-field">
+                                Amount (KSh)
+                            </label>
+                            {{ form.amount }}
+                            {% if form.amount.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.amount.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="{{ form.tax_amount.id_for_label }}" class="form-label">
+                                Tax Amount (KSh)
+                            </label>
+                            {{ form.tax_amount }}
+                            {% if form.tax_amount.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.tax_amount.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label class="form-label">Total Amount (KSh)</label>
+                            <input type="text" class="form-control" id="total_amount_display" readonly 
+                                   value="{{ expense.total_amount|floatformat:2 }}">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.payment_method.id_for_label }}" class="form-label required-field">
+                                Payment Method
+                            </label>
+                            {{ form.payment_method }}
+                            {% if form.payment_method.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.payment_method.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.expense_type.id_for_label }}" class="form-label">
+                                Expense Type
+                            </label>
+                            {{ form.expense_type }}
+                            {% if form.expense_type.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.expense_type.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.reference_number.id_for_label }}" class="form-label">
+                                Reference Number
+                            </label>
+                            {{ form.reference_number }}
+                            {% if form.reference_number.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.reference_number.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.receipt_number.id_for_label }}" class="form-label">
+                                Receipt Number
+                            </label>
+                            {{ form.receipt_number }}
+                            {% if form.receipt_number.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.receipt_number.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if form.notes %}
+                <div class="form-group">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label">
+                        Additional Notes
+                    </label>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}
+                    <div class="invalid-feedback d-block">
+                        {{ form.notes.errors.0 }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <div class="d-flex btn-group-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Update Expense
+                    </button>
+                    
+                    <a href="/business/{{ request.tenant.slug }}/expenses/{{ expense.pk }}/" class="btn btn-secondary">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </a>
+                    
+                    <a href="/business/{{ request.tenant.slug }}/expenses/list/" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-2"></i>Back to List
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-calculate total amount when amount or tax changes
+    const amountField = document.getElementById('{{ form.amount.id_for_label }}');
+    const taxField = document.getElementById('{{ form.tax_amount.id_for_label }}');
+    const totalField = document.getElementById('total_amount_display');
+    
+    function calculateTotal() {
+        const amount = parseFloat(amountField.value) || 0;
+        const tax = parseFloat(taxField.value) || 0;
+        const total = amount + tax;
+        
+        totalField.value = total.toFixed(2);
+    }
+    
+    if (amountField) amountField.addEventListener('input', calculateTotal);
+    if (taxField) taxField.addEventListener('input', calculateTotal);
+});
+</script>
+{% endblock %}
