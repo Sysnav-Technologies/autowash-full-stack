@@ -1,0 +1,242 @@
+/* PWA Specific Styles - Using AutoWash Design System */
+/* 
+ * This PWA stylesheet inherits from main.css and uses existing CSS variables
+ * to maintain consistency with the AutoWash design system.
+ * All colors, spacing, and styling should use existing CSS custom properties.
+ * 
+ * IMPORTANT: This file should NOT override main app styling or backgrounds.
+ * It only adds PWA-specific functionality without changing existing design.
+ */
+
+/* Install button styling - only visible when PWA can be installed */
+#pwa-install-btn {
+    background: linear-gradient(135deg, var(--autowash-primary), var(--autowash-primary-dark));
+    border: none;
+    color: white;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-lg);
+    z-index: 1050; /* High z-index but below modals */
+}
+
+#pwa-install-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+    background: linear-gradient(135deg, var(--autowash-primary-light), var(--autowash-primary));
+}
+
+#pwa-install-btn:active {
+    transform: translateY(0);
+}
+
+/* Offline notification styling - only shown when offline */
+#offline-notification {
+    animation: slideDown 0.3s ease-out;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: none;
+    box-shadow: var(--shadow-lg);
+    background-color: var(--warning-500);
+    color: white;
+    z-index: 1060; /* Above install button */
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateX(-50%) translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+/* PWA toast notifications */
+.pwa-toast {
+    animation: slideInRight 0.3s ease-out;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-lg);
+    border: none;
+    box-shadow: var(--shadow-xl);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Mobile-first responsive design improvements */
+/* These styles enhance mobile experience without changing existing design */
+@media (max-width: 768px) {
+    /* Better touch targets - only for PWA-specific elements */
+    #pwa-install-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Improve form inputs on mobile - inherit existing styling */
+    .form-control:focus, .form-select:focus {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+}
+
+/* Standalone PWA styling (when app is already installed) */
+@media (display-mode: standalone) {
+    /* Hide install button when app is already installed */
+    #pwa-install-btn {
+        display: none !important;
+    }
+    
+    /* Add safe area padding for devices with notches - only affect containers */
+    .container-fluid:not(.sidebar):not(.navbar) {
+        padding-left: max(15px, env(safe-area-inset-left));
+        padding-right: max(15px, env(safe-area-inset-right));
+    }
+    
+    /* Adjust header for standalone mode - preserve existing styling */
+    .navbar {
+        padding-top: max(var(--navbar-height, 8px), env(safe-area-inset-top));
+    }
+}
+
+/* Landscape orientation adjustments */
+@media (orientation: landscape) and (max-height: 500px) {
+    .sidebar {
+        width: 250px; /* Smaller sidebar in landscape */
+    }
+    
+    .main-content {
+        margin-left: 250px;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .btn {
+        border: 2px solid;
+    }
+    
+    .card {
+        border: 1px solid;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* PWA install banner styling */
+#pwa-install-banner {
+    background: var(--autowash-background, #ffffff);
+    border: 1px solid var(--autowash-primary);
+    color: var(--autowash-dark, #0f172a);
+}
+
+/* Dark theme support for PWA banner */
+.dark-theme #pwa-install-banner {
+    background: var(--gray-800);
+    color: var(--gray-50);
+    border-color: var(--autowash-primary-light);
+}
+
+/* Dark mode support for PWA - only affects PWA-specific elements */
+@media (prefers-color-scheme: dark) {
+    #pwa-install-btn {
+        background: linear-gradient(135deg, var(--autowash-primary-light), var(--autowash-primary));
+    }
+    
+    #offline-notification {
+        background-color: var(--gray-700) !important;
+        color: var(--gray-50) !important;
+    }
+    
+    /* Only affect PWA toast notifications, not main app */
+    .pwa-toast {
+        background-color: var(--gray-800);
+        border-color: var(--gray-600);
+    }
+}
+
+/* Loading states for offline scenarios - minimal styling */
+.offline-loading {
+    position: relative;
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.offline-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 8px,
+        rgba(37, 99, 235, 0.1) 8px,
+        rgba(37, 99, 235, 0.1) 16px
+    );
+}
+
+/* Splash screen for PWA launch - efficient and branded */
+.pwa-splash {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: var(--autowash-background, #ffffff);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    color: var(--autowash-primary);
+}
+
+.pwa-splash .logo {
+    width: 120px;
+    height: auto;
+    margin-bottom: 1rem;
+}
+
+.pwa-splash.fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+
+/* Print styles for PWA */
+@media print {
+    #pwa-install-btn,
+    #offline-notification,
+    .sidebar {
+        display: none !important;
+    }
+    
+    .main-content {
+        margin-left: 0 !important;
+    }
+}

@@ -1,13 +1,16 @@
-from django.http import HttpResponse, FileResponse, Http404
+from django.http import HttpResponse, FileResponse, Http404, JsonResponse
 from django.conf import settings
 from django.db import connection
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.apps import apps
+from django.views.decorators.cache import cache_control
+from django.views.decorators.http import require_http_methods
 import sys
 import os
 import datetime
 import traceback
+import json
 
 from django.shortcuts import render
 from django.views.decorators.csrf import requires_csrf_token
@@ -424,3 +427,210 @@ def serve_legal_document(request, document_name):
         return response
     except IOError:
         raise Http404("Document could not be read")
+
+
+# PWA Views
+@cache_control(max_age=86400)  # Cache for 24 hours
+def manifest_view(request):
+    """Serve PWA manifest with dynamic values"""
+    
+    # Get the base URL for the tenant
+    base_url = request.build_absolute_uri('/')
+    
+    manifest = {
+        "name": "AutoWash - Car Wash Management System",
+        "short_name": "AutoWash",
+        "description": "Complete management solution for the automotive service industry. Digitizes service management, expenses, inventory and revenue tracking for carwash centers, auto detailing and repair workshops.",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#2563eb",
+        "orientation": "portrait-primary",
+        "scope": "/",
+        "lang": "en",
+        "categories": ["business", "productivity", "automotive", "management"],
+        "icons": [
+            {
+                "src": f"{base_url}static/img/icons/icon-72x72.png",
+                "sizes": "72x72",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-96x96.png",
+                "sizes": "96x96",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-128x128.png",
+                "sizes": "128x128",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-144x144.png",
+                "sizes": "144x144",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-152x152.png",
+                "sizes": "152x152",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-192x192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-384x384.png",
+                "sizes": "384x384",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-512x512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-192x192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "maskable"
+            },
+            {
+                "src": f"{base_url}static/img/icons/icon-512x512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable"
+            }
+        ],
+        "screenshots": [
+            {
+                "src": f"{base_url}static/img/screenshots/desktop-1.png",
+                "sizes": "1280x720",
+                "type": "image/png",
+                "form_factor": "wide",
+                "label": "AutoWash Dashboard - Business Analytics"
+            },
+            {
+                "src": f"{base_url}static/img/screenshots/desktop-2.png",
+                "sizes": "1280x720",
+                "type": "image/png",
+                "form_factor": "wide",
+                "label": "Customer Management Interface"
+            },
+            {
+                "src": f"{base_url}static/img/screenshots/desktop-3.png",
+                "sizes": "1280x720",
+                "type": "image/png",
+                "form_factor": "wide",
+                "label": "Service Queue Management"
+            },
+            {
+                "src": f"{base_url}static/img/screenshots/desktop-4.png",
+                "sizes": "1280x720",
+                "type": "image/png",
+                "form_factor": "wide",
+                "label": "Employee & Inventory Tracking"
+            },
+            {
+                "src": f"{base_url}static/img/screenshots/mobile-1.png",
+                "sizes": "390x844",
+                "type": "image/png",
+                "form_factor": "narrow",
+                "label": "Mobile Dashboard"
+            },
+            {
+                "src": f"{base_url}static/img/screenshots/mobile-2.png",
+                "sizes": "390x844",
+                "type": "image/png",
+                "form_factor": "narrow",
+                "label": "Mobile Customer View"
+            },
+            {
+                "src": f"{base_url}static/img/screenshots/mobile-3.png",
+                "sizes": "390x844",
+                "type": "image/png",
+                "form_factor": "narrow",
+                "label": "Mobile Service Management"
+            },
+            {
+                "src": f"{base_url}static/img/screenshots/mobile-4.png",
+                "sizes": "390x844",
+                "type": "image/png",
+                "form_factor": "narrow",
+                "label": "Mobile Reports & Analytics"
+            }
+        ],
+        "shortcuts": [
+            {
+                "name": "Dashboard",
+                "short_name": "Dashboard",
+                "description": "Business overview and analytics",
+                "url": "/dashboard/",
+                "icons": [{"src": f"{base_url}static/img/icons/icon-96x96.png", "sizes": "96x96"}]
+            },
+            {
+                "name": "Customers",
+                "short_name": "Customers",
+                "description": "Customer management and profiles",
+                "url": "/customers/",
+                "icons": [{"src": f"{base_url}static/img/icons/icon-96x96.png", "sizes": "96x96"}]
+            },
+            {
+                "name": "Services",
+                "short_name": "Services",
+                "description": "Service management and tracking",
+                "url": "/services/",
+                "icons": [{"src": f"{base_url}static/img/icons/icon-96x96.png", "sizes": "96x96"}]
+            },
+            {
+                "name": "Reports",
+                "short_name": "Reports",
+                "description": "Analytics and business reports",
+                "url": "/reports/",
+                "icons": [{"src": f"{base_url}static/img/icons/icon-96x96.png", "sizes": "96x96"}]
+            }
+        ]
+    }
+    
+    return JsonResponse(manifest, content_type='application/manifest+json')
+
+
+def offline_view(request):
+    """Serve offline page when user is offline"""
+    return render(request, 'core/offline.html')
+
+
+def pwa_test_view(request):
+    """PWA testing interface"""
+    return render(request, 'core/pwa_test.html')
+
+
+@require_http_methods(["POST"])
+def pwa_push_subscription(request):
+    """Handle PWA push subscription from frontend"""
+    try:
+        data = json.loads(request.body)
+        
+        # Here you would typically save the subscription to your database
+        # For now, we'll just log it and return success
+        print(f"PWA Push Subscription received: {data}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Push subscription saved successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)

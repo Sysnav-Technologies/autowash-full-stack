@@ -1,0 +1,338 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}PWA Test - AutoWash{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <h1 class="page-title">
+                    <i class="fas fa-mobile-alt me-2"></i>
+                    PWA Test Center
+                </h1>
+                <p class="text-muted">Test AutoWash Progressive Web App features</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- PWA Status -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        PWA Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Service Worker:</span>
+                                <span id="sw-status" class="badge bg-secondary">Checking...</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Install Prompt:</span>
+                                <span id="install-status" class="badge bg-secondary">Checking...</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Offline Ready:</span>
+                                <span id="offline-status" class="badge bg-secondary">Checking...</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Network Status:</span>
+                                <span id="network-status" class="badge bg-secondary">Checking...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PWA Actions -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        PWA Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button id="install-btn" class="btn btn-primary" onclick="installPWA()">
+                            <i class="fas fa-download me-2"></i>
+                            Install App
+                        </button>
+                        <button class="btn btn-info" onclick="showNotification()">
+                            <i class="fas fa-bell me-2"></i>
+                            Test Notification
+                        </button>
+                        <button class="btn btn-warning" onclick="showInstallBanner()">
+                            <i class="fas fa-banner me-2"></i>
+                            Show Install Banner
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearCache()">
+                            <i class="fas fa-trash me-2"></i>
+                            Clear Cache
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Screenshots Preview -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-images me-2"></i>
+                        Chrome Install Dialog Preview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">These screenshots will appear in Chrome's PWA install dialog:</p>
+                    
+                    <h6>Desktop Screenshots (1280x720)</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <img src="{% static 'img/screenshots/desktop-1.png' %}" class="img-fluid rounded shadow-sm" alt="Dashboard">
+                            <small class="text-muted d-block mt-1">Dashboard Analytics</small>
+                        </div>
+                        <div class="col-md-3">
+                            <img src="{% static 'img/screenshots/desktop-2.png' %}" class="img-fluid rounded shadow-sm" alt="Customers">
+                            <small class="text-muted d-block mt-1">Customer Management</small>
+                        </div>
+                        <div class="col-md-3">
+                            <img src="{% static 'img/screenshots/desktop-3.png' %}" class="img-fluid rounded shadow-sm" alt="Services">
+                            <small class="text-muted d-block mt-1">Service Queue</small>
+                        </div>
+                        <div class="col-md-3">
+                            <img src="{% static 'img/screenshots/desktop-4.png' %}" class="img-fluid rounded shadow-sm" alt="Reports">
+                            <small class="text-muted d-block mt-1">Employee & Inventory</small>
+                        </div>
+                    </div>
+                    
+                    <h6>Mobile Screenshots (390x844)</h6>
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <img src="{% static 'img/screenshots/mobile-1.png' %}" class="img-fluid rounded shadow-sm" alt="Mobile Dashboard">
+                            <small class="text-muted d-block mt-1">Mobile Dashboard</small>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <img src="{% static 'img/screenshots/mobile-2.png' %}" class="img-fluid rounded shadow-sm" alt="Mobile Customers">
+                            <small class="text-muted d-block mt-1">Mobile Customers</small>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <img src="{% static 'img/screenshots/mobile-3.png' %}" class="img-fluid rounded shadow-sm" alt="Mobile Services">
+                            <small class="text-muted d-block mt-1">Mobile Services</small>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <img src="{% static 'img/screenshots/mobile-4.png' %}" class="img-fluid rounded shadow-sm" alt="Mobile Reports">
+                            <small class="text-muted d-block mt-1">Mobile Reports</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- PWA Manifest Info -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-file-code me-2"></i>
+                        Manifest Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>App Details</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Name:</strong> AutoWash - Car Wash Management System</li>
+                                <li><strong>Short Name:</strong> AutoWash</li>
+                                <li><strong>Theme Color:</strong> <span style="color: var(--autowash-primary)">#2563eb</span></li>
+                                <li><strong>Background Color:</strong> #ffffff</li>
+                                <li><strong>Display:</strong> standalone</li>
+                                <li><strong>Orientation:</strong> portrait-primary</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>PWA Features</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success me-2"></i>Offline Support</li>
+                                <li><i class="fas fa-check text-success me-2"></i>App Icons (8 sizes)</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Screenshots (8 images)</li>
+                                <li><i class="fas fa-check text-success me-2"></i>App Shortcuts</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Push Notifications</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Background Sync</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// PWA Status Checks
+document.addEventListener('DOMContentLoaded', function() {
+    checkPWAStatus();
+    updateNetworkStatus();
+});
+
+function checkPWAStatus() {
+    // Service Worker Status
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(function(registration) {
+            const swStatus = document.getElementById('sw-status');
+            if (registration && registration.active) {
+                swStatus.textContent = 'Active';
+                swStatus.className = 'badge bg-success';
+            } else {
+                swStatus.textContent = 'Not Registered';
+                swStatus.className = 'badge bg-danger';
+            }
+        });
+    } else {
+        document.getElementById('sw-status').textContent = 'Not Supported';
+        document.getElementById('sw-status').className = 'badge bg-danger';
+    }
+    
+    // Install Prompt Status
+    const installStatus = document.getElementById('install-status');
+    if (window.pwaManager && window.pwaManager.deferredPrompt) {
+        installStatus.textContent = 'Available';
+        installStatus.className = 'badge bg-success';
+    } else {
+        installStatus.textContent = 'Not Available';
+        installStatus.className = 'badge bg-warning';
+    }
+    
+    // Offline Status
+    const offlineStatus = document.getElementById('offline-status');
+    if ('serviceWorker' in navigator && 'caches' in window) {
+        caches.keys().then(cacheNames => {
+            if (cacheNames.length > 0) {
+                offlineStatus.textContent = 'Ready';
+                offlineStatus.className = 'badge bg-success';
+            } else {
+                offlineStatus.textContent = 'Not Ready';
+                offlineStatus.className = 'badge bg-warning';
+            }
+        });
+    } else {
+        offlineStatus.textContent = 'Not Supported';
+        offlineStatus.className = 'badge bg-danger';
+    }
+}
+
+function updateNetworkStatus() {
+    const networkStatus = document.getElementById('network-status');
+    if (navigator.onLine) {
+        networkStatus.textContent = 'Online';
+        networkStatus.className = 'badge bg-success';
+    } else {
+        networkStatus.textContent = 'Offline';
+        networkStatus.className = 'badge bg-danger';
+    }
+}
+
+// PWA Actions
+function installPWA() {
+    if (window.pwaManager) {
+        window.pwaManager.installPWA();
+    } else {
+        alert('PWA Manager not available');
+    }
+}
+
+function showNotification() {
+    if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+            new Notification('AutoWash PWA Test', {
+                body: 'Notifications are working correctly!',
+                icon: '/static/img/icons/icon-192x192.png',
+                badge: '/static/img/icons/icon-96x96.png'
+            });
+        } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    new Notification('AutoWash PWA Test', {
+                        body: 'Notifications are now enabled!',
+                        icon: '/static/img/icons/icon-192x192.png'
+                    });
+                }
+            });
+        } else {
+            alert('Notifications are blocked. Please enable them in your browser settings.');
+        }
+    } else {
+        alert('Notifications are not supported in this browser.');
+    }
+}
+
+function showInstallBanner() {
+    if (window.pwaManager) {
+        // Clear the banner flag to show it again
+        sessionStorage.removeItem('pwa-banner-shown');
+        window.pwaManager.showInstallBanner();
+    }
+}
+
+function clearCache() {
+    if ('caches' in window) {
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => caches.delete(cacheName))
+            );
+        }).then(() => {
+            alert('Cache cleared! Refresh the page to rebuild cache.');
+        });
+    } else {
+        alert('Cache API not supported');
+    }
+}
+
+// Listen for network changes
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+
+.page-header {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+img.img-fluid {
+    max-height: 120px;
+    object-fit: cover;
+    border: 1px solid #e2e8f0;
+}
+</style>
+{% endblock %}
