@@ -269,7 +269,6 @@ function initializeUserMenu() {
     // Handle theme toggle - use event delegation for all theme toggle buttons
     $(document).off('click.theme').on('click.theme', '[onclick="toggleTheme()"], .theme-toggle-btn', function(e) {
         e.preventDefault();
-        console.log('Theme toggle clicked'); // Debug
         if (window.toggleTheme) {
             window.toggleTheme();
         } else {
@@ -285,7 +284,6 @@ function initializeUserMenu() {
 
 // Make sure theme functions are available globally
 window.toggleTheme = window.toggleTheme || function() {
-    console.log('Fallback toggleTheme called');
     const body = document.body;
     const isDark = body.classList.contains('dark-theme');
     

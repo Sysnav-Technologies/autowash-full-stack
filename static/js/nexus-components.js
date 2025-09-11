@@ -1,113 +1,19 @@
-// Nexus Components JavaScript
+// Nexus Components JavaScript - Sidebar functionality DISABLED
 document.addEventListener('DOMContentLoaded', function() {
-// Make functions globally available
-window.toggleTheme = toggleTheme;
-window.initializeTheme = initializeTheme;
-window.applyTheme = applyTheme;
-window.updateThemeToggleButton = updateThemeToggleButton;    // Sidebar elements
-    const mobileToggle = document.getElementById('mobileSidebarToggle');
-    const desktopToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const sidebarOverlay = document.querySelector('.sidebar-overlay');
-    const topbar = document.querySelector('.topbar');
-    const mainContent = document.querySelector('.main-content');
-    const body = document.body;
-
-    // Create sidebar overlay if it doesn't exist
-    if (!sidebarOverlay) {
-        const overlay = document.createElement('div');
-        overlay.className = 'sidebar-overlay';
-        overlay.id = 'sidebarOverlay';
-        document.body.appendChild(overlay);
-    }
-
-    // Get the actual overlay element (created or existing)
-    const actualOverlay = document.querySelector('.sidebar-overlay') || document.getElementById('sidebarOverlay');
-
-    // Mobile toggle functionality
-    if (mobileToggle) {
-        mobileToggle.addEventListener('click', function() {
-            console.log('Mobile toggle clicked'); // Debug log
-            sidebar.classList.toggle('mobile-open');
-            
-            // When opening mobile sidebar, ensure it's not collapsed
-            if (sidebar.classList.contains('mobile-open')) {
-                sidebar.classList.remove('collapsed');
-                if (topbar) topbar.classList.remove('sidebar-collapsed');
-                if (mainContent) mainContent.classList.remove('sidebar-collapsed');
-                
-                // Force visibility of text elements on mobile
-                setTimeout(() => {
-                    const navTexts = document.querySelectorAll('.nav-text');
-                    const brandText = document.querySelector('.brand-text');
-                    const userInfo = document.querySelector('.user-info');
-                    
-                    navTexts.forEach(text => {
-                        text.style.opacity = '1';
-                        text.style.width = 'auto';
-                        text.style.whiteSpace = 'normal'; // Allow text wrapping
-                        text.style.overflow = 'visible';
-                        text.style.textOverflow = 'initial';
-                    });
-                    
-                    if (brandText) {
-                        brandText.style.opacity = '1';
-                        brandText.style.width = 'auto';
-                    }
-                    
-                    if (userInfo) {
-                        userInfo.style.opacity = '1';
-                        userInfo.style.width = 'auto';
-                    }
-                    
-                    console.log('Mobile sidebar opened - forced text visibility and wrapping');
-                }, 50);
-            }
-            
-            if (actualOverlay) {
-                actualOverlay.classList.toggle('show');
-            }
-            body.classList.toggle('sidebar-open');
-        });
-    }
-
-    // Desktop toggle functionality
-    if (desktopToggle) {
-        desktopToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('collapsed');
-            if (topbar) topbar.classList.toggle('sidebar-collapsed');
-            if (mainContent) mainContent.classList.toggle('sidebar-collapsed');
-            
-            // Save state to localStorage
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-        });
-    }
-
-    // Sidebar overlay click
-    if (actualOverlay) {
-        actualOverlay.addEventListener('click', function() {
-            console.log('Overlay clicked'); // Debug log
-            sidebar.classList.remove('mobile-open');
-            actualOverlay.classList.remove('show');
-            body.classList.remove('sidebar-open');
-        });
-    }
-
-    // Clear sidebar collapsed state for debugging (remove after testing)
-    localStorage.removeItem('sidebarCollapsed');
+    // Make functions globally available
+    window.toggleTheme = toggleTheme;
+    window.initializeTheme = initializeTheme;
+    window.applyTheme = applyTheme;
+    window.updateThemeToggleButton = updateThemeToggleButton;
     
-    // Restore sidebar state on page load (desktop only)
-    if (window.innerWidth > 992) {
-        const savedState = localStorage.getItem('sidebarCollapsed');
-        if (savedState === 'true') {
-            sidebar.classList.add('collapsed');
-            if (topbar) topbar.classList.add('sidebar-collapsed');
-            if (mainContent) mainContent.classList.add('sidebar-collapsed');
-        }
-    }
+    // SIDEBAR FUNCTIONALITY COMPLETELY DISABLED - handled by main.js
+    console.log('Nexus components loaded - sidebar functionality disabled');
+    
+    // REMOVED SIDEBAR STATE RESTORATION - causes conflicts
+    // Only keep theme and other non-sidebar functionality below...
 
-    // Force brand text visibility check
+    // DISABLED - Brand text visibility check (causes sidebar variable conflicts)
+    /*
     function ensureBrandTextVisibility() {
         const brandText = document.querySelector('.brand-text');
         const brandName = document.querySelector('.brand-name');
@@ -133,6 +39,7 @@ window.updateThemeToggleButton = updateThemeToggleButton;    // Sidebar elements
 
     // Run visibility check after DOM is ready
     setTimeout(ensureBrandTextVisibility, 100);
+    */
 
     // Ensure sidebar scrolling works properly
     function ensureSidebarScrolling() {
@@ -209,18 +116,12 @@ window.updateThemeToggleButton = updateThemeToggleButton;    // Sidebar elements
     // Initialize submenu enhancements
     setTimeout(enhanceSubmenuScrolling, 300);
 
-    // Handle window resize
+    // DISABLED - Window resize handler (causes sidebar variable conflicts) - handled by main.js
+    /*
     window.addEventListener('resize', function() {
-        if (window.innerWidth > 768) {
-            // Close mobile sidebar on desktop
-            sidebar.classList.remove('mobile-open');
-            if (actualOverlay) {
-                actualOverlay.classList.remove('show');
-            }
-            body.classList.remove('sidebar-open');
-        } else {
-            // Remove collapsed state on mobile and force text visibility
-            sidebar.classList.remove('collapsed');
+        // All sidebar resize handling moved to main.js
+    });
+    */
             if (topbar) topbar.classList.remove('sidebar-collapsed');
             if (mainContent) mainContent.classList.remove('sidebar-collapsed');
             
@@ -331,23 +232,26 @@ function initializeSidebarDropdowns() {
     dropdownToggles.forEach((toggle, index) => {
         console.log('Processing toggle', index, toggle); // Debug log
         
-        // Remove existing onclick handlers
-        toggle.removeAttribute('onclick');
-        
-        // Add new click event listener
-        toggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Toggle clicked!'); // Debug log
-            
-            const dropdown = this.closest('.nav-dropdown');
-            if (dropdown) {
-                console.log('Found dropdown:', dropdown.id); // Debug log
-                toggleDropdown(dropdown.id);
-            } else {
-                console.log('No dropdown found for toggle'); // Debug log
-            }
-        });
+        // Only add event listeners if there's no onclick attribute
+        if (!toggle.hasAttribute('onclick')) {
+            console.log('Adding event listener to toggle without onclick'); // Debug log
+            // Add new click event listener
+            toggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Toggle clicked via event listener!'); // Debug log
+                
+                const dropdown = this.closest('.nav-dropdown');
+                if (dropdown) {
+                    console.log('Found dropdown:', dropdown.id); // Debug log
+                    toggleDropdown(dropdown.id);
+                } else {
+                    console.log('No dropdown found for toggle'); // Debug log
+                }
+            });
+        } else {
+            console.log('Toggle has onclick attribute, skipping event listener'); // Debug log
+        }
     });
 }
 
