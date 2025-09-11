@@ -1,4 +1,5 @@
-// Sidebar initialization
+// Sidebar initialization - DISABLED - functionality moved to main.js
+/*
 document.addEventListener('DOMContentLoaded', function() {
     // Sidebar toggle
     const sidebarToggle = document.querySelector('.sidebar-toggle');
@@ -54,3 +55,4 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+*/

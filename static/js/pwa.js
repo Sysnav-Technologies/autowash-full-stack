@@ -10,26 +10,7 @@ class PWAManager {
         this.registerServiceWorker();
         this.setupInstallPrompt();
         this.setupOfflineHandling();
-        this.showSplashScreen();
-    }
-
-    // Show branded splash screen
-    showSplashScreen() {
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            const splash = document.createElement('div');
-            splash.className = 'pwa-splash';
-            splash.innerHTML = `
-                <img src="/static/img/logo.png" alt="AutoWash" class="logo">
-                <h3>AutoWash</h3>
-                <p>Loading your dashboard...</p>
-            `;
-            document.body.appendChild(splash);
-            
-            setTimeout(() => {
-                splash.classList.add('fade-out');
-                setTimeout(() => splash.remove(), 300);
-            }, 1500);
-        }
+        // Removed splash screen as it was confusing users
     }
 
     // Service Worker Registration

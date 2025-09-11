@@ -1,10 +1,9 @@
 /**
- * Modern Components JavaScript - Nexus Style Design
- * Handles sidebar, topbar, and responsive interactions
+ * Modern Components JavaScript - Clean Version
+ * Handles dropdowns, responsive interactions, and search functionality
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    initializeSidebar();
     initializeDropdowns();
     initializeResponsive();
     initializeSearch();
@@ -12,74 +11,195 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Initialize sidebar functionality
- */
-function initializeSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const mainContent = document.querySelector('.app-main-content');
-    
-    if (sidebarToggle && sidebar) {
-        sidebarToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('collapsed');
-            
-            // Store sidebar state
-            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
-        });
-        
-        // Restore sidebar state
-        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-        if (isCollapsed) {
-            sidebar.classList.add('collapsed');
-        }
-    }
-}
-
-/**
  * Initialize dropdown functionality
  */
 function initializeDropdowns() {
-    console.log('Dropdown initialization skipped - handled by nexus-components.js'); // Debug log
+    // Handle mobile-specific dropdown behaviors
+    const dropdowns = document.querySelectorAll('.dropdown');
     
-    // The dropdown functionality is already handled by nexus-components.js
-    // We'll just handle the mobile-specific behaviors here
-    
-    // Handle submenu item clicks on mobile
-    const submenuLinks = document.querySelectorAll('.nav-submenu .nav-link');
-    submenuLinks.forEach(link => {
-        link.addEventListener('click', function() {
-            const isMobile = window.innerWidth <= 768;
-            if (isMobile) {
-                const sidebar = document.getElementById('sidebar');
-                const overlay = document.querySelector('.sidebar-overlay');
+    dropdowns.forEach(dropdown => {
+        const toggle = dropdown.querySelector('.dropdown-toggle');
+        const menu = dropdown.querySelector('.dropdown-menu');
+        
+        if (toggle && menu) {
+            toggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 
-                // Close mobile sidebar when navigating
-                if (sidebar && sidebar.classList.contains('mobile-open')) {
-                    sidebar.classList.remove('mobile-open');
-                    document.body.classList.remove('sidebar-open');
-                    if (overlay) {
-                        overlay.classList.remove('show');
-                        setTimeout(() => overlay.style.display = 'none', 300);
+                // Close other dropdowns
+                dropdowns.forEach(other => {
+                    if (other !== dropdown) {
+                        other.classList.remove('show');
                     }
-                    // Close all dropdowns
-                    document.querySelectorAll('.nav-dropdown.open, .nav-dropdown.expanded').forEach(dropdown => {
-                        dropdown.classList.remove('open', 'expanded');
-                    });
-                }
-            }
-        });
+                });
+                
+                // Toggle current dropdown
+                dropdown.classList.toggle('show');
+            });
+        }
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.dropdown')) {
+            dropdowns.forEach(dropdown => {
+                dropdown.classList.remove('show');
+            });
+        }
     });
 }
 
 /**
- * Toggle dropdown function (global) - Fallback only
+ * Initialize responsive functionality
  */
-function toggleDropdown(dropdownId) {
-    // This is a fallback - the main function is in nexus-components.js
-    console.log('Fallback toggleDropdown called for:', dropdownId);
-    if (window.toggleDropdown && window.toggleDropdown !== toggleDropdown) {
-        window.toggleDropdown(dropdownId);
+function initializeResponsive() {
+    // Handle responsive navigation
+    const navTogglers = document.querySelectorAll('.navbar-toggler');
+    
+    navTogglers.forEach(toggler => {
+        toggler.addEventListener('click', function() {
+            const target = document.querySelector(this.getAttribute('data-bs-target') || this.getAttribute('data-target'));
+            if (target) {
+                target.classList.toggle('show');
+            }
+        });
+    });
+    
+    // Handle responsive tables
+    const tables = document.querySelectorAll('.table-responsive');
+    tables.forEach(tableContainer => {
+        const table = tableContainer.querySelector('table');
+        if (table) {
+            // Add scroll indicators if needed
+            updateScrollIndicators(tableContainer);
+            
+            tableContainer.addEventListener('scroll', function() {
+                updateScrollIndicators(tableContainer);
+            });
+        }
+    });
+}
+
+/**
+ * Update scroll indicators for responsive tables
+ */
+function updateScrollIndicators(container) {
+    const scrollLeft = container.scrollLeft;
+    const scrollWidth = container.scrollWidth;
+    const clientWidth = container.clientWidth;
+    
+    container.classList.toggle('scroll-left', scrollLeft > 0);
+    container.classList.toggle('scroll-right', scrollLeft < scrollWidth - clientWidth);
+}
+
+/**
+ * Initialize search functionality
+ */
+function initializeSearch() {
+    const searchInputs = document.querySelectorAll('.search-input, [data-search]');
+    
+    searchInputs.forEach(input => {
+        const targetSelector = input.getAttribute('data-search-target');
+        if (targetSelector) {
+            const debounceDelay = parseInt(input.getAttribute('data-search-delay')) || 300;
+            
+            let searchTimeout;
+            input.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    performSearch(this.value, targetSelector);
+                }, debounceDelay);
+            });
+        }
+    });
+}
+
+/**
+ * Perform search on target elements
+ */
+function performSearch(query, targetSelector) {
+    const targets = document.querySelectorAll(targetSelector);
+    const searchTerm = query.toLowerCase().trim();
+    
+    targets.forEach(target => {
+        const searchableText = target.textContent.toLowerCase();
+        const matches = searchTerm === '' || searchableText.includes(searchTerm);
+        
+        target.style.display = matches ? '' : 'none';
+        
+        // Add search highlighting
+        if (matches && searchTerm) {
+            highlightSearchTerm(target, searchTerm);
+        } else {
+            removeSearchHighlight(target);
+        }
+    });
+    
+    // Update search results count
+    updateSearchResultsCount(targets, query);
+}
+
+/**
+ * Highlight search terms in target element
+ */
+function highlightSearchTerm(element, term) {
+    removeSearchHighlight(element);
+    
+    const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+    
+    const textNodes = [];
+    let node;
+    
+    while (node = walker.nextNode()) {
+        textNodes.push(node);
     }
+    
+    textNodes.forEach(textNode => {
+        const text = textNode.textContent;
+        const regex = new RegExp(`(${term})`, 'gi');
+        
+        if (regex.test(text)) {
+            const highlightedHTML = text.replace(regex, '<mark class="search-highlight">$1</mark>');
+            const wrapper = document.createElement('span');
+            wrapper.innerHTML = highlightedHTML;
+            textNode.parentNode.replaceChild(wrapper, textNode);
+        }
+    });
+}
+
+/**
+ * Remove search highlighting from element
+ */
+function removeSearchHighlight(element) {
+    const highlights = element.querySelectorAll('.search-highlight');
+    highlights.forEach(highlight => {
+        const parent = highlight.parentNode;
+        parent.replaceChild(document.createTextNode(highlight.textContent), highlight);
+        parent.normalize();
+    });
+}
+
+/**
+ * Update search results count display
+ */
+function updateSearchResultsCount(targets, query) {
+    const visibleCount = Array.from(targets).filter(target => target.style.display !== 'none').length;
+    const totalCount = targets.length;
+    
+    const countElements = document.querySelectorAll('.search-results-count');
+    countElements.forEach(element => {
+        if (query.trim()) {
+            element.textContent = `Showing ${visibleCount} of ${totalCount} results`;
+            element.style.display = '';
+        } else {
+            element.style.display = 'none';
+        }
+    });
 }
 
 /**
@@ -87,147 +207,66 @@ function toggleDropdown(dropdownId) {
  */
 function restoreDropdownStates() {
     try {
-        const openDropdowns = JSON.parse(localStorage.getItem('openDropdowns') || '[]');
-        openDropdowns.forEach(dropdownId => {
+        const savedStates = JSON.parse(localStorage.getItem('dropdown-states') || '{}');
+        
+        Object.keys(savedStates).forEach(dropdownId => {
             const dropdown = document.getElementById(dropdownId);
-            if (dropdown) {
-                dropdown.classList.add('expanded'); // Use expanded class to match nexus-components.js
+            if (dropdown && savedStates[dropdownId]) {
+                dropdown.classList.add('show');
             }
         });
     } catch (e) {
-        console.warn('Could not restore dropdown states:', e);
+        // Ignore localStorage errors
     }
 }
 
-// Make toggleDropdown available globally
-window.toggleDropdown = toggleDropdown;
-
 /**
- * Initialize responsive behavior
+ * Save dropdown states to localStorage
  */
-function initializeResponsive() {
-    const sidebar = document.getElementById('sidebar');
-    const mainContent = document.querySelector('.app-main-content');
-    
-    function handleResize() {
-        const isMobile = window.innerWidth <= 768;
+function saveDropdownStates() {
+    try {
+        const states = {};
+        const dropdowns = document.querySelectorAll('.dropdown[id]');
         
-        if (sidebar && mainContent) {
-            if (isMobile) {
-                sidebar.classList.add('mobile');
-                
-                // Close all dropdowns when switching to mobile
-                document.querySelectorAll('.nav-dropdown.open, .nav-dropdown.expanded').forEach(dropdown => {
-                    dropdown.classList.remove('open', 'expanded');
-                });
-                
-                // Add overlay for mobile sidebar
-                if (!document.querySelector('.sidebar-overlay')) {
-                    const overlay = document.createElement('div');
-                    overlay.className = 'sidebar-overlay';
-                    overlay.addEventListener('click', function() {
-                        sidebar.classList.remove('mobile-open');
-                        document.body.classList.remove('sidebar-open');
-                        this.classList.remove('show');
-                        setTimeout(() => this.style.display = 'none', 300);
-                        // Close all dropdowns when overlay is clicked
-                        document.querySelectorAll('.nav-dropdown.open, .nav-dropdown.expanded').forEach(dropdown => {
-                            dropdown.classList.remove('open', 'expanded');
-                        });
-                    });
-                    document.body.appendChild(overlay);
-                }
-            } else {
-                sidebar.classList.remove('mobile', 'mobile-open');
-                const overlay = document.querySelector('.sidebar-overlay');
-                if (overlay) {
-                    overlay.style.display = 'none';
-                }
-                // Restore dropdown states from localStorage when switching back to desktop
-                restoreDropdownStates();
-            }
-        }
-    }
-    
-    // Handle mobile sidebar toggle
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            const isMobile = window.innerWidth <= 768;
-            if (isMobile && sidebar) {
-                const isOpening = !sidebar.classList.contains('mobile-open');
-                sidebar.classList.toggle('mobile-open');
-                const overlay = document.querySelector('.sidebar-overlay');
-                
-                if (isOpening) {
-                    // Opening sidebar
-                    document.body.classList.add('sidebar-open');
-                    if (overlay) {
-                        overlay.style.display = 'block';
-                        setTimeout(() => overlay.classList.add('show'), 10);
-                    }
-                } else {
-                    // Closing sidebar
-                    document.body.classList.remove('sidebar-open');
-                    if (overlay) {
-                        overlay.classList.remove('show');
-                        setTimeout(() => overlay.style.display = 'none', 300);
-                    }
-                    // Close all dropdowns when closing mobile sidebar
-                    document.querySelectorAll('.nav-dropdown.open, .nav-dropdown.expanded').forEach(dropdown => {
-                        dropdown.classList.remove('open', 'expanded');
-                    });
-                }
-            }
+        dropdowns.forEach(dropdown => {
+            states[dropdown.id] = dropdown.classList.contains('show');
         });
+        
+        localStorage.setItem('dropdown-states', JSON.stringify(states));
+    } catch (e) {
+        // Ignore localStorage errors
     }
-    
-    // Initial check
-    handleResize();
-    
-    // Listen for resize events
-    window.addEventListener('resize', handleResize);
 }
 
 /**
- * Initialize search functionality
+ * Initialize tooltips (if Bootstrap is available)
  */
-function initializeSearch() {
-    const searchInput = document.querySelector('.search-input');
-    
-    if (searchInput) {
-        searchInput.addEventListener('focus', function() {
-            this.parentElement.classList.add('focused');
-        });
-        
-        searchInput.addEventListener('blur', function() {
-            this.parentElement.classList.remove('focused');
-        });
-        
-        // Handle search keyboard shortcut (Cmd/Ctrl + K)
-        document.addEventListener('keydown', function(e) {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                e.preventDefault();
-                searchInput.focus();
-            }
+function initializeTooltips() {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     }
 }
 
 /**
- * Utility functions
+ * Initialize popovers (if Bootstrap is available)
  */
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
+function initializePopovers() {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
+        const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+        popoverTriggerList.map(function (popoverTriggerEl) {
+            return new bootstrap.Popover(popoverTriggerEl);
+        });
     }
-    return cookieValue;
 }
+
+// Initialize tooltips and popovers when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initializeTooltips();
+    initializePopovers();
+});
+
+// Save dropdown states before page unload
+window.addEventListener('beforeunload', saveDropdownStates);
