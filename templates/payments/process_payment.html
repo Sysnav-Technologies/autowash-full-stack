@@ -572,6 +572,19 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
             splitTotal += itemAmount;
         });
         
+        // Check for M-Pesa in split payments and warn about phone number requirement
+        const hasMpesa = Array.from(splitItems).some(item => {
+            const method = item.querySelector('.split-method');
+            const selectedOption = method.options[method.selectedIndex];
+            return selectedOption && selectedOption.dataset.type === 'mpesa';
+        });
+        
+        if (hasMpesa) {
+            // For now, let the backend handle M-Pesa phone number collection
+            // You might want to add phone number fields to split items in the future
+            console.log('Split payment contains M-Pesa - will be handled by M-Pesa flow');
+        }
+        
         if (!hasValidItems) {
             e.preventDefault();
             alert('Please complete all split payment items');
@@ -590,6 +603,20 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
             e.preventDefault();
             alert('Please select a payment method');
             return;
+        }
+        
+        // For M-Pesa payments, validate phone number if required
+        if (selectedMethod) {
+            const selectedMethodElement = document.querySelector(`[data-method-id="${selectedMethod}"]`);
+            if (selectedMethodElement && selectedMethodElement.dataset.methodType === 'mpesa') {
+                const phoneInput = document.querySelector('#mpesaDetails input[name="customer_phone"]');
+                if (phoneInput && !phoneInput.value.trim()) {
+                    e.preventDefault();
+                    alert('Please enter phone number for M-Pesa payment');
+                    phoneInput.focus();
+                    return;
+                }
+            }
         }
     }
     

@@ -136,6 +136,8 @@ class ReportsView(TemplateView):
             ('attendance_report', 'Employee Attendance'),
             ('department_performance', 'Department Performance'),
             ('subscription_analysis', 'Subscription Analysis'),
+            ('balance_sheet', 'Balance Sheet'),
+            ('refunds_report', 'Refunds & Returns'),
         ]
     
     def _get_report_data(self, report_type, start_date, end_date, page):
@@ -191,6 +193,10 @@ class ReportsView(TemplateView):
                 data.update(self._get_department_performance_data(start_date, end_date, page))
             elif report_type == 'subscription_analysis':
                 data.update(self._get_subscription_analysis_data(start_date, end_date, page))
+            elif report_type == 'balance_sheet':
+                data.update(self._get_balance_sheet_data(start_date, end_date, page))
+            elif report_type == 'refunds_report':
+                data.update(self._get_refunds_report_data(start_date, end_date, page))
             else:  # business_overview
                 data.update(self._get_business_overview_data(start_date, end_date, page))
                 
@@ -223,69 +229,89 @@ class ReportsView(TemplateView):
             'attendance_report': 'Employee Attendance Report',
             'department_performance': 'Department Performance Report',
             'subscription_analysis': 'Subscription Analysis Report',
+            'balance_sheet': 'Balance Sheet Report',
+            'refunds_report': 'Refunds & Returns Report',
         }
         return titles.get(report_type, 'Business Report')
     
     # ============== CORE REPORT DATA METHODS ==============
     
     def _get_business_overview_data(self, start_date, end_date, page):
-        """Get business overview data based on completed payments (excluding refunds)"""
+        """Get business overview data based on service orders created in the period"""
         from django.core.paginator import Paginator
         
         try:
             # Convert dates to datetime for proper filtering
             start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
             
-            # Get payments (completed revenue) for the overview - excluding refunds
-            completed_payments = Payment.objects.select_related(
-                'service_order__customer', 
-                'service_order__assigned_attendant', 
-                'service_order__vehicle',
-                'payment_method'
+            # Get service orders created in the date range
+            service_orders = ServiceOrder.objects.select_related(
+                'customer', 
+                'assigned_attendant', 
+                'vehicle'
             ).filter(
-                completed_at__range=[start_datetime, end_datetime],
-                status__in=['completed', 'verified']
-            ).exclude(
-                payment_type='refund'  # Exclude refunds from revenue calculation
-            ).order_by('-completed_at')
+                created_at__range=[start_datetime, end_datetime]
+            ).order_by('-created_at')
             
-            # Paginate payments
-            paginator = Paginator(completed_payments, 20)
-            payments_page = paginator.get_page(page)
+            # Paginate service orders
+            paginator = Paginator(service_orders, 20)
+            orders_page = paginator.get_page(page)
             
-            # Calculate summary metrics based on actual payments (excluding refunds)
-            total_payments = completed_payments.count()
-            total_revenue = completed_payments.aggregate(Sum('amount'))['amount__sum'] or 0
-            
-            # Get unique orders that have payments
-            paid_orders = ServiceOrder.objects.filter(
-                payments__completed_at__range=[start_datetime, end_datetime],
+            # Get payments for these orders (regardless of when payment was made)
+            orders_with_payments = service_orders.filter(
                 payments__status__in=['completed', 'verified']
             ).exclude(
                 payments__payment_type='refund'
             ).distinct()
             
-            completed_orders = paid_orders.count()
+            # Calculate summary metrics based on orders created in the period
+            total_orders = service_orders.count()
+            paid_orders_count = orders_with_payments.count()
             
-            # Get orders created but not yet paid in this period
-            all_orders_period = ServiceOrder.objects.filter(
-                created_at__range=[start_datetime, end_datetime]
-            )
-            pending_orders = all_orders_period.exclude(
-                id__in=paid_orders.values_list('id', flat=True)
-            ).count()
+            # Revenue from payments for orders created in this period
+            total_revenue = Payment.objects.filter(
+                service_order__in=service_orders,
+                status__in=['completed', 'verified']
+            ).exclude(
+                payment_type='refund'
+            ).aggregate(Sum('amount'))['amount__sum'] or 0
             
-            avg_payment_value = total_revenue / max(total_payments, 1)
+            # Track refunds separately for orders created in this period
+            total_refunds = Payment.objects.filter(
+                service_order__in=service_orders,
+                payment_type='refund',
+                status__in=['completed', 'verified']
+            ).aggregate(Sum('amount'))['amount__sum'] or 0
             
-            # Payment completion rate (payments vs orders created)
-            payment_completion_rate = (completed_orders / max(all_orders_period.count(), 1)) * 100
+            # Also get refunds from PaymentRefund model
+            from apps.payments.models import PaymentRefund
+            refund_records = PaymentRefund.objects.filter(
+                original_payment__service_order__in=service_orders,
+                status='completed'
+            ).aggregate(Sum('amount'))['amount__sum'] or 0
+            
+            # Total refunds = refund payments + refund records
+            total_refunds_combined = total_refunds + refund_records
+            
+            # Net revenue = revenue - refunds
+            net_revenue = total_revenue - total_refunds_combined
+            
+            # Orders not yet paid
+            pending_orders = total_orders - paid_orders_count
+            
+            # Total order value (regardless of payment status)
+            total_order_value = service_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+            
+            avg_order_value = total_order_value / max(total_orders, 1)
+            payment_completion_rate = (paid_orders_count / max(total_orders, 1)) * 100
             
             # Debug information
             debug_info = {
-                'payments_count': total_payments,
-                'paid_orders_count': completed_orders,
-                'revenue_from_payments': total_revenue,
+                'orders_created_count': total_orders,
+                'paid_orders_count': paid_orders_count,
+                'revenue_from_paid_orders': total_revenue,
                 'pending_orders': pending_orders,
+                'total_order_value': total_order_value,
                 'date_range': f"{start_date} to {end_date}",
                 'datetime_range': f"{start_datetime} to {end_datetime}",
                 'payment_completion_rate': payment_completion_rate,
@@ -293,28 +319,34 @@ class ReportsView(TemplateView):
             }
             
             return {
-                'items': payments_page,
+                'items': orders_page,
                 'summary': {
-                    'total_payments': total_payments,
+                    'total_orders': total_orders,
                     'total_revenue': total_revenue,
-                    'paid_orders': completed_orders,
+                    'total_refunds': total_refunds_combined,
+                    'net_revenue': net_revenue,
+                    'paid_orders': paid_orders_count,
                     'pending_orders': pending_orders,
-                    'avg_payment_value': avg_payment_value,
+                    'avg_order_value': avg_order_value,
                     'payment_completion_rate': payment_completion_rate,
+                    'refund_rate': (total_refunds_combined / max(total_revenue, 1)) * 100,
                 },
-                'pagination': self._get_pagination_data(payments_page, paginator),
+                'pagination': self._get_pagination_data(orders_page, paginator),
                 'debug_info': debug_info
             }
         except Exception as e:
             return {
                 'items': [],
                 'summary': {
-                    'total_payments': 0,
+                    'total_orders': 0,
                     'total_revenue': 0,
+                    'total_refunds': 0,
+                    'net_revenue': 0,
                     'paid_orders': 0,
                     'pending_orders': 0,
-                    'avg_payment_value': 0,
+                    'avg_order_value': 0,
                     'payment_completion_rate': 0,
+                    'refund_rate': 0,
                 },
                 'pagination': {},
                 'error': f"Error generating business overview: {str(e)}",
@@ -369,30 +401,35 @@ class ReportsView(TemplateView):
             }
     
     def _get_services_data(self, start_date, end_date, page):
-        """Get services-specific data based on completed payments (excluding refunds)"""
+        """Get services-specific data based on orders created in the period"""
         from django.core.paginator import Paginator
         
         try:
             # Convert dates to datetime for proper filtering
             start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
             
-            # Get services with performance metrics based on payments (excluding refunds)
+            # Get services with performance metrics based on orders created in the period
             services = Service.objects.select_related('category').annotate(
-                # Count orders that have been paid for (excluding refunds)
-                paid_orders_count=Count('order_items__order__payments',
-                                       filter=Q(order_items__order__payments__completed_at__range=[start_datetime, end_datetime],
-                                               order_items__order__payments__status__in=['completed', 'verified']) & 
-                                               ~Q(order_items__order__payments__payment_type='refund')),
-                # Revenue from actual payments, not order amounts (excluding refunds)
+                # Count orders created in the period
+                orders_count=Count('order_items__order',
+                                 filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime])),
+                # Total order value for orders created in the period
+                total_order_value=Sum('order_items__total_price',
+                                    filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime])),
+                # Revenue from payments for orders created in this period (regardless of when payment was made)
                 actual_revenue=Sum('order_items__order__payments__amount',
-                                 filter=Q(order_items__order__payments__completed_at__range=[start_datetime, end_datetime],
+                                 filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime],
                                          order_items__order__payments__status__in=['completed', 'verified']) &
                                          ~Q(order_items__order__payments__payment_type='refund')),
+                # Count of paid orders created in the period
+                paid_orders_count=Count('order_items__order__payments',
+                                       distinct=True,
+                                       filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime],
+                                               order_items__order__payments__status__in=['completed', 'verified']) & 
+                                               ~Q(order_items__order__payments__payment_type='refund')),
                 avg_rating=Avg('order_items__rating',
-                             filter=Q(order_items__order__payments__completed_at__range=[start_datetime, end_datetime],
-                                     order_items__order__payments__status__in=['completed', 'verified']) &
-                                     ~Q(order_items__order__payments__payment_type='refund'))
-            ).order_by('-actual_revenue', 'name')
+                             filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime]))
+            ).filter(orders_count__gt=0).order_by('-actual_revenue', 'name')
             
             # Paginate services
             paginator = Paginator(services, 20)
@@ -400,19 +437,22 @@ class ReportsView(TemplateView):
             
             # Calculate summary
             total_services = services.count()
-            active_services = services.filter(paid_orders_count__gt=0).count()
+            total_orders = sum(s.orders_count or 0 for s in services)
             total_paid_orders = sum(s.paid_orders_count or 0 for s in services)
+            total_order_value = sum(s.total_order_value or 0 for s in services)
             total_revenue = sum(s.actual_revenue or 0 for s in services)
             
             return {
                 'items': services_page,
                 'summary': {
                     'total_services': total_services,
-                    'active_services': active_services,
+                    'total_orders': total_orders,
                     'total_paid_orders': total_paid_orders,
+                    'total_order_value': total_order_value,
                     'total_revenue': total_revenue,
-                    'avg_revenue_per_service': total_revenue / max(active_services, 1),
-                    'debug_info': f"Services with payments: {active_services} out of {total_services}",
+                    'avg_revenue_per_service': total_revenue / max(total_services, 1),
+                    'avg_order_value': total_order_value / max(total_orders, 1),
+                    'payment_rate': (total_paid_orders / max(total_orders, 1)) * 100,
                 },
                 'pagination': self._get_pagination_data(services_page, paginator)
             }
@@ -480,27 +520,31 @@ class ReportsView(TemplateView):
         }
     
     def _get_employees_data(self, start_date, end_date, page):
-        """Get employees-specific data based on actual payments (excluding refunds)"""
+        """Get employees-specific data based on orders created in the period"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
-        # Get employees with their performance metrics based on payments (excluding refunds)
+        # Get employees with their performance metrics based on orders created in the period
         employees = Employee.objects.select_related('department').annotate(
-            # Orders that have been paid for (actual revenue generated) - excluding refunds
-            paid_orders_handled=Count('assigned_orders__payments',
-                                    filter=Q(assigned_orders__payments__completed_at__range=[start_datetime, end_datetime],
-                                            assigned_orders__payments__status__in=['completed', 'verified']) &
-                                            ~Q(assigned_orders__payments__payment_type='refund')),
-            # Actual revenue from payments (excluding refunds)
-            revenue_generated=Sum('assigned_orders__payments__amount',
-                                filter=Q(assigned_orders__payments__completed_at__range=[start_datetime, end_datetime],
-                                        assigned_orders__payments__status__in=['completed', 'verified']) &
-                                        ~Q(assigned_orders__payments__payment_type='refund')),
-            # Total orders assigned (may not be paid yet)
+            # Total orders assigned to employee that were created in the period
             total_orders_assigned=Count('assigned_orders',
                                       filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime])),
+            # Revenue from payments for orders created in this period (regardless of when payment was made)
+            revenue_generated=Sum('assigned_orders__payments__amount',
+                                filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime],
+                                        assigned_orders__payments__status__in=['completed', 'verified']) &
+                                        ~Q(assigned_orders__payments__payment_type='refund')),
+            # Orders created in period that have been paid
+            paid_orders_handled=Count('assigned_orders__payments',
+                                    distinct=True,
+                                    filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime],
+                                            assigned_orders__payments__status__in=['completed', 'verified']) &
+                                            ~Q(assigned_orders__payments__payment_type='refund')),
+            # Total order value for orders created in period
+            total_order_value=Sum('assigned_orders__total_amount',
+                                filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime])),
             # Performance metrics
             payment_conversion_rate=Case(
                 When(total_orders_assigned__gt=0, 
@@ -508,7 +552,7 @@ class ReportsView(TemplateView):
                 default=0,
                 output_field=DecimalField(max_digits=5, decimal_places=2)
             )
-        ).order_by('-revenue_generated')
+        ).filter(total_orders_assigned__gt=0).order_by('-revenue_generated')
         
         # Paginate employees
         paginator = Paginator(employees, 20)
@@ -516,35 +560,42 @@ class ReportsView(TemplateView):
         
         # Calculate summary
         total_employees = employees.count()
-        active_employees = employees.filter(paid_orders_handled__gt=0).count()
+        total_orders_assigned = sum(e.total_orders_assigned or 0 for e in employees)
         total_paid_orders = sum(e.paid_orders_handled or 0 for e in employees)
         total_revenue = sum(e.revenue_generated or 0 for e in employees)
-        avg_revenue_per_employee = total_revenue / max(active_employees, 1)
+        total_order_value = sum(e.total_order_value or 0 for e in employees)
+        avg_revenue_per_employee = total_revenue / max(total_employees, 1)
+        avg_orders_per_employee = total_orders_assigned / max(total_employees, 1)
         
         return {
             'items': employees_page,
             'summary': {
                 'total_employees': total_employees,
-                'active_employees': active_employees,
+                'total_orders_assigned': total_orders_assigned,
                 'total_paid_orders': total_paid_orders,
                 'total_revenue': total_revenue,
+                'total_order_value': total_order_value,
                 'avg_revenue_per_employee': avg_revenue_per_employee,
-                'employee_efficiency': (active_employees / max(total_employees, 1)) * 100,
+                'avg_orders_per_employee': avg_orders_per_employee,
+                'payment_rate': (total_paid_orders / max(total_orders_assigned, 1)) * 100,
             },
             'pagination': self._get_pagination_data(employees_page, paginator)
         }
     
     def _get_payments_data(self, start_date, end_date, page):
-        """Get payments-specific data"""
+        """Get payments-specific data for services ordered in the date range"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
-        # Get payments in the date range
+        # Get payments for service orders created in the date range (not payments made in date range)
         payments = Payment.objects.select_related('payment_method', 'service_order', 'customer').filter(
-            created_at__range=[start_datetime, end_datetime]
-        ).order_by('-created_at')
+            service_order__created_at__range=[start_datetime, end_datetime],
+            status__in=['completed', 'verified']
+        ).exclude(
+            payment_type='refund'
+        ).order_by('-completed_at', '-created_at')
         
         # Paginate payments
         paginator = Paginator(payments, 20)
@@ -572,12 +623,13 @@ class ReportsView(TemplateView):
         }
     
     def _get_expenses_data(self, start_date, end_date, page):
-        """Get expenses-specific data"""
+        """Get expenses-specific data - only approved expenses"""
         from django.core.paginator import Paginator
         
-        # Get expenses in the date range
+        # Get only approved expenses in the date range
         expenses = Expense.objects.select_related('category', 'vendor').filter(
-            expense_date__range=[start_date, end_date]
+            expense_date__range=[start_date, end_date],
+            status='approved'  # Only show approved expenses
         ).order_by('-expense_date')
         
         # Paginate expenses
@@ -620,14 +672,14 @@ class ReportsView(TemplateView):
         except Employee.DoesNotExist:
             return {'error': 'Employee not found'}
         
-        # Get payments for orders handled by this employee in the date range (excluding refunds)
+        # Get payments for orders created and handled by this employee in the date range (excluding refunds)
         employee_payments = Payment.objects.select_related(
             'service_order__customer', 
             'service_order__vehicle',
             'payment_method'
         ).filter(
             service_order__assigned_attendant=employee,
-            completed_at__range=[start_datetime, end_datetime],
+            service_order__created_at__range=[start_datetime, end_datetime],  # Orders created in period
             status__in=['completed', 'verified']
         ).exclude(
             payment_type='refund'  # Exclude refunds
@@ -705,30 +757,57 @@ class ReportsView(TemplateView):
     # ============== ADVANCED REPORT DATA METHODS ==============
     
     def _get_financial_summary_data(self, start_date, end_date, page):
-        """Get financial summary data (excluding refunds from revenue)"""
+        """Get financial summary data based on orders created in the period"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
-        # Get revenue (excluding refunds) and expense data
+        # Get service orders created in the period
+        orders_in_period = ServiceOrder.objects.filter(
+            created_at__range=[start_datetime, end_datetime]
+        )
+        
+        # Get revenue from payments for orders created in this period (regardless of when payment was made)
         revenue = Payment.objects.filter(
-            completed_at__range=[start_datetime, end_datetime],
+            service_order__in=orders_in_period,
             status__in=['completed', 'verified']
         ).exclude(
             payment_type='refund'  # Exclude refunds from revenue
         ).aggregate(total=Sum('amount'))['total'] or 0
         
+        # Track refunds separately for orders created in this period
+        refunds = Payment.objects.filter(
+            service_order__in=orders_in_period,
+            payment_type='refund',
+            status__in=['completed', 'verified']
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        # Also get refunds from PaymentRefund model
+        from apps.payments.models import PaymentRefund
+        refund_records = PaymentRefund.objects.filter(
+            original_payment__service_order__in=orders_in_period,
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        # Total refunds = refund payments + refund records
+        total_refunds = refunds + refund_records
+        
+        # Net revenue = revenue - refunds
+        net_revenue = revenue - total_refunds
+        
+        # Get only approved expenses for the period
         expenses = Expense.objects.filter(
-            expense_date__range=[start_date, end_date]
+            expense_date__range=[start_date, end_date],
+            status='approved'  # Only approved expenses
         ).aggregate(total=Sum('total_amount'))['total'] or 0
         
         # Get recent financial transactions
         transactions = []
         
-        # Add successful payments as positive transactions (excluding refunds)
+        # Add successful payments for orders created in this period as positive transactions
         payments = Payment.objects.select_related('payment_method', 'service_order').filter(
-            completed_at__range=[start_datetime, end_datetime],
+            service_order__in=orders_in_period,
             status__in=['completed', 'verified']
         ).exclude(
             payment_type='refund'
@@ -738,14 +817,14 @@ class ReportsView(TemplateView):
             transactions.append({
                 'type': 'Revenue',
                 'amount': payment.amount,
-                'description': f"Payment for Order #{payment.service_order.order_number if payment.service_order else 'N/A'}",
+                'description': f"Payment for Order #{payment.service_order.order_number if payment.service_order else 'N/A'} (Created: {payment.service_order.created_at.date() if payment.service_order else 'N/A'})",
                 'date': payment.completed_at.date() if hasattr(payment.completed_at, 'date') else payment.completed_at,
                 'category': payment.payment_method.name if payment.payment_method else 'Unknown'
             })
         
-        # Add refunds as negative impact transactions
+        # Add refunds for orders created in this period as negative impact transactions
         refunds = Payment.objects.select_related('payment_method', 'service_order').filter(
-            completed_at__range=[start_datetime, end_datetime],
+            service_order__in=orders_in_period,
             status__in=['completed', 'verified'],
             payment_type='refund'
         ).order_by('-completed_at')[:25]
@@ -754,14 +833,15 @@ class ReportsView(TemplateView):
             transactions.append({
                 'type': 'Refund',
                 'amount': -refund.amount,  # Negative impact
-                'description': f"Refund for Order #{refund.service_order.order_number if refund.service_order else 'N/A'}",
+                'description': f"Refund for Order #{refund.service_order.order_number if refund.service_order else 'N/A'} (Created: {refund.service_order.created_at.date() if refund.service_order else 'N/A'})",
                 'date': refund.completed_at.date() if hasattr(refund.completed_at, 'date') else refund.completed_at,
                 'category': refund.payment_method.name if refund.payment_method else 'Unknown'
             })
         
-        # Add expenses as negative transactions
+        # Add only approved expenses as negative transactions
         expense_items = Expense.objects.select_related('category', 'vendor').filter(
-            expense_date__range=[start_date, end_date]
+            expense_date__range=[start_date, end_date],
+            status='approved'  # Only approved expenses
         ).order_by('-expense_date')[:25]
         
         for expense in expense_items:
@@ -780,19 +860,17 @@ class ReportsView(TemplateView):
         paginator = Paginator(transactions, 20)
         transactions_page = paginator.get_page(page)
         
-        # Calculate net effect including refunds
-        refund_amount = sum(r.amount for r in refunds)
-        net_revenue = revenue - refund_amount  # Revenue minus refunds
+        # Calculate financial metrics
         profit = net_revenue - expenses
         profit_margin = (profit / max(net_revenue, 1)) * 100
         
         return {
             'items': transactions_page,
             'summary': {
-                'gross_revenue': revenue,  # Revenue before refunds
-                'refunds_amount': refund_amount,
-                'net_revenue': net_revenue,  # Revenue after refunds
-                'total_expenses': expenses,
+                'gross_revenue': revenue,  # Revenue before refunds for orders created in period
+                'refunds_amount': total_refunds,  # Use the calculated total refunds
+                'net_revenue': net_revenue,  # Revenue after refunds for orders created in period
+                'total_expenses': expenses,  # Only approved expenses
                 'net_profit': profit,
                 'profit_margin': profit_margin,
             },
@@ -800,27 +878,37 @@ class ReportsView(TemplateView):
         }
     
     def _get_daily_summary_data(self, start_date, end_date, page):
-        """Get daily summary data based on payments (excluding refunds)"""
+        """Get daily summary data based on service orders created each day"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
-        # Get daily aggregated payment data (excluding refunds)
-        daily_payment_data = Payment.objects.filter(
-            completed_at__range=[start_datetime, end_datetime],
-            status__in=['completed', 'verified']
-        ).exclude(
-            payment_type='refund'  # Exclude refunds
-        ).values('completed_at__date').annotate(
-            payments_count=Count('id'),
-            revenue=Sum('amount'),
+        # Get daily aggregated service order data
+        daily_order_data = ServiceOrder.objects.filter(
+            created_at__range=[start_datetime, end_datetime]
+        ).values('created_at__date').annotate(
+            orders_count=Count('id'),
+            total_order_value=Sum('total_amount'),
             unique_customers=Count('customer', distinct=True),
-            unique_orders=Count('service_order', distinct=True)
-        ).order_by('-completed_at__date')
+            # Get revenue from payments for orders created on this day (regardless of when payment was made)
+            revenue_from_payments=Sum(
+                'payments__amount',
+                filter=Q(
+                    payments__status__in=['completed', 'verified']
+                ) & ~Q(payments__payment_type='refund')
+            ),
+            paid_orders_count=Count(
+                'payments',
+                distinct=True,
+                filter=Q(
+                    payments__status__in=['completed', 'verified']
+                ) & ~Q(payments__payment_type='refund')
+            )
+        ).order_by('-created_at__date')
         
         # Convert to list for pagination
-        daily_list = list(daily_payment_data)
+        daily_list = list(daily_order_data)
         
         # Paginate daily data
         paginator = Paginator(daily_list, 20)
@@ -828,26 +916,28 @@ class ReportsView(TemplateView):
         
         # Calculate summary
         total_days = len(daily_list)
-        avg_daily_payments = sum(day['payments_count'] for day in daily_list) / max(total_days, 1)
-        avg_daily_revenue = sum(day['revenue'] or 0 for day in daily_list) / max(total_days, 1)
-        total_revenue = sum(day['revenue'] or 0 for day in daily_list)
-        total_payments = sum(day['payments_count'] for day in daily_list)
+        avg_daily_orders = sum(day['orders_count'] for day in daily_list) / max(total_days, 1)
+        avg_daily_revenue = sum(day['revenue_from_payments'] or 0 for day in daily_list) / max(total_days, 1)
+        total_revenue = sum(day['revenue_from_payments'] or 0 for day in daily_list)
+        total_orders = sum(day['orders_count'] for day in daily_list)
+        total_order_value = sum(day['total_order_value'] or 0 for day in daily_list)
         
         return {
             'items': daily_page,
             'summary': {
                 'total_days': total_days,
-                'avg_daily_payments': avg_daily_payments,
+                'avg_daily_orders': avg_daily_orders,
                 'avg_daily_revenue': avg_daily_revenue,
                 'total_revenue': total_revenue,
-                'total_payments': total_payments,
-                'avg_payment_value': total_revenue / max(total_payments, 1),
+                'total_orders': total_orders,
+                'total_order_value': total_order_value,
+                'avg_order_value': total_order_value / max(total_orders, 1),
             },
             'pagination': self._get_pagination_data(daily_page, paginator)
         }
     
     def _get_weekly_summary_data(self, start_date, end_date, page):
-        """Get weekly summary data based on payments (excluding refunds)"""
+        """Get weekly summary data based on service orders created in each week"""
         from django.core.paginator import Paginator
         from datetime import datetime, timedelta
         
@@ -855,42 +945,49 @@ class ReportsView(TemplateView):
             # Convert dates to datetime for proper filtering
             start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
             
-            # Get all payments in the date range (excluding refunds)
-            payments = Payment.objects.filter(
-                completed_at__range=[start_datetime, end_datetime],
-                status__in=['completed', 'verified']
-            ).exclude(
-                payment_type='refund'
-            ).order_by('-completed_at')
+            # Get all service orders in the date range
+            orders = ServiceOrder.objects.filter(
+                created_at__range=[start_datetime, end_datetime]
+            ).select_related('customer').order_by('-created_at')
             
-            # Group payments by week manually
+            # Group orders by week manually
             weekly_data = {}
-            for payment in payments:
+            for order in orders:
                 # Get the start of the week (Monday)
-                payment_date = payment.completed_at.date()
-                week_start = payment_date - timedelta(days=payment_date.weekday())
+                order_date = order.created_at.date()
+                week_start = order_date - timedelta(days=order_date.weekday())
                 week_key = week_start.strftime('%Y-%m-%d')
                 
                 if week_key not in weekly_data:
                     weekly_data[week_key] = {
                         'week': week_start,
-                        'payments_count': 0,
-                        'revenue': 0,
+                        'orders_count': 0,
+                        'total_order_value': 0,
+                        'revenue_from_payments': 0,
                         'unique_customers': set(),
-                        'unique_orders': set()
+                        'paid_orders': set()
                     }
                 
-                weekly_data[week_key]['payments_count'] += 1
-                weekly_data[week_key]['revenue'] += float(payment.amount or 0)
-                if payment.customer_id:
-                    weekly_data[week_key]['unique_customers'].add(payment.customer_id)
-                if payment.service_order_id:
-                    weekly_data[week_key]['unique_orders'].add(payment.service_order_id)
+                weekly_data[week_key]['orders_count'] += 1
+                weekly_data[week_key]['total_order_value'] += float(order.total_amount or 0)
+                if order.customer_id:
+                    weekly_data[week_key]['unique_customers'].add(order.customer_id)
+                
+                # Add payment revenue for this order (regardless of when payment was made)
+                order_payments = Payment.objects.filter(
+                    service_order=order,
+                    status__in=['completed', 'verified']
+                ).exclude(payment_type='refund')
+                
+                for payment in order_payments:
+                    weekly_data[week_key]['revenue_from_payments'] += float(payment.amount or 0)
+                    weekly_data[week_key]['paid_orders'].add(order.id)
             
             # Convert sets to counts and prepare final data
             for week_data in weekly_data.values():
                 week_data['unique_customers'] = len(week_data['unique_customers'])
-                week_data['unique_orders'] = len(week_data['unique_orders'])
+                week_data['paid_orders_count'] = len(week_data['paid_orders'])
+                del week_data['paid_orders']  # Remove the set, keep only the count
             
             # Convert to list and sort by week
             weekly_list = list(weekly_data.values())
@@ -902,18 +999,18 @@ class ReportsView(TemplateView):
             
             # Calculate summary
             total_weeks = len(weekly_list)
-            total_payments = sum(week['payments_count'] for week in weekly_list)
-            total_revenue = sum(week['revenue'] for week in weekly_list)
-            avg_weekly_payments = total_payments / max(total_weeks, 1)
+            total_orders = sum(week['orders_count'] for week in weekly_list)
+            total_revenue = sum(week['revenue_from_payments'] for week in weekly_list)
+            avg_weekly_orders = total_orders / max(total_weeks, 1)
             avg_weekly_revenue = total_revenue / max(total_weeks, 1)
             
             return {
                 'items': weekly_page,
                 'summary': {
                     'total_weeks': total_weeks,
-                    'avg_weekly_payments': avg_weekly_payments,
+                    'avg_weekly_orders': avg_weekly_orders,
                     'avg_weekly_revenue': avg_weekly_revenue,
-                    'total_payments': total_payments,
+                    'total_orders': total_orders,
                     'total_revenue': total_revenue,
                 },
                 'pagination': self._get_pagination_data(weekly_page, paginator)
@@ -933,7 +1030,7 @@ class ReportsView(TemplateView):
             }
     
     def _get_monthly_summary_data(self, start_date, end_date, page):
-        """Get monthly summary data based on payments (excluding refunds)"""
+        """Get monthly summary data based on service orders created each month"""
         from django.core.paginator import Paginator
         from datetime import datetime
         
@@ -941,42 +1038,49 @@ class ReportsView(TemplateView):
             # Convert dates to datetime for proper filtering
             start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
             
-            # Get all payments in the date range (excluding refunds)
-            payments = Payment.objects.filter(
-                completed_at__range=[start_datetime, end_datetime],
-                status__in=['completed', 'verified']
-            ).exclude(
-                payment_type='refund'
-            ).order_by('-completed_at')
+            # Get all service orders in the date range
+            orders = ServiceOrder.objects.filter(
+                created_at__range=[start_datetime, end_datetime]
+            ).select_related('customer').order_by('-created_at')
             
-            # Group payments by month manually
+            # Group orders by month manually
             monthly_data = {}
-            for payment in payments:
+            for order in orders:
                 # Get the first day of the month
-                payment_date = payment.completed_at.date()
-                month_key = payment_date.strftime('%Y-%m')
-                month_start = payment_date.replace(day=1)
+                order_date = order.created_at.date()
+                month_key = order_date.strftime('%Y-%m')
+                month_start = order_date.replace(day=1)
                 
                 if month_key not in monthly_data:
                     monthly_data[month_key] = {
                         'month': month_start,
-                        'payments_count': 0,
-                        'revenue': 0,
+                        'orders_count': 0,
+                        'total_order_value': 0,
+                        'revenue_from_payments': 0,
                         'unique_customers': set(),
-                        'unique_orders': set()
+                        'paid_orders': set()
                     }
                 
-                monthly_data[month_key]['payments_count'] += 1
-                monthly_data[month_key]['revenue'] += float(payment.amount or 0)
-                if payment.customer_id:
-                    monthly_data[month_key]['unique_customers'].add(payment.customer_id)
-                if payment.service_order_id:
-                    monthly_data[month_key]['unique_orders'].add(payment.service_order_id)
+                monthly_data[month_key]['orders_count'] += 1
+                monthly_data[month_key]['total_order_value'] += float(order.total_amount or 0)
+                if order.customer_id:
+                    monthly_data[month_key]['unique_customers'].add(order.customer_id)
+                
+                # Add payment revenue for this order (regardless of when payment was made)
+                order_payments = Payment.objects.filter(
+                    service_order=order,
+                    status__in=['completed', 'verified']
+                ).exclude(payment_type='refund')
+                
+                for payment in order_payments:
+                    monthly_data[month_key]['revenue_from_payments'] += float(payment.amount or 0)
+                    monthly_data[month_key]['paid_orders'].add(order.id)
             
             # Convert sets to counts
             for month_data in monthly_data.values():
                 month_data['unique_customers'] = len(month_data['unique_customers'])
-                month_data['unique_orders'] = len(month_data['unique_orders'])
+                month_data['paid_orders_count'] = len(month_data['paid_orders'])
+                del month_data['paid_orders']  # Remove the set, keep only the count
             
             # Convert to list and sort by month
             monthly_list = list(monthly_data.values())
@@ -988,19 +1092,21 @@ class ReportsView(TemplateView):
             
             # Calculate summary
             total_months = len(monthly_list)
-            total_payments = sum(month['payments_count'] for month in monthly_list)
-            total_revenue = sum(month['revenue'] for month in monthly_list)
-            avg_monthly_payments = total_payments / max(total_months, 1)
+            total_orders = sum(month['orders_count'] for month in monthly_list)
+            total_revenue = sum(month['revenue_from_payments'] for month in monthly_list)
+            total_order_value = sum(month['total_order_value'] for month in monthly_list)
+            avg_monthly_orders = total_orders / max(total_months, 1)
             avg_monthly_revenue = total_revenue / max(total_months, 1)
             
             return {
                 'items': monthly_page,
                 'summary': {
                     'total_months': total_months,
-                    'avg_monthly_payments': avg_monthly_payments,
+                    'avg_monthly_orders': avg_monthly_orders,
                     'avg_monthly_revenue': avg_monthly_revenue,
-                    'total_payments': total_payments,
+                    'total_orders': total_orders,
                     'total_revenue': total_revenue,
+                    'total_order_value': total_order_value,
                 },
                 'pagination': self._get_pagination_data(monthly_page, paginator)
             }
@@ -1019,30 +1125,31 @@ class ReportsView(TemplateView):
             }
     
     def _get_sales_analysis_data(self, start_date, end_date, page):
-        """Get sales analysis data based on actual payments (excluding refunds)"""
+        """Get sales analysis data based on service orders created in the date range"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
-        # Get sales by service based on payments (not just orders)
+        # Get sales by service based on orders created in the date range
         sales_data = ServiceOrderItem.objects.filter(
-            order__payments__completed_at__range=[start_datetime, end_datetime],
-            order__payments__status__in=['completed', 'verified']
-        ).exclude(
-            order__payments__payment_type='refund'
+            order__created_at__range=[start_datetime, end_datetime]
         ).values(
             'service__name', 'service__category__name'
         ).annotate(
             quantity_sold=Sum('quantity'),
-            # Use actual payment amounts, not order amounts
-            total_revenue=Sum('order__payments__amount', 
-                            filter=Q(order__payments__completed_at__range=[start_datetime, end_datetime],
-                                    order__payments__status__in=['completed', 'verified'])),
-            paid_orders_count=Count('order__payments', distinct=True,
-                                  filter=Q(order__payments__completed_at__range=[start_datetime, end_datetime],
-                                          order__payments__status__in=['completed', 'verified']))
-        ).order_by('-total_revenue')
+            # Total order value for this service from orders created in the period
+            total_order_value=Sum('total_price'),
+            # For revenue, we'll calculate it as the total_price (order value) for this service
+            # This represents the revenue potential of the service
+            total_revenue=Sum('total_price'),
+            orders_count=Count('order', distinct=True),
+            # Count orders that have at least one completed payment
+            paid_orders_count=Count('order', distinct=True,
+                                  filter=Q(
+                                      order__payments__status__in=['completed', 'verified']
+                                  ) & ~Q(order__payments__payment_type='refund'))
+        ).order_by('-total_order_value')
         
         # Convert to list for pagination
         sales_list = list(sales_data)
@@ -1054,7 +1161,9 @@ class ReportsView(TemplateView):
         # Calculate summary
         total_services = len(sales_list)
         total_sales_revenue = sum(item['total_revenue'] or 0 for item in sales_list)
+        total_order_value = sum(item['total_order_value'] or 0 for item in sales_list)
         total_items_sold = sum(item['quantity_sold'] or 0 for item in sales_list)
+        total_orders = sum(item['orders_count'] or 0 for item in sales_list)
         total_paid_orders = sum(item['paid_orders_count'] or 0 for item in sales_list)
         
         return {
@@ -1062,9 +1171,12 @@ class ReportsView(TemplateView):
             'summary': {
                 'total_services': total_services,
                 'total_sales_revenue': total_sales_revenue,
+                'total_order_value': total_order_value,
                 'total_items_sold': total_items_sold,
+                'total_orders': total_orders,
                 'total_paid_orders': total_paid_orders,
                 'avg_revenue_per_service': total_sales_revenue / max(total_services, 1),
+                'avg_order_value': total_order_value / max(total_orders, 1),
             },
             'pagination': self._get_pagination_data(sales_page, paginator)
         }
@@ -1131,77 +1243,79 @@ class ReportsView(TemplateView):
             }
     
     def _get_supplier_report_data(self, start_date, end_date, page):
-        """Get supplier report data"""
+        """Get supplier report data based on approved expenses"""
         from django.core.paginator import Paginator
         
-        # Convert dates to datetime for proper filtering
-        start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
-        
-        # Get supplier data if the model exists
+        # Get vendor data from approved expenses in the period
         try:
-            suppliers = Supplier.objects.annotate(
-                orders_count=Count('purchaseorder',
-                                 filter=Q(purchaseorder__created_at__range=[start_datetime, end_datetime])),
-                total_purchased=Sum('purchaseorder__total_amount',
-                                  filter=Q(purchaseorder__created_at__range=[start_datetime, end_datetime]))
-            ).order_by('-total_purchased')
+            vendors = Vendor.objects.annotate(
+                approved_expenses_count=Count('expenses',
+                                            filter=Q(expenses__expense_date__range=[start_date, end_date],
+                                                    expenses__status='approved')),
+                total_approved_expenses=Sum('expenses__total_amount',
+                                          filter=Q(expenses__expense_date__range=[start_date, end_date],
+                                                  expenses__status='approved'))
+            ).filter(approved_expenses_count__gt=0).order_by('-total_approved_expenses')
             
-            # Paginate suppliers
-            paginator = Paginator(suppliers, 20)
-            suppliers_page = paginator.get_page(page)
+            # Paginate vendors
+            paginator = Paginator(vendors, 20)
+            vendors_page = paginator.get_page(page)
             
             # Calculate summary
-            total_suppliers = suppliers.count()
-            active_suppliers = suppliers.filter(orders_count__gt=0).count()
-            total_purchases = sum(s.total_purchased or 0 for s in suppliers)
+            total_vendors = vendors.count()
+            total_approved_expenses = sum(v.total_approved_expenses or 0 for v in vendors)
+            avg_expense_per_vendor = total_approved_expenses / max(total_vendors, 1)
             
             return {
-                'items': suppliers_page,
+                'items': vendors_page,
                 'summary': {
-                    'total_suppliers': total_suppliers,
-                    'active_suppliers': active_suppliers,
-                    'total_purchases': total_purchases,
+                    'total_vendors': total_vendors,
+                    'total_approved_expenses': total_approved_expenses,
+                    'avg_expense_per_vendor': avg_expense_per_vendor,
                 },
-                'pagination': self._get_pagination_data(suppliers_page, paginator)
+                'pagination': self._get_pagination_data(vendors_page, paginator)
             }
-        except:
-            # Return empty data if supplier model doesn't exist or has issues
+        except Exception as e:
+            # Return empty data if there are issues
             return {
                 'items': [],
                 'summary': {
-                    'total_suppliers': 0,
-                    'active_suppliers': 0,
-                    'total_purchases': 0,
+                    'total_vendors': 0,
+                    'total_approved_expenses': 0,
+                    'avg_expense_per_vendor': 0,
                 },
                 'pagination': {},
-                'error': 'Supplier data not available'
+                'error': f'Vendor data error: {str(e)}'
             }
     
     # ============== NEW REPORT TYPES ==============
     
     def _get_vehicle_analysis_data(self, start_date, end_date, page):
-        """Get vehicle analysis data based on completed payments"""
+        """Get vehicle analysis data based on orders created in the period"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
         try:
-            # Get vehicles with service frequency based on actual payments
+            # Get vehicles with service frequency based on orders created in the period
             vehicles = Vehicle.objects.select_related('customer').annotate(
-                paid_services_count=Count('service_orders__payments',
-                                        filter=Q(service_orders__payments__completed_at__range=[start_datetime, end_datetime],
+                orders_count=Count('service_orders',
+                                 filter=Q(service_orders__created_at__range=[start_datetime, end_datetime])),
+                total_order_value=Sum('service_orders__total_amount',
+                                    filter=Q(service_orders__created_at__range=[start_datetime, end_datetime])),
+                revenue_from_payments=Sum('service_orders__payments__amount',
+                                        filter=Q(service_orders__created_at__range=[start_datetime, end_datetime],
                                                 service_orders__payments__status__in=['completed', 'verified']) &
                                                 ~Q(service_orders__payments__payment_type='refund')),
-                total_spent=Sum('service_orders__payments__amount',
-                              filter=Q(service_orders__payments__completed_at__range=[start_datetime, end_datetime],
-                                      service_orders__payments__status__in=['completed', 'verified']) &
-                                      ~Q(service_orders__payments__payment_type='refund')),
-                last_service=Max('service_orders__payments__completed_at',
-                               filter=Q(service_orders__payments__completed_at__range=[start_datetime, end_datetime],
-                                       service_orders__payments__status__in=['completed', 'verified']) &
-                                       ~Q(service_orders__payments__payment_type='refund'))
-            ).filter(paid_services_count__gt=0).order_by('-paid_services_count')
+                paid_orders_count=Count('service_orders__payments',
+                                      distinct=True,
+                                      filter=Q(service_orders__created_at__range=[start_datetime, end_datetime],
+                                              service_orders__payments__status__in=['completed', 'verified']) &
+                                              ~Q(service_orders__payments__payment_type='refund')),
+                last_service_order=Max('service_orders__created_at',
+                                     filter=Q(service_orders__created_at__range=[start_datetime, end_datetime]))
+            ).filter(orders_count__gt=0).order_by('-orders_count')
             
             # Paginate vehicles
             paginator = Paginator(vehicles, 20)
@@ -1209,15 +1323,19 @@ class ReportsView(TemplateView):
             
             # Calculate summary
             total_vehicles = vehicles.count()
-            total_revenue = sum(v.total_spent or 0 for v in vehicles)
-            avg_services_per_vehicle = sum(v.paid_services_count or 0 for v in vehicles) / max(total_vehicles, 1)
+            total_orders = sum(v.orders_count or 0 for v in vehicles)
+            total_order_value = sum(v.total_order_value or 0 for v in vehicles)
+            total_revenue = sum(v.revenue_from_payments or 0 for v in vehicles)
+            avg_orders_per_vehicle = total_orders / max(total_vehicles, 1)
             
             return {
                 'items': vehicles_page,
                 'summary': {
                     'total_vehicles': total_vehicles,
+                    'total_orders': total_orders,
+                    'total_order_value': total_order_value,
                     'total_revenue': total_revenue,
-                    'avg_services_per_vehicle': avg_services_per_vehicle,
+                    'avg_orders_per_vehicle': avg_orders_per_vehicle,
                 },
                 'pagination': self._get_pagination_data(vehicles_page, paginator)
             }
@@ -1225,20 +1343,29 @@ class ReportsView(TemplateView):
             return {'error': f'Vehicle data not available: {str(e)}', 'items': [], 'summary': {}}
     
     def _get_service_packages_data(self, start_date, end_date, page):
-        """Get service packages data"""
+        """Get service packages data based on orders created in the period"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
         try:
-            # Get service packages with usage statistics
+            # Get service packages with usage statistics based on orders created in period
             packages = ServicePackage.objects.annotate(
                 orders_count=Count('serviceorder',
                                  filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime])),
-                total_revenue=Sum('serviceorder__total_amount',
-                                filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime]))
-            ).order_by('-orders_count')
+                total_order_value=Sum('serviceorder__total_amount',
+                                    filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime])),
+                revenue_from_payments=Sum('serviceorder__payments__amount',
+                                        filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime],
+                                                serviceorder__payments__status__in=['completed', 'verified']) &
+                                                ~Q(serviceorder__payments__payment_type='refund')),
+                paid_orders_count=Count('serviceorder__payments',
+                                      distinct=True,
+                                      filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime],
+                                              serviceorder__payments__status__in=['completed', 'verified']) &
+                                              ~Q(serviceorder__payments__payment_type='refund'))
+            ).filter(orders_count__gt=0).order_by('-orders_count')
             
             # Paginate packages
             paginator = Paginator(packages, 20)
@@ -1246,15 +1373,18 @@ class ReportsView(TemplateView):
             
             # Calculate summary
             total_packages = packages.count()
-            active_packages = packages.filter(orders_count__gt=0).count()
-            total_revenue = sum(p.total_revenue or 0 for p in packages)
+            total_orders = sum(p.orders_count or 0 for p in packages)
+            total_order_value = sum(p.total_order_value or 0 for p in packages)
+            total_revenue = sum(p.revenue_from_payments or 0 for p in packages)
             
             return {
                 'items': packages_page,
                 'summary': {
                     'total_packages': total_packages,
-                    'active_packages': active_packages,
+                    'total_orders': total_orders,
+                    'total_order_value': total_order_value,
                     'total_revenue': total_revenue,
+                    'avg_orders_per_package': total_orders / max(total_packages, 1),
                 },
                 'pagination': self._get_pagination_data(packages_page, paginator)
             }
@@ -1262,41 +1392,51 @@ class ReportsView(TemplateView):
             return {'error': 'Service packages data not available', 'items': [], 'summary': {}}
     
     def _get_loyalty_program_data(self, start_date, end_date, page):
-        """Get loyalty program data"""
+        """Get loyalty program data based on orders created in the period"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
         try:
-            # Get customers with loyalty points activity in the date range
+            # Get customers with loyalty activity based on orders created in period
             customers_with_loyalty = Customer.objects.annotate(
-                orders_count=Count('service_orders',
-                                 filter=Q(service_orders__created_at__range=[start_datetime, end_datetime])),
-                points_earned=Sum('service_orders__total_amount',
-                                filter=Q(service_orders__created_at__range=[start_datetime, end_datetime])) / 10
+                orders_count=Count('serviceorder',
+                                 filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime])),
+                total_spent=Sum('serviceorder__total_amount',
+                              filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime])),
+                payments_made=Sum('serviceorder__payments__amount',
+                                filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime],
+                                        serviceorder__payments__status__in=['completed', 'verified']) &
+                                        ~Q(serviceorder__payments__payment_type='refund')),
+                points_earned=Sum('serviceorder__total_amount',
+                                filter=Q(serviceorder__created_at__range=[start_datetime, end_datetime])) / 10
             ).filter(orders_count__gt=0, loyalty_points__gt=0).order_by('-loyalty_points')
             
             # Paginate customers
             paginator = Paginator(customers_with_loyalty, 20)
             loyalty_page = paginator.get_page(page)
             
-            # Calculate summary
+            # Calculate loyalty metrics
             total_members = customers_with_loyalty.count()
             total_points = sum(c.loyalty_points or 0 for c in customers_with_loyalty)
+            total_orders = sum(c.orders_count or 0 for c in customers_with_loyalty)
+            total_revenue = sum(c.payments_made or 0 for c in customers_with_loyalty)
             avg_points_per_member = total_points / max(total_members, 1)
             
             return {
                 'items': loyalty_page,
                 'summary': {
                     'total_members': total_members,
+                    'total_orders': total_orders,
                     'total_points': total_points,
+                    'total_revenue': total_revenue,
                     'avg_points_per_member': avg_points_per_member,
                 },
                 'pagination': self._get_pagination_data(loyalty_page, paginator)
             }
-        except:
-            return {'error': 'Loyalty program data not available', 'items': [], 'summary': {}}
+        except Exception as e:
+            return {'error': f'Loyalty program data not available: {str(e)}', 'items': [], 'summary': {}}
     
     def _get_attendance_report_data(self, start_date, end_date, page):
         """Get employee attendance data"""
@@ -1334,21 +1474,27 @@ class ReportsView(TemplateView):
             return {'error': 'Attendance data not available', 'items': [], 'summary': {}}
     
     def _get_department_performance_data(self, start_date, end_date, page):
-        """Get department performance data"""
+        """Get department performance data based on orders created in the period"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
         try:
-            # Get departments with performance metrics
+            # Get departments with performance metrics based on orders created in period
             departments = Department.objects.annotate(
                 employee_count=Count('employees', filter=Q(employees__is_active=True)),
                 orders_handled=Count('employees__assigned_orders',
                                    filter=Q(employees__assigned_orders__created_at__range=[start_datetime, end_datetime])),
-                revenue_generated=Sum('employees__assigned_orders__total_amount',
-                                    filter=Q(employees__assigned_orders__created_at__range=[start_datetime, end_datetime]))
-            ).order_by('-revenue_generated')
+                total_order_value=Sum('employees__assigned_orders__total_amount',
+                                    filter=Q(employees__assigned_orders__created_at__range=[start_datetime, end_datetime])),
+                revenue_from_payments=Sum('employees__assigned_orders__payments__amount',
+                                        filter=Q(employees__assigned_orders__created_at__range=[start_datetime, end_datetime],
+                                                employees__assigned_orders__payments__status__in=['completed', 'verified']) &
+                                                ~Q(employees__assigned_orders__payments__payment_type='refund')),
+                avg_order_value=Avg('employees__assigned_orders__total_amount',
+                                  filter=Q(employees__assigned_orders__created_at__range=[start_datetime, end_datetime]))
+            ).filter(orders_handled__gt=0).order_by('-revenue_from_payments')
             
             # Paginate departments
             paginator = Paginator(departments, 20)
@@ -1357,32 +1503,47 @@ class ReportsView(TemplateView):
             # Calculate summary
             total_departments = departments.count()
             total_employees = sum(d.employee_count or 0 for d in departments)
-            total_revenue = sum(d.revenue_generated or 0 for d in departments)
+            total_orders = sum(d.orders_handled or 0 for d in departments)
+            total_order_value = sum(d.total_order_value or 0 for d in departments)
+            total_revenue = sum(d.revenue_from_payments or 0 for d in departments)
             
             return {
                 'items': departments_page,
                 'summary': {
                     'total_departments': total_departments,
                     'total_employees': total_employees,
+                    'total_orders': total_orders,
+                    'total_order_value': total_order_value,
                     'total_revenue': total_revenue,
+                    'avg_revenue_per_dept': total_revenue / max(total_departments, 1),
                 },
                 'pagination': self._get_pagination_data(departments_page, paginator)
             }
-        except:
-            return {'error': 'Department data not available', 'items': [], 'summary': {}}
+        except Exception as e:
+            return {'error': f'Department data not available: {str(e)}', 'items': [], 'summary': {}}
     
     def _get_subscription_analysis_data(self, start_date, end_date, page):
-        """Get subscription analysis data"""
+        """Get subscription analysis data based on subscriptions created and order activity in the period"""
         from django.core.paginator import Paginator
         
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
         try:
-            # Get subscriptions with activity
-            subscriptions = Subscription.objects.select_related('customer').filter(
-                created_at__range=[start_datetime, end_datetime]
-            ).order_by('-created_at')
+            # Get subscriptions with activity based on orders created in period
+            subscriptions = Subscription.objects.select_related('customer').annotate(
+                orders_count=Count('customer__serviceorder',
+                                 filter=Q(customer__serviceorder__created_at__range=[start_datetime, end_datetime])),
+                total_order_value=Sum('customer__serviceorder__total_amount',
+                                    filter=Q(customer__serviceorder__created_at__range=[start_datetime, end_datetime])),
+                revenue_from_payments=Sum('customer__serviceorder__payments__amount',
+                                        filter=Q(customer__serviceorder__created_at__range=[start_datetime, end_datetime],
+                                                customer__serviceorder__payments__status__in=['completed', 'verified']) &
+                                                ~Q(customer__serviceorder__payments__payment_type='refund'))
+            ).filter(
+                Q(created_at__range=[start_datetime, end_datetime]) |
+                Q(orders_count__gt=0)
+            ).order_by('-revenue_from_payments')
             
             # Paginate subscriptions
             paginator = Paginator(subscriptions, 20)
@@ -1390,21 +1551,333 @@ class ReportsView(TemplateView):
             
             # Calculate summary
             total_subscriptions = subscriptions.count()
+            new_subscriptions = subscriptions.filter(created_at__range=[start_datetime, end_datetime]).count()
             active_subscriptions = subscriptions.filter(status='active').count()
-            total_revenue = subscriptions.aggregate(Sum('amount'))['amount__sum'] or 0
+            total_subscription_revenue = subscriptions.aggregate(Sum('amount'))['amount__sum'] or 0
+            total_order_revenue = sum(s.revenue_from_payments or 0 for s in subscriptions)
+            avg_orders_per_subscriber = sum(s.orders_count or 0 for s in subscriptions) / max(total_subscriptions, 1)
             
             return {
                 'items': subscriptions_page,
                 'summary': {
                     'total_subscriptions': total_subscriptions,
+                    'new_subscriptions': new_subscriptions,
                     'active_subscriptions': active_subscriptions,
-                    'total_revenue': total_revenue,
+                    'total_subscription_revenue': total_subscription_revenue,
+                    'total_order_revenue': total_order_revenue,
+                    'avg_orders_per_subscriber': avg_orders_per_subscriber,
                 },
                 'pagination': self._get_pagination_data(subscriptions_page, paginator)
             }
-        except:
-            return {'error': 'Subscription data not available', 'items': [], 'summary': {}}
+        except Exception as e:
+            return {'error': f'Subscription data not available: {str(e)}', 'items': [], 'summary': {}}
     
+    def _get_balance_sheet_data(self, start_date, end_date, page):
+        """Get comprehensive balance sheet data - Assets, Liabilities, Equity"""
+        from django.core.paginator import Paginator
+        
+        # Convert dates to datetime for proper filtering
+        start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
+        
+        try:
+            # ASSETS SECTION
+            
+            # Current Assets - Cash and Cash Equivalents
+            cash_from_payments = Payment.objects.filter(
+                service_order__created_at__range=[start_datetime, end_datetime],
+                status__in=['completed', 'verified'],
+                payment_method__name__icontains='cash'
+            ).exclude(payment_type='refund').aggregate(
+                total=Sum('amount')
+            )['total'] or 0
+            
+            bank_from_payments = Payment.objects.filter(
+                service_order__created_at__range=[start_datetime, end_datetime],
+                status__in=['completed', 'verified']
+            ).exclude(
+                payment_method__name__icontains='cash'
+            ).exclude(payment_type='refund').aggregate(
+                total=Sum('amount')
+            )['total'] or 0
+            
+            # Accounts Receivable - Unpaid service orders
+            accounts_receivable = ServiceOrder.objects.filter(
+                created_at__range=[start_datetime, end_datetime]
+            ).aggregate(
+                total_orders=Sum('total_amount'),
+                paid_amount=Sum('payments__amount', filter=Q(
+                    payments__status__in=['completed', 'verified']
+                ) & ~Q(payments__payment_type='refund'))
+            )
+            
+            total_orders_value = Decimal(str(accounts_receivable['total_orders'] or 0))
+            total_paid = Decimal(str(accounts_receivable['paid_amount'] or 0))
+            accounts_receivable_amount = total_orders_value - total_paid
+            
+            # Inventory Assets
+            inventory_value = Decimal('0')
+            try:
+                from apps.inventory.models import InventoryItem
+                inventory_items = InventoryItem.objects.all()
+                for item in inventory_items:
+                    unit_cost = getattr(item, 'unit_cost', 0) or 0
+                    current_stock = getattr(item, 'current_stock', 0) or 0
+                    # Convert to Decimal to avoid type mixing
+                    inventory_value += Decimal(str(unit_cost)) * Decimal(str(current_stock))
+            except Exception:
+                inventory_value = Decimal('0')
+                
+            # Total Current Assets
+            total_current_assets = cash_from_payments + bank_from_payments + accounts_receivable_amount + inventory_value
+            
+            # LIABILITIES SECTION
+            
+            # Current Liabilities - Accounts Payable (Unpaid Approved Expenses)
+            accounts_payable = Expense.objects.filter(
+                created_at__range=[start_datetime, end_datetime],
+                status='approved'
+            ).aggregate(
+                total_approved=Sum('amount'),
+                total_paid=Sum('amount', filter=Q(status='paid'))
+            )
+            
+            total_approved_expenses = Decimal(str(accounts_payable['total_approved'] or 0))
+            total_paid_expenses = Decimal(str(accounts_payable['total_paid'] or 0))
+            accounts_payable_amount = total_approved_expenses - total_paid_expenses
+            
+            # Employee Liabilities (Unpaid wages/salaries)
+            employee_liabilities = Decimal('0')
+            try:
+                # Calculate based on employee performance and unpaid wages
+                employees_with_revenue = Employee.objects.filter(is_active=True).annotate(
+                    revenue_generated=Sum('assigned_orders__payments__amount',
+                                        filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime],
+                                                assigned_orders__payments__status__in=['completed', 'verified']) &
+                                                ~Q(assigned_orders__payments__payment_type='refund'))
+                )
+                # Estimate 10% commission as liability
+                for emp in employees_with_revenue:
+                    if emp.revenue_generated:
+                        # Convert to Decimal to avoid type mixing
+                        employee_liabilities += Decimal(str(emp.revenue_generated)) * Decimal('0.1')
+            except Exception:
+                employee_liabilities = Decimal('0')
+            
+            # Total Current Liabilities
+            total_current_liabilities = accounts_payable_amount + employee_liabilities
+            
+            # EQUITY SECTION
+            
+            # Revenue
+            total_revenue = cash_from_payments + bank_from_payments
+            
+            # Total Expenses (All paid expenses in period)
+            total_expenses = Expense.objects.filter(
+                created_at__range=[start_datetime, end_datetime],
+                status__in=['approved', 'paid']
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            total_expenses = Decimal(str(total_expenses))
+            
+            # Net Income
+            net_income = total_revenue - total_expenses
+            
+            # Owner's Equity (simplified)
+            owners_equity = net_income
+            
+            # Total Equity
+            total_equity = owners_equity
+            
+            # BALANCE SHEET ITEMS (for display)
+            balance_sheet_items = [
+                # Assets
+                {'category': 'CURRENT ASSETS', 'name': 'Cash', 'amount': cash_from_payments, 'type': 'asset'},
+                {'category': 'CURRENT ASSETS', 'name': 'Bank/Digital Payments', 'amount': bank_from_payments, 'type': 'asset'},
+                {'category': 'CURRENT ASSETS', 'name': 'Accounts Receivable', 'amount': accounts_receivable_amount, 'type': 'asset'},
+                {'category': 'CURRENT ASSETS', 'name': 'Inventory', 'amount': inventory_value, 'type': 'asset'},
+                {'category': 'TOTAL ASSETS', 'name': 'Total Current Assets', 'amount': total_current_assets, 'type': 'asset_total'},
+                
+                # Liabilities
+                {'category': 'CURRENT LIABILITIES', 'name': 'Accounts Payable', 'amount': accounts_payable_amount, 'type': 'liability'},
+                {'category': 'CURRENT LIABILITIES', 'name': 'Employee Liabilities', 'amount': employee_liabilities, 'type': 'liability'},
+                {'category': 'TOTAL LIABILITIES', 'name': 'Total Current Liabilities', 'amount': total_current_liabilities, 'type': 'liability_total'},
+                
+                # Equity
+                {'category': 'EQUITY', 'name': 'Net Income', 'amount': net_income, 'type': 'equity'},
+                {'category': 'EQUITY', 'name': "Owner's Equity", 'amount': owners_equity, 'type': 'equity'},
+                {'category': 'TOTAL EQUITY', 'name': 'Total Equity', 'amount': total_equity, 'type': 'equity_total'},
+            ]
+            
+            # Paginate balance sheet items
+            paginator = Paginator(balance_sheet_items, 20)
+            balance_sheet_page = paginator.get_page(page)
+            
+            # Verify Balance Sheet Equation: Assets = Liabilities + Equity
+            balance_check = total_current_assets - (total_current_liabilities + total_equity)
+            
+            return {
+                'items': balance_sheet_page,
+                'summary': {
+                    'total_assets': total_current_assets,
+                    'total_liabilities': total_current_liabilities,
+                    'total_equity': total_equity,
+                    'total_revenue': total_revenue,
+                    'total_expenses': total_expenses,
+                    'net_income': net_income,
+                    'balance_check': balance_check,
+                    'balance_verified': abs(balance_check) < 0.01,  # Within 1 cent
+                    'cash_on_hand': cash_from_payments,
+                    'bank_balance': bank_from_payments,
+                    'outstanding_receivables': accounts_receivable_amount,
+                    'inventory_value': inventory_value,
+                    'outstanding_payables': accounts_payable_amount,
+                },
+                'pagination': self._get_pagination_data(balance_sheet_page, paginator)
+            }
+            
+        except Exception as e:
+            return {'error': f'Balance sheet data not available: {str(e)}', 'items': [], 'summary': {}}
+
+    def _get_refunds_report_data(self, start_date, end_date, page):
+        """Get comprehensive refunds and returns data"""
+        from django.core.paginator import Paginator
+        from apps.payments.models import PaymentRefund
+        
+        # Convert dates to datetime for proper filtering
+        start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
+        
+        try:
+            # Get all refund-related data
+            refund_items = []
+            processed_orders = set()  # Track orders already processed to avoid duplicates
+            
+            # 1. Payment records with payment_type='refund' for orders created in period
+            refund_payments = Payment.objects.select_related(
+                'service_order', 'customer', 'payment_method', 'processed_by'
+            ).filter(
+                service_order__created_at__range=[start_datetime, end_datetime],
+                payment_type='refund',
+                status__in=['completed', 'verified']
+            ).order_by('-completed_at')
+            
+            for payment in refund_payments:
+                order_key = f"{payment.service_order.id}_{payment.id}" if payment.service_order else f"no_order_{payment.id}"
+                if order_key not in processed_orders:
+                    processed_orders.add(order_key)
+                    refund_items.append({
+                        'type': 'Direct Refund Payment',
+                        'refund_id': payment.payment_id,
+                        'original_order': payment.service_order.order_number if payment.service_order else 'N/A',
+                        'customer': payment.customer.full_name if payment.customer else 'N/A',
+                        'amount': payment.amount,
+                        'reason': 'Payment refund',
+                        'processed_by': payment.processed_by.full_name if payment.processed_by else 'System',
+                        'processed_at': payment.completed_at,
+                        'status': 'Completed',
+                        'payment_method': payment.payment_method.name if payment.payment_method else 'N/A',
+                        'order_date': payment.service_order.created_at if payment.service_order else None,
+                    })
+            
+            # 2. PaymentRefund records for orders created in period
+            payment_refunds = PaymentRefund.objects.select_related(
+                'original_payment', 'original_payment__service_order', 
+                'original_payment__customer', 'processed_by', 'approved_by'
+            ).filter(
+                original_payment__service_order__created_at__range=[start_datetime, end_datetime],
+                status='completed'
+            ).order_by('-processed_at')
+            
+            for refund in payment_refunds:
+                # Check if this refund's original payment was already processed
+                original_order_key = f"{refund.original_payment.service_order.id}_{refund.original_payment.id}" if refund.original_payment.service_order else f"no_order_{refund.original_payment.id}"
+                if original_order_key not in processed_orders:
+                    processed_orders.add(original_order_key)
+                    refund_items.append({
+                        'type': 'Formal Refund Record',
+                        'refund_id': refund.refund_id,
+                        'original_order': refund.original_payment.service_order.order_number if refund.original_payment.service_order else 'N/A',
+                        'customer': refund.original_payment.customer.full_name if refund.original_payment.customer else 'N/A',
+                        'amount': refund.amount,
+                        'reason': refund.reason[:100] + '...' if len(refund.reason) > 100 else refund.reason,
+                        'processed_by': refund.processed_by.full_name if refund.processed_by else 'N/A',
+                        'processed_at': refund.processed_at,
+                        'status': refund.get_status_display(),
+                        'payment_method': refund.original_payment.payment_method.name if refund.original_payment.payment_method else 'N/A',
+                        'order_date': refund.original_payment.service_order.created_at if refund.original_payment.service_order else None,
+                    })
+            
+            # 3. Payments with status='refunded' for orders created in period (only if not already processed)
+            refunded_payments = Payment.objects.select_related(
+                'service_order', 'customer', 'payment_method'
+            ).filter(
+                service_order__created_at__range=[start_datetime, end_datetime],
+                status='refunded'
+            ).order_by('-updated_at')
+            
+            for payment in refunded_payments:
+                order_key = f"{payment.service_order.id}_{payment.id}" if payment.service_order else f"no_order_{payment.id}"
+                if order_key not in processed_orders:
+                    processed_orders.add(order_key)
+                    refund_items.append({
+                        'type': 'Refunded Payment',
+                        'refund_id': f"RF-{payment.payment_id}",
+                        'original_order': payment.service_order.order_number if payment.service_order else 'N/A',
+                        'customer': payment.customer.full_name if payment.customer else 'N/A',
+                        'amount': payment.amount,
+                        'reason': 'Payment marked as refunded',
+                        'processed_by': 'System',
+                        'processed_at': payment.updated_at,
+                        'status': 'Refunded',
+                        'payment_method': payment.payment_method.name if payment.payment_method else 'N/A',
+                        'order_date': payment.service_order.created_at if payment.service_order else None,
+                    })
+            
+            # Sort all refunds by processed date
+            refund_items.sort(key=lambda x: x['processed_at'] or x['order_date'], reverse=True)
+            
+            # Paginate refund items
+            paginator = Paginator(refund_items, 20)
+            refunds_page = paginator.get_page(page)
+            
+            # Calculate summary
+            total_refunds_count = len(refund_items)
+            total_refund_amount = sum(item['amount'] for item in refund_items)
+            
+            # Group by refund type
+            refund_types = {}
+            for item in refund_items:
+                refund_type = item['type']
+                if refund_type not in refund_types:
+                    refund_types[refund_type] = {'count': 0, 'amount': 0}
+                refund_types[refund_type]['count'] += 1
+                refund_types[refund_type]['amount'] += item['amount']
+            
+            # Get revenue for comparison
+            orders_in_period = ServiceOrder.objects.filter(
+                created_at__range=[start_datetime, end_datetime]
+            )
+            total_revenue = Payment.objects.filter(
+                service_order__in=orders_in_period,
+                status__in=['completed', 'verified']
+            ).exclude(payment_type='refund').aggregate(Sum('amount'))['amount__sum'] or 0
+            
+            refund_rate = (total_refund_amount / max(total_revenue, 1)) * 100
+            
+            return {
+                'items': refunds_page,
+                'summary': {
+                    'total_refunds_count': total_refunds_count,
+                    'total_refund_amount': total_refund_amount,
+                    'total_revenue': total_revenue,
+                    'refund_rate': refund_rate,
+                    'refund_types': refund_types,
+                    'avg_refund_amount': total_refund_amount / max(total_refunds_count, 1),
+                },
+                'pagination': self._get_pagination_data(refunds_page, paginator)
+            }
+            
+        except Exception as e:
+            return {'error': f'Refunds data not available: {str(e)}', 'items': [], 'summary': {}}
+
     # ============== HELPER METHODS ==============
     
     def _get_pagination_data(self, page_obj, paginator):
@@ -1444,7 +1917,7 @@ class ReportsView(TemplateView):
             return self._generate_excel_export(report_data, request.tenant)
     
     def _get_export_data(self, report_type, start_date, end_date, employee_id=None):
-        """Get all data for export (no pagination) - Updated to use payment-based data"""
+        """Get all data for export (no pagination) - Updated to use order-based data"""
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
@@ -1464,20 +1937,16 @@ class ReportsView(TemplateView):
             else:
                 paginated_data = self._get_report_data(report_type, start_date, end_date, 1)
             
-            # For export, we want all items, not just the paginated ones - Updated to use payment-based data
+            # For export, we want all items, not just the paginated ones - Updated to use order-based data
             if report_type == 'business_overview':
-                # Use payment-based data for business overview
-                data['items'] = list(Payment.objects.select_related(
-                    'service_order__customer', 
-                    'service_order__assigned_attendant', 
-                    'service_order__vehicle',
-                    'payment_method'
+                # Use service orders created in the period
+                data['items'] = list(ServiceOrder.objects.select_related(
+                    'customer', 
+                    'assigned_attendant', 
+                    'vehicle'
                 ).filter(
-                    completed_at__range=[start_datetime, end_datetime],
-                    status__in=['completed', 'verified']
-                ).exclude(
-                    payment_type='refund'
-                ).order_by('-completed_at'))
+                    created_at__range=[start_datetime, end_datetime]
+                ).order_by('-created_at'))
             elif report_type == 'inventory':
                 # Get inventory items with movement data
                 items = InventoryItem.objects.select_related('category', 'unit').annotate(
@@ -1492,61 +1961,56 @@ class ReportsView(TemplateView):
                 ).order_by('-movement_count', 'name')
                 data['items'] = list(items)
             elif report_type == 'services':
-                # Get services with performance metrics based on payments
+                # Get services with performance metrics based on orders created in period
                 services = Service.objects.select_related('category').annotate(
-                    payments_count=Count('order_items__order__payments',
-                                       filter=Q(order_items__order__payments__completed_at__range=[start_datetime, end_datetime],
-                                               order_items__order__payments__status__in=['completed', 'verified']) &
-                                               ~Q(order_items__order__payments__payment_type='refund')),
+                    orders_count=Count('order_items__order',
+                                     filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime])),
                     total_revenue=Sum('order_items__order__payments__amount',
-                                    filter=Q(order_items__order__payments__completed_at__range=[start_datetime, end_datetime],
+                                    filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime],
                                             order_items__order__payments__status__in=['completed', 'verified']) &
                                             ~Q(order_items__order__payments__payment_type='refund')),
                     avg_rating=Avg('order_items__rating',
-                                 filter=Q(order_items__order__payments__completed_at__range=[start_datetime, end_datetime],
-                                         order_items__order__payments__status__in=['completed', 'verified']) &
-                                         ~Q(order_items__order__payments__payment_type='refund'))
+                                 filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime]))
                 ).order_by('-total_revenue', 'name')
                 data['items'] = list(services)
             elif report_type == 'customers':
-                # Get customers with their payment activity in the date range
+                # Get customers with their order activity in the date range
                 customers = Customer.objects.annotate(
-                    total_payments=Count('payments', 
-                                       filter=Q(payments__completed_at__range=[start_datetime, end_datetime],
-                                               payments__status__in=['completed', 'verified']) &
-                                               ~Q(payments__payment_type='refund')),
-                    total_spent=Sum('payments__amount',
-                                  filter=Q(payments__completed_at__range=[start_datetime, end_datetime],
-                                          payments__status__in=['completed', 'verified']) &
-                                          ~Q(payments__payment_type='refund')),
-                    avg_payment_value=Avg('payments__amount',
-                                        filter=Q(payments__completed_at__range=[start_datetime, end_datetime],
-                                                payments__status__in=['completed', 'verified']) &
-                                                ~Q(payments__payment_type='refund'))
-                ).order_by('-total_spent')
+                    total_orders=Count('service_orders', 
+                                     filter=Q(service_orders__created_at__range=[start_datetime, end_datetime])),
+                    total_spent=Sum('service_orders__payments__amount',
+                                  filter=Q(service_orders__created_at__range=[start_datetime, end_datetime],
+                                          service_orders__payments__status__in=['completed', 'verified']) &
+                                          ~Q(service_orders__payments__payment_type='refund')),
+                    avg_order_value=Avg('service_orders__total_amount',
+                                      filter=Q(service_orders__created_at__range=[start_datetime, end_datetime]))
+                ).filter(total_orders__gt=0).order_by('-total_spent')
                 data['items'] = list(customers)
             elif report_type == 'employees':
-                # Get employees with their performance metrics based on payments
+                # Get employees with their performance metrics based on orders created in period
                 employees = Employee.objects.select_related('department', 'position').annotate(
-                    total_payments_handled=Count('assigned_orders__payments',
-                                               filter=Q(assigned_orders__payments__completed_at__range=[start_datetime, end_datetime],
-                                                       assigned_orders__payments__status__in=['completed', 'verified']) &
-                                                       ~Q(assigned_orders__payments__payment_type='refund')),
-                    total_revenue_generated=Sum('assigned_orders__payments__amount',
-                                              filter=Q(assigned_orders__payments__completed_at__range=[start_datetime, end_datetime],
-                                                      assigned_orders__payments__status__in=['completed', 'verified']) &
-                                                      ~Q(assigned_orders__payments__payment_type='refund')),
                     orders_assigned_count=Count('assigned_orders',
-                                              filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime]))
+                                              filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime])),
+                    total_revenue_generated=Sum('assigned_orders__payments__amount',
+                                              filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime],
+                                                      assigned_orders__payments__status__in=['completed', 'verified']) &
+                                                      ~Q(assigned_orders__payments__payment_type='refund'))
                 ).filter(is_active=True).order_by('-total_revenue_generated')
                 data['items'] = list(employees)
             elif report_type == 'payments':
+                # Get payments for orders created in the period
                 data['items'] = list(Payment.objects.select_related('payment_method', 'service_order', 'customer').filter(
-                    completed_at__range=[start_datetime, end_datetime],
+                    service_order__created_at__range=[start_datetime, end_datetime],
                     status__in=['completed', 'verified']
                 ).exclude(
                     payment_type='refund'
-                ).order_by('-completed_at'))
+                ).order_by('-completed_at', '-created_at'))
+            elif report_type == 'expenses':
+                # Get only approved expenses
+                data['items'] = list(Expense.objects.select_related('category', 'vendor').filter(
+                    expense_date__range=[start_date, end_date],
+                    status='approved'
+                ).order_by('-expense_date'))
             elif report_type == 'individual_employee':
                 # For individual employee, we need to include employee_details and payment data
                 if employee_id:
@@ -1704,7 +2168,7 @@ class ReportsView(TemplateView):
             
             summary_data = []
             for key, value in report_data['summary'].items():
-                if key != 'error' and value is not None:
+                if key != 'error' and key != 'refund_types' and value is not None:
                     formatted_key = key.replace('_', ' ').title()
                     if 'revenue' in key.lower() or 'profit' in key.lower() or 'value' in key.lower() or 'amount' in key.lower():
                         formatted_value = f"KES {value:,.2f}"
@@ -1806,19 +2270,20 @@ class ReportsView(TemplateView):
             return []
         
         if report_type == 'business_overview':
-            headers = ['Payment Date', 'Order #', 'Customer', 'Payment Method', 'Amount', 'Status']
+            headers = ['Order Date', 'Order #', 'Customer', 'Vehicle', 'Total Amount', 'Payment Status']
             table_data = [headers]
             total_amount = 0
             for item in items[:50]:  # Limit to 50 items for PDF
-                amount = float(item.amount or 0)
+                amount = float(item.total_amount or 0)
                 total_amount += amount
+                payment_status = 'Paid' if hasattr(item, 'payment_received') and item.payment_received else 'Unpaid'
                 table_data.append([
-                    item.completed_at.strftime('%Y-%m-%d') if item.completed_at else 'N/A',
-                    item.service_order.order_number if item.service_order else 'N/A',
-                    item.service_order.customer.full_name if item.service_order and item.service_order.customer else 'N/A',
-                    item.payment_method.name if item.payment_method else 'Cash',
+                    item.created_at.strftime('%Y-%m-%d') if item.created_at else 'N/A',
+                    item.order_number if hasattr(item, 'order_number') else 'N/A',
+                    item.customer.full_name if item.customer else 'N/A',
+                    f"{item.vehicle.make} {item.vehicle.model}" if item.vehicle else 'N/A',
                     f"KES {amount:,.2f}",
-                    item.status.title()
+                    payment_status
                 ])
             # Add total row
             table_data.append(['', '', '', 'TOTAL:', f"KES {total_amount:,.2f}", ''])
@@ -1954,30 +2419,40 @@ class ReportsView(TemplateView):
             table_data.append(['', '', '', 'TOTAL:', f"KES {total_amount:,.2f}"])
         
         elif report_type == 'daily_summary':
-            headers = ['Date', 'Payments Count', 'Revenue', 'Completed Payments']
+            headers = ['Date', 'Orders Count', 'Revenue', 'Paid Orders', 'Order Value']
             table_data = [headers]
             total_revenue = 0
+            total_orders = 0
             for item in items[:50]:
-                revenue = float(item.get('revenue', 0) or 0)
+                revenue = float(item.get('revenue_from_payments', 0) or 0)
+                orders_count = int(item.get('orders_count', 0) or 0)
+                paid_orders = int(item.get('paid_orders_count', 0) or 0)
+                order_value = float(item.get('total_order_value', 0) or 0)
+                
                 total_revenue += revenue
-                date_str = item.get('date', 'N/A')
+                total_orders += orders_count
+                
+                # Handle date field - could be 'created_at__date' or 'date'
+                date_str = item.get('created_at__date') or item.get('date', 'N/A')
                 if hasattr(date_str, 'strftime'):
                     date_str = date_str.strftime('%Y-%m-%d')
+                
                 table_data.append([
                     str(date_str),
-                    str(item.get('payments_count', 0) or 0),
+                    str(orders_count),
                     f"KES {revenue:,.2f}",
-                    str(item.get('completed_payments', 0) or 0)
+                    str(paid_orders),
+                    f"KES {order_value:,.2f}"
                 ])
             # Add total row
-            table_data.append(['', 'TOTAL:', f"KES {total_revenue:,.2f}", ''])
+            table_data.append(['TOTAL:', str(total_orders), f"KES {total_revenue:,.2f}", '', ''])
                 
         elif report_type == 'weekly_summary':
             headers = ['Week', 'Orders Count', 'Revenue', 'Completed Orders']
             table_data = [headers]
             total_revenue = 0
             for item in items[:50]:
-                revenue = float(item.get('revenue', 0) or 0)
+                revenue = float(item.get('revenue_from_payments', 0) or 0)
                 total_revenue += revenue
                 week_str = item.get('week', 'N/A')
                 if hasattr(week_str, 'strftime'):
@@ -1986,7 +2461,7 @@ class ReportsView(TemplateView):
                     str(week_str),
                     str(item.get('orders_count', 0) or 0),
                     f"KES {revenue:,.2f}",
-                    str(item.get('completed_orders', 0) or 0)
+                    str(item.get('paid_orders_count', 0) or 0)
                 ])
             # Add total row
             table_data.append(['', 'TOTAL:', f"KES {total_revenue:,.2f}", ''])
@@ -1996,7 +2471,7 @@ class ReportsView(TemplateView):
             table_data = [headers]
             total_revenue = 0
             for item in items[:50]:
-                revenue = float(item.get('revenue', 0) or 0)
+                revenue = float(item.get('revenue_from_payments', 0) or 0)
                 total_revenue += revenue
                 month_str = item.get('month', 'N/A')
                 if hasattr(month_str, 'strftime'):
@@ -2005,27 +2480,28 @@ class ReportsView(TemplateView):
                     str(month_str),
                     str(item.get('orders_count', 0) or 0),
                     f"KES {revenue:,.2f}",
-                    str(item.get('completed_orders', 0) or 0)
+                    str(item.get('paid_orders_count', 0) or 0)
                 ])
             # Add total row
             table_data.append(['', 'TOTAL:', f"KES {total_revenue:,.2f}", ''])
                 
         elif report_type == 'sales_analysis':
-            headers = ['Date', 'Service', 'Quantity', 'Revenue', 'Category']
+            headers = ['Service', 'Category', 'Quantity', 'Revenue', 'Orders']
             table_data = [headers]
             total_revenue = 0
             for item in items[:50]:
                 revenue = float(item.get('total_revenue', 0) or 0)
                 total_revenue += revenue
-                date_str = item.get('date', 'N/A')
-                if hasattr(date_str, 'strftime'):
-                    date_str = date_str.strftime('%Y-%m-%d')
+                service_name = item.get('service__name', 'N/A')
+                category_name = item.get('service__category__name', 'Uncategorized')
+                quantity = item.get('quantity_sold', 0) or 0
+                orders_count = item.get('orders_count', 0) or 0
                 table_data.append([
-                    str(date_str),
-                    str(item.get('service_name', item.get('name', 'N/A'))),
-                    str(item.get('quantity', item.get('orders_count', 0)) or 0),
+                    str(service_name),
+                    str(category_name),
+                    str(quantity),
                     f"KES {revenue:,.2f}",
-                    str(item.get('category', 'N/A'))
+                    str(orders_count)
                 ])
             # Add total row
             table_data.append(['', '', '', f"KES {total_revenue:,.2f}", ''])
@@ -2073,6 +2549,66 @@ class ReportsView(TemplateView):
                 ])
             # Add total row
             table_data.append(['', '', 'TOTALS:', str(total_services), f"KES {total_revenue:,.2f}", ''])
+        
+        elif report_type == 'balance_sheet':
+            headers = ['Category', 'Item', 'Amount', 'Type']
+            table_data = [headers]
+            
+            # Summary section first
+            summary = report_data.get('summary', {})
+            table_data.append(['SUMMARY', 'Total Assets', f"KES {summary.get('total_assets', 0):,.2f}", 'Asset'])
+            table_data.append(['SUMMARY', 'Total Liabilities', f"KES {summary.get('total_liabilities', 0):,.2f}", 'Liability'])
+            table_data.append(['SUMMARY', 'Total Equity', f"KES {summary.get('total_equity', 0):,.2f}", 'Equity'])
+            table_data.append(['', '', '', ''])  # Spacing
+            
+            # Detailed items
+            for item in items[:50]:
+                table_data.append([
+                    item.get('category', ''),
+                    item.get('name', ''),
+                    f"KES {item.get('amount', 0):,.2f}",
+                    item.get('type', '').title()
+                ])
+            
+            # Financial performance
+            table_data.append(['', '', '', ''])  # Spacing
+            table_data.append(['PERFORMANCE', 'Total Revenue', f"KES {summary.get('total_revenue', 0):,.2f}", 'Income'])
+            table_data.append(['PERFORMANCE', 'Total Expenses', f"KES {summary.get('total_expenses', 0):,.2f}", 'Expense'])
+            table_data.append(['PERFORMANCE', 'Net Income', f"KES {summary.get('net_income', 0):,.2f}", 'Profit/Loss'])
+        
+        elif report_type == 'refunds_report':
+            headers = ['Refund ID', 'Type', 'Order', 'Customer', 'Amount', 'Date']
+            table_data = [headers]
+            total_refund_amount = 0
+            
+            for item in items[:50]:  # Limit to 50 items for PDF
+                if isinstance(item, dict):
+                    amount = float(item.get('amount', 0))
+                    total_refund_amount += amount
+                    processed_at = item.get('processed_at')
+                    date_str = processed_at.strftime('%Y-%m-%d') if processed_at else 'N/A'
+                    
+                    table_data.append([
+                        item.get('refund_id', ''),
+                        item.get('type', ''),
+                        item.get('original_order', ''),
+                        item.get('customer', ''),
+                        f"KES {amount:,.2f}",
+                        date_str
+                    ])
+                else:
+                    # Fallback for unexpected item format
+                    table_data.append([
+                        str(item)[:20],
+                        'Refund Item',
+                        'N/A',
+                        'N/A',
+                        'N/A',
+                        'N/A'
+                    ])
+            
+            # Add total row
+            table_data.append(['', '', '', 'TOTAL:', f"KES {total_refund_amount:,.2f}", ''])
         
         else:
             # Generic format for other report types
@@ -2440,16 +2976,16 @@ class ReportsView(TemplateView):
             total_orders = 0
             total_customers = 0
             for item in items:
-                revenue = float(item.get('revenue', 0) or 0)
+                revenue = float(item.get('revenue_from_payments', 0) or 0)
                 expenses = float(item.get('expenses', 0) or 0)
-                orders = int(item.get('orders', 0) or 0)
-                customers = int(item.get('customers', 0) or 0)
+                orders = int(item.get('orders_count', 0) or 0)
+                customers = int(item.get('unique_customers', 0) or 0)
                 total_revenue += revenue
                 total_expenses += expenses
                 total_orders += orders
                 total_customers += customers
                 table_data.append([
-                    item.get('week_start', '').strftime('%Y-%m-%d') if hasattr(item.get('week_start', ''), 'strftime') else str(item.get('week_start', '')),
+                    item.get('week', '').strftime('%Y-%m-%d') if hasattr(item.get('week', ''), 'strftime') else str(item.get('week', '')),
                     orders,
                     revenue,
                     expenses,
@@ -2467,16 +3003,16 @@ class ReportsView(TemplateView):
             total_orders = 0
             total_customers = 0
             for item in items:
-                revenue = float(item.get('revenue', 0) or 0)
+                revenue = float(item.get('revenue_from_payments', 0) or 0)
                 expenses = float(item.get('expenses', 0) or 0)
-                orders = int(item.get('orders', 0) or 0)
-                customers = int(item.get('customers', 0) or 0)
+                orders = int(item.get('orders_count', 0) or 0)
+                customers = int(item.get('unique_customers', 0) or 0)
                 total_revenue += revenue
                 total_expenses += expenses
                 total_orders += orders
                 total_customers += customers
                 table_data.append([
-                    f"{item.get('year', '')}-{item.get('month', ''):02d}" if item.get('year') and item.get('month') else str(item.get('month', '')),
+                    item.get('month', '').strftime('%Y-%m') if hasattr(item.get('month', ''), 'strftime') else str(item.get('month', '')),
                     orders,
                     revenue,
                     expenses,
@@ -2487,29 +3023,33 @@ class ReportsView(TemplateView):
             table_data.append(['TOTAL:', total_orders, total_revenue, total_expenses, total_revenue - total_expenses, total_customers])
             
         elif report_type == 'sales_analysis':
-            headers = ['Date', 'Orders', 'Revenue', 'Avg Order Value', 'New Customers', 'Top Service']
+            headers = ['Service', 'Category', 'Quantity Sold', 'Revenue', 'Order Value', 'Orders Count']
             table_data = [headers]
             total_revenue = 0
+            total_order_value = 0
             total_orders = 0
-            total_customers = 0
             for item in items:
-                revenue = float(item.get('revenue', 0) or 0)
-                orders = int(item.get('orders', 0) or 0)
-                customers = int(item.get('new_customers', 0) or 0)
+                revenue = float(item.get('total_revenue', 0) or 0)
+                order_value = float(item.get('total_order_value', 0) or 0)
+                orders = int(item.get('orders_count', 0) or 0)
+                quantity = int(item.get('quantity_sold', 0) or 0)
+                service_name = item.get('service__name', 'N/A')
+                category_name = item.get('service__category__name', 'Uncategorized')
+                
                 total_revenue += revenue
+                total_order_value += order_value
                 total_orders += orders
-                total_customers += customers
+                
                 table_data.append([
-                    item.get('date', '').strftime('%Y-%m-%d') if hasattr(item.get('date', ''), 'strftime') else str(item.get('date', '')),
-                    orders,
+                    service_name,
+                    category_name,
+                    quantity,
                     revenue,
-                    float(item.get('avg_order_value', 0) or 0),
-                    customers,
-                    item.get('top_service', 'N/A')
+                    order_value,
+                    orders
                 ])
             # Add total row
-            avg_order_value = total_revenue / total_orders if total_orders > 0 else 0
-            table_data.append(['TOTAL:', total_orders, total_revenue, avg_order_value, total_customers, ''])
+            table_data.append(['TOTAL:', '', '', total_revenue, total_order_value, total_orders])
                 
         elif report_type == 'vehicle_analysis':
             headers = ['Vehicle', 'Customer', 'License Plate', 'Services Count', 'Total Spent', 'Last Service', 'Customer Phone']
@@ -2539,6 +3079,67 @@ class ReportsView(TemplateView):
                 ])
             # Add total row
             table_data.append(['', '', 'TOTALS:', total_services, total_revenue, '', ''])
+        
+        elif report_type == 'balance_sheet':
+            headers = ['Category', 'Item', 'Amount', 'Type']
+            table_data = [headers]
+            
+            # Process balance sheet items
+            for item in items:
+                if isinstance(item, dict):
+                    table_data.append([
+                        item.get('category', ''),
+                        item.get('name', ''),
+                        f"KES {float(item.get('amount', 0)):,.2f}",
+                        item.get('type', '').title()
+                    ])
+                else:
+                    # Fallback for unexpected item format
+                    table_data.append([
+                        str(item)[:50],
+                        'Balance Sheet Item',
+                        'N/A',
+                        'Unknown'
+                    ])
+        
+        elif report_type == 'refunds_report':
+            headers = ['Refund ID', 'Type', 'Order', 'Customer', 'Amount', 'Reason', 'Processed By', 'Date']
+            table_data = [headers]
+            total_refund_amount = 0
+            
+            # Process refund items
+            for item in items:
+                if isinstance(item, dict):
+                    amount = float(item.get('amount', 0))
+                    total_refund_amount += amount
+                    processed_at = item.get('processed_at')
+                    date_str = processed_at.strftime('%Y-%m-%d') if processed_at else 'N/A'
+                    
+                    table_data.append([
+                        item.get('refund_id', ''),
+                        item.get('type', ''),
+                        item.get('original_order', ''),
+                        item.get('customer', ''),
+                        f"KES {amount:,.2f}",
+                        item.get('reason', '')[:50] + ('...' if len(item.get('reason', '')) > 50 else ''),
+                        item.get('processed_by', ''),
+                        date_str
+                    ])
+                else:
+                    # Fallback for unexpected item format
+                    table_data.append([
+                        str(item)[:20],
+                        'Refund Item',
+                        'N/A',
+                        'N/A',
+                        'N/A',
+                        'N/A',
+                        'N/A',
+                        'N/A'
+                    ])
+            
+            # Add total row
+            table_data.append(['', '', '', 'TOTAL:', f"KES {total_refund_amount:,.2f}", '', '', ''])
         
         else:
             # Generic format for other report types

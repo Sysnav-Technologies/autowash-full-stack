@@ -82,7 +82,7 @@
     {% if report_data.summary and not report_data.error %}
     <div class="row mb-4">
         {% for key, value in report_data.summary.items %}
-        {% if key != 'error' and key != 'method_breakdown' and key != 'category_breakdown' %}
+        {% if key != 'error' and key != 'method_breakdown' and key != 'category_breakdown' and key != 'refund_types' %}
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
@@ -138,36 +138,58 @@
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
-                            <th>Payment ID</th>
                             <th>Order Number</th>
                             <th>Customer</th>
-                            <th>Payment Method</th>
-                            <th>Amount</th>
+                            <th>Vehicle</th>
+                            <th>Attendant</th>
+                            <th>Order Amount</th>
+                            <th>Payment Status</th>
+                            <th>Order Date</th>
                             <th>Status</th>
-                            <th>Payment Date</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for payment in report_data.items %}
+                        {% for order in report_data.items %}
                         <tr>
-                            <td>#{{ payment.payment_id|default:payment.id }}</td>
-                            <td>{{ payment.service_order.order_number|default:"N/A" }}</td>
-                            <td>{{ payment.service_order.customer.full_name|default:"N/A" }}</td>
-                            <td>{{ payment.payment_method.name|default:"Unknown" }}</td>
-                            <td><strong class="text-success">KES {{ payment.amount|floatformat:2 }}</strong></td>
+                            <td>#{{ order.order_number }}</td>
+                            <td>{{ order.customer.full_name|default:"N/A" }}</td>
+                            <td>{{ order.vehicle.registration_number|default:"N/A" }}</td>
+                            <td>{{ order.assigned_attendant.full_name|default:"Unassigned" }}</td>
+                            <td><strong class="text-primary">KES {{ order.total_amount|floatformat:2 }}</strong></td>
                             <td>
-                                <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'verified' %}bg-info{% elif payment.status == 'processing' %}bg-warning{% else %}bg-secondary{% endif %}">
-                                    {{ payment.get_status_display|default:payment.status|title }}
+                                <span class="badge {% if order.payment_status == 'paid' %}bg-success{% elif order.payment_status == 'partial' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ order.get_payment_status_display|default:order.payment_status|title }}
                                 </span>
                             </td>
-                            <td>{{ payment.completed_at|date:"M d, Y H:i" }}</td>
+                            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+                            <td>
+                                <span class="badge {% if order.status == 'completed' %}bg-success{% elif order.status == 'in_progress' %}bg-info{% elif order.status == 'confirmed' %}bg-primary{% elif order.status == 'cancelled' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                    {{ order.get_status_display|default:order.status|title }}
+                                </span>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted">No payments found for the selected period</td>
+                            <td colspan="8" class="text-center text-muted">No service orders found for the selected period</td>
                         </tr>
                         {% endfor %}
                     </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="4">Summary</th>
+                            <th>{{ report_data.summary.total_orders|default:0 }} orders</th>
+                            <th>{{ report_data.summary.paid_orders|default:0 }} paid</th>
+                            <th colspan="2">
+                                <div>Revenue: <span class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</span></div>
+                                {% if report_data.summary.total_refunds > 0 %}
+                                <div>Refunds: <span class="text-danger">KES {{ report_data.summary.total_refunds|default:0|floatformat:2 }}</span></div>
+                                <div>Net Revenue: <span class="text-primary">KES {{ report_data.summary.net_revenue|default:0|floatformat:2 }}</span></div>
+                                {% endif %}
+                            </th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
                 </table>
 
                 <!-- Inventory Table -->
@@ -349,6 +371,10 @@
 
                 <!-- Payments Table -->
                 {% elif selected_report_type == 'payments' %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Note:</strong> This report shows payments for service orders created during the selected period, regardless of when the payment was actually made.
+                </div>
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
@@ -357,7 +383,8 @@
                             <th>Customer</th>
                             <th>Amount</th>
                             <th>Method</th>
-                            <th>Date</th>
+                            <th>Payment Date</th>
+                            <th>Order Date</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -366,7 +393,7 @@
                             <td>#{{ payment.id }}</td>
                             <td>
                                 {% if payment.service_order %}
-                                #{{ payment.service_order.id }}
+                                #{{ payment.service_order.order_number }}
                                 {% else %}
                                 N/A
                                 {% endif %}
@@ -380,11 +407,12 @@
                             </td>
                             <td>KES {{ payment.amount|floatformat:2 }}</td>
                             <td>{{ payment.payment_method.name|default:"Unknown" }}</td>
-                            <td>{{ payment.created_at|date:"M d, Y H:i" }}</td>
+                            <td>{{ payment.completed_at|date:"M d, Y H:i"|default:"Pending" }}</td>
+                            <td>{{ payment.service_order.created_at|date:"M d, Y H:i"|default:"N/A" }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No payments found</td>
+                            <td colspan="7" class="text-center text-muted">No payments found for orders created in the selected period</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -392,6 +420,10 @@
 
                 <!-- Expenses Table -->
                 {% elif selected_report_type == 'expenses' %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Note:</strong> This report shows only approved expenses for the selected period.
+                </div>
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
@@ -400,6 +432,7 @@
                             <th>Amount</th>
                             <th>Vendor</th>
                             <th>Date</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -410,10 +443,15 @@
                             <td>KES {{ expense.total_amount|floatformat:2 }}</td>
                             <td>{{ expense.vendor.name|default:"N/A" }}</td>
                             <td>{{ expense.expense_date|date:"M d, Y" }}</td>
+                            <td>
+                                <span class="badge bg-success">
+                                    {{ expense.get_status_display|default:expense.status|title }}
+                                </span>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No expenses found</td>
+                            <td colspan="6" class="text-center text-muted">No approved expenses found for the selected period</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -421,6 +459,10 @@
 
                 <!-- Financial Summary Table -->
                 {% elif selected_report_type == 'financial_summary' %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Note:</strong> This report shows payments for orders created during the selected period and only approved expenses. Revenue is calculated from orders created in the period regardless of when payment was made.
+                </div>
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
@@ -433,14 +475,14 @@
                     </thead>
                     <tbody>
                         {% for transaction in report_data.items %}
-                        <tr class="{% if transaction.type == 'Revenue' %}table-success{% else %}table-danger{% endif %}">
+                        <tr class="{% if transaction.type == 'Revenue' %}table-success{% elif transaction.type == 'Refund' %}table-warning{% else %}table-danger{% endif %}">
                             <td>{{ transaction.date|date:"M d, Y" }}</td>
                             <td>
-                                <span class="badge {% if transaction.type == 'Revenue' %}bg-success{% else %}bg-danger{% endif %}">
+                                <span class="badge {% if transaction.type == 'Revenue' %}bg-success{% elif transaction.type == 'Refund' %}bg-warning{% else %}bg-danger{% endif %}">
                                     {{ transaction.type }}
                                 </span>
                             </td>
-                            <td>{{ transaction.description|truncatechars:40 }}</td>
+                            <td>{{ transaction.description|truncatechars:50 }}</td>
                             <td>{{ transaction.category|default:"N/A" }}</td>
                             <td>
                                 <strong class="{% if transaction.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
@@ -450,7 +492,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No financial transactions found</td>
+                            <td colspan="5" class="text-center text-muted">No financial transactions found for orders/expenses in the selected period</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -619,28 +661,34 @@
 
                 <!-- Daily Summary Table -->
                 {% elif selected_report_type == 'daily_summary' %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Note:</strong> This report shows daily activity based on service orders created each day and their corresponding payments (regardless of payment date).
+                </div>
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
                             <th>Date</th>
-                            <th>Payments</th>
-                            <th>Revenue</th>
+                            <th>Orders Created</th>
+                            <th>Order Value</th>
+                            <th>Revenue from Payments</th>
                             <th>Unique Customers</th>
-                            <th>Orders Paid</th>
+                            <th>Paid Orders</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for day in report_data.items %}
                         <tr>
-                            <td>{{ day.completed_at__date|date:"M d, Y" }}</td>
-                            <td>{{ day.payments_count }}</td>
-                            <td><strong class="text-success">KES {{ day.revenue|floatformat:2 }}</strong></td>
+                            <td>{{ day.created_at__date|date:"M d, Y" }}</td>
+                            <td>{{ day.orders_count }}</td>
+                            <td><strong class="text-primary">KES {{ day.total_order_value|floatformat:2 }}</strong></td>
+                            <td><strong class="text-success">KES {{ day.revenue_from_payments|floatformat:2 }}</strong></td>
                             <td>{{ day.unique_customers }}</td>
-                            <td>{{ day.unique_orders }}</td>
+                            <td>{{ day.paid_orders_count }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No daily payment data found</td>
+                            <td colspan="6" class="text-center text-muted">No daily order data found for the selected period</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -648,10 +696,11 @@
                     <tfoot class="table-secondary">
                         <tr>
                             <th>Totals</th>
-                            <th>{{ report_data.summary.total_payments }} payments</th>
+                            <th>{{ report_data.summary.total_orders }} orders</th>
+                            <th class="text-primary">KES {{ report_data.summary.total_order_value|floatformat:2 }}</th>
                             <th class="text-success">KES {{ report_data.summary.total_revenue|floatformat:2 }}</th>
-                            <th>{{ report_data.summary.avg_daily_payments|floatformat:0 }} avg/day</th>
-                            <th>KES {{ report_data.summary.avg_payment_value|floatformat:2 }} avg value</th>
+                            <th>{{ report_data.summary.avg_daily_orders|floatformat:0 }} avg/day</th>
+                            <th>KES {{ report_data.summary.avg_order_value|floatformat:2 }} avg value</th>
                         </tr>
                     </tfoot>
                     {% endif %}
@@ -673,8 +722,8 @@
                         <tr>
                             <td>{{ week.week|date:"M d, Y" }}</td>
                             <td>{{ week.orders_count }}</td>
-                            <td><strong class="text-success">KES {{ week.revenue|floatformat:2 }}</strong></td>
-                            <td>{{ week.completed_orders }}</td>
+                            <td><strong class="text-success">KES {{ week.revenue_from_payments|floatformat:2 }}</strong></td>
+                            <td>{{ week.paid_orders_count }}</td>
                         </tr>
                         {% empty %}
                         <tr>
@@ -710,8 +759,8 @@
                         <tr>
                             <td>{{ month.month|date:"F Y" }}</td>
                             <td>{{ month.orders_count }}</td>
-                            <td><strong class="text-success">KES {{ month.revenue|floatformat:2 }}</strong></td>
-                            <td>{{ month.completed_orders }}</td>
+                            <td><strong class="text-success">KES {{ month.revenue_from_payments|floatformat:2 }}</strong></td>
+                            <td>{{ month.paid_orders_count }}</td>
                         </tr>
                         {% empty %}
                         <tr>
@@ -748,9 +797,9 @@
                         <tr>
                             <td>{{ sale.service__name|default:"N/A" }}</td>
                             <td>{{ sale.service__category__name|default:"Uncategorized" }}</td>
-                            <td>{{ sale.quantity_sold }}</td>
-                            <td><strong class="text-success">KES {{ sale.total_revenue|floatformat:2 }}</strong></td>
-                            <td>{{ sale.orders_count }}</td>
+                            <td>{{ sale.quantity_sold|default:0 }}</td>
+                            <td><strong class="text-success">KES {{ sale.total_revenue|default:0|floatformat:2 }}</strong></td>
+                            <td>{{ sale.orders_count|default:0 }}</td>
                         </tr>
                         {% empty %}
                         <tr>
@@ -771,6 +820,10 @@
 
                 <!-- Vehicle Analysis Report -->
                 {% elif selected_report_type == 'vehicle_analysis' %}
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Vehicle Analysis:</strong> Shows vehicle usage based on service orders created during the selected period.
+                </div>
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
@@ -836,6 +889,550 @@
                             <th>{{ report_data.summary.total_vehicles|default:0 }} vehicles</th>
                             <th class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</th>
                             <th>{{ report_data.summary.avg_services_per_vehicle|default:0|floatformat:1 }} avg</th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+
+                <!-- Service Packages Report -->
+                {% elif selected_report_type == 'service_packages' %}
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Service Packages:</strong> Shows package usage based on service orders created during the selected period.
+                </div>
+                <table class="table table-bordered table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Package Name</th>
+                            <th>Description</th>
+                            <th>Package Price</th>
+                            <th>Orders Count</th>
+                            <th>Total Order Value</th>
+                            <th>Revenue from Payments</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for package in report_data.items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ package.name }}</div>
+                                {% if package.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ package.description|default:"No description"|truncatechars:50 }}</td>
+                            <td class="text-success fw-bold">KES {{ package.price|default:0|floatformat:2 }}</td>
+                            <td><span class="badge bg-info">{{ package.orders_count|default:0 }}</span></td>
+                            <td class="text-primary fw-bold">KES {{ package.total_order_value|default:0|floatformat:2 }}</td>
+                            <td class="text-success fw-bold">KES {{ package.revenue_from_payments|default:0|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No service package data available for the selected period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="3">Summary</th>
+                            <th>{{ report_data.summary.total_orders|default:0 }} orders</th>
+                            <th class="text-primary">KES {{ report_data.summary.total_order_value|default:0|floatformat:2 }}</th>
+                            <th class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+
+                <!-- Loyalty Program Report -->
+                {% elif selected_report_type == 'loyalty_program' %}
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Loyalty Program:</strong> Shows customer loyalty data based on service orders created during the selected period.
+                </div>
+                <table class="table table-bordered table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Customer</th>
+                            <th>Contact</th>
+                            <th>Loyalty Points</th>
+                            <th>Orders Count</th>
+                            <th>Total Spent</th>
+                            <th>Payments Made</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for customer in report_data.items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ customer.full_name }}</div>
+                                <small class="text-muted">ID: {{ customer.customer_id|default:"N/A" }}</small>
+                            </td>
+                            <td>
+                                {% if customer.phone %}
+                                    <div>{{ customer.phone }}</div>
+                                {% endif %}
+                                {% if customer.email %}
+                                    <small class="text-muted">{{ customer.email }}</small>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-warning">{{ customer.loyalty_points|default:0 }} pts</span></td>
+                            <td><span class="badge bg-info">{{ customer.orders_count|default:0 }}</span></td>
+                            <td class="text-primary fw-bold">KES {{ customer.total_spent|default:0|floatformat:2 }}</td>
+                            <td class="text-success fw-bold">KES {{ customer.payments_made|default:0|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No loyalty program data available for the selected period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="3">Summary</th>
+                            <th>{{ report_data.summary.total_orders|default:0 }} orders</th>
+                            <th class="text-primary">KES {{ report_data.summary.total_order_value|default:0|floatformat:2 }}</th>
+                            <th class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+
+                <!-- Attendance Report -->
+                {% elif selected_report_type == 'attendance_report' %}
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Attendance Report:</strong> Shows employee attendance records for the selected date range.
+                </div>
+                <table class="table table-bordered table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Employee</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                            <th>Hours Worked</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for attendance in report_data.items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ attendance.employee.full_name }}</div>
+                                <small class="text-muted">{{ attendance.employee.employee_id|default:"N/A" }}</small>
+                            </td>
+                            <td>{{ attendance.date|date:"M d, Y" }}</td>
+                            <td>
+                                {% if attendance.status == 'present' %}
+                                    <span class="badge bg-success">Present</span>
+                                {% elif attendance.status == 'absent' %}
+                                    <span class="badge bg-danger">Absent</span>
+                                {% elif attendance.status == 'late' %}
+                                    <span class="badge bg-warning">Late</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ attendance.status|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ attendance.check_in|time:"H:i"|default:"--" }}</td>
+                            <td>{{ attendance.check_out|time:"H:i"|default:"--" }}</td>
+                            <td>{{ attendance.hours_worked|default:"--" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No attendance data available for the selected period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="2">Summary</th>
+                            <th>{{ report_data.summary.attendance_rate|default:0|floatformat:1 }}% Rate</th>
+                            <th>{{ report_data.summary.present_count|default:0 }} Present</th>
+                            <th>{{ report_data.summary.absent_count|default:0 }} Absent</th>
+                            <th>{{ report_data.summary.late_count|default:0 }} Late</th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+
+                <!-- Department Performance Report -->
+                {% elif selected_report_type == 'department_performance' %}
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Department Performance:</strong> Shows department performance based on service orders created during the selected period.
+                </div>
+                <table class="table table-bordered table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Department</th>
+                            <th>Employees</th>
+                            <th>Orders Handled</th>
+                            <th>Total Order Value</th>
+                            <th>Revenue from Payments</th>
+                            <th>Avg Order Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for department in report_data.items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ department.name }}</div>
+                                {% if department.description %}
+                                    <small class="text-muted">{{ department.description|truncatechars:30 }}</small>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-info">{{ department.employee_count|default:0 }}</span></td>
+                            <td><span class="badge bg-primary">{{ department.orders_handled|default:0 }}</span></td>
+                            <td class="text-primary fw-bold">KES {{ department.total_order_value|default:0|floatformat:2 }}</td>
+                            <td class="text-success fw-bold">KES {{ department.revenue_from_payments|default:0|floatformat:2 }}</td>
+                            <td class="text-info">KES {{ department.avg_order_value|default:0|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No department performance data available for the selected period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="2">Summary ({{ report_data.summary.total_departments }} depts)</th>
+                            <th>{{ report_data.summary.total_orders|default:0 }} orders</th>
+                            <th class="text-primary">KES {{ report_data.summary.total_order_value|default:0|floatformat:2 }}</th>
+                            <th class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</th>
+                            <th class="text-info">KES {{ report_data.summary.avg_revenue_per_dept|default:0|floatformat:2 }}</th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+
+                <!-- Subscription Analysis Report -->
+                {% elif selected_report_type == 'subscription_analysis' %}
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Subscription Analysis:</strong> Shows subscription data and related order activity during the selected period.
+                </div>
+                <table class="table table-bordered table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Customer</th>
+                            <th>Subscription</th>
+                            <th>Status</th>
+                            <th>Orders Count</th>
+                            <th>Order Revenue</th>
+                            <th>Subscription Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for subscription in report_data.items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ subscription.customer.full_name }}</div>
+                                {% if subscription.customer.phone %}
+                                    <small class="text-muted">{{ subscription.customer.phone }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="fw-bold">{{ subscription.plan_name|default:"Basic Plan" }}</div>
+                                <small class="text-muted">Created: {{ subscription.created_at|date:"M d, Y" }}</small>
+                            </td>
+                            <td>
+                                {% if subscription.status == 'active' %}
+                                    <span class="badge bg-success">Active</span>
+                                {% elif subscription.status == 'cancelled' %}
+                                    <span class="badge bg-danger">Cancelled</span>
+                                {% elif subscription.status == 'expired' %}
+                                    <span class="badge bg-warning">Expired</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ subscription.status|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-info">{{ subscription.orders_count|default:0 }}</span></td>
+                            <td class="text-success fw-bold">KES {{ subscription.revenue_from_payments|default:0|floatformat:2 }}</td>
+                            <td class="text-primary fw-bold">KES {{ subscription.amount|default:0|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No subscription data available for the selected period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="3">Summary ({{ report_data.summary.total_subscriptions }} total)</th>
+                            <th>{{ report_data.summary.total_order_revenue|default:0|floatformat:2 }} orders avg</th>
+                            <th class="text-success">KES {{ report_data.summary.total_order_revenue|default:0|floatformat:2 }}</th>
+                            <th class="text-primary">KES {{ report_data.summary.total_subscription_revenue|default:0|floatformat:2 }}</th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+
+                <!-- Balance Sheet Report -->
+                {% elif selected_report_type == 'balance_sheet' %}
+                <div class="alert alert-success mb-3">
+                    <i class="fas fa-balance-scale"></i>
+                    <strong>Balance Sheet:</strong> Comprehensive financial position showing Assets, Liabilities, and Equity based on the selected period.
+                    {% if report_data.summary.balance_verified %}
+                        <br><span class="text-success"><i class="fas fa-check-circle"></i> Balance Sheet Verified: Assets = Liabilities + Equity</span>
+                    {% else %}
+                        <br><span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Balance Check Difference: KES {{ report_data.summary.balance_check|floatformat:2 }}</span>
+                    {% endif %}
+                </div>
+                
+                <!-- Balance Sheet Summary Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-coins"></i> Total Assets</h5>
+                                <h3 class="mb-0">KES {{ report_data.summary.total_assets|default:0|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-credit-card"></i> Total Liabilities</h5>
+                                <h3 class="mb-0">KES {{ report_data.summary.total_liabilities|default:0|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-success text-white">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-chart-line"></i> Total Equity</h5>
+                                <h3 class="mb-0">KES {{ report_data.summary.total_equity|default:0|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Balance Sheet Table -->
+                <table class="table table-bordered table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Category</th>
+                            <th>Item</th>
+                            <th>Amount</th>
+                            <th>Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in report_data.items %}
+                        <tr {% if item.type == 'asset_total' or item.type == 'liability_total' or item.type == 'equity_total' %}class="table-dark fw-bold"{% endif %}>
+                            <td>
+                                <strong>{{ item.category }}</strong>
+                            </td>
+                            <td>
+                                {{ item.name }}
+                                {% if item.type == 'asset_total' or item.type == 'liability_total' or item.type == 'equity_total' %}
+                                    <i class="fas fa-equals ms-2"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold">
+                                {% if item.type == 'asset' or item.type == 'asset_total' %}
+                                    <span class="text-primary">KES {{ item.amount|default:0|floatformat:2 }}</span>
+                                {% elif item.type == 'liability' or item.type == 'liability_total' %}
+                                    <span class="text-warning">KES {{ item.amount|default:0|floatformat:2 }}</span>
+                                {% elif item.type == 'equity' or item.type == 'equity_total' %}
+                                    <span class="text-success">KES {{ item.amount|default:0|floatformat:2 }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.type == 'asset' or item.type == 'asset_total' %}
+                                    <span class="badge bg-primary">Asset</span>
+                                {% elif item.type == 'liability' or item.type == 'liability_total' %}
+                                    <span class="badge bg-warning">Liability</span>
+                                {% elif item.type == 'equity' or item.type == 'equity_total' %}
+                                    <span class="badge bg-success">Equity</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No balance sheet data available for the selected period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <!-- Financial Performance Summary -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-chart-line"></i> Financial Performance</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tr><td><strong>Total Revenue:</strong></td><td class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</td></tr>
+                                    <tr><td><strong>Total Expenses:</strong></td><td class="text-danger">KES {{ report_data.summary.total_expenses|default:0|floatformat:2 }}</td></tr>
+                                    <tr class="table-success"><td><strong>Net Income:</strong></td><td class="text-success fw-bold">KES {{ report_data.summary.net_income|default:0|floatformat:2 }}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-info">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0"><i class="fas fa-wallet"></i> Cash Position</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tr><td><strong>Cash on Hand:</strong></td><td class="text-success">KES {{ report_data.summary.cash_on_hand|default:0|floatformat:2 }}</td></tr>
+                                    <tr><td><strong>Bank Balance:</strong></td><td class="text-primary">KES {{ report_data.summary.bank_balance|default:0|floatformat:2 }}</td></tr>
+                                    <tr><td><strong>Outstanding Receivables:</strong></td><td class="text-warning">KES {{ report_data.summary.outstanding_receivables|default:0|floatformat:2 }}</td></tr>
+                                    <tr><td><strong>Outstanding Payables:</strong></td><td class="text-danger">KES {{ report_data.summary.outstanding_payables|default:0|floatformat:2 }}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Refunds & Returns Report -->
+                {% elif selected_report_type == 'refunds_report' %}
+                <div class="alert alert-warning mb-3">
+                    <i class="fas fa-undo"></i>
+                    <strong>Refunds & Returns:</strong> Comprehensive view of all refunds and returns for orders created during the selected period.
+                </div>
+                
+                <!-- Refunds Summary Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-undo"></i> Total Refunds</h5>
+                                <h3 class="mb-0">{{ report_data.summary.total_refunds_count|default:0 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-danger text-white">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-money-bill-wave"></i> Refund Amount</h5>
+                                <h3 class="mb-0">KES {{ report_data.summary.total_refund_amount|default:0|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-percentage"></i> Refund Rate</h5>
+                                <h3 class="mb-0">{{ report_data.summary.refund_rate|default:0|floatformat:1 }}%</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-secondary text-white">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-calculator"></i> Avg Amount</h5>
+                                <h3 class="mb-0">KES {{ report_data.summary.avg_refund_amount|default:0|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Refund Types Breakdown -->
+                {% if report_data.summary.refund_types %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Refund Types Breakdown</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    {% for refund_type, data in report_data.summary.refund_types.items %}
+                                    <div class="col-md-4 mb-3">
+                                        <div class="border p-3 rounded">
+                                            <h6 class="text-primary">{{ refund_type }}</h6>
+                                            <div class="d-flex justify-content-between">
+                                                <span>Count:</span>
+                                                <strong>{{ data.count }}</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span>Amount:</span>
+                                                <strong class="text-danger">KES {{ data.amount|floatformat:2 }}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Detailed Refunds Table -->
+                <table class="table table-bordered table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Refund ID</th>
+                            <th>Type</th>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Amount</th>
+                            <th>Reason</th>
+                            <th>Processed By</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for refund in report_data.items %}
+                        <tr>
+                            <td>
+                                <strong>{{ refund.refund_id }}</strong>
+                                <br><small class="text-muted">{{ refund.payment_method }}</small>
+                            </td>
+                            <td>
+                                {% if refund.type == 'Direct Refund Payment' %}
+                                    <span class="badge bg-warning">Direct</span>
+                                {% elif refund.type == 'Formal Refund Record' %}
+                                    <span class="badge bg-danger">Formal</span>
+                                {% elif refund.type == 'Refunded Payment' %}
+                                    <span class="badge bg-secondary">Marked</span>
+                                {% endif %}
+                                <br><small>{{ refund.type }}</small>
+                            </td>
+                            <td>
+                                <strong>#{{ refund.original_order }}</strong>
+                                {% if refund.order_date %}
+                                    <br><small class="text-muted">{{ refund.order_date|date:"M d, Y" }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ refund.customer }}</td>
+                            <td class="text-danger fw-bold">KES {{ refund.amount|floatformat:2 }}</td>
+                            <td>{{ refund.reason|truncatechars:50 }}</td>
+                            <td>{{ refund.processed_by }}</td>
+                            <td>
+                                {% if refund.processed_at %}
+                                    {{ refund.processed_at|date:"M d, Y H:i" }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">No refunds found for the selected period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if report_data.items %}
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="4">Summary</th>
+                            <th class="text-danger">KES {{ report_data.summary.total_refund_amount|default:0|floatformat:2 }}</th>
+                            <th>{{ report_data.summary.total_refunds_count|default:0 }} refunds</th>
+                            <th colspan="2">Rate: {{ report_data.summary.refund_rate|default:0|floatformat:1 }}%</th>
                         </tr>
                     </tfoot>
                     {% endif %}
