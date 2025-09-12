@@ -2127,6 +2127,66 @@ class ReportsView(TemplateView):
             elif report_type in ['daily_summary', 'weekly_summary', 'monthly_summary', 'sales_analysis']:
                 # For summary reports, use paginated data which is already payment-based
                 data['items'] = list(paginated_data.get('items', []))
+            elif report_type == 'financial_summary':
+                # For financial summary, get ALL transactions (not paginated) using the same logic as _get_financial_summary_data
+                # Get non-cancelled service orders created in the period
+                orders_in_period = ServiceOrder.objects.filter(
+                    created_at__range=[start_datetime, end_datetime]
+                ).exclude(status='cancelled')
+                
+                transactions = []
+                
+                # Add successful payments for orders created in this period as positive transactions
+                payments = Payment.objects.select_related('payment_method', 'service_order').filter(
+                    service_order__in=orders_in_period,
+                    status__in=['completed', 'verified']
+                ).exclude(
+                    payment_type='refund'
+                ).order_by('-completed_at')
+                
+                for payment in payments:
+                    transactions.append({
+                        'type': 'Revenue',
+                        'amount': payment.amount,
+                        'description': f"Order #{payment.service_order.order_number if payment.service_order else 'N/A'}",
+                        'date': payment.completed_at.date() if hasattr(payment.completed_at, 'date') else payment.completed_at,
+                        'category': payment.payment_method.name if payment.payment_method else 'Unknown'
+                    })
+                
+                # Add refunds for orders created in this period as negative impact transactions
+                refunds = Payment.objects.select_related('payment_method', 'service_order').filter(
+                    service_order__in=orders_in_period,
+                    status__in=['completed', 'verified'],
+                    payment_type='refund'
+                ).order_by('-completed_at')
+                
+                for refund in refunds:
+                    transactions.append({
+                        'type': 'Refund',
+                        'amount': -refund.amount,  # Negative impact
+                        'description': f"Refund Order #{refund.service_order.order_number if refund.service_order else 'N/A'}",
+                        'date': refund.completed_at.date() if hasattr(refund.completed_at, 'date') else refund.completed_at,
+                        'category': refund.payment_method.name if refund.payment_method else 'Unknown'
+                    })
+                
+                # Add only approved expenses as negative transactions
+                expense_items = Expense.objects.select_related('category', 'vendor').filter(
+                    expense_date__range=[start_date, end_date],
+                    status='approved'  # Only approved expenses
+                ).order_by('-expense_date')
+                
+                for expense in expense_items:
+                    transactions.append({
+                        'type': 'Expense',
+                        'amount': -expense.total_amount,
+                        'description': expense.description[:30] + '...' if expense.description and len(expense.description) > 30 else (expense.description or f"{expense.category.name if expense.category else 'General'}"),
+                        'date': expense.expense_date,
+                        'category': expense.category.name if expense.category else 'General'
+                    })
+                
+                # Sort transactions by date
+                transactions.sort(key=lambda x: x['date'], reverse=True)
+                data['items'] = transactions
             else:
                 # For other report types, use the paginated data items
                 data['items'] = list(paginated_data.get('items', []))
@@ -2440,11 +2500,26 @@ class ReportsView(TemplateView):
                     total_revenue += amount
                 else:
                     total_expenses += abs(amount)
+                
+                # Shorten type names for better table fit
+                type_short = item.get('type', 'N/A')
+                if type_short == 'Revenue':
+                    type_short = 'Rev'
+                elif type_short == 'Expense':
+                    type_short = 'Exp'
+                elif type_short == 'Refund':
+                    type_short = 'Ref'
+                
+                # Shorten description for better table fit
+                description = item.get('description', 'N/A')
+                if len(description) > 30:
+                    description = description[:27] + '...'
+                
                 table_data.append([
-                    item.get('date', '').strftime('%Y-%m-%d') if hasattr(item.get('date', ''), 'strftime') else str(item.get('date', '')),
-                    item.get('type', 'N/A'),
-                    item.get('description', 'N/A')[:40],
-                    item.get('category', 'N/A'),
+                    item.get('date', '').strftime('%m/%d') if hasattr(item.get('date', ''), 'strftime') else str(item.get('date', '')),
+                    type_short,
+                    description,
+                    item.get('category', 'N/A')[:15],  # Limit category length too
                     f"KES {amount:,.2f}"
                 ])
             # Add summary rows
@@ -2943,7 +3018,7 @@ class ReportsView(TemplateView):
                 return []
                 
         elif report_type == 'financial_summary':
-            headers = ['Date', 'Transaction Type', 'Description', 'Category', 'Amount']
+            headers = ['Date', 'Type', 'Description', 'Category', 'Amount']
             table_data = [headers]
             total_revenue = 0
             total_expenses = 0
@@ -2953,11 +3028,26 @@ class ReportsView(TemplateView):
                     total_revenue += amount
                 else:
                     total_expenses += abs(amount)
+                
+                # Shorten type names for better table fit
+                type_short = item.get('type', 'N/A')
+                if type_short == 'Revenue':
+                    type_short = 'Rev'
+                elif type_short == 'Expense':
+                    type_short = 'Exp'
+                elif type_short == 'Refund':
+                    type_short = 'Ref'
+                
+                # Shorten description for better table fit
+                description = item.get('description', 'N/A')
+                if len(description) > 35:
+                    description = description[:32] + '...'
+                
                 table_data.append([
-                    item.get('date', '').strftime('%Y-%m-%d') if hasattr(item.get('date', ''), 'strftime') else str(item.get('date', '')),
-                    item.get('type', 'N/A'),
-                    item.get('description', 'N/A'),
-                    item.get('category', 'N/A'),
+                    item.get('date', '').strftime('%m/%d/%y') if hasattr(item.get('date', ''), 'strftime') else str(item.get('date', '')),
+                    type_short,
+                    description,
+                    item.get('category', 'N/A')[:15],  # Limit category length
                     amount
                 ])
             # Add summary rows
