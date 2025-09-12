@@ -25,12 +25,23 @@ class TenantDatabaseRouter:
         # NOTE: Always use the main database cache, NOT tenant-specific cache
         if tenant:
             try:
-                # Explicitly use the main cache backend to avoid tenant database confusion
-                from django.core.cache import caches
-                # Force use of default cache which should be on main database or Redis
-                main_cache = caches['default']
-                cache_key = f"tenant_db_config_{tenant.id}"
-                main_cache.set(cache_key, tenant.database_config, 300)  # Cache for 5 minutes
+                # Handle both Tenant objects and BusinessContext objects
+                database_config = None
+                if hasattr(tenant, 'database_config'):
+                    database_config = tenant.database_config
+                elif hasattr(tenant, 'id'):
+                    # If it's a BusinessContext, get the full Tenant object
+                    from apps.core.tenant_models import Tenant
+                    full_tenant = Tenant.objects.using('default').get(id=tenant.id)
+                    database_config = full_tenant.database_config
+                
+                if database_config:
+                    # Explicitly use the main cache backend to avoid tenant database confusion
+                    from django.core.cache import caches
+                    # Force use of default cache which should be on main database or Redis
+                    main_cache = caches['default']
+                    cache_key = f"tenant_db_config_{tenant.id}"
+                    main_cache.set(cache_key, database_config, 300)  # Cache for 5 minutes
             except Exception as e:
                 # If cache fails, continue without caching (non-critical feature)
                 # This prevents the "django_cache_table doesn't exist" errors

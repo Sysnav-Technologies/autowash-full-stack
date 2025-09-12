@@ -3444,3 +3444,199 @@ body,
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     border-color: var(--autowash-primary);
 }
+
+/* ========================================
+   SMOOTH LOADING OVERLAY
+======================================== */
+.smooth-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Ensure perfect centering on all devices */
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile */
+}
+
+.smooth-loading-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.smooth-loading-overlay.fade-out {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.smooth-loader-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 200px;
+    margin: 0 auto;
+    /* Perfect centering on all devices */
+    position: relative;
+    z-index: 1;
+}
+
+.smooth-spinner-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto; /* Ensure horizontal centering */
+}
+
+.smooth-spinner {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border: 4px solid rgba(37, 99, 235, 0.1);
+    border-top: 4px solid var(--autowash-primary);
+    border-radius: 50%;
+    animation: smoothSpin 0.5s linear infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+.smooth-logo-img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    filter: brightness(1.1);
+    animation: smoothFloat 2s ease-in-out infinite alternate;
+}
+
+.smooth-loader-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-600);
+    letter-spacing: 0.025em;
+    animation: smoothPulse 1.5s ease-in-out infinite;
+    transition: all 0.3s ease;
+    min-height: 1.25rem; /* Prevent height jumping during text changes */
+}
+
+@keyframes smoothSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes smoothFloat {
+    0% { 
+        transform: translateY(0px) scale(1);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+    }
+    100% { 
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+}
+
+@keyframes smoothPulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .smooth-loading-overlay {
+        background: rgba(15, 23, 42, 0.95);
+    }
+    
+    .smooth-spinner {
+        background: rgba(15, 23, 42, 0.9);
+    }
+    
+    .smooth-loader-text {
+        color: var(--gray-300);
+    }
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+    .smooth-loading-overlay {
+        /* Ensure perfect mobile centering */
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding: 1rem;
+    }
+    
+    .smooth-spinner-container {
+        width: 70px;
+        height: 70px;
+        margin: 0 auto;
+    }
+    
+    .smooth-spinner {
+        width: 70px;
+        height: 70px;
+        border-width: 3px;
+    }
+    
+    .smooth-logo-img {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .smooth-loader-text {
+        font-size: 0.8rem;
+    }
+    
+    .smooth-loader-content {
+        gap: 1rem;
+        padding: 1rem;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+    .smooth-spinner-container {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .smooth-spinner {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .smooth-logo-img {
+        width: 24px;
+        height: 24px;
+    }
+}
+
+/* Prevent page interactions during loading */
+body.loading {
+    overflow: hidden;
+}
+
+body.loading * {
+    pointer-events: none;
+}
+
+body.loading .smooth-loading-overlay {
+    pointer-events: auto;
+}

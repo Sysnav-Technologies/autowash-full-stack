@@ -80,8 +80,14 @@ class TenantBackupManager:
         
         file_path = os.path.join(backup_dir, f"{backup.backup_id}.sql")
         
-        # Get database configuration
-        db_config = self.tenant.database_config
+        # Get database configuration - handle both Tenant and BusinessContext objects
+        if hasattr(self.tenant, 'database_config'):
+            db_config = self.tenant.database_config
+        else:
+            # If it's a BusinessContext, get the full Tenant object
+            from apps.core.tenant_models import Tenant
+            full_tenant = Tenant.objects.using('default').get(id=self.tenant.id)
+            db_config = full_tenant.database_config
         
         # For cPanel hosting, try mysqldump first, then fallback to Django-based backup
         try:

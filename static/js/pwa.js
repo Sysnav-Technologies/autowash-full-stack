@@ -10,7 +10,47 @@ class PWAManager {
         this.registerServiceWorker();
         this.setupInstallPrompt();
         this.setupOfflineHandling();
-        // Removed splash screen as it was confusing users
+        // Only show PWA loading on initial startup, not on every page load
+        this.showPwaLoadingCircle();
+    }
+
+    // Show fast loading circle for PWA startup only
+    showPwaLoadingCircle() {
+        // Only show on PWA standalone mode AND if it's the initial load
+        if (window.matchMedia('(display-mode: standalone)').matches && 
+            !sessionStorage.getItem('pwa-startup-shown')) {
+            
+            // Mark that we've shown the startup screen
+            sessionStorage.setItem('pwa-startup-shown', 'true');
+            
+            // Use the same overlay system as smooth navigation
+            if (!document.getElementById('smooth-loader')) {
+                const loader = document.createElement('div');
+                loader.id = 'pwa-startup-loader';
+                loader.className = 'smooth-loading-overlay active';
+                loader.innerHTML = `
+                    <div class="smooth-loader-content">
+                        <div class="smooth-spinner-container">
+                            <div class="smooth-spinner">
+                                <img src="/static/img/logo.png" alt="AutoWash" class="smooth-logo-img">
+                            </div>
+                        </div>
+                        <div class="smooth-loader-text">Starting AutoWash...</div>
+                    </div>
+                `;
+                document.body.appendChild(loader);
+                
+                // Quick fade out after 800ms for fast startup
+                setTimeout(() => {
+                    loader.classList.add('fade-out');
+                    setTimeout(() => {
+                        if (loader.parentNode) {
+                            loader.remove();
+                        }
+                    }, 400);
+                }, 800);
+            }
+        }
     }
 
     // Service Worker Registration
