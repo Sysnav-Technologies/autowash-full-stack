@@ -82,15 +82,54 @@ def process_manual_mpesa_payment(request, payment, phone_number, payment_code):
             messages.success(request, success_msg)
         
         # Check if this completes a service order and redirect appropriately
+        tenant_slug = request.tenant.slug
+        
+        # Check if this is part of a split payment
+        split_payment_ids = request.session.get('split_payment_ids', [])
+        split_mpesa_remaining = request.session.get('split_mpesa_remaining', 0)
+        
+        if split_payment_ids and payment.payment_id in split_payment_ids:
+            # This is part of a split payment
+            split_mpesa_remaining -= 1
+            request.session['split_mpesa_remaining'] = split_mpesa_remaining
+            
+            if split_mpesa_remaining > 0:
+                # Find next M-Pesa payment to process
+                next_mpesa_payment = Payment.objects.filter(
+                    payment_id__in=split_payment_ids,
+                    payment_method__method_type='mpesa',
+                    status='pending'
+                ).first()
+                
+                if next_mpesa_payment:
+                    messages.info(request, f'M-Pesa payment completed! {split_mpesa_remaining} more M-Pesa payment(s) remaining.')
+                    return redirect(f'/business/{tenant_slug}/payments/{next_mpesa_payment.payment_id}/mpesa/')
+            
+            # All M-Pesa payments in split are complete
+            del request.session['split_payment_ids']
+            del request.session['split_mpesa_remaining']
+            
+            # Update service order payment status if applicable
+            if payment.service_order and hasattr(payment.service_order, 'update_payment_status'):
+                payment.service_order.update_payment_status()
+            
+            messages.success(request, 'All split payments completed successfully!')
+            
+            if payment.service_order:
+                return redirect(f'/business/{tenant_slug}/services/orders/{payment.service_order.pk}/receipt/')
+            else:
+                return redirect(f'/business/{tenant_slug}/payments/')
+        
+        # Regular (non-split) payment handling
         if payment.service_order:
             # If order is fully paid, redirect to order receipt
             if payment.service_order.payment_status == 'paid':
-                return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/receipt/')
+                return redirect(f'/business/{tenant_slug}/services/orders/{payment.service_order.pk}/receipt/')
             else:
-                return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/')
+                return redirect(f'/business/{tenant_slug}/services/orders/{payment.service_order.pk}/')
         
         # Otherwise redirect to payment detail
-        return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/')
+        return redirect(f'/business/{tenant_slug}/payments/{payment.payment_id}/')
         
     except Exception as e:
         logger.error(f"Error processing manual M-Pesa payment: {e}")
@@ -453,6 +492,147 @@ def payment_receipt_view(request, payment_id):
     
     return render(request, 'payments/receipt.html', context)
 
+
+def handle_split_payment(request, service_order, split_methods, split_amounts):
+    """Handle split payment processing across multiple payment methods"""
+    from apps.services.models import ServiceOrder
+    from decimal import Decimal
+    
+    try:
+        # Validate split payment data
+        if len(split_methods) != len(split_amounts):
+            messages.error(request, 'Invalid split payment data.')
+            return render(request, 'payments/process_payment.html', {
+                'service_order': service_order,
+                'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                'title': 'Process Payment'
+            })
+        
+        # Convert amounts and validate
+        total_split_amount = Decimal('0')
+        processed_splits = []
+        
+        for i, (method_id, amount_str) in enumerate(zip(split_methods, split_amounts)):
+            if not method_id or not amount_str:
+                continue
+                
+            try:
+                amount = Decimal(str(amount_str))
+                if amount <= 0:
+                    continue
+                    
+                payment_method = PaymentMethod.objects.get(id=method_id, is_active=True)
+                processed_splits.append({
+                    'method': payment_method,
+                    'amount': amount,
+                    'index': i
+                })
+                total_split_amount += amount
+                
+            except (ValueError, PaymentMethod.DoesNotExist):
+                messages.error(request, f'Invalid payment method or amount in split item {i+1}.')
+                return render(request, 'payments/process_payment.html', {
+                    'service_order': service_order,
+                    'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                    'title': 'Process Payment'
+                })
+        
+        if not processed_splits:
+            messages.error(request, 'No valid split payment items found.')
+            return render(request, 'payments/process_payment.html', {
+                'service_order': service_order,
+                'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                'title': 'Process Payment'
+            })
+        
+        # Validate total amount matches order total (if applicable)
+        if service_order:
+            balance_due = getattr(service_order, 'balance_due', service_order.total_amount)
+            if abs(total_split_amount - balance_due) > Decimal('0.01'):
+                messages.error(request, f'Split total (KES {total_split_amount}) must equal order balance (KES {balance_due}).')
+                return render(request, 'payments/process_payment.html', {
+                    'service_order': service_order,
+                    'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                    'title': 'Process Payment'
+                })
+        
+        # Create payment records for each split
+        with transaction.atomic():
+            created_payments = []
+            tenant_slug = request.tenant.slug
+            
+            for split_data in processed_splits:
+                payment_data = {
+                    'payment_id': generate_unique_code('PAY', 8),
+                    'service_order': service_order,
+                    'customer': service_order.customer if service_order else None,
+                    'payment_method': split_data['method'],
+                    'amount': split_data['amount'],
+                    'description': f'Split payment ({split_data["index"]+1}/{len(processed_splits)}) for {service_order.order_number}' if service_order else f'Split payment {split_data["index"]+1}',
+                    'customer_phone': request.POST.get('customer_phone', ''),
+                    'customer_email': request.POST.get('customer_email', ''),
+                    'processed_by': request.employee,
+                }
+                
+                payment = Payment.objects.create(**payment_data)
+                payment.set_created_by(request.user)
+                
+                # Mark as split payment in metadata
+                payment.metadata = payment.metadata or {}
+                payment.metadata['is_split_payment'] = True
+                payment.metadata['split_index'] = split_data['index']
+                payment.metadata['total_splits'] = len(processed_splits)
+                payment.save()
+                
+                created_payments.append(payment)
+            
+            # For M-Pesa payments in split, redirect to first M-Pesa payment for processing
+            mpesa_payments = [p for p in created_payments if p.payment_method.method_type == 'mpesa']
+            if mpesa_payments:
+                # Process non-M-Pesa payments as completed
+                for payment in created_payments:
+                    if payment.payment_method.method_type != 'mpesa':
+                        payment.status = 'completed'
+                        payment.completed_at = timezone.now()
+                        payment.save()
+                
+                # Store split payment info in session for M-Pesa processing
+                request.session['split_payment_ids'] = [p.payment_id for p in created_payments]
+                request.session['split_mpesa_remaining'] = len(mpesa_payments)
+                
+                # Redirect to first M-Pesa payment for processing
+                messages.info(request, f'Processing split payment: {len(mpesa_payments)} M-Pesa payment(s) require processing.')
+                return redirect(f'/business/{tenant_slug}/payments/{mpesa_payments[0].payment_id}/mpesa/')
+            
+            else:
+                # No M-Pesa payments, complete all immediately
+                for payment in created_payments:
+                    payment.status = 'completed'
+                    payment.completed_at = timezone.now()
+                    payment.save()
+                
+                # Update service order payment status if applicable
+                if service_order and hasattr(service_order, 'update_payment_status'):
+                    service_order.update_payment_status()
+                
+                messages.success(request, f'Split payment processed successfully! {len(created_payments)} payment records created.')
+                
+                # Redirect to service order receipt if fully paid
+                if service_order:
+                    return redirect(f'/business/{tenant_slug}/services/orders/{service_order.pk}/receipt/')
+                else:
+                    return redirect(f'/business/{tenant_slug}/payments/')
+                    
+    except Exception as e:
+        messages.error(request, f'Error processing split payment: {str(e)}')
+        logger.error(f"Split payment processing error: {e}")
+        return render(request, 'payments/process_payment.html', {
+            'service_order': service_order,
+            'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+            'title': 'Process Payment'
+        })
+
+
 @login_required
 @employee_required()
 def process_payment_view(request, order_id=None):
@@ -465,15 +645,25 @@ def process_payment_view(request, order_id=None):
         service_order = get_object_or_404(ServiceOrder, pk=order_id)
     
     if request.method == 'POST':
-        payment_method_id = request.POST.get('payment_method')
+        # Check if this is a split payment
+        split_methods = request.POST.getlist('split_methods[]')
+        split_amounts = request.POST.getlist('split_amounts[]')
+        is_split_payment = bool(split_methods and split_amounts)
         
-        if not payment_method_id:
-            messages.error(request, 'Please select a payment method.')
-            return render(request, 'payments/process_payment.html', {
-                'service_order': service_order,
-                'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
-                'title': 'Process Payment'
-            })
+        if is_split_payment:
+            # Handle split payment processing
+            return handle_split_payment(request, service_order, split_methods, split_amounts)
+        else:
+            # Handle single payment method
+            payment_method_id = request.POST.get('payment_method')
+            
+            if not payment_method_id:
+                messages.error(request, 'Please select a payment method.')
+                return render(request, 'payments/process_payment.html', {
+                    'service_order': service_order,
+                    'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                    'title': 'Process Payment'
+                })
             
         payment_method = get_object_or_404(PaymentMethod, id=payment_method_id)
         

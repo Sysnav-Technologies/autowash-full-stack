@@ -152,47 +152,54 @@ def auto_link_inventory_expenses():
 def auto_link_salary_expenses():
     """
     Automatically create expenses for employee salary payments
+    
+    NOTE: This task is disabled because SalaryPayment model doesn't exist.
+    This prevents duplicate expense/payment creation issues.
     """
-    try:
-        from apps.employees.models import SalaryPayment
-        from .views import create_salary_expense
-        
-        # Get unlinked salary payments from the last 30 days
-        cutoff_date = timezone.now().date() - timezone.timedelta(days=30)
-        
-        payments = SalaryPayment.objects.filter(
-            linked_expense_id__isnull=True,
-            pay_date__gte=cutoff_date,
-            status='paid',
-            amount__gt=0
-        )
-        
-        created_count = 0
-        for payment in payments:
-            expense = create_salary_expense(
-                payment.employee,
-                payment.amount,
-                payment.pay_date
-            )
-            if expense:
-                payment.linked_expense_id = expense.id
-                payment.save()
-                created_count += 1
-                
-                logger.info(
-                    f"Created salary expense: {expense.title} "
-                    f"for ${expense.total_amount}"
-                )
-        
-        logger.info(f"Auto-linked {created_count} salary expenses")
-        return created_count
-        
-    except ImportError:
-        logger.warning("Employees app not available for auto-linking")
-        return 0
-    except Exception as e:
-        logger.error(f"Error auto-linking salary expenses: {e}")
-        return 0
+    logger.warning("Auto-link salary expenses task is disabled - SalaryPayment model not found")
+    return 0
+    
+    # COMMENTED OUT - Only enable after creating SalaryPayment model
+    # try:
+    #     from apps.employees.models import SalaryPayment
+    #     from .views import create_salary_expense
+    #     
+    #     # Get unlinked salary payments from the last 30 days
+    #     cutoff_date = timezone.now().date() - timezone.timedelta(days=30)
+    #     
+    #     payments = SalaryPayment.objects.filter(
+    #         linked_expense_id__isnull=True,
+    #         pay_date__gte=cutoff_date,
+    #         status='paid',
+    #         amount__gt=0
+    #     )
+    #     
+    #     created_count = 0
+    #     for payment in payments:
+    #         expense = create_salary_expense(
+    #             payment.employee,
+    #             payment.amount,
+    #             payment.pay_date
+    #         )
+    #         if expense:
+    #             payment.linked_expense_id = expense.id
+    #             payment.save()
+    #             created_count += 1
+    #             
+    #             logger.info(
+    #                 f"Created salary expense: {expense.title} "
+    #                 f"for ${expense.total_amount}"
+    #             )
+    #     
+    #     logger.info(f"Auto-linked {created_count} salary expenses")
+    #     return created_count
+    #     
+    # except ImportError:
+    #     logger.warning("Employees app not available for auto-linking")
+    #     return 0
+    # except Exception as e:
+    #     logger.error(f"Error auto-linking salary expenses: {e}")
+    #     return 0
 
 
 @shared_task

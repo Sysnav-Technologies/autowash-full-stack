@@ -910,33 +910,40 @@ def auto_link_inventory_expenses(request):
 @require_POST
 def auto_link_salary_expenses(request):
     """Link employee salaries to expenses"""
-    try:
-        from apps.employees.models import Employee, SalaryPayment
-        
-        # Get unlinked salary payments
-        payments = SalaryPayment.objects.filter(
-            linked_expense_id__isnull=True,
-            status='paid'
-        )
-        
-        created_count = 0
-        for payment in payments:
-            expense = create_salary_expense(
-                payment.employee,
-                payment.amount,
-                payment.pay_date
-            )
-            if expense:
-                payment.linked_expense_id = expense.id
-                payment.save()
-                created_count += 1
-        
-        messages.success(request, f'{created_count} salary expenses created.')
-        
-    except Exception as e:
-        messages.error(request, f'Error linking salary expenses: {e}')
     
+    # NOTE: This feature is disabled because SalaryPayment model doesn't exist
+    # This prevents duplicate payment creation issues
+    messages.warning(request, 'Auto-linking of salary expenses is currently disabled to prevent duplicate records.')
     return tenant_redirect(request, 'expenses:dashboard')
+    
+    # COMMENTED OUT - Only enable after creating SalaryPayment model
+    # try:
+    #     from apps.employees.models import Employee, SalaryPayment
+    #     
+    #     # Get unlinked salary payments
+    #     payments = SalaryPayment.objects.filter(
+    #         linked_expense_id__isnull=True,
+    #         status='paid'
+    #     )
+    #     
+    #     created_count = 0
+    #     for payment in payments:
+    #         expense = create_salary_expense(
+    #             payment.employee,
+    #             payment.amount,
+    #             payment.pay_date
+    #         )
+    #         if expense:
+    #             payment.linked_expense_id = expense.id
+    #             payment.save()
+    #             created_count += 1
+    #     
+    #     messages.success(request, f'{created_count} salary expenses created.')
+    #     
+    # except Exception as e:
+    #     messages.error(request, f'Error linking salary expenses: {e}')
+    # 
+    # return tenant_redirect(request, 'expenses:dashboard')
 
 
 @employee_required()
