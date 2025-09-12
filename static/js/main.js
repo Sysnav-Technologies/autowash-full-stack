@@ -1,7 +1,13 @@
 /**
  * Main JavaScript Application - Clean Version
- * Handles sidebar functionality and core interactions
+ * Handles sidebar functionality and core interactions with smooth loading
  */
+
+// Global navigation state
+window.AutoWashNavigation = {
+    isNavigating: false,
+    loadingTimeout: null
+};
 
 $(document).ready(function() {
     initializeApp();
@@ -16,6 +22,196 @@ function initializeApp() {
     
     initializeSidebar();
     initializeDebugPanel();
+    initializeSmoothNavigation();
+}
+
+// ===============================
+// SMOOTH NAVIGATION SYSTEM
+// ===============================
+function initializeSmoothNavigation() {
+    // Create loading overlay
+    createLoadingOverlay();
+    
+    // Intercept navigation clicks
+    $(document).on('click', 'a[href]:not([href^="#"]):not([href^="javascript:"]):not([target="_blank"]):not(.no-smooth)', function(e) {
+        const href = $(this).attr('href');
+        const isDropdownToggle = $(this).hasClass('nav-dropdown-toggle') || $(this).attr('onclick');
+        
+        // Skip if it's a dropdown toggle or external link
+        if (isDropdownToggle || !href || href === '#' || href.startsWith('mailto:') || href.startsWith('tel:')) {
+            return true;
+        }
+        
+        // Check if it's the same page
+        const currentPath = window.location.pathname;
+        const linkPath = new URL(href, window.location.origin).pathname;
+        
+        if (currentPath === linkPath) {
+            return true; // Don't show loader for same page
+        }
+        
+        // Show smooth loading overlay
+        window.AutoWashNavigation.isNavigating = true;
+        showSmoothLoader();
+        
+        // Set a maximum loading time
+        if (window.AutoWashNavigation.loadingTimeout) {
+            clearTimeout(window.AutoWashNavigation.loadingTimeout);
+        }
+        
+        window.AutoWashNavigation.loadingTimeout = setTimeout(() => {
+            if (window.AutoWashNavigation.isNavigating) {
+                hideSmoothLoader();
+                window.AutoWashNavigation.isNavigating = false;
+            }
+        }, 5000);
+        
+        // Allow the navigation to proceed normally
+        return true;
+    });
+    
+    // Handle form submissions
+    $(document).on('submit', 'form:not(.no-smooth)', function(e) {
+        window.AutoWashNavigation.isNavigating = true;
+        showSmoothLoader();
+    });
+    
+    // Hide loader on page load completion
+    $(window).on('load', function() {
+        setTimeout(() => {
+            hideSmoothLoader();
+            window.AutoWashNavigation.isNavigating = false;
+        }, 150);
+    });
+    
+    // Also hide on DOM ready for faster perceived loading
+    $(document).ready(function() {
+        // Small delay to ensure all scripts are loaded
+        setTimeout(() => {
+            // Only hide if it's not a PWA startup and loader is showing
+            if ($('#smooth-loader').hasClass('active') && !document.getElementById('pwa-startup-loader')) {
+                hideSmoothLoader();
+                window.AutoWashNavigation.isNavigating = false;
+            }
+        }, 150);
+    });
+    
+    // Handle browser back/forward navigation
+    $(window).on('pageshow', function(event) {
+        if (event.originalEvent.persisted) {
+            // Page was loaded from cache, hide loader immediately
+            hideSmoothLoader();
+            window.AutoWashNavigation.isNavigating = false;
+        }
+    });
+    
+    // Handle visibility change (when user switches tabs)
+    $(document).on('visibilitychange', function() {
+        if (!document.hidden && $('#smooth-loader').hasClass('active')) {
+            // User came back to tab, hide loader if it's still showing
+            setTimeout(() => {
+                hideSmoothLoader();
+                window.AutoWashNavigation.isNavigating = false;
+            }, 200);
+        }
+    });
+}
+
+function createLoadingOverlay() {
+    if ($('#smooth-loader').length === 0) {
+        const loaderHTML = `
+            <div id="smooth-loader" class="smooth-loading-overlay">
+                <div class="smooth-loader-content">
+                    <div class="smooth-spinner-container">
+                        <div class="smooth-spinner">
+                            <img src="/static/img/logo.png" alt="AutoWash" class="smooth-logo-img">
+                        </div>
+                    </div>
+                    <div class="smooth-loader-text" id="smooth-loader-text">Loading...</div>
+                </div>
+            </div>
+        `;
+        $('body').append(loaderHTML);
+    }
+}
+
+// Array of loading messages for variety
+const loadingMessages = [
+    'Loading...',
+    'Preparing your dashboard...',
+    'Getting things ready...',
+    'Almost there...',
+    'Loading your data...'
+];
+
+let currentMessageIndex = 0;
+let loadingMessageInterval = null;
+
+function showSmoothLoader() {
+    // Don't show if PWA startup loader is already showing
+    if (document.getElementById('pwa-startup-loader')) {
+        return;
+    }
+    
+    const loader = $('#smooth-loader');
+    if (loader.length) {
+        // Clear any existing fade-out state
+        loader.removeClass('fade-out');
+        
+        loader.addClass('active');
+        $('body').addClass('loading');
+        
+        // Start cycling through loading messages
+        const loaderText = $('#smooth-loader-text');
+        currentMessageIndex = 0;
+        loaderText.text(loadingMessages[currentMessageIndex]);
+        
+        // Clear any existing interval
+        if (loadingMessageInterval) {
+            clearInterval(loadingMessageInterval);
+        }
+        
+        loadingMessageInterval = setInterval(() => {
+            currentMessageIndex = (currentMessageIndex + 1) % loadingMessages.length;
+            loaderText.fadeOut(200, function() {
+                $(this).text(loadingMessages[currentMessageIndex]).fadeIn(200);
+            });
+        }, 1500); // Slightly slower message changes
+        
+        // Add a subtle vibration for mobile
+        if ('vibrate' in navigator && window.innerWidth <= 768) {
+            navigator.vibrate(50);
+        }
+        
+        // Close any open dropdowns
+        $('.nav-dropdown').removeClass('open');
+        $('.sidebar-dropdown').removeClass('open');
+    }
+}
+
+function hideSmoothLoader() {
+    const loader = $('#smooth-loader');
+    if (loader.length && loader.hasClass('active')) {
+        // Add fade-out class for smooth animation
+        loader.addClass('fade-out');
+        
+        // Remove active class after animation starts
+        setTimeout(() => {
+            loader.removeClass('active');
+            $('body').removeClass('loading');
+            
+            // Remove fade-out class after animation completes
+            setTimeout(() => {
+                loader.removeClass('fade-out');
+            }, 300);
+        }, 100);
+        
+        // Clear loading message interval
+        if (loadingMessageInterval) {
+            clearInterval(loadingMessageInterval);
+            loadingMessageInterval = null;
+        }
+    }
 }
 
 // ===============================
@@ -96,9 +292,13 @@ function initializeSidebar() {
             
             // Only close for actual navigation links (not dropdown toggles)
             if (href && href !== '#' && !isDropdownToggle) {
+                // Close sidebar immediately for smooth navigation
                 sidebar.removeClass('mobile-open');
                 $('body').removeClass('sidebar-open');
                 localStorage.setItem('sidebar-mobile-open', 'false');
+                
+                // Show loading overlay
+                showSmoothLoader();
             }
         }
     });
@@ -141,6 +341,11 @@ function initializeSidebarDropdowns() {
 
 // Dropdown toggle function (called from HTML)
 function toggleDropdown(dropdownId) {
+    // Skip if loading is active
+    if ($('body').hasClass('loading')) {
+        return false;
+    }
+    
     const dropdown = $('#' + dropdownId);
     const allDropdowns = $('.nav-dropdown');
     

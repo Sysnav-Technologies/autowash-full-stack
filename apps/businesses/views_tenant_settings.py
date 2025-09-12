@@ -21,14 +21,20 @@ from .models import BusinessAlert
 
 def get_or_create_tenant_settings(business):
     """Helper function to get or create tenant settings with current business info"""
+    # Get the actual tenant object if we have a simplified BusinessContext
+    if hasattr(business, 'id') and not hasattr(business, 'address_line_1'):
+        from apps.core.tenant_models import Tenant
+        # CRITICAL: Tenant model is in default database, use explicit database routing
+        business = Tenant.objects.using('default').get(id=business.id)
+    
     with tenant_context(business):
         # Format the full address from Address mixin fields
         address_parts = [
-            business.address_line_1,
-            business.address_line_2,
-            business.city,
-            business.state,
-            business.postal_code,
+            getattr(business, 'address_line_1', ''),
+            getattr(business, 'address_line_2', ''),
+            getattr(business, 'city', ''),
+            getattr(business, 'state', ''),
+            getattr(business, 'postal_code', ''),
         ]
         business_address = ', '.join([part for part in address_parts if part])
         
@@ -36,8 +42,8 @@ def get_or_create_tenant_settings(business):
             tenant_id=business.id,
             defaults={
                 'business_name': business.name,
-                'contact_phone': str(business.phone) if business.phone else '',
-                'contact_email': business.email or '',
+                'contact_phone': str(business.phone) if getattr(business, 'phone', None) else '',
+                'contact_email': getattr(business, 'email', '') or '',
                 'contact_address': business_address,
                 'default_currency': 'KES',
                 'timezone': 'Africa/Nairobi',
@@ -50,10 +56,10 @@ def get_or_create_tenant_settings(business):
             if not tenant_settings.business_name and business.name:
                 tenant_settings.business_name = business.name
                 updated = True
-            if not tenant_settings.contact_email and business.email:
+            if not tenant_settings.contact_email and getattr(business, 'email', None):
                 tenant_settings.contact_email = business.email
                 updated = True
-            if not tenant_settings.contact_phone and business.phone:
+            if not tenant_settings.contact_phone and getattr(business, 'phone', None):
                 tenant_settings.contact_phone = str(business.phone)
                 updated = True
             if not tenant_settings.contact_address and business_address:
@@ -433,6 +439,11 @@ def create_backup_api(request):
     business = request.business
     
     try:
+        # Convert BusinessContext to full Tenant object for backup operations
+        if hasattr(business, 'id') and not hasattr(business, 'database_config'):
+            from apps.core.tenant_models import Tenant
+            business = Tenant.objects.using('default').get(id=business.id)
+        
         import json
         data = json.loads(request.body)
         
@@ -476,6 +487,11 @@ def download_backup(request, backup_id):
     business = request.business
     
     try:
+        # Convert BusinessContext to full Tenant object for backup operations
+        if hasattr(business, 'id') and not hasattr(business, 'database_config'):
+            from apps.core.tenant_models import Tenant
+            business = Tenant.objects.using('default').get(id=business.id)
+        
         backup_manager = TenantBackupManager(business)
         return backup_manager.get_backup_download_response(backup_id)
     except Exception as e:
@@ -491,6 +507,11 @@ def delete_backup_api(request, backup_id):
     business = request.business
     
     try:
+        # Convert BusinessContext to full Tenant object for backup operations
+        if hasattr(business, 'id') and not hasattr(business, 'database_config'):
+            from apps.core.tenant_models import Tenant
+            business = Tenant.objects.using('default').get(id=business.id)
+        
         backup_manager = TenantBackupManager(business)
         success = backup_manager.delete_backup(backup_id)
         
