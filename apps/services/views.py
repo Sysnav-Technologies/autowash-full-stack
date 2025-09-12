@@ -263,14 +263,47 @@ def order_list_view(request):
     date_to = request.GET.get('date_to')
     search = request.GET.get('search')
     
+    # Clean up None values and empty strings
+    if status and status.lower() in ['none', '']:
+        status = None
+    if attendant_id and attendant_id.lower() in ['none', '']:
+        attendant_id = None
+    if date_from and date_from.lower() in ['none', '']:
+        date_from = None
+    if date_to and date_to.lower() in ['none', '']:
+        date_to = None
+    if search and search.lower() in ['none', '']:
+        search = None
+    
+    # Apply filters
     if status:
         orders = orders.filter(status=status)
+        
     if attendant_id:
-        orders = orders.filter(assigned_attendant_id=attendant_id)
+        try:
+            attendant_id_int = int(attendant_id)
+            orders = orders.filter(assigned_attendant_id=attendant_id_int)
+        except (ValueError, TypeError):
+            # Invalid attendant ID, ignore filter
+            attendant_id = None
+            
     if date_from:
-        orders = orders.filter(created_at__date__gte=date_from)
+        try:
+            from datetime import datetime
+            date_from_parsed = datetime.strptime(date_from, '%Y-%m-%d').date()
+            orders = orders.filter(created_at__date__gte=date_from_parsed)
+        except (ValueError, TypeError):
+            # Invalid date format, ignore filter
+            date_from = None
+            
     if date_to:
-        orders = orders.filter(created_at__date__lte=date_to)
+        try:
+            from datetime import datetime
+            date_to_parsed = datetime.strptime(date_to, '%Y-%m-%d').date()
+            orders = orders.filter(created_at__date__lte=date_to_parsed)
+        except (ValueError, TypeError):
+            # Invalid date format, ignore filter
+            date_to = None
     if search:
         orders = orders.filter(
             Q(order_number__icontains=search) |
@@ -300,19 +333,76 @@ def order_list_view(request):
     # Get attendants for filter
     from apps.employees.models import Employee
     attendants = Employee.objects.filter(
-        role__in=['attendant', 'supervisor', 'manager'],
+        role__in=['attendant', 'supervisor', 'manager', 'cleaner'],
         is_active=True
     )
     
-    # Statistics
+    # Statistics - focus on today's data with additional metrics
+    today = timezone.now().date()
+    
+    # Get ALL today's orders (unfiltered) for statistics using improved date filtering
+    # Method 1: Simple date filter
+    orders_date_filter = ServiceOrder.objects.filter(created_at__date=today)
+    
+    # Method 2: Datetime range filter (more precise for timezone issues)
+    from datetime import datetime
+    date_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    date_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    orders_datetime_filter = ServiceOrder.objects.filter(
+        created_at__gte=date_start, 
+        created_at__lte=date_end
+    )
+    
+    # Use whichever method finds more orders (same as businesses/utils.py)
+    if orders_datetime_filter.count() > orders_date_filter.count():
+        all_today_orders = orders_datetime_filter
+    else:
+        all_today_orders = orders_date_filter
+    # Revenue calculation for today (completely paid orders only)
+    today_revenue = Decimal('0.00')
+    try:
+        from apps.payments.models import Payment
+        
+        for order in all_today_orders.exclude(status='cancelled'):
+            # Get total payments for this order (excluding refunds)
+            total_payments = Payment.objects.filter(
+                service_order=order,
+                status__in=['completed', 'verified', 'paid', 'success']
+            ).exclude(
+                payment_type='refund'
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+            
+            # Check if order is completely paid
+            order_total = order.total_amount or Decimal('0.00')
+            if total_payments >= order_total:
+                today_revenue += order_total
+    except Exception as e:
+        # Fallback to completed orders total
+        today_revenue = all_today_orders.filter(status='completed').aggregate(
+            total=Sum('total_amount')
+        )['total'] or Decimal('0.00')
+    
+    # Calculate statistics breakdown
+    pending_count = all_today_orders.filter(status='pending').count()
+    in_progress_count = all_today_orders.filter(status='in_progress').count()
+    completed_count = all_today_orders.filter(status='completed').count()
+    
     stats = {
+        # Today's core metrics (unfiltered)
+        'total_orders_today': all_today_orders.count(),
+        'pending_orders': pending_count,
+        'in_progress_orders': in_progress_count,
+        'completed_today': completed_count,
+        'cancelled_today': all_today_orders.filter(status='cancelled').count(),
+        'today_revenue': today_revenue,
+        
+        # Overall metrics for context (filtered)
         'total_orders': orders.count(),
-        'pending_orders': orders.filter(status='pending').count(),
-        'in_progress_orders': orders.filter(status='in_progress').count(),
-        'completed_today': orders.filter(
-            status='completed',
-            actual_end_time__date=timezone.now().date()
-        ).count(),
+        'active_orders': orders.filter(status__in=['pending', 'in_progress']).count(),
+        
+        # Average metrics
+        'avg_order_value': today_revenue / max(all_today_orders.exclude(status='cancelled').count(), 1),
+        'completion_rate': (completed_count / max(all_today_orders.exclude(status='cancelled').count(), 1)) * 100,
     }
     
     context = {
@@ -321,11 +411,11 @@ def order_list_view(request):
         'stats': stats,
         'status_choices': ServiceOrder.STATUS_CHOICES,
         'current_filters': {
-            'status': status,
-            'attendant': attendant_id,
-            'date_from': date_from,
-            'date_to': date_to,
-            'search': search
+            'status': status or '',
+            'attendant': attendant_id or '',
+            'date_from': date_from or '',
+            'date_to': date_to or '',
+            'search': search or ''
         },
         'title': 'Service Orders'
     }
@@ -2907,16 +2997,40 @@ def daily_service_report(request):
     """Daily service report"""
     date = request.GET.get('date', timezone.now().date())
     
+    # Filter out cancelled orders
     orders = ServiceOrder.objects.filter(
         created_at__date=date
-    ).select_related('customer', 'vehicle', 'assigned_attendant')
+    ).exclude(status='cancelled').select_related('customer', 'vehicle', 'assigned_attendant')
+    
+    # Calculate revenue from completely paid orders only
+    total_revenue = Decimal('0.00')
+    
+    try:
+        from apps.payments.models import Payment
+        
+        for order in orders:
+            # Get total payments for this order (excluding refunds)
+            total_payments = Payment.objects.filter(
+                service_order=order,
+                status__in=['completed', 'verified', 'paid', 'success']
+            ).exclude(
+                payment_type='refund'
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+            
+            # Check if order is completely paid
+            order_total = order.total_amount or Decimal('0.00')
+            if total_payments >= order_total:
+                total_revenue += order_total
+    except:
+        # Fallback to completed orders if Payment model not available
+        total_revenue = orders.filter(status='completed').aggregate(
+            total=Sum('total_amount')
+        )['total'] or 0
     
     stats = {
         'total_orders': orders.count(),
         'completed_orders': orders.filter(status='completed').count(),
-        'total_revenue': orders.filter(status='completed').aggregate(
-            total=Sum('total_amount')
-        )['total'] or 0,
+        'total_revenue': total_revenue,
         'avg_service_time': orders.filter(
             status='completed',
             actual_start_time__isnull=False,
@@ -2943,22 +3057,91 @@ def service_performance_report(request):
     date_from = request.GET.get('date_from', (timezone.now() - timedelta(days=30)).date())
     date_to = request.GET.get('date_to', timezone.now().date())
     
-    # Employee performance
-    employee_performance = ServiceOrder.objects.filter(
+    # Employee performance - exclude cancelled orders
+    completed_orders = ServiceOrder.objects.filter(
         status='completed',
         actual_end_time__date__range=[date_from, date_to]
-    ).extra(
-        select={'duration_minutes': "TIMESTAMPDIFF(MINUTE, actual_start_time, actual_end_time)"}
-    ).values(
-        'assigned_attendant__employee_id',
-        'assigned_attendant__first_name',
-        'assigned_attendant__last_name'
-    ).annotate(
-        orders_completed=Count('id'),
-        total_revenue=Sum('total_amount'),
-        avg_rating=Avg('customer_rating'),
-        avg_service_time=Avg('duration_minutes')
-    ).order_by('-orders_completed')
+    ).exclude(status='cancelled')
+    
+    # Calculate revenue per employee from completely paid orders only
+    employee_performance = []
+    
+    try:
+        from apps.payments.models import Payment
+        
+        # Group by employee
+        employees = completed_orders.values(
+            'assigned_attendant__employee_id',
+            'assigned_attendant__first_name',
+            'assigned_attendant__last_name'
+        ).distinct()
+        
+        for emp in employees:
+            if not emp['assigned_attendant__employee_id']:
+                continue
+                
+            emp_orders = completed_orders.filter(
+                assigned_attendant__employee_id=emp['assigned_attendant__employee_id']
+            )
+            
+            # Calculate revenue from completely paid orders only
+            emp_revenue = Decimal('0.00')
+            for order in emp_orders:
+                # Get total payments for this order (excluding refunds)
+                total_payments = Payment.objects.filter(
+                    service_order=order,
+                    status__in=['completed', 'verified', 'paid', 'success']
+                ).exclude(
+                    payment_type='refund'
+                ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+                
+                # Check if order is completely paid
+                order_total = order.total_amount or Decimal('0.00')
+                if total_payments >= order_total:
+                    emp_revenue += order_total
+            
+            # Calculate other metrics
+            emp_performance = {
+                'assigned_attendant__employee_id': emp['assigned_attendant__employee_id'],
+                'assigned_attendant__first_name': emp['assigned_attendant__first_name'],
+                'assigned_attendant__last_name': emp['assigned_attendant__last_name'],
+                'orders_completed': emp_orders.count(),
+                'total_revenue': emp_revenue,
+                'avg_rating': emp_orders.aggregate(avg=Avg('customer_rating'))['avg'],
+            }
+            
+            # Calculate average service time
+            duration_orders = emp_orders.filter(
+                actual_start_time__isnull=False,
+                actual_end_time__isnull=False
+            ).extra(
+                select={'duration_minutes': "TIMESTAMPDIFF(MINUTE, actual_start_time, actual_end_time)"}
+            )
+            if duration_orders.exists():
+                avg_duration = duration_orders.aggregate(avg=Avg('duration_minutes'))['avg']
+                emp_performance['avg_service_time'] = avg_duration
+            else:
+                emp_performance['avg_service_time'] = None
+                
+            employee_performance.append(emp_performance)
+            
+        # Sort by orders completed
+        employee_performance.sort(key=lambda x: x['orders_completed'], reverse=True)
+        
+    except Exception as e:
+        # Fallback to simple aggregation if Payment model not available
+        employee_performance = completed_orders.extra(
+            select={'duration_minutes': "TIMESTAMPDIFF(MINUTE, actual_start_time, actual_end_time)"}
+        ).values(
+            'assigned_attendant__employee_id',
+            'assigned_attendant__first_name',
+            'assigned_attendant__last_name'
+        ).annotate(
+            orders_completed=Count('id'),
+            total_revenue=Sum('total_amount'),
+            avg_rating=Avg('customer_rating'),
+            avg_service_time=Avg('duration_minutes')
+        ).order_by('-orders_completed')
     
     context = {
         'employee_performance': employee_performance,

@@ -103,11 +103,55 @@ def get_completed_statuses():
 def get_revenue_eligible_statuses():
     """
     Get list of statuses that should be considered for revenue calculation.
+    Only non-cancelled orders should be eligible for revenue.
     
     Returns:
         List of status strings
     """
-    return ['completed', 'confirmed', 'in_progress', 'pending']
+    return ['completed', 'confirmed', 'in_progress', 'pending']  # Exclude cancelled
+
+def get_completely_paid_orders_for_date(date):
+    """
+    Get orders for a specific date that are completely paid (payment total >= order total).
+    
+    Args:
+        date: The date to filter by
+        
+    Returns:
+        List of order IDs that are completely paid
+    """
+    try:
+        # Import here to avoid circular imports
+        from django.db.models import Sum
+        
+        orders = get_orders_for_date(date)
+        if not orders:
+            return []
+        
+        # Exclude cancelled orders
+        orders = orders.exclude(status='cancelled')
+        
+        completely_paid_order_ids = []
+        
+        for order in orders:
+            # Get total payments for this order (excluding refunds)
+            Payment = apps.get_model('payments', 'Payment')
+            total_payments = Payment.objects.filter(
+                service_order=order,
+                status__in=['completed', 'verified']
+            ).exclude(
+                payment_type='refund'
+            ).aggregate(Sum('amount'))['amount__sum'] or 0
+            
+            # Check if order is completely paid
+            if total_payments >= (order.total_amount or 0):
+                completely_paid_order_ids.append(order.id)
+        
+        return completely_paid_order_ids
+        
+    except Exception as e:
+        logger.error(f"Error getting completely paid orders for date {date}: {e}")
+        return []
 
 def get_customers_for_date(date):
     """

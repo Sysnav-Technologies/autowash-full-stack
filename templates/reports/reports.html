@@ -177,14 +177,17 @@
                     {% if report_data.items %}
                     <tfoot class="table-secondary">
                         <tr>
-                            <th colspan="4">Summary</th>
+                            <th colspan="4">Summary (Active Orders Only)</th>
                             <th>{{ report_data.summary.total_orders|default:0 }} orders</th>
                             <th>{{ report_data.summary.paid_orders|default:0 }} paid</th>
                             <th colspan="2">
-                                <div>Revenue: <span class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</span></div>
+                                <div>Revenue (Paid): <span class="text-success">KES {{ report_data.summary.total_revenue|default:0|floatformat:2 }}</span></div>
                                 {% if report_data.summary.total_refunds > 0 %}
                                 <div>Refunds: <span class="text-danger">KES {{ report_data.summary.total_refunds|default:0|floatformat:2 }}</span></div>
                                 <div>Net Revenue: <span class="text-primary">KES {{ report_data.summary.net_revenue|default:0|floatformat:2 }}</span></div>
+                                {% endif %}
+                                {% if report_data.summary.cancelled_orders > 0 %}
+                                <div>Cancelled Orders: <span class="text-warning">{{ report_data.summary.cancelled_orders }} (KES {{ report_data.summary.cancelled_order_value|default:0|floatformat:2 }})</span></div>
                                 {% endif %}
                             </th>
                         </tr>
@@ -1120,7 +1123,7 @@
                 <table class="table table-bordered table-striped">
                     <thead class="table-primary">
                         <tr>
-                            <th>Customer</th>
+                            <th>Business</th>
                             <th>Subscription</th>
                             <th>Status</th>
                             <th>Orders Count</th>
@@ -1132,13 +1135,13 @@
                         {% for subscription in report_data.items %}
                         <tr>
                             <td>
-                                <div class="fw-bold">{{ subscription.customer.full_name }}</div>
-                                {% if subscription.customer.phone %}
-                                    <small class="text-muted">{{ subscription.customer.phone }}</small>
+                                <div class="fw-bold">{{ subscription.business.name|default:"Unknown Business" }}</div>
+                                {% if subscription.business.domain %}
+                                    <small class="text-muted">{{ subscription.business.domain }}</small>
                                 {% endif %}
                             </td>
                             <td>
-                                <div class="fw-bold">{{ subscription.plan_name|default:"Basic Plan" }}</div>
+                                <div class="fw-bold">{{ subscription.plan.name|default:"Basic Plan" }}</div>
                                 <small class="text-muted">Created: {{ subscription.created_at|date:"M d, Y" }}</small>
                             </td>
                             <td>

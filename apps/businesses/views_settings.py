@@ -204,16 +204,45 @@ def payment_settings_view(request):
         from django.db.models import Sum
         
         today = timezone.now().date()
+        
+        # Get payments for today (excluding refunds)
+        today_payments = Payment.objects.filter(
+            created_at__date=today,
+            status__in=['completed', 'verified']
+        ).exclude(payment_type='refund')
+        
+        # Calculate revenue from completely paid orders only
+        total_revenue_today = Decimal('0.00')
+        
+        try:
+            # Get all orders for today and check which are completely paid
+            from django.apps import apps
+            ServiceOrder = apps.get_model('services', 'ServiceOrder')
+            orders_today = ServiceOrder.objects.filter(
+                created_at__date=today
+            ).exclude(status='cancelled')
+            
+            for order in orders_today:
+                # Get total payments for this order (excluding refunds)
+                total_payments = Payment.objects.filter(
+                    service_order=order,
+                    status__in=['completed', 'verified']
+                ).exclude(
+                    payment_type='refund'
+                ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+                
+                # Check if order is completely paid
+                order_total = order.total_amount or Decimal('0.00')
+                if total_payments >= order_total:
+                    total_revenue_today += order_total
+        except:
+            # Fallback to simple payment sum if ServiceOrder not available
+            total_revenue_today = today_payments.aggregate(total=Sum('amount'))['total'] or 0
+        
         payment_stats = {
             'active_methods': PaymentMethod.objects.filter(is_active=True).count(),
-            'today_payments': Payment.objects.filter(
-                created_at__date=today,
-                status__in=['completed', 'verified']
-            ).count(),
-            'total_revenue_today': Payment.objects.filter(
-                created_at__date=today,
-                status__in=['completed', 'verified']
-            ).aggregate(total=Sum('amount'))['total'] or 0,
+            'today_payments': today_payments.count(),
+            'total_revenue_today': total_revenue_today,
         }
     except ImportError:
         payment_stats = {

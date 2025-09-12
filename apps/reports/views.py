@@ -244,41 +244,50 @@ class ReportsView(TemplateView):
             # Convert dates to datetime for proper filtering
             start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
             
-            # Get service orders created in the date range
-            service_orders = ServiceOrder.objects.select_related(
+            # Get all service orders created in the date range
+            all_orders = ServiceOrder.objects.filter(
+                created_at__range=[start_datetime, end_datetime]
+            )
+            
+            # Separate cancelled orders from active orders
+            cancelled_orders = all_orders.filter(status='cancelled')
+            active_orders = all_orders.exclude(status='cancelled').select_related(
                 'customer', 
                 'assigned_attendant', 
                 'vehicle'
-            ).filter(
-                created_at__range=[start_datetime, end_datetime]
             ).order_by('-created_at')
             
-            # Paginate service orders
-            paginator = Paginator(service_orders, 20)
+            # Paginate active service orders only
+            paginator = Paginator(active_orders, 20)
             orders_page = paginator.get_page(page)
             
-            # Get payments for these orders (regardless of when payment was made)
-            orders_with_payments = service_orders.filter(
-                payments__status__in=['completed', 'verified']
-            ).exclude(
-                payments__payment_type='refund'
-            ).distinct()
+            # Get COMPLETELY paid orders (where total payments >= order amount)
+            completely_paid_orders = []
+            for order in active_orders:
+                total_payments = Payment.objects.filter(
+                    service_order=order,
+                    status__in=['completed', 'verified']
+                ).exclude(payment_type='refund').aggregate(Sum('amount'))['amount__sum'] or 0
+                
+                if total_payments >= (order.total_amount or 0):
+                    completely_paid_orders.append(order.id)
             
-            # Calculate summary metrics based on orders created in the period
-            total_orders = service_orders.count()
-            paid_orders_count = orders_with_payments.count()
+            # Calculate summary metrics
+            total_active_orders = active_orders.count()
+            total_cancelled_orders = cancelled_orders.count()
+            completely_paid_count = len(completely_paid_orders)
             
-            # Revenue from payments for orders created in this period
-            total_revenue = Payment.objects.filter(
-                service_order__in=service_orders,
+            # Revenue ONLY from completely paid orders
+            revenue_from_paid_orders = Payment.objects.filter(
+                service_order__id__in=completely_paid_orders,
                 status__in=['completed', 'verified']
             ).exclude(
                 payment_type='refund'
             ).aggregate(Sum('amount'))['amount__sum'] or 0
             
-            # Track refunds separately for orders created in this period
+            # Track refunds separately for active orders in this period
             total_refunds = Payment.objects.filter(
-                service_order__in=service_orders,
+                service_order__in=active_orders,
                 payment_type='refund',
                 status__in=['completed', 'verified']
             ).aggregate(Sum('amount'))['amount__sum'] or 0
@@ -286,32 +295,35 @@ class ReportsView(TemplateView):
             # Also get refunds from PaymentRefund model
             from apps.payments.models import PaymentRefund
             refund_records = PaymentRefund.objects.filter(
-                original_payment__service_order__in=service_orders,
+                original_payment__service_order__in=active_orders,
                 status='completed'
             ).aggregate(Sum('amount'))['amount__sum'] or 0
             
             # Total refunds = refund payments + refund records
             total_refunds_combined = total_refunds + refund_records
             
-            # Net revenue = revenue - refunds
-            net_revenue = total_revenue - total_refunds_combined
+            # Net revenue = revenue from completely paid orders - refunds
+            net_revenue = revenue_from_paid_orders - total_refunds_combined
             
-            # Orders not yet paid
-            pending_orders = total_orders - paid_orders_count
+            # Orders not yet completely paid
+            pending_orders = total_active_orders - completely_paid_count
             
-            # Total order value (regardless of payment status)
-            total_order_value = service_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+            # Total order value for active orders only
+            total_order_value = active_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+            cancelled_order_value = cancelled_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
             
-            avg_order_value = total_order_value / max(total_orders, 1)
-            payment_completion_rate = (paid_orders_count / max(total_orders, 1)) * 100
+            avg_order_value = total_order_value / max(total_active_orders, 1)
+            payment_completion_rate = (completely_paid_count / max(total_active_orders, 1)) * 100
             
             # Debug information
             debug_info = {
-                'orders_created_count': total_orders,
-                'paid_orders_count': paid_orders_count,
-                'revenue_from_paid_orders': total_revenue,
+                'active_orders_count': total_active_orders,
+                'cancelled_orders_count': total_cancelled_orders,
+                'completely_paid_count': completely_paid_count,
+                'revenue_from_completely_paid': revenue_from_paid_orders,
                 'pending_orders': pending_orders,
                 'total_order_value': total_order_value,
+                'cancelled_order_value': cancelled_order_value,
                 'date_range': f"{start_date} to {end_date}",
                 'datetime_range': f"{start_datetime} to {end_datetime}",
                 'payment_completion_rate': payment_completion_rate,
@@ -321,15 +333,17 @@ class ReportsView(TemplateView):
             return {
                 'items': orders_page,
                 'summary': {
-                    'total_orders': total_orders,
-                    'total_revenue': total_revenue,
+                    'total_orders': total_active_orders,
+                    'cancelled_orders': total_cancelled_orders,
+                    'total_revenue': revenue_from_paid_orders,
                     'total_refunds': total_refunds_combined,
                     'net_revenue': net_revenue,
-                    'paid_orders': paid_orders_count,
+                    'paid_orders': completely_paid_count,
                     'pending_orders': pending_orders,
                     'avg_order_value': avg_order_value,
                     'payment_completion_rate': payment_completion_rate,
-                    'refund_rate': (total_refunds_combined / max(total_revenue, 1)) * 100,
+                    'refund_rate': (total_refunds_combined / max(revenue_from_paid_orders, 1)) * 100,
+                    'cancelled_order_value': cancelled_order_value,
                 },
                 'pagination': self._get_pagination_data(orders_page, paginator),
                 'debug_info': debug_info
@@ -408,27 +422,32 @@ class ReportsView(TemplateView):
             # Convert dates to datetime for proper filtering
             start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
             
-            # Get services with performance metrics based on orders created in the period
+            # Get services with performance metrics based on non-cancelled orders created in the period
             services = Service.objects.select_related('category').annotate(
-                # Count orders created in the period
+                # Count non-cancelled orders created in the period
                 orders_count=Count('order_items__order',
-                                 filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime])),
-                # Total order value for orders created in the period
+                                 filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime]) & 
+                                        ~Q(order_items__order__status='cancelled')),
+                # Total order value for non-cancelled orders created in the period
                 total_order_value=Sum('order_items__total_price',
-                                    filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime])),
-                # Revenue from payments for orders created in this period (regardless of when payment was made)
+                                    filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime]) & 
+                                           ~Q(order_items__order__status='cancelled')),
+                # Revenue ONLY from completely paid non-cancelled orders
                 actual_revenue=Sum('order_items__order__payments__amount',
                                  filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime],
                                          order_items__order__payments__status__in=['completed', 'verified']) &
-                                         ~Q(order_items__order__payments__payment_type='refund')),
-                # Count of paid orders created in the period
+                                         ~Q(order_items__order__payments__payment_type='refund') &
+                                         ~Q(order_items__order__status='cancelled')),
+                # Count of completely paid non-cancelled orders
                 paid_orders_count=Count('order_items__order__payments',
                                        distinct=True,
                                        filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime],
                                                order_items__order__payments__status__in=['completed', 'verified']) & 
-                                               ~Q(order_items__order__payments__payment_type='refund')),
+                                               ~Q(order_items__order__payments__payment_type='refund') &
+                                               ~Q(order_items__order__status='cancelled')),
                 avg_rating=Avg('order_items__rating',
-                             filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime]))
+                             filter=Q(order_items__order__created_at__range=[start_datetime, end_datetime]) & 
+                                    ~Q(order_items__order__status='cancelled'))
             ).filter(orders_count__gt=0).order_by('-actual_revenue', 'name')
             
             # Paginate services
@@ -471,28 +490,32 @@ class ReportsView(TemplateView):
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
-        # Get customers with their payment activity in the date range (excluding refunds)
+        # Get customers with their payment activity in the date range (excluding refunds and cancelled orders)
         customers = Customer.objects.annotate(
-            # Count payments made in the period (excluding refunds)
+            # Count payments made for non-cancelled orders in the period (excluding refunds)
             payments_count=Count('payments',
                                filter=Q(payments__completed_at__range=[start_datetime, end_datetime],
                                        payments__status__in=['completed', 'verified']) &
-                                       ~Q(payments__payment_type='refund')),
-            # Total amount actually paid (excluding refunds)
+                                       ~Q(payments__payment_type='refund') &
+                                       ~Q(payments__service_order__status='cancelled')),
+            # Total amount actually paid for non-cancelled orders (excluding refunds)
             customer_total_spent=Sum('payments__amount',
                           filter=Q(payments__completed_at__range=[start_datetime, end_datetime],
                                  payments__status__in=['completed', 'verified']) &
-                                 ~Q(payments__payment_type='refund')),
-            # Last payment date (excluding refunds)
+                                 ~Q(payments__payment_type='refund') &
+                                 ~Q(payments__service_order__status='cancelled')),
+            # Last payment date for non-cancelled orders (excluding refunds)
             last_payment=Max('payments__completed_at',
                            filter=Q(payments__completed_at__range=[start_datetime, end_datetime],
                                    payments__status__in=['completed', 'verified']) &
-                                   ~Q(payments__payment_type='refund')),
-            # Count of orders with payments (excluding refunds)
+                                   ~Q(payments__payment_type='refund') &
+                                   ~Q(payments__service_order__status='cancelled')),
+            # Count of non-cancelled orders with payments (excluding refunds)
             paid_orders_count=Count('service_orders__payments',
                                   filter=Q(service_orders__payments__completed_at__range=[start_datetime, end_datetime],
                                           service_orders__payments__status__in=['completed', 'verified']) &
-                                          ~Q(service_orders__payments__payment_type='refund'))
+                                          ~Q(service_orders__payments__payment_type='refund') &
+                                          ~Q(service_orders__status='cancelled'))
         ).order_by('-customer_total_spent')
         
         # Paginate customers
@@ -526,25 +549,29 @@ class ReportsView(TemplateView):
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
-        # Get employees with their performance metrics based on orders created in the period
+        # Get employees with their performance metrics based on non-cancelled orders created in the period
         employees = Employee.objects.select_related('department').annotate(
-            # Total orders assigned to employee that were created in the period
+            # Total non-cancelled orders assigned to employee that were created in the period
             total_orders_assigned=Count('assigned_orders',
-                                      filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime])),
-            # Revenue from payments for orders created in this period (regardless of when payment was made)
+                                      filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime]) &
+                                             ~Q(assigned_orders__status='cancelled')),
+            # Revenue ONLY from completely paid non-cancelled orders
             revenue_generated=Sum('assigned_orders__payments__amount',
                                 filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime],
                                         assigned_orders__payments__status__in=['completed', 'verified']) &
-                                        ~Q(assigned_orders__payments__payment_type='refund')),
-            # Orders created in period that have been paid
+                                        ~Q(assigned_orders__payments__payment_type='refund') &
+                                        ~Q(assigned_orders__status='cancelled')),
+            # Non-cancelled orders created in period that have been completely paid
             paid_orders_handled=Count('assigned_orders__payments',
                                     distinct=True,
                                     filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime],
                                             assigned_orders__payments__status__in=['completed', 'verified']) &
-                                            ~Q(assigned_orders__payments__payment_type='refund')),
-            # Total order value for orders created in period
+                                            ~Q(assigned_orders__payments__payment_type='refund') &
+                                            ~Q(assigned_orders__status='cancelled')),
+            # Total order value for non-cancelled orders created in period
             total_order_value=Sum('assigned_orders__total_amount',
-                                filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime])),
+                                filter=Q(assigned_orders__created_at__range=[start_datetime, end_datetime]) &
+                                       ~Q(assigned_orders__status='cancelled')),
             # Performance metrics
             payment_conversion_rate=Case(
                 When(total_orders_assigned__gt=0, 
@@ -763,12 +790,12 @@ class ReportsView(TemplateView):
         # Convert dates to datetime for proper filtering
         start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
         
-        # Get service orders created in the period
+        # Get non-cancelled service orders created in the period
         orders_in_period = ServiceOrder.objects.filter(
             created_at__range=[start_datetime, end_datetime]
-        )
+        ).exclude(status='cancelled')
         
-        # Get revenue from payments for orders created in this period (regardless of when payment was made)
+        # Get revenue ONLY from completely paid non-cancelled orders
         revenue = Payment.objects.filter(
             service_order__in=orders_in_period,
             status__in=['completed', 'verified']
@@ -1523,27 +1550,38 @@ class ReportsView(TemplateView):
             return {'error': f'Department data not available: {str(e)}', 'items': [], 'summary': {}}
     
     def _get_subscription_analysis_data(self, start_date, end_date, page):
-        """Get subscription analysis data based on subscriptions created and order activity in the period"""
+        """Get subscription analysis data based on subscriptions created and business activity in the period"""
         from django.core.paginator import Paginator
         
-        # Convert dates to datetime for proper filtering
-        start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
-        
         try:
-            # Get subscriptions with activity based on orders created in period
-            subscriptions = Subscription.objects.select_related('customer').annotate(
-                orders_count=Count('customer__serviceorder',
-                                 filter=Q(customer__serviceorder__created_at__range=[start_datetime, end_datetime])),
-                total_order_value=Sum('customer__serviceorder__total_amount',
-                                    filter=Q(customer__serviceorder__created_at__range=[start_datetime, end_datetime])),
-                revenue_from_payments=Sum('customer__serviceorder__payments__amount',
-                                        filter=Q(customer__serviceorder__created_at__range=[start_datetime, end_datetime],
-                                                customer__serviceorder__payments__status__in=['completed', 'verified']) &
-                                                ~Q(customer__serviceorder__payments__payment_type='refund'))
+            # Convert dates to datetime for proper filtering
+            start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
+            
+            # Get all service orders in the period (they're already in the current business context)
+            from apps.services.models import ServiceOrder
+            orders_in_period = ServiceOrder.objects.filter(
+                created_at__range=[start_datetime, end_datetime]
+            )
+            
+            # Calculate business activity metrics
+            total_orders = orders_in_period.count()
+            total_order_value = orders_in_period.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+            revenue_from_payments = Payment.objects.filter(
+                service_order__in=orders_in_period,
+                status__in=['completed', 'verified']
+            ).exclude(payment_type='refund').aggregate(Sum('amount'))['amount__sum'] or 0
+            
+            # Get subscriptions for this business from main database
+            current_business = getattr(self.request, 'tenant', None)
+            if not current_business:
+                return {'error': 'No business context available', 'items': [], 'summary': {}}
+                
+            subscriptions = Subscription.objects.using('default').select_related('business', 'plan').filter(
+                business_id=current_business.id
             ).filter(
                 Q(created_at__range=[start_datetime, end_datetime]) |
-                Q(orders_count__gt=0)
-            ).order_by('-revenue_from_payments')
+                Q(status='active')  # Include active subscriptions even if created earlier
+            ).order_by('-created_at')
             
             # Paginate subscriptions
             paginator = Paginator(subscriptions, 20)
@@ -1554,8 +1592,12 @@ class ReportsView(TemplateView):
             new_subscriptions = subscriptions.filter(created_at__range=[start_datetime, end_datetime]).count()
             active_subscriptions = subscriptions.filter(status='active').count()
             total_subscription_revenue = subscriptions.aggregate(Sum('amount'))['amount__sum'] or 0
-            total_order_revenue = sum(s.revenue_from_payments or 0 for s in subscriptions)
-            avg_orders_per_subscriber = sum(s.orders_count or 0 for s in subscriptions) / max(total_subscriptions, 1)
+            
+            # Add order metrics to each subscription (they all refer to the same business)
+            for subscription in subscriptions_page:
+                subscription.orders_count = total_orders
+                subscription.total_order_value = total_order_value
+                subscription.revenue_from_payments = revenue_from_payments
             
             return {
                 'items': subscriptions_page,
@@ -1564,8 +1606,9 @@ class ReportsView(TemplateView):
                     'new_subscriptions': new_subscriptions,
                     'active_subscriptions': active_subscriptions,
                     'total_subscription_revenue': total_subscription_revenue,
-                    'total_order_revenue': total_order_revenue,
-                    'avg_orders_per_subscriber': avg_orders_per_subscriber,
+                    'total_order_revenue': revenue_from_payments,
+                    'total_orders': total_orders,
+                    'total_order_value': total_order_value,
                 },
                 'pagination': self._get_pagination_data(subscriptions_page, paginator)
             }
@@ -1939,12 +1982,12 @@ class ReportsView(TemplateView):
             
             # For export, we want all items, not just the paginated ones - Updated to use order-based data
             if report_type == 'business_overview':
-                # Use service orders created in the period
+                # Use service orders created in the period with payment relationships
                 data['items'] = list(ServiceOrder.objects.select_related(
                     'customer', 
                     'assigned_attendant', 
                     'vehicle'
-                ).filter(
+                ).prefetch_related('payments').filter(
                     created_at__range=[start_datetime, end_datetime]
                 ).order_by('-created_at'))
             elif report_type == 'inventory':
@@ -2273,20 +2316,28 @@ class ReportsView(TemplateView):
             headers = ['Order Date', 'Order #', 'Customer', 'Vehicle', 'Total Amount', 'Payment Status']
             table_data = [headers]
             total_amount = 0
+            paid_orders_total = 0
             for item in items[:50]:  # Limit to 50 items for PDF
                 amount = float(item.total_amount or 0)
                 total_amount += amount
-                payment_status = 'Paid' if hasattr(item, 'payment_received') and item.payment_received else 'Unpaid'
+                
+                # Check if order has completed payments
+                has_payments = item.payments.filter(status__in=['completed', 'verified']).exclude(payment_type='refund').exists()
+                payment_status = 'Paid' if has_payments else 'Unpaid'
+                
+                if has_payments:
+                    paid_orders_total += amount
+                
                 table_data.append([
                     item.created_at.strftime('%Y-%m-%d') if item.created_at else 'N/A',
                     item.order_number if hasattr(item, 'order_number') else 'N/A',
                     item.customer.full_name if item.customer else 'N/A',
-                    f"{item.vehicle.make} {item.vehicle.model}" if item.vehicle else 'N/A',
+                    item.vehicle.registration_number if item.vehicle else 'N/A',
                     f"KES {amount:,.2f}",
                     payment_status
                 ])
-            # Add total row
-            table_data.append(['', '', '', 'TOTAL:', f"KES {total_amount:,.2f}", ''])
+            # Add total row showing paid orders total
+            table_data.append(['', '', '', 'TOTAL (Paid Orders):', f"KES {paid_orders_total:,.2f}", ''])
                 
         elif report_type == 'inventory':
             headers = ['Item Name', 'Category', 'Current Stock', 'Stock Value', 'Movements']
@@ -2770,22 +2821,31 @@ class ReportsView(TemplateView):
             return []
         
         if report_type == 'business_overview':
-            headers = ['Payment Date', 'Order #', 'Customer', 'Payment Method', 'Amount', 'Status']
+            headers = ['Order Date', 'Order #', 'Customer', 'Vehicle', 'Total Amount', 'Payment Status']
             table_data = [headers]
             total_amount = 0
+            paid_orders_total = 0
             for item in items:
-                amount = float(item.amount or 0)
+                amount = float(item.total_amount or 0)
                 total_amount += amount
+                
+                # Check if order has completed payments
+                has_payments = item.payments.filter(status__in=['completed', 'verified']).exclude(payment_type='refund').exists()
+                payment_status = 'Paid' if has_payments else 'Unpaid'
+                
+                if has_payments:
+                    paid_orders_total += amount
+                
                 table_data.append([
-                    item.completed_at.strftime('%Y-%m-%d') if item.completed_at else 'N/A',
-                    item.service_order.order_number if item.service_order else 'N/A',
-                    item.service_order.customer.full_name if item.service_order and item.service_order.customer else 'N/A',
-                    item.payment_method.name if item.payment_method else 'Cash',
+                    item.created_at.strftime('%Y-%m-%d') if item.created_at else 'N/A',
+                    item.order_number if hasattr(item, 'order_number') else 'N/A',
+                    item.customer.full_name if item.customer else 'N/A',
+                    item.vehicle.registration_number if item.vehicle else 'N/A',
                     amount,
-                    item.status.title()
+                    payment_status
                 ])
-            # Add total row
-            table_data.append(['', '', '', 'TOTAL:', total_amount, ''])
+            # Add total row showing paid orders total
+            table_data.append(['', '', '', 'TOTAL (Paid Orders):', paid_orders_total, ''])
                 
         elif report_type == 'inventory':
             headers = ['Item Name', 'Category', 'Current Stock', 'Unit Price', 'Stock Value', 'Movements']

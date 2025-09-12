@@ -317,52 +317,82 @@ def get_business_insights():
         Customer = apps.get_model('customers', 'Customer')
         insights['total_customers'] = Customer.objects.count()
         
-        # Service order metrics
+        # Service order metrics - exclude cancelled orders
         ServiceOrder = apps.get_model('services', 'ServiceOrder')
-        total_orders = ServiceOrder.objects.count()
+        total_orders = ServiceOrder.objects.exclude(status='cancelled').count()
         insights['total_orders'] = total_orders
         
-        # Average order value - Use ServiceOrder data primarily
+        # Average order value - Calculate from completely paid orders only
         if total_orders > 0:
-            # Try to get from completed service orders first
-            completed_orders_revenue = ServiceOrder.objects.filter(
-                status='completed'
-            ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+            # Get all non-cancelled orders
+            all_orders = ServiceOrder.objects.exclude(status='cancelled')
             
-            # Also try payments as backup
+            # Calculate revenue from completely paid orders only
+            total_revenue = Decimal('0.00')
+            completely_paid_count = 0
+            
             try:
                 Payment = apps.get_model('payments', 'Payment')
-                payment_revenue = Payment.objects.filter(
-                    status__in=['completed', 'paid', 'success']
-                ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
                 
-                # Use the higher value
-                total_revenue = max(completed_orders_revenue, payment_revenue)
-            except:
-                total_revenue = completed_orders_revenue
+                for order in all_orders:
+                    # Get total payments for this order (excluding refunds)
+                    total_payments = Payment.objects.filter(
+                        service_order=order,
+                        status__in=['completed', 'verified', 'paid', 'success']
+                    ).exclude(
+                        payment_type='refund'
+                    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+                    
+                    # Check if order is completely paid
+                    order_total = order.total_amount or Decimal('0.00')
+                    if total_payments >= order_total:
+                        total_revenue += order_total
+                        completely_paid_count += 1
+                        
+            except Exception as e:
+                # Fallback to completed orders if Payment model not available
+                total_revenue = ServiceOrder.objects.filter(
+                    status='completed'
+                ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+                completely_paid_count = total_orders
             
-            if total_orders > 0:
-                insights['average_order_value'] = total_revenue / total_orders
+            if completely_paid_count > 0:
+                insights['average_order_value'] = total_revenue / completely_paid_count
         
-        # Monthly revenue - Use ServiceOrder data primarily
+        # Monthly revenue - Calculate from completely paid orders only
         current_month_start = timezone.now().replace(day=1).date()
-        monthly_orders_revenue = ServiceOrder.objects.filter(
-            created_at__date__gte=current_month_start,
-            status='completed'
-        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+        monthly_orders = ServiceOrder.objects.filter(
+            created_at__date__gte=current_month_start
+        ).exclude(status='cancelled')
         
-        # Also try payments as backup
+        # Calculate monthly revenue from completely paid orders only
+        monthly_revenue = Decimal('0.00')
+        
         try:
             Payment = apps.get_model('payments', 'Payment')
-            monthly_payments_revenue = Payment.objects.filter(
-                created_at__date__gte=current_month_start,
-                status__in=['completed', 'paid', 'success']
-            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
             
-            # Use the higher value
-            insights['monthly_revenue'] = max(monthly_orders_revenue, monthly_payments_revenue)
-        except:
-            insights['monthly_revenue'] = monthly_orders_revenue
+            for order in monthly_orders:
+                # Get total payments for this order (excluding refunds)
+                total_payments = Payment.objects.filter(
+                    service_order=order,
+                    status__in=['completed', 'verified', 'paid', 'success']
+                ).exclude(
+                    payment_type='refund'
+                ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+                
+                # Check if order is completely paid
+                order_total = order.total_amount or Decimal('0.00')
+                if total_payments >= order_total:
+                    monthly_revenue += order_total
+                    
+        except Exception as e:
+            # Fallback to completed orders if Payment model not available
+            monthly_revenue = ServiceOrder.objects.filter(
+                created_at__date__gte=current_month_start,
+                status='completed'
+            ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+        
+        insights['monthly_revenue'] = monthly_revenue
         
         # Top services
         Service = apps.get_model('services', 'Service')
@@ -532,9 +562,6 @@ def update_daily_metrics(metrics, user=None):
     
     # Service metrics - use utility functions
     try:
-        # Debug order data for today
-        debug_order_data(today, "Service Metrics")
-        
         # Get all orders for today
         service_orders_today = get_orders_for_date(today)
         if service_orders_today is None:
@@ -544,6 +571,16 @@ def update_daily_metrics(metrics, user=None):
         total_services = service_orders_today.count()
         metrics.total_services = total_services
         logger.info(f"DEBUG: Total services today: {total_services}")
+        
+        # Debug: Show all order statuses for today
+        if service_orders_today.exists():
+            status_breakdown = {}
+            for order in service_orders_today:
+                status = order.status
+                status_breakdown[status] = status_breakdown.get(status, 0) + 1
+            logger.info(f"DEBUG: Order status breakdown: {status_breakdown}")
+        else:
+            logger.info("DEBUG: No orders found for today")
         
         # Count completed services (including 'confirmed' status)
         completed_statuses = get_completed_statuses()
@@ -577,50 +614,52 @@ def update_daily_metrics(metrics, user=None):
     try:
         # Get revenue-eligible orders for today
         revenue_statuses = get_revenue_eligible_statuses()
-        revenue_orders_today = get_orders_for_date(today, status_filter=revenue_statuses)
+        # Calculate revenue from completely paid orders only (excluding cancelled)
+        revenue_orders_today = get_orders_for_date(today)
         
         if revenue_orders_today is None:
-            logger.error("DEBUG: Could not get revenue orders for today")
+            logger.error("DEBUG: Could not get orders for today")
             return
         
-        logger.info(f"DEBUG: Found {revenue_orders_today.count()} revenue-eligible orders (statuses: {revenue_statuses})")
+        # Exclude cancelled orders
+        revenue_orders_today = revenue_orders_today.exclude(status='cancelled')
+        logger.info(f"DEBUG: Found {revenue_orders_today.count()} non-cancelled orders")
         
-        # Calculate revenue from orders
-        order_revenue = revenue_orders_today.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
-        logger.info(f"DEBUG: Revenue from orders: {order_revenue}")
+        # Calculate revenue from completely paid orders only
+        gross_revenue = Decimal('0.00')
+        completely_paid_count = 0
         
-        # Also get all orders regardless of status to compare
-        all_orders_today = get_orders_for_date(today)
-        if all_orders_today:
-            all_orders_revenue = all_orders_today.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
-            logger.info(f"DEBUG: Revenue from ALL orders today (any status): {all_orders_revenue}")
-        else:
-            all_orders_revenue = Decimal('0.00')
+        for order in revenue_orders_today:
+            # Get total payments for this order (excluding refunds)
+            Payment = apps.get_model('payments', 'Payment')
+            total_payments = Payment.objects.filter(
+                service_order=order,
+                status__in=['completed', 'verified', 'paid', 'success']
+            ).exclude(
+                payment_type='refund'
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+            
+            # Check if order is completely paid
+            order_total = order.total_amount or Decimal('0.00')
+            if total_payments >= order_total:
+                gross_revenue += order_total
+                completely_paid_count += 1
         
-        # Use the higher value
-        gross_revenue = max(order_revenue, all_orders_revenue)
-        logger.info(f"DEBUG: Using gross revenue: {gross_revenue}")
+        logger.info(f"DEBUG: Revenue from {completely_paid_count} completely paid orders: {gross_revenue}")
         metrics.gross_revenue = gross_revenue
         
-        # Also try to get from payments if they exist
+        # Payment method breakdown from all payments today (excluding refunds)
         try:
-            payments_today = get_payments_for_date(today, status_filter=['completed', 'paid', 'success'])
+            Payment = apps.get_model('payments', 'Payment')
+            payments_today = Payment.objects.filter(
+                created_at__date=today,
+                status__in=['completed', 'verified', 'paid', 'success']
+            ).exclude(payment_type='refund')
             
-            if payments_today:
-                logger.info(f"DEBUG: Found {payments_today.count()} payments for revenue")
+            if payments_today.exists():
+                logger.info(f"DEBUG: Found {payments_today.count()} payments for breakdown")
                 
-                payment_revenue = payments_today.aggregate(
-                    total=Sum('amount')
-                )['total'] or Decimal('0.00')
-                
-                logger.info(f"DEBUG: Payment revenue: {payment_revenue}")
-                
-                # Use the higher value between order revenue and payment revenue
-                final_revenue = max(gross_revenue, payment_revenue)
-                metrics.gross_revenue = final_revenue
-                logger.info(f"DEBUG: Final gross revenue: {final_revenue}")
-                
-                # Payment method breakdown - fix the field lookup
+                # Payment method breakdown
                 cash_payments = payments_today.filter(payment_method='cash').aggregate(
                     total=Sum('amount')
                 )['total'] or Decimal('0.00')
@@ -638,28 +677,32 @@ def update_daily_metrics(metrics, user=None):
                     # Try case-insensitive matching for common variations
                     for payment in payments_today:
                         method = str(payment.payment_method).lower() if payment.payment_method else ''
+                        amount = payment.amount or Decimal('0.00')
                         if 'cash' in method:
-                            cash_payments += payment.amount or Decimal('0.00')
+                            cash_payments += amount
                         elif 'card' in method or 'visa' in method or 'mastercard' in method:
-                            card_payments += payment.amount or Decimal('0.00')
+                            card_payments += amount
                         elif 'mpesa' in method or 'mobile' in method:
-                            mpesa_payments += payment.amount or Decimal('0.00')
+                            mpesa_payments += amount
                         else:
                             # Default unknown payments to mpesa
-                            mpesa_payments += payment.amount or Decimal('0.00')
+                            mpesa_payments += amount
                 
                 metrics.cash_payments = cash_payments
                 metrics.card_payments = card_payments
                 metrics.mpesa_payments = mpesa_payments
             else:
                 logger.info("DEBUG: No payments found for today")
+                metrics.cash_payments = Decimal('0.00')
+                metrics.card_payments = Decimal('0.00') 
+                metrics.mpesa_payments = Decimal('0.00')
                 
         except Exception as e:
             logger.error(f"DEBUG: Error getting payment data: {e}")
-            # If payments table doesn't work, just use order totals
+            # If payments table doesn't work, set defaults
             metrics.cash_payments = Decimal('0.00')
             metrics.card_payments = Decimal('0.00') 
-            metrics.mpesa_payments = gross_revenue  # Assume all is mpesa if no payment breakdown
+            metrics.mpesa_payments = Decimal('0.00')
         
     except Exception as e:
         logger.error(f"DEBUG: Error in revenue calculation: {e}")
@@ -761,8 +804,10 @@ def update_daily_metrics(metrics, user=None):
     logger.info("=== DEBUG: Finished update_daily_metrics ===\n")
 
 def get_pending_dashboard_items(employee, request):
-    """Get pending items that need attention"""
+    """Get pending items that need attention - focused on today's items"""
     from django.apps import apps
+    
+    today = timezone.now().date()
     
     pending_items = {
         'pending_orders': 0,
@@ -777,38 +822,41 @@ def get_pending_dashboard_items(employee, request):
         # Get tenant slug from request since employee doesn't have business field in tenant system
         tenant_slug = request.tenant.slug
         
-        # Pending service orders
+        # Pending service orders - TODAY ONLY
         ServiceOrder = apps.get_model('services', 'ServiceOrder')
         pending_orders = ServiceOrder.objects.filter(
-            status='pending'
+            status='pending',
+            created_at__date=today
         ).count()
         pending_items['pending_orders'] = pending_orders
         
         if pending_orders > 0:
             pending_items['items'].append({
-                'title': f'{pending_orders} pending service orders',
+                'title': f'{pending_orders} pending orders today',
                 'created_at': timezone.now(),
                 'type': 'warning',
                 'icon': 'clock',
                 'url': f'/business/{tenant_slug}/services/orders/?status=pending'
             })
         
-        # Active queue items
+        # Active queue items - TODAY ONLY
         active_queue = ServiceOrder.objects.filter(
-            status='in_progress'
+            status='in_progress',
+            created_at__date=today
         ).count()
         pending_items['active_queue'] = active_queue
         
-        # Pending payments
+        # Pending payments - TODAY ONLY
         Payment = apps.get_model('payments', 'Payment')
         pending_payments = Payment.objects.filter(
-            status='pending'
+            status='pending',
+            created_at__date=today
         ).count()
         pending_items['pending_payments'] = pending_payments
         
         if pending_payments > 0:
             pending_items['items'].append({
-                'title': f'{pending_payments} pending payments',
+                'title': f'{pending_payments} pending payments today',
                 'created_at': timezone.now(),
                 'type': 'info',
                 'icon': 'credit-card',
