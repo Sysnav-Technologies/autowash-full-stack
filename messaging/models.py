@@ -157,7 +157,7 @@ class SMSMessage(models.Model):
     tenant_settings = models.ForeignKey(TenantSMSSettings, on_delete=models.CASCADE)
     recipient = models.CharField(max_length=20, help_text="Phone number with country code")
     message = models.TextField(help_text="SMS message content")
-    sender_id = models.CharField(max_length=11, blank=True, help_text="Sender ID override")
+    sender_id = models.CharField(max_length=20, blank=True, help_text="Sender ID override")
     
     # Status tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
