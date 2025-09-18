@@ -3167,10 +3167,34 @@ def test_tenant_sms(request, tenant_id):
         messages.error(request, f'No active SMS settings found for "{tenant.name}"')
         return redirect('system_admin:tenant_sms_settings')
     
+    # Prepare context first
+    context = {
+        'title': f'Test SMS - {tenant.name}',
+        'tenant': tenant,
+        'sms_settings': sms_settings,
+        'tenant_settings': sms_settings,  # For template compatibility
+    }
+    
     if request.method == 'POST':
         form = TestSMSForm(request.POST)
         if form.is_valid():
             try:
+                # First, let's check if the SMS settings are properly configured
+                if not sms_settings.is_active:
+                    messages.error(request, 'SMS settings are not active for this tenant.')
+                    context['form'] = form
+                    return render(request, 'system_admin/sms/test_sms.html', context)
+                
+                if not sms_settings.is_configured():
+                    messages.error(request, 'SMS provider is not properly configured. Please check credentials.')
+                    context['form'] = form
+                    return render(request, 'system_admin/sms/test_sms.html', context)
+                
+                if not sms_settings.can_send_sms():
+                    messages.error(request, f'Cannot send SMS. Daily usage: {sms_settings.daily_usage}/{sms_settings.daily_limit}, Monthly usage: {sms_settings.monthly_usage}/{sms_settings.monthly_limit}')
+                    context['form'] = form
+                    return render(request, 'system_admin/sms/test_sms.html', context)
+                
                 result = send_sms(
                     tenant_id=str(tenant_id),
                     recipient=form.cleaned_data['test_number'],
@@ -3181,7 +3205,7 @@ def test_tenant_sms(request, tenant_id):
                 if result:
                     messages.success(
                         request, 
-                        f'Test SMS sent successfully! Message ID: {result.id}'
+                        f'Test SMS sent successfully! Message ID: {result.id} | Status: {result.status}'
                     )
                 else:
                     messages.error(
@@ -3194,14 +3218,7 @@ def test_tenant_sms(request, tenant_id):
     else:
         form = TestSMSForm()
     
-    context = {
-        'title': f'Test SMS - {tenant.name}',
-        'tenant': tenant,
-        'sms_settings': sms_settings,
-        'tenant_settings': sms_settings,  # For template compatibility
-        'form': form,
-    }
-    
+    context['form'] = form
     return render(request, 'system_admin/sms/test_sms.html', context)
 
 
