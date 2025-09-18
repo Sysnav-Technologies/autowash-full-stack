@@ -48,25 +48,14 @@
                     {% endif %}
 
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <div class="form-group">
-                                <label for="{{ form.tenant_id.id_for_label }}" class="form-label">
-                                    Tenant <span class="text-danger">*</span>
-                                </label>
-                                {{ form.tenant_id }}
-                                {% if form.tenant_id.help_text %}
-                                    <small class="form-text text-muted">{{ form.tenant_id.help_text }}</small>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="{{ form.phone_number.id_for_label }}" class="form-label">
+                                <label for="{{ form.test_number.id_for_label }}" class="form-label">
                                     Phone Number <span class="text-danger">*</span>
                                 </label>
-                                {{ form.phone_number }}
-                                {% if form.phone_number.help_text %}
-                                    <small class="form-text text-muted">{{ form.phone_number.help_text }}</small>
+                                {{ form.test_number }}
+                                {% if form.test_number.help_text %}
+                                    <small class="form-text text-muted">{{ form.test_number.help_text }}</small>
                                 {% else %}
                                     <small class="form-text text-muted">Include country code (e.g., +254712345678)</small>
                                 {% endif %}
@@ -75,40 +64,18 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="{{ form.message.id_for_label }}" class="form-label">
+                        <label for="{{ form.test_message.id_for_label }}" class="form-label">
                             Test Message <span class="text-danger">*</span>
                         </label>
-                        {{ form.message }}
+                        {{ form.test_message }}
                         <div class="d-flex justify-content-between">
-                            {% if form.message.help_text %}
-                                <small class="form-text text-muted">{{ form.message.help_text }}</small>
+                            {% if form.test_message.help_text %}
+                                <small class="form-text text-muted">{{ form.test_message.help_text }}</small>
                             {% endif %}
                             <small class="form-text text-muted">
                                 <span id="messageCounter">0</span>/160 characters
                             </small>
                         </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="{{ form.sender_id.id_for_label }}" class="form-label">
-                            Sender ID (Optional)
-                        </label>
-                        {{ form.sender_id }}
-                        {% if form.sender_id.help_text %}
-                            <small class="form-text text-muted">{{ form.sender_id.help_text }}</small>
-                        {% else %}
-                            <small class="form-text text-muted">Leave blank to use provider default</small>
-                        {% endif %}
-                    </div>
-
-                    <div class="form-check">
-                        {{ form.test_delivery_report }}
-                        <label class="form-check-label" for="{{ form.test_delivery_report.id_for_label }}">
-                            Test delivery report functionality
-                        </label>
-                        <small class="form-text text-muted d-block">
-                            Check if the provider supports delivery reports
-                        </small>
                     </div>
                 </div>
 
@@ -238,7 +205,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Message character counter
-    const messageTextarea = document.getElementById('{{ form.message.id_for_label }}');
+    const messageTextarea = document.getElementById('{{ form.test_message.id_for_label }}');
     const messageCounter = document.getElementById('messageCounter');
     
     function updateCounter() {
@@ -253,41 +220,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    messageTextarea.addEventListener('input', updateCounter);
-    updateCounter();
+    if (messageTextarea) {
+        messageTextarea.addEventListener('input', updateCounter);
+        updateCounter();
+    }
     
     // Phone number formatting
-    const phoneInput = document.getElementById('{{ form.phone_number.id_for_label }}');
-    phoneInput.addEventListener('input', function() {
-        let value = this.value;
-        if (value && !value.startsWith('+')) {
-            this.value = '+' + value.replace(/^\+/, '');
-        }
-    });
+    const phoneInput = document.getElementById('{{ form.test_number.id_for_label }}');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function() {
+            let value = this.value;
+            if (value && !value.startsWith('+')) {
+                this.value = '+' + value.replace(/^\+/, '');
+            }
+        });
+    }
     
     // Form submission with loading state
     const form = document.getElementById('testSmsForm');
     const sendBtn = document.getElementById('sendBtn');
-    const originalBtnText = sendBtn.innerHTML;
     
-    form.addEventListener('submit', function() {
-        sendBtn.disabled = true;
-        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    if (form && sendBtn) {
+        const originalBtnText = sendBtn.innerHTML;
         
-        setTimeout(function() {
-            sendBtn.disabled = false;
-            sendBtn.innerHTML = originalBtnText;
-        }, 5000);
-    });
-    
-    // Auto-load tenant settings when tenant changes
-    const tenantSelect = document.getElementById('{{ form.tenant_id.id_for_label }}');
-    tenantSelect.addEventListener('change', function() {
-        if (this.value) {
-            // You can add AJAX call here to load tenant-specific settings
-            console.log('Loading settings for tenant:', this.value);
-        }
-    });
+        form.addEventListener('submit', function() {
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            
+            setTimeout(function() {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = originalBtnText;
+            }, 5000);
+        });
+    }
 });
 </script>
 

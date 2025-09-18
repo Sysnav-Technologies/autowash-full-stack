@@ -209,19 +209,27 @@ class TestSMSForm(forms.Form):
     
     test_number = forms.CharField(
         max_length=20,
+        required=True,
+        label="Phone Number",
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': '+254712345678'
+            'placeholder': '+254712345678',
+            'required': True
         }),
         help_text="Your phone number to receive the test SMS"
     )
     
     test_message = forms.CharField(
+        required=True,
+        label="Test Message",
         initial="This is a test message from Autowash SMS system.",
         widget=forms.Textarea(attrs={
             'class': 'form-control',
-            'rows': 3
-        })
+            'rows': 3,
+            'required': True,
+            'maxlength': 160
+        }),
+        help_text="Message content (max 160 characters for single SMS)"
     )
     
     def clean_test_number(self):
@@ -229,3 +237,9 @@ class TestSMSForm(forms.Form):
         if number and not number.startswith('+'):
             raise forms.ValidationError("Phone number must include country code (e.g., +254)")
         return number
+    
+    def clean_test_message(self):
+        message = self.cleaned_data.get('test_message')
+        if message and len(message) > 160:
+            raise forms.ValidationError("Message cannot exceed 160 characters for standard SMS")
+        return message

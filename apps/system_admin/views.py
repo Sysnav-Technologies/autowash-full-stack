@@ -3198,6 +3198,7 @@ def test_tenant_sms(request, tenant_id):
         'title': f'Test SMS - {tenant.name}',
         'tenant': tenant,
         'sms_settings': sms_settings,
+        'tenant_settings': sms_settings,  # For template compatibility
         'form': form,
     }
     
@@ -3370,3 +3371,82 @@ def sms_statistics(request):
     }
     
     return render(request, 'system_admin/sms/statistics.html', context)
+
+
+@login_required
+@staff_member_required
+def create_sms_template(request):
+    """Create a new SMS template"""
+    from messaging.models import SMSTemplate
+    
+    if request.method == 'POST':
+        try:
+            template = SMSTemplate.objects.create(
+                name=request.POST.get('name'),
+                description=request.POST.get('description', ''),
+                content=request.POST.get('content'),
+                category=request.POST.get('category', 'general'),
+                is_active=request.POST.get('is_active') == 'on',
+                created_by=request.user
+            )
+            
+            messages.success(request, f'SMS template "{template.name}" created successfully!')
+            return redirect('system_admin:sms_templates')
+            
+        except Exception as e:
+            messages.error(request, f'Error creating template: {str(e)}')
+            return redirect('system_admin:sms_templates')
+    
+    return redirect('system_admin:sms_templates')
+
+
+@login_required
+@staff_member_required
+def edit_sms_template(request, template_id):
+    """Edit an existing SMS template"""
+    from messaging.models import SMSTemplate
+    
+    try:
+        template = SMSTemplate.objects.get(id=template_id)
+    except SMSTemplate.DoesNotExist:
+        messages.error(request, 'SMS template not found!')
+        return redirect('system_admin:sms_templates')
+    
+    if request.method == 'POST':
+        try:
+            template.name = request.POST.get('name')
+            template.description = request.POST.get('description', '')
+            template.content = request.POST.get('content')
+            template.category = request.POST.get('category', 'general')
+            template.is_active = request.POST.get('is_active') == 'on'
+            template.save()
+            
+            messages.success(request, f'SMS template "{template.name}" updated successfully!')
+            return redirect('system_admin:sms_templates')
+            
+        except Exception as e:
+            messages.error(request, f'Error updating template: {str(e)}')
+            return redirect('system_admin:sms_templates')
+    
+    return redirect('system_admin:sms_templates')
+
+
+@login_required
+@staff_member_required
+def delete_sms_template(request, template_id):
+    """Delete an SMS template"""
+    from messaging.models import SMSTemplate
+    
+    try:
+        template = SMSTemplate.objects.get(id=template_id)
+        template_name = template.name
+        template.delete()
+        
+        messages.success(request, f'SMS template "{template_name}" deleted successfully!')
+        
+    except SMSTemplate.DoesNotExist:
+        messages.error(request, 'SMS template not found!')
+    except Exception as e:
+        messages.error(request, f'Error deleting template: {str(e)}')
+    
+    return redirect('system_admin:sms_templates')

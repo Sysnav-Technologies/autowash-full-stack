@@ -82,6 +82,9 @@ urlpatterns = [
     path('sms/tenant-settings/<uuid:tenant_id>/test/', views.test_tenant_sms, name='test_tenant_sms'),
     path('sms/messages/', views.sms_messages, name='sms_messages'),
     path('sms/templates/', views.sms_templates, name='sms_templates'),
+    path('sms/templates/create/', views.create_sms_template, name='create_sms_template'),
+    path('sms/templates/<int:template_id>/edit/', views.edit_sms_template, name='edit_sms_template'),
+    path('sms/templates/<int:template_id>/delete/', views.delete_sms_template, name='delete_sms_template'),
     path('sms/statistics/', views.sms_statistics, name='sms_statistics'),
     
     # Settings & Tools
