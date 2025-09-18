@@ -3172,21 +3172,21 @@ def test_tenant_sms(request, tenant_id):
         if form.is_valid():
             try:
                 result = send_sms(
-                    tenant_settings=sms_settings,
+                    tenant_id=str(tenant_id),
                     recipient=form.cleaned_data['test_number'],
                     message=form.cleaned_data['test_message'],
                     message_type='test'
                 )
                 
-                if result['success']:
+                if result:
                     messages.success(
                         request, 
-                        f'Test SMS sent successfully! Message ID: {result.get("message_id", "N/A")}'
+                        f'Test SMS sent successfully! Message ID: {result.id}'
                     )
                 else:
                     messages.error(
                         request, 
-                        f'Failed to send test SMS: {result.get("error", "Unknown error")}'
+                        'Failed to send test SMS: Unable to send message (check limits or configuration)'
                     )
                     
             except Exception as e:
