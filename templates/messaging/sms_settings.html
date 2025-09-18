@@ -1,0 +1,299 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}SMS Settings{% endblock %}
+
+{% block page_title %}SMS Settings{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/">Dashboard</a>
+</li>
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/messaging/">SMS Messages</a>
+</li>
+<li class="breadcrumb-item active">SMS Settings</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        {% if settings %}
+        <div class="card card-primary">
+            <div class="card-header">
+                <h3 class="card-title">Current SMS Configuration</h3>
+                <div class="card-tools">
+                    {% if not can_edit %}
+                    <span class="badge badge-info">Read Only</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>SMS Provider</label>
+                            <div class="form-control-plaintext">
+                                {% if settings.provider %}
+                                    {{ settings.provider.name }}
+                                    <span class="badge badge-{{ settings.provider.is_active|yesno:'success,secondary' }}">
+                                        {{ settings.provider.is_active|yesno:'Active,Inactive' }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">Not configured</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Provider Type</label>
+                            <div class="form-control-plaintext">
+                                {% if settings.provider %}
+                                    {{ settings.provider.get_provider_type_display }}
+                                {% else %}
+                                    <span class="text-muted">Not configured</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Default Sender ID</label>
+                            <div class="form-control-plaintext">
+                                {{ settings.default_sender_id|default:"Not set" }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Status</label>
+                            <div class="form-control-plaintext">
+                                <span class="badge badge-{{ settings.is_active|yesno:'success,secondary' }}">
+                                    {{ settings.is_active|yesno:'Active,Inactive' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Daily Limit</label>
+                            <div class="form-control-plaintext">
+                                {{ settings.daily_limit|default:"Unlimited" }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Monthly Limit</label>
+                            <div class="form-control-plaintext">
+                                {{ settings.monthly_limit|default:"Unlimited" }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Daily Usage</label>
+                            <div class="form-control-plaintext">
+                                <span class="badge badge-info">{{ settings.daily_usage }}</span>
+                                {% if settings.daily_limit %}
+                                    / {{ settings.daily_limit }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Configuration Date</label>
+                            <div class="form-control-plaintext">
+                                {{ settings.created_at|date:"M d, Y H:i" }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if settings.provider and settings.provider.webhook_url %}
+                <div class="row">
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label>Webhook URL</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" 
+                                       value="{{ settings.provider.webhook_url }}" readonly>
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-secondary copy-webhook" 
+                                            data-clipboard-text="{{ settings.provider.webhook_url }}">
+                                        <i class="fas fa-copy"></i> Copy
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">
+                                Configure this URL in your SMS provider's webhook settings
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if not can_edit %}
+            <div class="card-footer bg-light">
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    SMS configuration can only be modified by system administrators. 
+                    Contact your system admin to make changes to these settings.
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="card card-warning">
+            <div class="card-header">
+                <h3 class="card-title">SMS Not Configured</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h5><i class="icon fas fa-exclamation-triangle"></i> SMS service is not configured!</h5>
+                    Contact your system administrator to set up SMS functionality for your tenant.
+                </div>
+                
+                <div class="mt-4">
+                    <h6>What you can do:</h6>
+                    <ul>
+                        <li>Contact your system administrator</li>
+                        <li>Request SMS service activation</li>
+                        <li>Provide your preferred SMS provider details</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card card-info">
+            <div class="card-header">
+                <h3 class="card-title">Quick Actions</h3>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% if settings and settings.is_active %}
+                    <a href="/business/{{ request.tenant.slug }}/messaging/send/" class="list-group-item list-group-item-action">
+                        <i class="fas fa-paper-plane text-primary"></i>
+                        Send SMS Message
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/messaging/bulk/" class="list-group-item list-group-item-action">
+                        <i class="fas fa-broadcast-tower text-info"></i>
+                        Send Bulk SMS
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/messaging/test/" class="list-group-item list-group-item-action">
+                        <i class="fas fa-vial text-warning"></i>
+                        Test SMS Service
+                    </a>
+                    {% endif %}
+                    <a href="/business/{{ request.tenant.slug }}/messaging/" class="list-group-item list-group-item-action">
+                        <i class="fas fa-list text-secondary"></i>
+                        View SMS History
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/messaging/templates/" class="list-group-item list-group-item-action">
+                        <i class="fas fa-file-alt text-success"></i>
+                        Manage Templates
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        {% if settings and settings.is_active %}
+        <div class="card card-success">
+            <div class="card-header">
+                <h3 class="card-title">Usage Statistics</h3>
+            </div>
+            <div class="card-body" id="sms-stats">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin"></i> Loading...
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Initialize clipboard
+    var clipboard = new ClipboardJS('.copy-webhook');
+    
+    clipboard.on('success', function(e) {
+        $(e.trigger).find('i').removeClass('fa-copy').addClass('fa-check');
+        setTimeout(function() {
+            $(e.trigger).find('i').removeClass('fa-check').addClass('fa-copy');
+        }, 2000);
+    });
+    
+    // Load SMS statistics
+    {% if settings and settings.is_active %}
+    $.get('/business/{{ request.tenant.slug }}/messaging/api/statistics/')
+        .done(function(data) {
+            var html = '<div class="row">' +
+                '<div class="col-6 text-center">' +
+                '<div class="description-block border-right">' +
+                '<h5 class="description-header">' + data.total_messages + '</h5>' +
+                '<span class="description-text">TOTAL SENT</span>' +
+                '</div>' +
+                '</div>' +
+                '<div class="col-6 text-center">' +
+                '<div class="description-block">' +
+                '<h5 class="description-header">' + data.delivered + '</h5>' +
+                '<span class="description-text">DELIVERED</span>' +
+                '</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="row mt-3">' +
+                '<div class="col-6 text-center">' +
+                '<div class="description-block border-right">' +
+                '<h5 class="description-header">' + data.monthly_messages + '</h5>' +
+                '<span class="description-text">THIS MONTH</span>' +
+                '</div>' +
+                '</div>' +
+                '<div class="col-6 text-center">' +
+                '<div class="description-block">' +
+                '<h5 class="description-header">' + data.daily_usage + '</h5>' +
+                '<span class="description-text">TODAY</span>' +
+                '</div>' +
+                '</div>' +
+                '</div>';
+            
+            if (data.monthly_limit) {
+                var percentage = (data.monthly_messages / data.monthly_limit * 100).toFixed(1);
+                html += '<div class="progress mt-3">' +
+                    '<div class="progress-bar" style="width: ' + percentage + '%"></div>' +
+                    '</div>' +
+                    '<span class="description-text">' + percentage + '% of monthly limit used</span>';
+            }
+            
+            $('#sms-stats').html(html);
+        })
+        .fail(function() {
+            $('#sms-stats').html('<div class="alert alert-danger">Failed to load statistics</div>');
+        });
+    {% endif %}
+});
+</script>
+{% endblock %}

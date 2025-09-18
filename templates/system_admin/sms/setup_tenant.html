@@ -1,0 +1,310 @@
+{% extends 'system_admin/base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}SMS Setup - {{ tenant.name }} - System Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-cog text-primary"></i>
+            SMS Setup - {{ tenant.name }}
+        </h1>
+        <a href="{% url 'system_admin:tenant_sms_settings' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Tenant Settings
+        </a>
+    </div>
+
+    <!-- Tenant Info -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-left-info shadow">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="font-weight-bold text-info">Tenant Information</h6>
+                            <p><strong>Name:</strong> {{ tenant.name }}</p>
+                            <p><strong>Domain:</strong> {{ tenant.domain }}</p>
+                            <p><strong>ID:</strong> {{ tenant.id }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="font-weight-bold text-info">Current Status</h6>
+                            {% if sms_settings %}
+                                {% if sms_settings.is_active %}
+                                    <span class="badge badge-success">SMS Configured & Active</span>
+                                {% else %}
+                                    <span class="badge badge-warning">SMS Configured but Inactive</span>
+                                {% endif %}
+                                <p><strong>Provider:</strong> {{ sms_settings.provider.name }}</p>
+                            {% else %}
+                                <span class="badge badge-secondary">SMS Not Configured</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SMS Configuration Form -->
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">SMS Configuration</h6>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <!-- Basic Settings -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.provider.id_for_label }}" class="form-label">
+                                <strong>SMS Provider *</strong>
+                            </label>
+                            {{ form.provider|add_class:"form-select" }}
+                            {% if form.provider.errors %}
+                                <div class="text-danger">{{ form.provider.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <div class="form-check mt-4">
+                                {{ form.is_active|add_class:"form-check-input" }}
+                                <label for="{{ form.is_active.id_for_label }}" class="form-check-label">
+                                    <strong>Active</strong>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <div class="form-check mt-4">
+                                {{ form.use_autowash_billing|add_class:"form-check-input" }}
+                                <label for="{{ form.use_autowash_billing.id_for_label }}" class="form-check-label">
+                                    <strong>Use Autowash Billing</strong>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Host Pinnacle Settings -->
+                <div id="host-pinnacle-settings" class="provider-settings">
+                    <h5 class="text-primary mb-3">
+                        <i class="fab fa-whatsapp"></i> Host Pinnacle WhatsApp Settings
+                    </h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.hp_instance_id.id_for_label }}" class="form-label">Instance ID</label>
+                                {{ form.hp_instance_id|add_class:"form-control" }}
+                                {% if form.hp_instance_id.errors %}
+                                    <div class="text-danger">{{ form.hp_instance_id.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.hp_webhook_url.id_for_label }}" class="form-label">Webhook URL</label>
+                                {{ form.hp_webhook_url|add_class:"form-control" }}
+                                {% if form.hp_webhook_url.errors %}
+                                    <div class="text-danger">{{ form.hp_webhook_url.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="{{ form.hp_access_token.id_for_label }}" class="form-label">Access Token</label>
+                                {{ form.hp_access_token|add_class:"form-control" }}
+                                {% if form.hp_access_token.errors %}
+                                    <div class="text-danger">{{ form.hp_access_token.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Africa's Talking Settings -->
+                <div id="africas-talking-settings" class="provider-settings">
+                    <h5 class="text-warning mb-3">
+                        <i class="fas fa-globe-africa"></i> Africa's Talking Settings
+                    </h5>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.at_username.id_for_label }}" class="form-label">Username</label>
+                                {{ form.at_username|add_class:"form-control" }}
+                                {% if form.at_username.errors %}
+                                    <div class="text-danger">{{ form.at_username.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.at_api_key.id_for_label }}" class="form-label">API Key</label>
+                                {{ form.at_api_key|add_class:"form-control" }}
+                                {% if form.at_api_key.errors %}
+                                    <div class="text-danger">{{ form.at_api_key.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.at_sender_id.id_for_label }}" class="form-label">Sender ID</label>
+                                {{ form.at_sender_id|add_class:"form-control" }}
+                                {% if form.at_sender_id.errors %}
+                                    <div class="text-danger">{{ form.at_sender_id.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Twilio Settings -->
+                <div id="twilio-settings" class="provider-settings">
+                    <h5 class="text-info mb-3">
+                        <i class="fas fa-phone"></i> Twilio Settings
+                    </h5>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.twilio_account_sid.id_for_label }}" class="form-label">Account SID</label>
+                                {{ form.twilio_account_sid|add_class:"form-control" }}
+                                {% if form.twilio_account_sid.errors %}
+                                    <div class="text-danger">{{ form.twilio_account_sid.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.twilio_auth_token.id_for_label }}" class="form-label">Auth Token</label>
+                                {{ form.twilio_auth_token|add_class:"form-control" }}
+                                {% if form.twilio_auth_token.errors %}
+                                    <div class="text-danger">{{ form.twilio_auth_token.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="{{ form.twilio_phone_number.id_for_label }}" class="form-label">Phone Number</label>
+                                {{ form.twilio_phone_number|add_class:"form-control" }}
+                                {% if form.twilio_phone_number.errors %}
+                                    <div class="text-danger">{{ form.twilio_phone_number.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usage Limits -->
+                <h5 class="text-secondary mb-3">
+                    <i class="fas fa-chart-bar"></i> Usage Limits
+                </h5>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.daily_limit.id_for_label }}" class="form-label">Daily SMS Limit</label>
+                            {{ form.daily_limit|add_class:"form-control" }}
+                            <small class="form-text text-muted">Leave empty for unlimited</small>
+                            {% if form.daily_limit.errors %}
+                                <div class="text-danger">{{ form.daily_limit.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.monthly_limit.id_for_label }}" class="form-label">Monthly SMS Limit</label>
+                            {{ form.monthly_limit|add_class:"form-control" }}
+                            <small class="form-text text-muted">Leave empty for unlimited</small>
+                            {% if form.monthly_limit.errors %}
+                                <div class="text-danger">{{ form.monthly_limit.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'system_admin:tenant_sms_settings' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                            <div>
+                                {% if sms_settings and sms_settings.is_active %}
+                                    <a href="{% url 'system_admin:test_tenant_sms' tenant.id %}" class="btn btn-info me-2">
+                                        <i class="fas fa-paper-plane"></i> Test SMS
+                                    </a>
+                                {% endif %}
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Save Configuration
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleProviderFields() {
+    const providerSelect = document.getElementById('id_provider');
+    const selectedOption = providerSelect.options[providerSelect.selectedIndex];
+    const selectedText = selectedOption.text.toLowerCase();
+    
+    // Hide all provider settings
+    document.querySelectorAll('.provider-settings').forEach(function(el) {
+        el.style.display = 'none';
+    });
+    
+    // Show relevant provider settings
+    if (selectedText.includes('host pinnacle') || selectedText.includes('whatsapp')) {
+        document.getElementById('host-pinnacle-settings').style.display = 'block';
+    } else if (selectedText.includes('africa')) {
+        document.getElementById('africas-talking-settings').style.display = 'block';
+    } else if (selectedText.includes('twilio')) {
+        document.getElementById('twilio-settings').style.display = 'block';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleProviderFields();
+    
+    // Add event listener for provider change
+    const providerSelect = document.getElementById('id_provider');
+    if (providerSelect) {
+        providerSelect.addEventListener('change', toggleProviderFields);
+    }
+});
+</script>
+
+<style>
+.provider-settings {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #6c757d;
+}
+
+#host-pinnacle-settings {
+    border-left-color: #28a745;
+}
+
+#africas-talking-settings {
+    border-left-color: #ffc107;
+}
+
+#twilio-settings {
+    border-left-color: #17a2b8;
+}
+</style>
+{% endblock %}

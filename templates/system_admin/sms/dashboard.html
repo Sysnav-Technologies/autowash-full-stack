@@ -1,0 +1,247 @@
+{% extends 'system_admin/base.html' %}
+{% load humanize %}
+
+{% block title %}SMS Management - System Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-sms text-primary"></i>
+            SMS Management Dashboard
+        </h1>
+        <div class="btn-group">
+            <a href="{% url 'system_admin:sms_providers' %}" class="btn btn-primary">
+                <i class="fas fa-cogs"></i> Manage Providers
+            </a>
+            <a href="{% url 'system_admin:tenant_sms_settings' %}" class="btn btn-info">
+                <i class="fas fa-building"></i> Tenant Settings
+            </a>
+            <a href="{% url 'system_admin:sms_messages' %}" class="btn btn-secondary">
+                <i class="fas fa-envelope"></i> Message Logs
+            </a>
+        </div>
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                SMS Providers
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ active_providers }} / {{ total_providers }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-server fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Active Tenants
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ active_sms_tenants }} / {{ total_tenants_with_sms }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Messages Today
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ total_messages_today|intcomma }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-envelope fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Failed Today
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ failed_messages_today|intcomma }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Provider Statistics -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Provider Statistics</h6>
+                    <a href="{% url 'system_admin:sms_statistics' %}" class="btn btn-sm btn-outline-primary">
+                        View Details
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if provider_stats %}
+                        <div class="table-responsive">
+                            <table class="table table-borderless">
+                                <thead>
+                                    <tr>
+                                        <th>Provider</th>
+                                        <th>Tenants</th>
+                                        <th>Messages Today</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for provider_name, stats in provider_stats.items %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ provider_name }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-info">{{ stats.tenants }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-success">{{ stats.messages_today }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                            <p>No provider statistics available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Messages -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Recent Messages</h6>
+                    <a href="{% url 'system_admin:sms_messages' %}" class="btn btn-sm btn-outline-primary">
+                        View All
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if recent_messages %}
+                        <div class="table-responsive">
+                            <table class="table table-borderless">
+                                <tbody>
+                                    {% for message in recent_messages %}
+                                    <tr>
+                                        <td style="width: 40px;">
+                                            {% if message.status == 'delivered' %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% elif message.status == 'failed' %}
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            {% elif message.status == 'sent' %}
+                                                <i class="fas fa-paper-plane text-info"></i>
+                                            {% else %}
+                                                <i class="fas fa-clock text-warning"></i>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="font-weight-bold">{{ message.tenant_name }}</div>
+                                            <small class="text-muted">{{ message.recipient }}</small>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ message.created_at|timesince }} ago</small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>No recent messages</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'system_admin:create_sms_provider' %}" class="btn btn-outline-primary btn-block">
+                                <i class="fas fa-plus-circle"></i><br>
+                                Add SMS Provider
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'system_admin:tenant_sms_settings' %}" class="btn btn-outline-info btn-block">
+                                <i class="fas fa-cog"></i><br>
+                                Configure Tenant SMS
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'system_admin:sms_templates' %}" class="btn btn-outline-success btn-block">
+                                <i class="fas fa-file-alt"></i><br>
+                                View Templates
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'system_admin:sms_statistics' %}" class="btn btn-outline-secondary btn-block">
+                                <i class="fas fa-chart-line"></i><br>
+                                View Analytics
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

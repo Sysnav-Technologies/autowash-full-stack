@@ -1,0 +1,313 @@
+{% extends "system_admin/base.html" %}
+{% load static %}
+
+{% block title %}Edit SMS Provider - System Admin{% endblock %}
+
+{% block page_title %}Edit SMS Provider{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:sms_management' %}">SMS Management</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:sms_providers' %}">Providers</a></li>
+        <li class="breadcrumb-item active">Edit Provider</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-edit"></i>
+                    Edit SMS Provider: {{ provider.name }}
+                </h3>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="card-body">
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-exclamation-triangle"></i> Please correct the errors below:</h5>
+                            {{ form.errors }}
+                        </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Provider Name <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" name="name" value="{{ provider.name }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Provider Type <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" name="provider_type" required>
+                                    {% for value, label in provider_types %}
+                                        <option value="{{ value }}" {% if provider.provider_type == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    API Endpoint
+                                </label>
+                                <input type="url" class="form-control" name="api_endpoint" value="{{ provider.api_endpoint }}" placeholder="https://api.provider.com">
+                                <small class="form-text text-muted">API base URL for this provider</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Rate per SMS
+                                </label>
+                                <input type="number" class="form-control" name="rate_per_sms" step="0.01" value="{{ provider.rate_per_sms }}">
+                                <small class="form-text text-muted">Cost per SMS in your currency</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active" {% if provider.is_active %}checked{% endif %}>
+                                <label class="form-check-label">
+                                    Active
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_default" {% if provider.is_default %}checked{% endif %}>
+                                <label class="form-check-label">
+                                    Default Provider
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <a href="{% url 'system_admin:sms_providers' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            {% if provider.pk %}
+                                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            {% endif %}
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Update Provider
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Provider Statistics -->
+        {% if provider.pk %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Provider Statistics
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="info-box bg-info">
+                            <span class="info-box-icon"><i class="fas fa-users"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Active Tenants</span>
+                                <span class="info-box-number">{{ provider.active_tenants_count }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-success">
+                            <span class="info-box-icon"><i class="fas fa-envelope"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Messages Today</span>
+                                <span class="info-box-number">{{ provider.messages_today }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-warning">
+                            <span class="info-box-icon"><i class="fas fa-calendar-week"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Messages This Week</span>
+                                <span class="info-box-number">{{ provider.messages_this_week }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-primary">
+                            <span class="info-box-icon"><i class="fas fa-calendar-alt"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Messages This Month</span>
+                                <span class="info-box-number">{{ provider.messages_this_month }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Provider Information
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if provider.pk %}
+                    <table class="table table-sm">
+                        <tr>
+                            <td><strong>Created:</strong></td>
+                            <td>{{ provider.created_at|date:"M d, Y H:i" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Last Updated:</strong></td>
+                            <td>{{ provider.updated_at|date:"M d, Y H:i" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% if provider.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Delivery Reports:</strong></td>
+                            <td>
+                                {% if provider.supports_delivery_reports %}
+                                    <span class="badge bg-info">Supported</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Not Supported</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                {% endif %}
+
+                <hr>
+
+                <div class="provider-help" id="host_pinnacle_help">
+                    <h6>Host Pinnacle Configuration</h6>
+                    <p>For Host Pinnacle WhatsApp Business API:</p>
+                    <pre class="bg-light p-2 rounded"><code>{
+  "account_id": "your_account_id",
+  "auth_token": "your_auth_token",
+  "sender_id": "your_whatsapp_number"
+}</code></pre>
+                </div>
+
+                <div class="provider-help" id="africas_talking_help">
+                    <h6>Africa's Talking Configuration</h6>
+                    <p>For Africa's Talking SMS API:</p>
+                    <pre class="bg-light p-2 rounded"><code>{
+  "username": "your_username",
+  "api_key": "your_api_key",
+  "environment": "production"
+}</code></pre>
+                </div>
+
+                <div class="provider-help" id="twilio_help">
+                    <h6>Twilio Configuration</h6>
+                    <p>For Twilio SMS API:</p>
+                    <pre class="bg-light p-2 rounded"><code>{
+  "account_sid": "your_account_sid",
+  "auth_token": "your_auth_token",
+  "from_number": "+1234567890"
+}</code></pre>
+                </div>
+
+                <div class="provider-help" id="autowash_default_help">
+                    <h6>Autowash Default Configuration</h6>
+                    <p>For internal Autowash SMS system:</p>
+                    <pre class="bg-light p-2 rounded"><code>{
+  "internal_api": true,
+  "rate_limit": 100
+}</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if provider.pk %}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the SMS provider <strong>{{ provider.name }}</strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    This action cannot be undone. All tenant configurations using this provider will be affected.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'system_admin:delete_sms_provider' provider.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete Provider</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const providerTypeSelect = document.getElementById('{{ form.provider_type.id_for_label }}');
+    const helpDivs = document.querySelectorAll('.provider-help');
+    
+    function showProviderHelp() {
+        helpDivs.forEach(div => {
+            div.classList.add('d-none');
+        });
+        const selectedType = providerTypeSelect.value;
+        if (selectedType) {
+            const helpDiv = document.getElementById(selectedType + '_help');
+            if (helpDiv) {
+                helpDiv.classList.remove('d-none');
+            }
+        }
+    }
+    
+    providerTypeSelect.addEventListener('change', showProviderHelp);
+    showProviderHelp(); // Show initial help
+});
+</script>
+{% endblock %}

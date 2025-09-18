@@ -1,0 +1,441 @@
+{% extends "system_admin/base.html" %}
+{% load static humanize %}
+
+{% block title %}SMS Messages - System Admin{% endblock %}
+
+{% block page_title %}SMS Messages{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:sms_management' %}">SMS Management</a></li>
+        <li class="breadcrumb-item active">Messages</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">
+                        <i class="fas fa-envelope"></i>
+                        SMS Messages
+                    </h3>
+                    <div>
+                        <a href="{% url 'system_admin:test_sms' %}" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Send Test SMS
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card-body border-bottom">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Search</label>
+                        <input type="text" class="form-control" name="search" 
+                               value="{{ search_query }}" 
+                               placeholder="Phone, message content...">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="">All Statuses</option>
+                            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Sent</option>
+                            <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Delivered</option>
+                            <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Failed</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Provider</label>
+                        <select class="form-select" name="provider">
+                            <option value="">All Providers</option>
+                            {% for provider in providers %}
+                                <option value="{{ provider.id }}" 
+                                        {% if provider_filter == provider.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ provider.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tenant</label>
+                        <select class="form-select" name="tenant">
+                            <option value="">All Tenants</option>
+                            {% for tenant in tenants %}
+                                <option value="{{ tenant.id }}" 
+                                        {% if tenant_filter == tenant.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ tenant.name|truncatechars:20 }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Date Range</label>
+                        <select class="form-select" name="date_range">
+                            <option value="">All Time</option>
+                            <option value="today" {% if date_range == 'today' %}selected{% endif %}>Today</option>
+                            <option value="yesterday" {% if date_range == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                            <option value="week" {% if date_range == 'week' %}selected{% endif %}>This Week</option>
+                            <option value="month" {% if date_range == 'month' %}selected{% endif %}>This Month</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card-body">
+                <!-- Summary Stats -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="info-box bg-info">
+                            <span class="info-box-icon"><i class="fas fa-envelope"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Total Messages</span>
+                                <span class="info-box-number">{{ stats.total|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-success">
+                            <span class="info-box-icon"><i class="fas fa-check"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Delivered</span>
+                                <span class="info-box-number">{{ stats.delivered|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-warning">
+                            <span class="info-box-icon"><i class="fas fa-clock"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Pending</span>
+                                <span class="info-box-number">{{ stats.pending|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-danger">
+                            <span class="info-box-icon"><i class="fas fa-times"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Failed</span>
+                                <span class="info-box-number">{{ stats.failed|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Messages Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover" id="messagesTable">
+                        <thead>
+                            <tr>
+                                <th>Message Details</th>
+                                <th>Recipient</th>
+                                <th>Tenant</th>
+                                <th>Provider</th>
+                                <th>Status</th>
+                                <th>Cost</th>
+                                <th>Sent At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for message in page_obj %}
+                            <tr>
+                                <td>
+                                    <div>
+                                        <strong>{{ message.message_content|truncatechars:50 }}</strong>
+                                        {% if message.sender_id %}
+                                            <br><small class="text-muted">From: {{ message.sender_id }}</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ message.phone_number }}</strong>
+                                        {% if message.recipient_name %}
+                                            <br><small class="text-muted">{{ message.recipient_name }}</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ message.tenant_name|default:"Unknown" }}</strong>
+                                        <br><small class="text-muted">{{ message.tenant_id|truncatechars:15 }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if message.provider %}
+                                        <div class="d-flex align-items-center">
+                                            {% if message.provider.provider_type == 'host_pinnacle' %}
+                                                <i class="fab fa-whatsapp text-success me-2"></i>
+                                            {% elif message.provider.provider_type == 'africas_talking' %}
+                                                <i class="fas fa-globe-africa text-warning me-2"></i>
+                                            {% elif message.provider.provider_type == 'twilio' %}
+                                                <i class="fas fa-phone text-info me-2"></i>
+                                            {% else %}
+                                                <i class="fas fa-sms text-secondary me-2"></i>
+                                            {% endif %}
+                                            {{ message.provider.name }}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Unknown</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if message.status == 'delivered' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> Delivered
+                                        </span>
+                                        {% if message.delivered_at %}
+                                            <br><small class="text-muted">
+                                                {{ message.delivered_at|timesince }} ago
+                                            </small>
+                                        {% endif %}
+                                    {% elif message.status == 'sent' %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-paper-plane"></i> Sent
+                                        </span>
+                                    {% elif message.status == 'pending' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-clock"></i> Pending
+                                        </span>
+                                    {% elif message.status == 'failed' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> Failed
+                                        </span>
+                                        {% if message.error_message %}
+                                            <br><small class="text-danger">
+                                                {{ message.error_message|truncatechars:30 }}
+                                            </small>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if message.cost %}
+                                        <span class="badge bg-secondary">
+                                            ${{ message.cost }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if message.sent_at %}
+                                        <div>
+                                            <strong>{{ message.sent_at|date:"M d, H:i" }}</strong>
+                                            <br><small class="text-muted">
+                                                {{ message.sent_at|timesince }} ago
+                                            </small>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Not sent</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-info" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#messageModal{{ message.id }}"
+                                                title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if message.status == 'failed' %}
+                                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                                    onclick="retryMessage({{ message.id }})"
+                                                    title="Retry Send">
+                                                <i class="fas fa-redo"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Message Detail Modal -->
+                            <div class="modal fade" id="messageModal{{ message.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Message Details</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" title="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <table class="table table-sm">
+                                                        <tr>
+                                                            <td><strong>ID:</strong></td>
+                                                            <td>{{ message.id }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Phone:</strong></td>
+                                                            <td>{{ message.phone_number }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Sender ID:</strong></td>
+                                                            <td>{{ message.sender_id|default:"-" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Provider:</strong></td>
+                                                            <td>{{ message.provider.name|default:"-" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>External ID:</strong></td>
+                                                            <td>{{ message.external_id|default:"-" }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <table class="table table-sm">
+                                                        <tr>
+                                                            <td><strong>Status:</strong></td>
+                                                            <td>{{ message.get_status_display }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Created:</strong></td>
+                                                            <td>{{ message.created_at|date:"M d, Y H:i:s" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Sent:</strong></td>
+                                                            <td>{{ message.sent_at|date:"M d, Y H:i:s"|default:"-" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Delivered:</strong></td>
+                                                            <td>{{ message.delivered_at|date:"M d, Y H:i:s"|default:"-" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Cost:</strong></td>
+                                                            <td>${{ message.cost|default:"-" }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-3">
+                                                <h6>Message Content:</h6>
+                                                <div class="bg-light p-3 rounded">
+                                                    {{ message.message_content }}
+                                                </div>
+                                            </div>
+
+                                            {% if message.error_message %}
+                                            <div class="mt-3">
+                                                <h6>Error Message:</h6>
+                                                <div class="bg-danger-light p-3 rounded text-danger">
+                                                    {{ message.error_message }}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+
+                                            {% if message.metadata %}
+                                            <div class="mt-3">
+                                                <h6>Metadata:</h6>
+                                                <pre class="bg-light p-3 rounded"><code>{{ message.metadata|safe }}</code></pre>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            {% if message.status == 'failed' %}
+                                                <button type="button" class="btn btn-warning" 
+                                                        onclick="retryMessage({{ message.id }})">
+                                                    <i class="fas fa-redo"></i> Retry Send
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="Messages pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" title="Previous Page" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if provider_filter %}&provider={{ provider_filter }}{% endif %}{% if tenant_filter %}&tenant={{ tenant_filter }}{% endif %}{% if date_range %}&date_range={{ date_range }}{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if provider_filter %}&provider={{ provider_filter }}{% endif %}{% if tenant_filter %}&tenant={{ tenant_filter }}{% endif %}{% if date_range %}&date_range={{ date_range }}{% endif %}">{{ num }}</a>
+                        </li>
+                            {% endif %}
+                        {% endfor %}
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" title="Next Page" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if provider_filter %}&provider={{ provider_filter }}{% endif %}{% if tenant_filter %}&tenant={{ tenant_filter }}{% endif %}{% if date_range %}&date_range={{ date_range }}{% endif %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function retryMessage(messageId) {
+    if (confirm('Are you sure you want to retry sending this message?')) {
+        fetch(`/system-admin/sms/messages/${messageId}/retry/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Message retry initiated successfully!');
+                location.reload();
+            } else {
+                alert('Error retrying message: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Error retrying message: ' + error);
+        });
+    }
+}
+
+// DataTable initialization
+document.addEventListener('DOMContentLoaded', function() {
+    $('#messagesTable').DataTable({
+        "pageLength": 25,
+        "order": [[6, "desc"]], // Sort by sent_at desc
+        "columnDefs": [
+            { "orderable": false, "targets": [7] } // Actions column
+        ]
+    });
+});
+</script>
+{% endblock %}

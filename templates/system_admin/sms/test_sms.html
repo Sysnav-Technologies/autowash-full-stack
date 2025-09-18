@@ -1,0 +1,332 @@
+{% extends "system_admin/base.html" %}
+{% load static %}
+
+{% block title %}Test SMS - System Admin{% endblock %}
+
+{% block page_title %}Test SMS{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:sms_management' %}">SMS Management</a></li>
+        <li class="breadcrumb-item active">Test SMS</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-paper-plane"></i>
+                    Send Test SMS
+                    {% if tenant %}
+                        - {{ tenant.name }}
+                    {% endif %}
+                </h3>
+            </div>
+            <form method="post" id="testSmsForm">
+                {% csrf_token %}
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" title="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-exclamation-triangle"></i> Please correct the errors below:</h5>
+                            {{ form.errors }}
+                        </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.tenant_id.id_for_label }}" class="form-label">
+                                    Tenant <span class="text-danger">*</span>
+                                </label>
+                                {{ form.tenant_id }}
+                                {% if form.tenant_id.help_text %}
+                                    <small class="form-text text-muted">{{ form.tenant_id.help_text }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.phone_number.id_for_label }}" class="form-label">
+                                    Phone Number <span class="text-danger">*</span>
+                                </label>
+                                {{ form.phone_number }}
+                                {% if form.phone_number.help_text %}
+                                    <small class="form-text text-muted">{{ form.phone_number.help_text }}</small>
+                                {% else %}
+                                    <small class="form-text text-muted">Include country code (e.g., +254712345678)</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.message.id_for_label }}" class="form-label">
+                            Test Message <span class="text-danger">*</span>
+                        </label>
+                        {{ form.message }}
+                        <div class="d-flex justify-content-between">
+                            {% if form.message.help_text %}
+                                <small class="form-text text-muted">{{ form.message.help_text }}</small>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                <span id="messageCounter">0</span>/160 characters
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.sender_id.id_for_label }}" class="form-label">
+                            Sender ID (Optional)
+                        </label>
+                        {{ form.sender_id }}
+                        {% if form.sender_id.help_text %}
+                            <small class="form-text text-muted">{{ form.sender_id.help_text }}</small>
+                        {% else %}
+                            <small class="form-text text-muted">Leave blank to use provider default</small>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check">
+                        {{ form.test_delivery_report }}
+                        <label class="form-check-label" for="{{ form.test_delivery_report.id_for_label }}">
+                            Test delivery report functionality
+                        </label>
+                        <small class="form-text text-muted d-block">
+                            Check if the provider supports delivery reports
+                        </small>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'system_admin:sms_management' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="sendBtn">
+                            <i class="fas fa-paper-plane"></i> Send Test SMS
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Test Results -->
+        <div class="card mt-4" id="testResults" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-clipboard-list"></i>
+                    Test Results
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="resultContent">
+                    <!-- Results will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Test Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-lightbulb"></i> Testing Tips</h6>
+                    <ul class="mb-0">
+                        <li>Use your own phone number for testing</li>
+                        <li>Check message delivery and formatting</li>
+                        <li>Test special characters and emojis</li>
+                        <li>Verify sender ID appears correctly</li>
+                        <li>Test delivery report functionality</li>
+                    </ul>
+                </div>
+
+                {% if tenant_settings %}
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Current SMS Configuration</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Provider:</strong></td>
+                                <td>{{ tenant_settings.provider.name }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Type:</strong></td>
+                                <td>{{ tenant_settings.provider.get_provider_type_display }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td>
+                                    {% if tenant_settings.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Daily Usage:</strong></td>
+                                <td>{{ tenant_settings.daily_usage }} / {{ tenant_settings.daily_limit|default:"∞" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Monthly Usage:</strong></td>
+                                <td>{{ tenant_settings.monthly_usage }} / {{ tenant_settings.monthly_limit|default:"∞" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-history"></i>
+                    Recent Test Messages
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_tests %}
+                    <div class="timeline">
+                        {% for test in recent_tests %}
+                            <div class="timeline-item">
+                                <div class="timeline-marker bg-{{ test.status|yesno:'success,danger' }}"></div>
+                                <div class="timeline-content">
+                                    <p class="mb-1">
+                                        <strong>{{ test.phone_number }}</strong>
+                                        <small class="text-muted float-end">
+                                            {{ test.created_at|timesince }} ago
+                                        </small>
+                                    </p>
+                                    <p class="text-muted mb-1">{{ test.message|truncatechars:50 }}</p>
+                                    <span class="badge bg-{{ test.status|yesno:'success,danger' }}">
+                                        {{ test.get_status_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center">No recent test messages</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Message character counter
+    const messageTextarea = document.getElementById('{{ form.message.id_for_label }}');
+    const messageCounter = document.getElementById('messageCounter');
+    
+    function updateCounter() {
+        const length = messageTextarea.value.length;
+        messageCounter.textContent = length;
+        
+        // Change color based on length
+        if (length > 160) {
+            messageCounter.classList.add('text-warning');
+        } else {
+            messageCounter.classList.remove('text-warning');
+        }
+    }
+    
+    messageTextarea.addEventListener('input', updateCounter);
+    updateCounter();
+    
+    // Phone number formatting
+    const phoneInput = document.getElementById('{{ form.phone_number.id_for_label }}');
+    phoneInput.addEventListener('input', function() {
+        let value = this.value;
+        if (value && !value.startsWith('+')) {
+            this.value = '+' + value.replace(/^\+/, '');
+        }
+    });
+    
+    // Form submission with loading state
+    const form = document.getElementById('testSmsForm');
+    const sendBtn = document.getElementById('sendBtn');
+    const originalBtnText = sendBtn.innerHTML;
+    
+    form.addEventListener('submit', function() {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        
+        setTimeout(function() {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = originalBtnText;
+        }, 5000);
+    });
+    
+    // Auto-load tenant settings when tenant changes
+    const tenantSelect = document.getElementById('{{ form.tenant_id.id_for_label }}');
+    tenantSelect.addEventListener('change', function() {
+        if (this.value) {
+            // You can add AJAX call here to load tenant-specific settings
+            console.log('Loading settings for tenant:', this.value);
+        }
+    });
+});
+</script>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 20px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -26px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+    border-left: 3px solid #007bff;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: -21px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+</style>
+{% endblock %}

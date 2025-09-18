@@ -1,0 +1,146 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Send SMS{% endblock %}
+
+{% block page_title %}Send SMS{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/">Dashboard</a>
+</li>
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/messaging/">SMS Messages</a>
+</li>
+<li class="breadcrumb-item active">Send SMS</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card card-primary">
+            <div class="card-header">
+                <h3 class="card-title">Send Individual SMS</h3>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="recipient">Recipient Phone Number</label>
+                        <input type="tel" class="form-control" id="recipient" name="recipient" 
+                               placeholder="+1234567890" required>
+                        <small class="form-text text-muted">
+                            Enter the phone number with country code (e.g., +1234567890)
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sender_id">Sender ID (Optional)</label>
+                        <input type="text" class="form-control" id="sender_id" name="sender_id" 
+                               placeholder="AutoWash" maxlength="11">
+                        <small class="form-text text-muted">
+                            Custom sender name (up to 11 characters)
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea class="form-control" id="message" name="message" rows="5" 
+                                  placeholder="Type your message here..." required maxlength="160"></textarea>
+                        <small class="form-text text-muted">
+                            <span id="char-count">0</span>/160 characters
+                        </small>
+                    </div>
+                </div>
+                
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Send SMS
+                    </button>
+                    <a href="/business/{{ request.tenant.slug }}/messaging/" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Messages
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        {% if templates %}
+        <div class="card card-info">
+            <div class="card-header">
+                <h3 class="card-title">SMS Templates</h3>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for template in templates %}
+                    <button type="button" class="list-group-item list-group-item-action template-btn" 
+                            data-message="{{ template.message }}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ template.name }}</h6>
+                            <small>{{ template.get_template_type_display }}</small>
+                        </div>
+                        <p class="mb-1">{{ template.message|truncatechars:50 }}</p>
+                    </button>
+                    {% endfor %}
+                </div>
+                <div class="mt-3">
+                    <a href="/business/{{ request.tenant.slug }}/messaging/templates/" class="btn btn-sm btn-outline-info">
+                        Manage Templates
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="card card-warning">
+            <div class="card-header">
+                <h3 class="card-title">Tips</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success"></i> Include country code (+1, +44, etc.)</li>
+                    <li><i class="fas fa-check text-success"></i> Keep messages under 160 characters</li>
+                    <li><i class="fas fa-check text-success"></i> Use clear, concise language</li>
+                    <li><i class="fas fa-check text-success"></i> Test with your own number first</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Character counter
+    $('#message').on('input', function() {
+        var length = $(this).val().length;
+        $('#char-count').text(length);
+        
+        if (length > 160) {
+            $('#char-count').addClass('text-danger');
+        } else if (length > 140) {
+            $('#char-count').addClass('text-warning').removeClass('text-danger');
+        } else {
+            $('#char-count').removeClass('text-danger text-warning');
+        }
+    });
+    
+    // Template selection
+    $('.template-btn').click(function() {
+        var message = $(this).data('message');
+        $('#message').val(message).trigger('input');
+    });
+    
+    // Phone number formatting
+    $('#recipient').on('input', function() {
+        var value = $(this).val().replace(/\D/g, '');
+        if (value && !value.startsWith('+')) {
+            $(this).val('+' + value);
+        }
+    });
+});
+</script>
+{% endblock %}

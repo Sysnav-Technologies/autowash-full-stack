@@ -337,6 +337,42 @@ function initializeSidebarDropdowns() {
     $('.nav-dropdown-toggle').on('click', function(e) {
         e.stopPropagation(); // Prevent sidebar close
     });
+    
+    // Initialize AdminLTE-style treeview functionality
+    initializeTreeview();
+}
+
+// Initialize treeview functionality for sidebar menus
+function initializeTreeview() {
+    // Handle clicks on treeview items
+    $('.has-treeview > .nav-link').on('click', function(e) {
+        e.preventDefault();
+        
+        const parentLi = $(this).parent('.has-treeview');
+        const treeviewMenu = parentLi.find('> .nav-treeview');
+        const isOpen = parentLi.hasClass('menu-open');
+        
+        // Close all other treeview menus
+        $('.has-treeview').not(parentLi).removeClass('menu-open');
+        $('.nav-treeview').not(treeviewMenu).slideUp(300);
+        
+        // Toggle current menu
+        if (isOpen) {
+            parentLi.removeClass('menu-open');
+            treeviewMenu.slideUp(300);
+        } else {
+            parentLi.addClass('menu-open');
+            treeviewMenu.slideDown(300);
+        }
+        
+        return false;
+    });
+    
+    // Keep menu open if a child item is active
+    $('.nav-treeview .nav-link.active').each(function() {
+        $(this).closest('.has-treeview').addClass('menu-open');
+        $(this).closest('.nav-treeview').show();
+    });
 }
 
 // Dropdown toggle function (called from HTML)

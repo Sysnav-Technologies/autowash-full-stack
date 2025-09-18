@@ -1,0 +1,190 @@
+{% extends "system_admin/base.html" %}
+{% load static %}
+
+{% block title %}Create SMS Provider - System Admin{% endblock %}
+
+{% block page_title %}Create SMS Provider{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:sms_management' %}">SMS Management</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:sms_providers' %}">Providers</a></li>
+        <li class="breadcrumb-item active">Create Provider</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-plus"></i>
+                    Create New SMS Provider
+                </h3>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="card-body">
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-exclamation-triangle"></i> Please correct the errors below:</h5>
+                            {{ form.errors }}
+                        </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Provider Name <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" name="name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Provider Type <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" name="provider_type" required>
+                                    <option value="">Select Provider Type</option>
+                                    {% for value, label in provider_types %}
+                                        <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    API Endpoint
+                                </label>
+                                <input type="url" class="form-control" name="api_endpoint" placeholder="https://api.provider.com">
+                                <small class="form-text text-muted">API base URL for this provider</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Rate per SMS
+                                </label>
+                                <input type="number" class="form-control" name="rate_per_sms" step="0.01" value="3.00">
+                                <small class="form-text text-muted">Cost per SMS in your currency</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active" checked>
+                                <label class="form-check-label">
+                                    Active
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_default">
+                                <label class="form-check-label">
+                                    Default Provider
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'system_admin:sms_providers' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Create Provider
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Provider Configuration Help
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="provider-help" id="host_pinnacle_help" style="display: none;">
+                    <h6>Host Pinnacle Configuration</h6>
+                    <p>For Host Pinnacle WhatsApp Business API:</p>
+                    <pre class="bg-light p-2 rounded"><code>{
+  "account_id": "your_account_id",
+  "auth_token": "your_auth_token",
+  "sender_id": "your_whatsapp_number"
+}</code></pre>
+                </div>
+
+                <div class="provider-help" id="africas_talking_help" style="display: none;">
+                    <h6>Africa's Talking Configuration</h6>
+                    <p>For Africa's Talking SMS API:</p>
+                    <pre class="bg-light p-2 rounded"><code>{
+  "username": "your_username",
+  "api_key": "your_api_key",
+  "environment": "production"
+}</code></pre>
+                </div>
+
+                <div class="provider-help" id="twilio_help" style="display: none;">
+                    <h6>Twilio Configuration</h6>
+                    <p>For Twilio SMS API:</p>
+                    <pre class="bg-light p-2 rounded"><code>{
+  "account_sid": "your_account_sid",
+  "auth_token": "your_auth_token",
+  "from_number": "+1234567890"
+}</code></pre>
+                </div>
+
+                <div class="provider-help" id="autowash_default_help" style="display: none;">
+                    <h6>Autowash Default Configuration</h6>
+                    <p>For internal Autowash SMS system:</p>
+                    <pre class="bg-light p-2 rounded"><code>{
+  "internal_api": true,
+  "rate_limit": 100
+}</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const providerTypeSelect = document.getElementById('{{ form.provider_type.id_for_label }}');
+    const helpDivs = document.querySelectorAll('.provider-help');
+    
+    function showProviderHelp() {
+        helpDivs.forEach(div => div.style.display = 'none');
+        const selectedType = providerTypeSelect.value;
+        if (selectedType) {
+            const helpDiv = document.getElementById(selectedType + '_help');
+            if (helpDiv) {
+                helpDiv.style.display = 'block';
+            }
+        }
+    }
+    
+    providerTypeSelect.addEventListener('change', showProviderHelp);
+    showProviderHelp(); // Show initial help
+});
+</script>
+{% endblock %}

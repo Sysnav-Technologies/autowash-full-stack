@@ -73,6 +73,7 @@ SHARED_APPS = [
     'apps.core',
     'apps.accounts',
     'apps.subscriptions',
+    'messaging',  # SMS/WhatsApp messaging system
 ]
 
 TENANT_APPS = [
