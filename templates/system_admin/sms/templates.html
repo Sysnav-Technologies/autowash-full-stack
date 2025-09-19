@@ -1,0 +1,477 @@
+{% extends "system_admin/base.html" %}
+{% load static humanize %}
+
+{% block title %}SMS Templates - System Admin{% endblock %}
+
+{% block page_title %}SMS Templates{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:sms_management' %}">SMS Management</a></li>
+        <li class="breadcrumb-item active">Templates</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">
+                        <i class="fas fa-file-alt"></i>
+                        SMS Templates
+                    </h3>
+                    <div>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
+                            <i class="fas fa-plus"></i> Create Template
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card-body border-bottom">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Search</label>
+                        <input type="text" class="form-control" name="search" 
+                               value="{{ search_query }}" 
+                               placeholder="Template name, content...">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" name="category" title="Filter by category">
+                            <option value="">All Categories</option>
+                            <option value="notification" {% if category_filter == 'notification' %}selected{% endif %}>Notification</option>
+                            <option value="marketing" {% if category_filter == 'marketing' %}selected{% endif %}>Marketing</option>
+                            <option value="reminder" {% if category_filter == 'reminder' %}selected{% endif %}>Reminder</option>
+                            <option value="alert" {% if category_filter == 'alert' %}selected{% endif %}>Alert</option>
+                            <option value="confirmation" {% if category_filter == 'confirmation' %}selected{% endif %}>Confirmation</option>
+                            <option value="other" {% if category_filter == 'other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status" title="Filter by status">
+                            <option value="">All Statuses</option>
+                            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tenant</label>
+                        <select class="form-select" name="tenant" title="Filter by tenant">
+                            <option value="">All Tenants</option>
+                            {% for tenant in tenants %}
+                                <option value="{{ tenant.id }}" 
+                                        {% if tenant_filter == tenant.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ tenant.name|truncatechars:20 }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-outline-primary" title="Apply filters">
+                                <i class="fas fa-search"></i> Filter
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card-body">
+                <!-- Summary Stats -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="info-box bg-info">
+                            <span class="info-box-icon"><i class="fas fa-file-alt"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Total Templates</span>
+                                <span class="info-box-number">{{ stats.total|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-success">
+                            <span class="info-box-icon"><i class="fas fa-check"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Active</span>
+                                <span class="info-box-number">{{ stats.active|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-warning">
+                            <span class="info-box-icon"><i class="fas fa-pause"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Inactive</span>
+                                <span class="info-box-number">{{ stats.inactive|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box bg-primary">
+                            <span class="info-box-icon"><i class="fas fa-paper-plane"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Used This Month</span>
+                                <span class="info-box-number">{{ stats.used_this_month|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Templates Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover" id="templatesTable">
+                        <thead>
+                            <tr>
+                                <th>Template Details</th>
+                                <th>Content Preview</th>
+                                <th>Category</th>
+                                <th>Tenant</th>
+                                <th>Usage</th>
+                                <th>Status</th>
+                                <th>Last Used</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for template in page_obj %}
+                            <tr>
+                                <td>
+                                    <div>
+                                        <strong>{{ template.name }}</strong>
+                                        {% if template.description %}
+                                            <br><small class="text-muted">{{ template.description|truncatechars:50 }}</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="text-muted">
+                                        {{ template.template_content|truncatechars:60 }}
+                                    </div>
+                                    {% if template.variables %}
+                                        <div class="mt-1">
+                                            {% for var in template.variables|slice:":3" %}
+                                                <span class="badge bg-light text-dark">{{ var }}</span>
+                                            {% endfor %}
+                                            {% if template.variables|length > 3 %}
+                                                <span class="badge bg-secondary">+{{ template.variables|length|add:"-3" }}</span>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if template.category == 'notification' %}info{% elif template.category == 'marketing' %}success{% elif template.category == 'reminder' %}warning{% elif template.category == 'alert' %}danger{% else %}secondary{% endif %}">
+                                        {{ template.get_category_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if template.tenant_id %}
+                                        <div>
+                                            <strong>{{ template.tenant_name|default:"Unknown" }}</strong>
+                                            <br><small class="text-muted">{{ template.tenant_id|truncatechars:15 }}</small>
+                                        </div>
+                                    {% else %}
+                                        <span class="badge bg-info">Global</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ template.usage_count|intcomma }}</strong>
+                                        <br><small class="text-muted">uses</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if template.is_active %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> Active
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> Inactive
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if template.last_used_at %}
+                                        <div>
+                                            <strong>{{ template.last_used_at|date:"M d, H:i" }}</strong>
+                                            <br><small class="text-muted">
+                                                {{ template.last_used_at|timesince }} ago
+                                            </small>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Never used</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-info" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#templateModal{{ template.id }}"
+                                                title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-warning"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editTemplateModal{{ template.id }}"
+                                                title="Edit Template">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-success"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#testTemplateModal{{ template.id }}"
+                                                title="Test Template">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Template Detail Modal -->
+                            <div class="modal fade" id="templateModal{{ template.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Template: {{ template.name }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" title="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <table class="table table-sm">
+                                                        <tr>
+                                                            <td><strong>Name:</strong></td>
+                                                            <td>{{ template.name }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Category:</strong></td>
+                                                            <td>{{ template.get_category_display }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Status:</strong></td>
+                                                            <td>
+                                                                {% if template.is_active %}
+                                                                    <span class="badge bg-success">Active</span>
+                                                                {% else %}
+                                                                    <span class="badge bg-danger">Inactive</span>
+                                                                {% endif %}
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Usage Count:</strong></td>
+                                                            <td>{{ template.usage_count|intcomma }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <table class="table table-sm">
+                                                        <tr>
+                                                            <td><strong>Created:</strong></td>
+                                                            <td>{{ template.created_at|date:"M d, Y H:i:s" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Updated:</strong></td>
+                                                            <td>{{ template.updated_at|date:"M d, Y H:i:s" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Last Used:</strong></td>
+                                                            <td>{{ template.last_used_at|date:"M d, Y H:i:s"|default:"-" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>Tenant:</strong></td>
+                                                            <td>{{ template.tenant_name|default:"Global" }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </div>
+                                            </div>
+
+                                            {% if template.description %}
+                                            <div class="mt-3">
+                                                <h6>Description:</h6>
+                                                <p>{{ template.description }}</p>
+                                            </div>
+                                            {% endif %}
+
+                                            <div class="mt-3">
+                                                <h6>Template Content:</h6>
+                                                <div class="bg-light p-3 rounded">
+                                                    {{ template.template_content }}
+                                                </div>
+                                            </div>
+
+                                            {% if template.variables %}
+                                            <div class="mt-3">
+                                                <h6>Available Variables:</h6>
+                                                <div>
+                                                    {% for var in template.variables %}
+                                                        <span class="badge bg-info me-1">{{ var }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+
+                                            {% if template.metadata %}
+                                            <div class="mt-3">
+                                                <h6>Metadata:</h6>
+                                                <pre class="bg-light p-3 rounded"><code>{{ template.metadata|safe }}</code></pre>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            <button type="button" class="btn btn-warning" 
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#editTemplateModal{{ template.id }}"
+                                                    data-bs-dismiss="modal">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                            <button type="button" class="btn btn-success" 
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#testTemplateModal{{ template.id }}"
+                                                    data-bs-dismiss="modal">
+                                                <i class="fas fa-paper-plane"></i> Test
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="Templates pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" title="Previous Page" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if tenant_filter %}&tenant={{ tenant_filter }}{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if tenant_filter %}&tenant={{ tenant_filter }}{% endif %}">{{ num }}</a>
+                        </li>
+                            {% endif %}
+                        {% endfor %}
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" title="Next Page" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if tenant_filter %}&tenant={{ tenant_filter }}{% endif %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Template Modal -->
+<div class="modal fade" id="createTemplateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create SMS Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" title="Close"></button>
+            </div>
+            <form method="post" action="{% url 'system_admin:create_sms_template' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Template Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                <select class="form-select" name="category" required title="Select category">
+                                    <option value="">Select Category</option>
+                                    <option value="notification">Notification</option>
+                                    <option value="marketing">Marketing</option>
+                                    <option value="reminder">Reminder</option>
+                                    <option value="alert">Alert</option>
+                                    <option value="confirmation">Confirmation</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Template Content <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="template_content" rows="4" required
+                                  placeholder="Enter your template content. Use {variable_name} for dynamic content."></textarea>
+                        <small class="form-text text-muted">Use {variable_name} for placeholders</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Tenant (Optional)</label>
+                                <select class="form-select" name="tenant_id" title="Select tenant">
+                                    <option value="">Global Template</option>
+                                    {% for tenant in tenants %}
+                                        <option value="{{ tenant.id }}">{{ tenant.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" name="is_active" checked>
+                                <label class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Create Template
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// DataTable initialization
+document.addEventListener('DOMContentLoaded', function() {
+    $('#templatesTable').DataTable({
+        "pageLength": 25,
+        "order": [[6, "desc"]], // Sort by last_used desc
+        "columnDefs": [
+            { "orderable": false, "targets": [7] } // Actions column
+        ]
+    });
+});
+</script>
+{% endblock %}

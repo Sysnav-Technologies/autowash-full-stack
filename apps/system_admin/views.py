@@ -21,6 +21,11 @@ from decimal import Decimal
 import traceback
 import json
 
+# Import messaging models and services
+from messaging.models import SMSProvider, TenantSMSSettings, SMSMessage, SMSTemplate, SMSWebhook
+from messaging.services import send_sms
+from messaging.forms import TenantSMSSettingsForm, TestSMSForm
+
 # Import email functions
 from apps.accounts.views import send_business_approval_email
 
@@ -2906,3 +2911,559 @@ def toggle_tenant_gateway(request, tenant_id, gateway_id):
         messages.error(request, f'Error updating gateway status: {str(e)}')
     
     return redirect('system_admin:gateway_management')
+
+
+# ==========================================
+# SMS MANAGEMENT VIEWS
+# ==========================================
+
+@user_passes_test(lambda u: u.is_superuser)
+def sms_management(request):
+    """SMS Management Dashboard"""
+    context = {
+        'title': 'SMS Management',
+        'total_providers': SMSProvider.objects.count(),
+        'active_providers': SMSProvider.objects.filter(is_active=True).count(),
+        'total_tenants_with_sms': TenantSMSSettings.objects.count(),
+        'active_sms_tenants': TenantSMSSettings.objects.filter(is_active=True).count(),
+        'total_messages_today': SMSMessage.objects.filter(
+            created_at__date=timezone.now().date()
+        ).count(),
+        'failed_messages_today': SMSMessage.objects.filter(
+            created_at__date=timezone.now().date(),
+            status='failed'
+        ).count(),
+    }
+    
+    # Recent messages
+    context['recent_messages'] = SMSMessage.objects.order_by('-created_at')[:10]
+    
+    # SMS statistics by provider
+    provider_stats = {}
+    for provider in SMSProvider.objects.filter(is_active=True):
+        tenant_count = TenantSMSSettings.objects.filter(provider=provider, is_active=True).count()
+        message_count = SMSMessage.objects.filter(
+            tenant_settings__provider=provider,
+            created_at__date=timezone.now().date()
+        ).count()
+        provider_stats[provider.name] = {
+            'tenants': tenant_count,
+            'messages_today': message_count
+        }
+    
+    context['provider_stats'] = provider_stats
+    
+    return render(request, 'system_admin/sms/dashboard.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def sms_providers(request):
+    """Manage SMS Providers"""
+    providers = SMSProvider.objects.all().order_by('name')
+    
+    context = {
+        'title': 'SMS Providers',
+        'providers': providers,
+    }
+    
+    return render(request, 'system_admin/sms/providers.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def create_sms_provider(request):
+    """Create new SMS provider"""
+    if request.method == 'POST':
+        try:
+            provider = SMSProvider.objects.create(
+                name=request.POST.get('name'),
+                provider_type=request.POST.get('provider_type'),
+                api_endpoint=request.POST.get('api_endpoint', ''),
+                is_active=request.POST.get('is_active') == 'on',
+                is_default=request.POST.get('is_default') == 'on',
+                rate_per_sms=Decimal(request.POST.get('rate_per_sms', '0.00'))
+            )
+            
+            messages.success(request, f'SMS Provider "{provider.name}" created successfully!')
+            return redirect('system_admin:sms_providers')
+            
+        except Exception as e:
+            messages.error(request, f'Error creating provider: {str(e)}')
+    
+    context = {
+        'title': 'Create SMS Provider',
+        'provider_types': SMSProvider.PROVIDER_CHOICES,
+    }
+    
+    return render(request, 'system_admin/sms/create_provider.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def edit_sms_provider(request, provider_id):
+    """Edit SMS provider"""
+    provider = get_object_or_404(SMSProvider, id=provider_id)
+    
+    if request.method == 'POST':
+        try:
+            provider.name = request.POST.get('name')
+            provider.provider_type = request.POST.get('provider_type')
+            provider.api_endpoint = request.POST.get('api_endpoint', '')
+            provider.is_active = request.POST.get('is_active') == 'on'
+            provider.is_default = request.POST.get('is_default') == 'on'
+            provider.rate_per_sms = Decimal(request.POST.get('rate_per_sms', '0.00'))
+            provider.save()
+            
+            messages.success(request, f'SMS Provider "{provider.name}" updated successfully!')
+            return redirect('system_admin:sms_providers')
+            
+        except Exception as e:
+            messages.error(request, f'Error updating provider: {str(e)}')
+    
+    context = {
+        'title': 'Edit SMS Provider',
+        'provider': provider,
+        'provider_types': SMSProvider.PROVIDER_CHOICES,
+    }
+    
+    return render(request, 'system_admin/sms/edit_provider.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def delete_sms_provider(request, provider_id):
+    """Delete SMS provider"""
+    provider = get_object_or_404(SMSProvider, id=provider_id)
+    
+    # Check if provider is being used
+    tenant_count = TenantSMSSettings.objects.filter(provider=provider).count()
+    
+    if tenant_count > 0:
+        messages.error(
+            request, 
+            f'Cannot delete provider "{provider.name}". It is being used by {tenant_count} tenant(s).'
+        )
+    else:
+        provider_name = provider.name
+        provider.delete()
+        messages.success(request, f'SMS Provider "{provider_name}" deleted successfully!')
+    
+    return redirect('system_admin:sms_providers')
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def tenant_sms_settings(request):
+    """Manage tenant SMS settings"""
+    search_query = request.GET.get('search', '')
+    provider_filter = request.GET.get('provider', '')
+    status_filter = request.GET.get('status', '')
+    
+    # Get all active tenants
+    all_tenants = Tenant.objects.filter(is_active=True, is_approved=True).values('id', 'name', 'slug')
+    
+    # Get existing SMS settings
+    existing_settings = TenantSMSSettings.objects.select_related('provider').all()
+    
+    # Create a mapping of tenant_id to settings
+    settings_map = {str(setting.tenant_id): setting for setting in existing_settings}
+    
+    # Combine tenant info with SMS settings
+    tenant_sms_data = []
+    for tenant in all_tenants:
+        tenant_id = str(tenant['id'])
+        sms_setting = settings_map.get(tenant_id)
+        
+        tenant_sms_data.append({
+            'tenant_id': tenant_id,
+            'tenant_name': tenant['name'],
+            'tenant_slug': tenant['slug'],
+            'sms_settings': sms_setting,
+            'has_sms': sms_setting is not None,
+            'is_active': sms_setting.is_active if sms_setting else False,
+            'provider': sms_setting.provider if sms_setting else None,
+        })
+    
+    # Apply filters
+    if search_query:
+        tenant_sms_data = [
+            item for item in tenant_sms_data 
+            if search_query.lower() in item['tenant_name'].lower() or 
+               search_query.lower() in item['tenant_id'].lower()
+        ]
+    
+    if provider_filter:
+        tenant_sms_data = [
+            item for item in tenant_sms_data 
+            if item['provider'] and str(item['provider'].id) == provider_filter
+        ]
+    
+    if status_filter == 'active':
+        tenant_sms_data = [item for item in tenant_sms_data if item['is_active']]
+    elif status_filter == 'inactive':
+        tenant_sms_data = [item for item in tenant_sms_data if not item['is_active']]
+    elif status_filter == 'configured':
+        tenant_sms_data = [item for item in tenant_sms_data if item['has_sms']]
+    elif status_filter == 'not_configured':
+        tenant_sms_data = [item for item in tenant_sms_data if not item['has_sms']]
+    
+    # Pagination
+    paginator = Paginator(tenant_sms_data, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'title': 'Tenant SMS Settings',
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'provider_filter': provider_filter,
+        'status_filter': status_filter,
+        'providers': SMSProvider.objects.filter(is_active=True),
+        'total_tenants': len(all_tenants),
+        'configured_tenants': len([item for item in tenant_sms_data if item['has_sms']]),
+        'active_sms_tenants': len([item for item in tenant_sms_data if item['is_active']]),
+    }
+    
+    return render(request, 'system_admin/sms/tenant_settings.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def setup_tenant_sms(request, tenant_id):
+    """Setup SMS for a specific tenant"""
+    tenant = get_object_or_404(Tenant, id=tenant_id, is_active=True)
+    
+    try:
+        sms_settings = TenantSMSSettings.objects.get(tenant_id=str(tenant_id))
+    except TenantSMSSettings.DoesNotExist:
+        sms_settings = None
+    
+    if request.method == 'POST':
+        form = TenantSMSSettingsForm(request.POST, instance=sms_settings)
+        if form.is_valid():
+            sms_settings = form.save(commit=False)
+            sms_settings.tenant_id = str(tenant_id)
+            sms_settings.tenant_name = tenant.name
+            sms_settings.save()
+            
+            messages.success(request, f'SMS settings for "{tenant.name}" updated successfully!')
+            return redirect('system_admin:tenant_sms_settings')
+    else:
+        form = TenantSMSSettingsForm(instance=sms_settings)
+    
+    context = {
+        'title': f'SMS Setup - {tenant.name}',
+        'tenant': tenant,
+        'form': form,
+        'sms_settings': sms_settings,
+    }
+    
+    return render(request, 'system_admin/sms/setup_tenant.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def test_tenant_sms(request, tenant_id):
+    """Test SMS configuration for a tenant"""
+    tenant = get_object_or_404(Tenant, id=tenant_id, is_active=True)
+    
+    try:
+        sms_settings = TenantSMSSettings.objects.get(tenant_id=str(tenant_id), is_active=True)
+    except TenantSMSSettings.DoesNotExist:
+        messages.error(request, f'No active SMS settings found for "{tenant.name}"')
+        return redirect('system_admin:tenant_sms_settings')
+    
+    # Prepare context first
+    context = {
+        'title': f'Test SMS - {tenant.name}',
+        'tenant': tenant,
+        'sms_settings': sms_settings,
+        'tenant_settings': sms_settings,  # For template compatibility
+    }
+    
+    if request.method == 'POST':
+        form = TestSMSForm(request.POST)
+        if form.is_valid():
+            try:
+                # First, let's check if the SMS settings are properly configured
+                if not sms_settings.is_active:
+                    messages.error(request, 'SMS settings are not active for this tenant.')
+                    context['form'] = form
+                    return render(request, 'system_admin/sms/test_sms.html', context)
+                
+                if not sms_settings.is_configured():
+                    messages.error(request, 'SMS provider is not properly configured. Please check credentials.')
+                    context['form'] = form
+                    return render(request, 'system_admin/sms/test_sms.html', context)
+                
+                if not sms_settings.can_send_sms():
+                    messages.error(request, f'Cannot send SMS. Daily usage: {sms_settings.daily_usage}/{sms_settings.daily_limit}, Monthly usage: {sms_settings.monthly_usage}/{sms_settings.monthly_limit}')
+                    context['form'] = form
+                    return render(request, 'system_admin/sms/test_sms.html', context)
+                
+                result = send_sms(
+                    tenant_id=str(tenant_id),
+                    recipient=form.cleaned_data['test_number'],
+                    message=form.cleaned_data['test_message'],
+                    message_type='test'
+                )
+                
+                if result:
+                    messages.success(
+                        request, 
+                        f'Test SMS sent successfully! Message ID: {result.id} | Status: {result.status}'
+                    )
+                else:
+                    messages.error(
+                        request, 
+                        'Failed to send test SMS: Unable to send message (check limits or configuration)'
+                    )
+                    
+            except Exception as e:
+                messages.error(request, f'Error sending test SMS: {str(e)}')
+    else:
+        form = TestSMSForm()
+    
+    context['form'] = form
+    return render(request, 'system_admin/sms/test_sms.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def sms_messages(request):
+    """View SMS message logs"""
+    search_query = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+    tenant_filter = request.GET.get('tenant', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    messages_qs = SMSMessage.objects.select_related('tenant_settings__provider').all()
+    
+    if search_query:
+        messages_qs = messages_qs.filter(
+            Q(recipient__icontains=search_query) |
+            Q(message__icontains=search_query) |
+            Q(tenant_settings__tenant_name__icontains=search_query)
+        )
+    
+    if status_filter:
+        messages_qs = messages_qs.filter(status=status_filter)
+    
+    if tenant_filter:
+        messages_qs = messages_qs.filter(tenant_id=tenant_filter)
+    
+    if date_from:
+        messages_qs = messages_qs.filter(created_at__date__gte=date_from)
+    
+    if date_to:
+        messages_qs = messages_qs.filter(created_at__date__lte=date_to)
+    
+    # Pagination
+    paginator = Paginator(messages_qs.order_by('-created_at'), 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'title': 'SMS Messages',
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'tenant_filter': tenant_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'status_choices': SMSMessage.STATUS_CHOICES,
+        'tenants': TenantSMSSettings.objects.values('tenant_id', 'tenant_name').distinct(),
+    }
+    
+    return render(request, 'system_admin/sms/messages.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def sms_templates(request):
+    """View SMS templates"""
+    search_query = request.GET.get('search', '')
+    template_type = request.GET.get('type', '')
+    tenant_filter = request.GET.get('tenant', '')
+    
+    templates = SMSTemplate.objects.all()
+    
+    if search_query:
+        templates = templates.filter(
+            Q(name__icontains=search_query) |
+            Q(message__icontains=search_query) |
+            Q(tenant_id__icontains=search_query)
+        )
+    
+    if template_type:
+        templates = templates.filter(template_type=template_type)
+    
+    if tenant_filter:
+        templates = templates.filter(tenant_id=tenant_filter)
+    
+    # Pagination
+    paginator = Paginator(templates.order_by('-usage_count', '-last_used'), 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'title': 'SMS Templates',
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'template_type': template_type,
+        'tenant_filter': tenant_filter,
+        'template_types': SMSTemplate.TEMPLATE_TYPES,
+        'tenants': SMSTemplate.objects.values('tenant_id').distinct(),
+    }
+    
+    return render(request, 'system_admin/sms/templates.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def sms_statistics(request):
+    """SMS usage statistics"""
+    from django.db.models import Count, Sum, Avg
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    # Date range
+    days = int(request.GET.get('days', 30))
+    start_date = timezone.now() - timedelta(days=days)
+    
+    # Overall statistics
+    total_messages = SMSMessage.objects.filter(created_at__gte=start_date).count()
+    successful_messages = SMSMessage.objects.filter(
+        created_at__gte=start_date,
+        status='delivered'
+    ).count()
+    failed_messages = SMSMessage.objects.filter(
+        created_at__gte=start_date,
+        status='failed'
+    ).count()
+    
+    # Success rate
+    success_rate = (successful_messages / total_messages * 100) if total_messages > 0 else 0
+    
+    # Cost analysis
+    total_cost = SMSMessage.objects.filter(
+        created_at__gte=start_date
+    ).aggregate(Sum('cost'))['cost__sum'] or 0
+    
+    # Provider statistics
+    provider_stats = SMSMessage.objects.filter(
+        created_at__gte=start_date
+    ).values(
+        'tenant_settings__provider__name'
+    ).annotate(
+        message_count=Count('id'),
+        success_count=Count('id', filter=Q(status='delivered')),
+        total_cost=Sum('cost')
+    ).order_by('-message_count')
+    
+    # Tenant statistics
+    tenant_stats = SMSMessage.objects.filter(
+        created_at__gte=start_date
+    ).values(
+        'tenant_settings__tenant_name'
+    ).annotate(
+        message_count=Count('id'),
+        success_count=Count('id', filter=Q(status='delivered')),
+        total_cost=Sum('cost')
+    ).order_by('-message_count')[:10]
+    
+    # Daily message counts for chart
+    daily_stats = []
+    for i in range(days):
+        date = (timezone.now() - timedelta(days=i)).date()
+        count = SMSMessage.objects.filter(created_at__date=date).count()
+        daily_stats.append({
+            'date': date.strftime('%Y-%m-%d'),
+            'count': count
+        })
+    
+    context = {
+        'title': 'SMS Statistics',
+        'days': days,
+        'total_messages': total_messages,
+        'successful_messages': successful_messages,
+        'failed_messages': failed_messages,
+        'success_rate': round(success_rate, 2),
+        'total_cost': total_cost,
+        'provider_stats': provider_stats,
+        'tenant_stats': tenant_stats,
+        'daily_stats': list(reversed(daily_stats)),
+    }
+    
+    return render(request, 'system_admin/sms/statistics.html', context)
+
+
+@login_required
+@staff_member_required
+def create_sms_template(request):
+    """Create a new SMS template"""
+    from messaging.models import SMSTemplate
+    
+    if request.method == 'POST':
+        try:
+            template = SMSTemplate.objects.create(
+                name=request.POST.get('name'),
+                description=request.POST.get('description', ''),
+                content=request.POST.get('content'),
+                category=request.POST.get('category', 'general'),
+                is_active=request.POST.get('is_active') == 'on',
+                created_by=request.user
+            )
+            
+            messages.success(request, f'SMS template "{template.name}" created successfully!')
+            return redirect('system_admin:sms_templates')
+            
+        except Exception as e:
+            messages.error(request, f'Error creating template: {str(e)}')
+            return redirect('system_admin:sms_templates')
+    
+    return redirect('system_admin:sms_templates')
+
+
+@login_required
+@staff_member_required
+def edit_sms_template(request, template_id):
+    """Edit an existing SMS template"""
+    from messaging.models import SMSTemplate
+    
+    try:
+        template = SMSTemplate.objects.get(id=template_id)
+    except SMSTemplate.DoesNotExist:
+        messages.error(request, 'SMS template not found!')
+        return redirect('system_admin:sms_templates')
+    
+    if request.method == 'POST':
+        try:
+            template.name = request.POST.get('name')
+            template.description = request.POST.get('description', '')
+            template.content = request.POST.get('content')
+            template.category = request.POST.get('category', 'general')
+            template.is_active = request.POST.get('is_active') == 'on'
+            template.save()
+            
+            messages.success(request, f'SMS template "{template.name}" updated successfully!')
+            return redirect('system_admin:sms_templates')
+            
+        except Exception as e:
+            messages.error(request, f'Error updating template: {str(e)}')
+            return redirect('system_admin:sms_templates')
+    
+    return redirect('system_admin:sms_templates')
+
+
+@login_required
+@staff_member_required
+def delete_sms_template(request, template_id):
+    """Delete an SMS template"""
+    from messaging.models import SMSTemplate
+    
+    try:
+        template = SMSTemplate.objects.get(id=template_id)
+        template_name = template.name
+        template.delete()
+        
+        messages.success(request, f'SMS template "{template_name}" deleted successfully!')
+        
+    except SMSTemplate.DoesNotExist:
+        messages.error(request, 'SMS template not found!')
+    except Exception as e:
+        messages.error(request, f'Error deleting template: {str(e)}')
+    
+    return redirect('system_admin:sms_templates')

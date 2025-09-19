@@ -1,0 +1,173 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Create SMS Template{% endblock %}
+
+{% block page_title %}Create SMS Template{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/">Dashboard</a>
+</li>
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/messaging/">SMS Messages</a>
+</li>
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/messaging/templates/">Templates</a>
+</li>
+<li class="breadcrumb-item active">Create Template</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card card-primary">
+            <div class="card-header">
+                <h3 class="card-title">Create New SMS Template</h3>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="id_name">Template Name</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="text-danger">{{ form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_template_type">Template Type</label>
+                        {{ form.template_type }}
+                        {% if form.template_type.errors %}
+                            <div class="text-danger">{{ form.template_type.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_subject">Subject (Optional)</label>
+                        {{ form.subject }}
+                        {% if form.subject.errors %}
+                            <div class="text-danger">{{ form.subject.errors }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Optional subject line for template organization
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_message">Message</label>
+                        {{ form.message }}
+                        {% if form.message.errors %}
+                            <div class="text-danger">{{ form.message.errors }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            <span id="char-count">0</span>/160 characters
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_variables">Variables (Optional)</label>
+                        {{ form.variables }}
+                        {% if form.variables.errors %}
+                            <div class="text-danger">{{ form.variables.errors }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Comma-separated list of variables (e.g., name, amount, date)
+                        </small>
+                    </div>
+                    
+                    <div class="form-check">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="id_is_active">
+                            Active Template
+                        </label>
+                        {% if form.is_active.errors %}
+                            <div class="text-danger">{{ form.is_active.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Template
+                    </button>
+                    <a href="/business/{{ request.tenant.slug }}/messaging/templates/" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Templates
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card card-info">
+            <div class="card-header">
+                <h3 class="card-title">Template Tips</h3>
+            </div>
+            <div class="card-body">
+                <h6>Template Types:</h6>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success"></i> <strong>Welcome:</strong> New customer greetings</li>
+                    <li><i class="fas fa-check text-success"></i> <strong>Appointment:</strong> Booking confirmations</li>
+                    <li><i class="fas fa-check text-success"></i> <strong>Reminder:</strong> Service reminders</li>
+                    <li><i class="fas fa-check text-success"></i> <strong>Promotional:</strong> Marketing messages</li>
+                    <li><i class="fas fa-check text-success"></i> <strong>System:</strong> System notifications</li>
+                </ul>
+                
+                <h6 class="mt-3">Variables:</h6>
+                <ul class="list-unstyled">
+                    <li><small><code>{name}</code> - Customer name</small></li>
+                    <li><small><code>{service}</code> - Service name</small></li>
+                    <li><small><code>{date}</code> - Appointment date</small></li>
+                    <li><small><code>{time}</code> - Appointment time</small></li>
+                    <li><small><code>{amount}</code> - Payment amount</small></li>
+                    <li><small><code>{business}</code> - Business name</small></li>
+                </ul>
+                
+                <h6 class="mt-3">Best Practices:</h6>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-lightbulb text-warning"></i> Keep under 160 characters</li>
+                    <li><i class="fas fa-lightbulb text-warning"></i> Use clear, simple language</li>
+                    <li><i class="fas fa-lightbulb text-warning"></i> Include action if needed</li>
+                    <li><i class="fas fa-lightbulb text-warning"></i> Test before using</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Add form classes
+    $('#id_name').addClass('form-control');
+    $('#id_template_type').addClass('form-control');
+    $('#id_subject').addClass('form-control');
+    $('#id_message').addClass('form-control').attr('rows', 5);
+    $('#id_variables').addClass('form-control');
+    $('#id_is_active').addClass('form-check-input');
+    
+    // Character counter
+    function updateCharCount() {
+        var length = $('#id_message').val().length;
+        $('#char-count').text(length);
+        
+        if (length > 160) {
+            $('#char-count').addClass('text-danger');
+        } else if (length > 140) {
+            $('#char-count').addClass('text-warning').removeClass('text-danger');
+        } else {
+            $('#char-count').removeClass('text-danger text-warning');
+        }
+    }
+    
+    $('#id_message').on('input', updateCharCount);
+    
+    // Initial count
+    updateCharCount();
+});
+</script>
+{% endblock %}

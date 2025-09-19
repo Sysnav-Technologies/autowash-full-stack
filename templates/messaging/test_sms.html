@@ -1,0 +1,234 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Test SMS{% endblock %}
+
+{% block page_title %}Test SMS Service{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/">Dashboard</a>
+</li>
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/messaging/">SMS Messages</a>
+</li>
+<li class="breadcrumb-item active">Test SMS</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card card-info">
+            <div class="card-header">
+                <h3 class="card-title">Test SMS Functionality</h3>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-vial"></i> SMS Service Test</h5>
+                        Send a test message to verify your SMS configuration is working correctly.
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="phone_number">Your Phone Number</label>
+                        <input type="tel" class="form-control" id="phone_number" name="phone_number" 
+                               placeholder="+1234567890" required>
+                        <small class="form-text text-muted">
+                            Enter your phone number with country code to receive the test message
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="message">Test Message</label>
+                        <textarea class="form-control" id="message" name="message" rows="4" 
+                                  maxlength="160">This is a test message from Autowash SMS service. If you receive this, your SMS configuration is working correctly!</textarea>
+                        <small class="form-text text-muted">
+                            <span id="char-count">118</span>/160 characters
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Important:</h6>
+                        <ul class="mb-0">
+                            <li>This will send a real SMS to the provided number</li>
+                            <li>SMS charges may apply based on your provider</li>
+                            <li>Make sure the number can receive SMS messages</li>
+                            <li>Check spam/junk folders if using SMS-to-email</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-info">
+                        <i class="fas fa-vial"></i> Send Test SMS
+                    </button>
+                    <a href="/business/{{ request.tenant.slug }}/messaging/settings/" class="btn btn-secondary">
+                        <i class="fas fa-cog"></i> SMS Settings
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/messaging/" class="btn btn-outline-secondary">
+                        <i class="fas fa-list"></i> View Messages
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card card-success">
+            <div class="card-header">
+                <h3 class="card-title">Test Checklist</h3>
+            </div>
+            <div class="card-body">
+                <div class="checklist">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check1">
+                        <label class="form-check-label" for="check1">
+                            SMS provider is configured
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check2">
+                        <label class="form-check-label" for="check2">
+                            API credentials are valid
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check3">
+                        <label class="form-check-label" for="check3">
+                            Phone number format is correct
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check4">
+                        <label class="form-check-label" for="check4">
+                            SMS service is active
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check5">
+                        <label class="form-check-label" for="check5">
+                            Within daily/monthly limits
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card card-warning">
+            <div class="card-header">
+                <h3 class="card-title">Troubleshooting</h3>
+            </div>
+            <div class="card-body">
+                <h6>If test fails:</h6>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-arrow-right text-warning"></i> Check SMS provider settings</li>
+                    <li><i class="fas fa-arrow-right text-warning"></i> Verify API credentials</li>
+                    <li><i class="fas fa-arrow-right text-warning"></i> Check phone number format</li>
+                    <li><i class="fas fa-arrow-right text-warning"></i> Review error logs</li>
+                    <li><i class="fas fa-arrow-right text-warning"></i> Contact system administrator</li>
+                </ul>
+                
+                <h6 class="mt-3">Common Issues:</h6>
+                <ul class="list-unstyled">
+                    <li><small><i class="fas fa-times text-danger"></i> Invalid phone number format</small></li>
+                    <li><small><i class="fas fa-times text-danger"></i> Missing country code</small></li>
+                    <li><small><i class="fas fa-times text-danger"></i> Exceeded rate limits</small></li>
+                    <li><small><i class="fas fa-times text-danger"></i> Blocked/invalid recipient</small></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card card-light">
+            <div class="card-header">
+                <h3 class="card-title">Provider Info</h3>
+            </div>
+            <div class="card-body" id="provider-info">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin"></i> Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Character counter
+    $('#message').on('input', function() {
+        var length = $(this).val().length;
+        $('#char-count').text(length);
+        
+        if (length > 160) {
+            $('#char-count').addClass('text-danger');
+        } else if (length > 140) {
+            $('#char-count').addClass('text-warning').removeClass('text-danger');
+        } else {
+            $('#char-count').removeClass('text-danger text-warning');
+        }
+    });
+    
+    // Phone number formatting
+    $('#phone_number').on('input', function() {
+        var value = $(this).val().replace(/\D/g, '');
+        if (value && !$(this).val().startsWith('+')) {
+            $(this).val('+' + value);
+        }
+        
+        // Check format and update checklist
+        var isValid = /^\+\d{10,15}$/.test($(this).val());
+        $('#check3').prop('checked', isValid);
+    });
+    
+    // Load provider information
+    $.get('/business/{{ request.tenant.slug }}/messaging/api/statistics/')
+        .done(function(data) {
+            // Update checklist based on data
+            $('#check1').prop('checked', true); // Provider configured if we got data
+            $('#check4').prop('checked', true); // Service active if we got data
+            $('#check5').prop('checked', true); // Assume within limits for now
+            
+            // Show provider info
+            $('#provider-info').html(
+                '<div class="text-center">' +
+                '<div class="description-block">' +
+                '<span class="description-text">SMS service is configured and active</span>' +
+                '</div>' +
+                '</div>'
+            );
+        })
+        .fail(function() {
+            $('#provider-info').html(
+                '<div class="alert alert-danger">' +
+                'SMS service not configured. Contact system administrator.' +
+                '</div>'
+            );
+        });
+    
+    // Form validation
+    $('form').submit(function(e) {
+        var phoneNumber = $('#phone_number').val();
+        if (!/^\+\d{10,15}$/.test(phoneNumber)) {
+            e.preventDefault();
+            alert('Please enter a valid phone number with country code (e.g., +1234567890)');
+            $('#phone_number').focus();
+            return false;
+        }
+        
+        if (confirm('Send test SMS to ' + phoneNumber + '?')) {
+            $('button[type="submit"]').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Sending...');
+            return true;
+        } else {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    // Initial character count
+    $('#message').trigger('input');
+});
+</script>
+{% endblock %}

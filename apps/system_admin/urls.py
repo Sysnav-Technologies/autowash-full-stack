@@ -71,6 +71,22 @@ urlpatterns = [
     path('gateways/<uuid:tenant_id>/<uuid:gateway_id>/delete/', views.delete_tenant_gateway, name='delete_tenant_gateway'),
     path('gateways/<uuid:tenant_id>/<uuid:gateway_id>/toggle/', views.toggle_tenant_gateway, name='toggle_tenant_gateway'),
     
+    # SMS Management
+    path('sms/', views.sms_management, name='sms_management'),
+    path('sms/providers/', views.sms_providers, name='sms_providers'),
+    path('sms/providers/create/', views.create_sms_provider, name='create_sms_provider'),
+    path('sms/providers/<int:provider_id>/edit/', views.edit_sms_provider, name='edit_sms_provider'),
+    path('sms/providers/<int:provider_id>/delete/', views.delete_sms_provider, name='delete_sms_provider'),
+    path('sms/tenant-settings/', views.tenant_sms_settings, name='tenant_sms_settings'),
+    path('sms/tenant-settings/<uuid:tenant_id>/', views.setup_tenant_sms, name='setup_tenant_sms'),
+    path('sms/tenant-settings/<uuid:tenant_id>/test/', views.test_tenant_sms, name='test_tenant_sms'),
+    path('sms/messages/', views.sms_messages, name='sms_messages'),
+    path('sms/templates/', views.sms_templates, name='sms_templates'),
+    path('sms/templates/create/', views.create_sms_template, name='create_sms_template'),
+    path('sms/templates/<int:template_id>/edit/', views.edit_sms_template, name='edit_sms_template'),
+    path('sms/templates/<int:template_id>/delete/', views.delete_sms_template, name='delete_sms_template'),
+    path('sms/statistics/', views.sms_statistics, name='sms_statistics'),
+    
     # Settings & Tools
     path('settings/', views.system_settings, name='system_settings'),
     path('export/', views.export_data, name='export_data'),

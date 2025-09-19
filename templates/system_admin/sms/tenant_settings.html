@@ -1,0 +1,285 @@
+{% extends 'system_admin/base.html' %}
+{% load humanize %}
+
+{% block title %}Tenant SMS Settings - System Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-building text-primary"></i>
+            Tenant SMS Settings
+        </h1>
+        <a href="{% url 'system_admin:sms_management' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="search" class="form-label">Search</label>
+                    <input type="text" class="form-control" id="search" name="search" 
+                           value="{{ search_query }}" placeholder="Tenant name or ID...">
+                </div>
+                <div class="col-md-2">
+                    <label for="provider" class="form-label">Provider</label>
+                    <select class="form-select" id="provider" name="provider">
+                        <option value="">All Providers</option>
+                        {% for provider in providers %}
+                        <option value="{{ provider.id }}" 
+                                {% if provider_filter == provider.id|stringformat:"s" %}selected{% endif %}>
+                            {{ provider.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">All Status</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                        <option value="configured" {% if status_filter == 'configured' %}selected{% endif %}>Configured</option>
+                        <option value="not_configured" {% if status_filter == 'not_configured' %}selected{% endif %}>Not Configured</option>
+                    </select>
+                </div>
+                <div class="col-md-2 align-self-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Filter
+                    </button>
+                    <a href="{% url 'system_admin:tenant_sms_settings' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tenant Settings List -->
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                Tenant SMS Configurations
+                {% if page_obj.paginator.count %}
+                    <span class="badge bg-info text-white">{{ page_obj.paginator.count }} total</span>
+                {% endif %}
+            </h6>
+        </div>
+        <div class="card-body">
+            {% if page_obj %}
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Tenant</th>
+                                <th>Provider</th>
+                                <th>Status</th>
+                                <th>Usage Today</th>
+                                <th>Limits</th>
+                                <th>Billing</th>
+                                <th>Last Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in page_obj %}
+                            <tr>
+                                <td>
+                                    <div>
+                                        <strong>{{ item.tenant_name }}</strong>
+                                        <br><small class="text-muted">{{ item.tenant_id|truncatechars:20 }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if item.provider %}
+                                        <div class="d-flex align-items-center">
+                                            {% if item.provider.provider_type == 'host_pinnacle' %}
+                                                <i class="fab fa-whatsapp text-success me-2"></i>
+                                            {% elif item.provider.provider_type == 'africas_talking' %}
+                                                <i class="fas fa-globe-africa text-warning me-2"></i>
+                                            {% elif item.provider.provider_type == 'twilio' %}
+                                                <i class="fas fa-phone text-info me-2"></i>
+                                            {% else %}
+                                                <i class="fas fa-sms text-secondary me-2"></i>
+                                            {% endif %}
+                                            {{ item.provider.name }}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Not configured</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.has_sms %}
+                                        {% if item.is_active %}
+                                            <span class="badge bg-success text-white">
+                                                <i class="fas fa-check"></i> Active
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-pause"></i> Inactive
+                                            </span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-secondary text-white">
+                                            <i class="fas fa-times"></i> Not Configured
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.sms_settings %}
+                                        <div>
+                                            <strong>{{ item.sms_settings.daily_usage|intcomma }}</strong>
+                                            <br><small class="text-muted">messages sent</small>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.sms_settings %}
+                                        <div>
+                                            <small>
+                                                Daily: {{ item.sms_settings.daily_limit|intcomma|default:"∞" }}<br>
+                                                Monthly: {{ item.sms_settings.monthly_limit|intcomma|default:"∞" }}
+                                            </small>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.sms_settings %}
+                                        {% if item.sms_settings.use_autowash_billing %}
+                                            <span class="badge bg-info text-white">Autowash Billing</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary text-white">Own Billing</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.sms_settings %}
+                                        <small class="text-muted">
+                                            {{ item.sms_settings.updated_at|timesince }} ago
+                                        </small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'system_admin:setup_tenant_sms' item.tenant_id %}" 
+                                           class="btn btn-sm btn-outline-primary" title="Configure SMS">
+                                            {% if item.has_sms %}
+                                                <i class="fas fa-cog"></i>
+                                            {% else %}
+                                                <i class="fas fa-plus"></i>
+                                            {% endif %}
+                                        </a>
+                                        {% if item.is_active and item.provider %}
+                                            <a href="{% url 'system_admin:test_tenant_sms' item.tenant_id %}" 
+                                               class="btn btn-sm btn-outline-success" title="Test SMS">
+                                                <i class="fas fa-paper-plane"></i>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if provider_filter %}&provider={{ provider_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for page_num in page_obj.paginator.page_range %}
+                            {% if page_num == page_obj.number %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                            {% elif page_num > page_obj.number|add:'-3' and page_num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if provider_filter %}&provider={{ provider_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                        {{ page_num }}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if provider_filter %}&provider={{ provider_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-building fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No Tenant SMS Settings</h5>
+                    <p class="text-muted">No tenants have SMS configured yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Statistics Summary -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card border-left-primary shadow">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                        Active SMS Tenants
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                        {{ page_obj.object_list|length }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-left-success shadow">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                        Using Autowash Billing
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                        {% with autowash_billing=page_obj.object_list|length %}{{ autowash_billing }}{% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-left-info shadow">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                        Total Configured
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                        {{ page_obj.paginator.count|default:0 }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

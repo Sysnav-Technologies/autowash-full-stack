@@ -1,0 +1,476 @@
+{% extends "system_admin/base.html" %}
+{% load static humanize %}
+
+{% block title %}SMS Statistics - System Admin{% endblock %}
+
+{% block page_title %}SMS Statistics{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system_admin:sms_management' %}">SMS Management</a></li>
+        <li class="breadcrumb-item active">Statistics</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Date Range Filter -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">From Date</label>
+                        <input type="date" class="form-control" name="from_date" value="{{ from_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">To Date</label>
+                        <input type="date" class="form-control" name="to_date" value="{{ to_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Quick Ranges</label>
+                        <select class="form-select" name="quick_range" title="Select quick date range">
+                            <option value="">Custom Range</option>
+                            <option value="today" {% if quick_range == 'today' %}selected{% endif %}>Today</option>
+                            <option value="yesterday" {% if quick_range == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                            <option value="week" {% if quick_range == 'week' %}selected{% endif %}>This Week</option>
+                            <option value="month" {% if quick_range == 'month' %}selected{% endif %}>This Month</option>
+                            <option value="quarter" {% if quick_range == 'quarter' %}selected{% endif %}>This Quarter</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-chart-bar"></i> Update Statistics
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Statistics -->
+    <div class="col-md-3">
+        <div class="info-box bg-info">
+            <span class="info-box-icon"><i class="fas fa-envelope"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Total Messages</span>
+                <span class="info-box-number">{{ overview.total_messages|intcomma }}</span>
+                <div class="progress">
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <span class="progress-description">
+                    {{ overview.total_messages_change|floatformat:1 }}% from previous period
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="info-box bg-success">
+            <span class="info-box-icon"><i class="fas fa-check"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Delivered</span>
+                <span class="info-box-number">{{ overview.delivered|intcomma }}</span>
+                <div class="progress">
+                    <div class="progress-bar bg-success" style="width: {{ overview.delivery_rate }}%"></div>
+                </div>
+                <span class="progress-description">
+                    {{ overview.delivery_rate|floatformat:1 }}% delivery rate
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="info-box bg-warning">
+            <span class="info-box-icon"><i class="fas fa-clock"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Pending</span>
+                <span class="info-box-number">{{ overview.pending|intcomma }}</span>
+                <div class="progress">
+                    <div class="progress-bar bg-warning" style="width: {{ overview.pending_rate }}%"></div>
+                </div>
+                <span class="progress-description">
+                    {{ overview.pending_rate|floatformat:1 }}% pending
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="info-box bg-danger">
+            <span class="info-box-icon"><i class="fas fa-times"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Failed</span>
+                <span class="info-box-number">{{ overview.failed|intcomma }}</span>
+                <div class="progress">
+                    <div class="progress-bar bg-danger" style="width: {{ overview.failure_rate }}%"></div>
+                </div>
+                <span class="progress-description">
+                    {{ overview.failure_rate|floatformat:1 }}% failure rate
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Messages Over Time Chart -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-line"></i>
+                    Messages Over Time
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="messagesChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Provider Distribution -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-pie"></i>
+                    Provider Distribution
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="providerChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Top Tenants -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-trophy"></i>
+                    Top Tenants by Volume
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Tenant</th>
+                                <th>Messages</th>
+                                <th>Delivery Rate</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tenant in top_tenants %}
+                            <tr>
+                                <td>
+                                    <div>
+                                        <strong>{{ tenant.name|truncatechars:20 }}</strong>
+                                        <br><small class="text-muted">{{ tenant.tenant_id|truncatechars:15 }}</small>
+                                    </div>
+                                </td>
+                                <td>{{ tenant.message_count|intcomma }}</td>
+                                <td>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-success" 
+                                             style="width: {{ tenant.delivery_rate }}%"></div>
+                                    </div>
+                                    <small>{{ tenant.delivery_rate|floatformat:1 }}%</small>
+                                </td>
+                                <td>KSh {{ tenant.total_cost|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Provider Performance -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-server"></i>
+                    Provider Performance
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>Messages</th>
+                                <th>Success Rate</th>
+                                <th>Avg Response Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for provider in provider_stats %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if provider.provider_type == 'host_pinnacle' %}
+                                            <i class="fab fa-whatsapp text-success me-2"></i>
+                                        {% elif provider.provider_type == 'africas_talking' %}
+                                            <i class="fas fa-globe-africa text-warning me-2"></i>
+                                        {% elif provider.provider_type == 'twilio' %}
+                                            <i class="fas fa-phone text-info me-2"></i>
+                                        {% else %}
+                                            <i class="fas fa-sms text-secondary me-2"></i>
+                                        {% endif %}
+                                        {{ provider.name }}
+                                    </div>
+                                </td>
+                                <td>{{ provider.message_count|intcomma }}</td>
+                                <td>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-{% if provider.success_rate >= 95 %}success{% elif provider.success_rate >= 85 %}warning{% else %}danger{% endif %}" 
+                                             style="width: {{ provider.success_rate }}%"></div>
+                                    </div>
+                                    <small>{{ provider.success_rate|floatformat:1 }}%</small>
+                                </td>
+                                <td>{{ provider.avg_response_time|floatformat:2 }}s</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Cost Analysis -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-dollar-sign"></i>
+                    Cost Analysis
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <div class="info-box bg-success">
+                            <span class="info-box-icon"><i class="fas fa-dollar-sign"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Total Cost</span>
+                                <span class="info-box-number">KSh {{ cost_analysis.total_cost|floatformat:2 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="info-box bg-info">
+                            <span class="info-box-icon"><i class="fas fa-calculator"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Avg Cost/SMS</span>
+                                <span class="info-box-number">KSh {{ cost_analysis.avg_cost_per_sms|floatformat:4 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <canvas id="costChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hourly Distribution -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-clock"></i>
+                    Hourly Distribution
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="hourlyChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Messages Over Time Chart
+    const messagesCtx = document.getElementById('messagesChart').getContext('2d');
+    new Chart(messagesCtx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_data.dates|safe }},
+            datasets: [{
+                label: 'Total Messages',
+                data: {{ chart_data.total_messages|safe }},
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1,
+                fill: false
+            }, {
+                label: 'Delivered',
+                data: {{ chart_data.delivered_messages|safe }},
+                borderColor: 'rgb(34, 197, 94)',
+                tension: 0.1,
+                fill: false
+            }, {
+                label: 'Failed',
+                data: {{ chart_data.failed_messages|safe }},
+                borderColor: 'rgb(239, 68, 68)',
+                tension: 0.1,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Provider Distribution Chart
+    const providerCtx = document.getElementById('providerChart').getContext('2d');
+    new Chart(providerCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ provider_chart.labels|safe }},
+            datasets: [{
+                data: {{ provider_chart.data|safe }},
+                backgroundColor: [
+                    '#FF6384',
+                    '#36A2EB',
+                    '#FFCE56',
+                    '#4BC0C0',
+                    '#9966FF',
+                    '#FF9F40'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    // Cost Chart
+    const costCtx = document.getElementById('costChart').getContext('2d');
+    new Chart(costCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ cost_chart.labels|safe }},
+            datasets: [{
+                label: 'Daily Cost',
+                data: {{ cost_chart.data|safe }},
+                backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                borderColor: 'rgb(34, 197, 94)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'KSh ' + value.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Hourly Distribution Chart
+    const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+    new Chart(hourlyCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ hourly_chart.labels|safe }},
+            datasets: [{
+                label: 'Messages by Hour',
+                data: {{ hourly_chart.data|safe }},
+                backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Hour of Day'
+                    }
+                }
+            }
+        }
+    });
+
+    // Quick range selector
+    const quickRangeSelect = document.querySelector('select[name="quick_range"]');
+    const fromDateInput = document.querySelector('input[name="from_date"]');
+    const toDateInput = document.querySelector('input[name="to_date"]');
+
+    quickRangeSelect.addEventListener('change', function() {
+        const today = new Date();
+        const formatDate = (date) => date.toISOString().split('T')[0];
+
+        switch(this.value) {
+            case 'today':
+                fromDateInput.value = formatDate(today);
+                toDateInput.value = formatDate(today);
+                break;
+            case 'yesterday':
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                fromDateInput.value = formatDate(yesterday);
+                toDateInput.value = formatDate(yesterday);
+                break;
+            case 'week':
+                const weekAgo = new Date(today);
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                fromDateInput.value = formatDate(weekAgo);
+                toDateInput.value = formatDate(today);
+                break;
+            case 'month':
+                const monthAgo = new Date(today);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                fromDateInput.value = formatDate(monthAgo);
+                toDateInput.value = formatDate(today);
+                break;
+            case 'quarter':
+                const quarterAgo = new Date(today);
+                quarterAgo.setMonth(quarterAgo.getMonth() - 3);
+                fromDateInput.value = formatDate(quarterAgo);
+                toDateInput.value = formatDate(today);
+                break;
+        }
+    });
+});
+</script>
+{% endblock %}

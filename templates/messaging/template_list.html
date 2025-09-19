@@ -1,0 +1,200 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}SMS Templates{% endblock %}
+
+{% block page_title %}SMS Templates{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/">Dashboard</a>
+</li>
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/messaging/">SMS Messages</a>
+</li>
+<li class="breadcrumb-item active">Templates</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">SMS Templates</h3>
+                <div class="card-tools">
+                    <a href="/business/{{ request.tenant.slug }}/messaging/templates/create/" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Create Template
+                    </a>
+                </div>
+            </div>
+
+            <div class="card-body table-responsive p-0">
+                <table class="table table-hover text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Message</th>
+                            <th>Variables</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for template in templates %}
+                        <tr>
+                            <td><strong>{{ template.name }}</strong></td>
+                            <td>
+                                <span class="badge badge-info">{{ template.get_template_type_display }}</span>
+                            </td>
+                            <td>
+                                <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                    {{ template.message|truncatechars:100 }}
+                                </div>
+                            </td>
+                            <td>
+                                {% if template.variables %}
+                                    <span class="badge badge-secondary">{{ template.variables }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ template.is_active|yesno:'success,secondary' }}">
+                                    {{ template.is_active|yesno:'Active,Inactive' }}
+                                </span>
+                            </td>
+                            <td>{{ template.created_at|date:"M d, Y" }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'messaging:edit_template' template.pk %}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-info view-template" 
+                                            data-id="{{ template.id }}" 
+                                            data-name="{{ template.name }}"
+                                            data-message="{{ template.message }}"
+                                            data-toggle="modal" data-target="#templateModal">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <a href="{% url 'messaging:delete_template' template.pk %}" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('Are you sure you want to delete this template?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                No SMS templates found. <a href="/business/{{ request.tenant.slug }}/messaging/templates/create/">Create your first template</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="card-footer">
+                <div class="row">
+                    <div class="col-sm-12 col-md-5">
+                        <div class="dataTables_info">
+                            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} entries
+                        </div>
+                    </div>
+                    <div class="col-sm-12 col-md-7">
+                        <div class="dataTables_paginate paging_simple_numbers">
+                            <ul class="pagination">
+                                {% if page_obj.has_previous %}
+                                    <li class="paginate_button page-item previous">
+                                        <a href="?page={{ page_obj.previous_page_number }}" class="page-link">Previous</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="paginate_button page-item active">
+                                    <span class="page-link">{{ page_obj.number }}</span>
+                                </li>
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="paginate_button page-item next">
+                                        <a href="?page={{ page_obj.next_page_number }}" class="page-link">Next</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Template Preview Modal -->
+<div class="modal fade" id="templateModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Template Preview</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="template-preview">
+                    <h6 id="template-name"></h6>
+                    <div class="form-group">
+                        <label>Message:</label>
+                        <div class="border p-3 bg-light" id="template-message"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Character Count:</label>
+                        <span id="template-char-count" class="badge badge-info"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="use-template">
+                    Use This Template
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('.view-template').click(function() {
+        var name = $(this).data('name');
+        var message = $(this).data('message');
+        
+        $('#template-name').text(name);
+        $('#template-message').text(message);
+        $('#template-char-count').text(message.length + '/160');
+        
+        if (message.length > 160) {
+            $('#template-char-count').removeClass('badge-info badge-warning').addClass('badge-danger');
+        } else if (message.length > 140) {
+            $('#template-char-count').removeClass('badge-info badge-danger').addClass('badge-warning');
+        } else {
+            $('#template-char-count').removeClass('badge-danger badge-warning').addClass('badge-info');
+        }
+    });
+    
+    $('#use-template').click(function() {
+        // This could be enhanced to redirect to send SMS with the template pre-filled
+        var message = $('#template-message').text();
+        var url = '/business/{{ request.tenant.slug }}/messaging/send/?template_message=' + encodeURIComponent(message);
+        window.location.href = url;
+    });
+});
+</script>
+{% endblock %}

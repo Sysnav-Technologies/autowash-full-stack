@@ -132,6 +132,7 @@ urlpatterns = [
     path('reports/', include('apps.reports.urls')),
     path('expenses/', include('apps.expenses.urls')),
     path('notifications/', include('apps.notification.urls')),
+    path('messaging/', include('messaging.urls')),
     
     # Legal documents and contact
     path('contact/', TemplateView.as_view(template_name='public/contact.html'), name='contact'),

@@ -1,0 +1,197 @@
+{% extends 'system_admin/base.html' %}
+{% load humanize %}
+
+{% block title %}SMS Providers - System Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-server text-primary"></i>
+            SMS Providers
+        </h1>
+        <div class="btn-group">
+            <a href="{% url 'system_admin:sms_management' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <a href="{% url 'system_admin:create_sms_provider' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Provider
+            </a>
+        </div>
+    </div>
+
+    <!-- Providers List -->
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Available SMS Providers</h6>
+        </div>
+        <div class="card-body">
+            {% if providers %}
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="providersTable">
+                        <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Rate per SMS</th>
+                                <th>Tenants Using</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for provider in providers %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if provider.provider_type == 'host_pinnacle' %}
+                                            <i class="fab fa-whatsapp text-success me-2"></i>
+                                        {% elif provider.provider_type == 'africas_talking' %}
+                                            <i class="fas fa-globe-africa text-warning me-2"></i>
+                                        {% elif provider.provider_type == 'twilio' %}
+                                            <i class="fas fa-phone text-info me-2"></i>
+                                        {% else %}
+                                            <i class="fas fa-sms text-secondary me-2"></i>
+                                        {% endif %}
+                                        <div>
+                                            <strong>{{ provider.name }}</strong>
+                                            {% if provider.description %}
+                                                <br><small class="text-muted">{{ provider.description|truncatechars:50 }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary text-white">
+                                        {{ provider.get_provider_type_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if provider.is_active %}
+                                        <span class="badge bg-success text-white">
+                                            <i class="fas fa-check"></i> Active
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger text-white">
+                                            <i class="fas fa-times"></i> Inactive
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info text-white">{{ provider.priority }}</span>
+                                </td>
+                                <td>
+                                    KSh {{ provider.rate_per_sms|floatformat:4 }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary text-white">
+                                        {{ provider.tenantsmsettings_set.count }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ provider.created_at|date:"M d, Y" }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'system_admin:edit_sms_provider' provider.id %}" 
+                                           class="btn btn-sm btn-outline-primary" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        {% if provider.tenantsmsettings_set.count == 0 %}
+                                            <a href="{% url 'system_admin:delete_sms_provider' provider.id %}" 
+                                               class="btn btn-sm btn-outline-danger" 
+                                               onclick="return confirm('Are you sure you want to delete this provider?')" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        {% else %}
+                                            <button class="btn btn-sm btn-outline-secondary" disabled title="Cannot delete - in use">
+                                                <i class="fas fa-lock"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No SMS Providers</h5>
+                    <p class="text-muted">Add your first SMS provider to get started.</p>
+                    <a href="{% url 'system_admin:create_sms_provider' %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add SMS Provider
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Provider Types Info -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Supported Provider Types</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-center">
+                                    <i class="fab fa-whatsapp fa-2x text-success mb-2"></i>
+                                    <h6>Host Pinnacle</h6>
+                                    <small class="text-muted">WhatsApp Business API integration for comprehensive messaging solutions</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-center">
+                                    <i class="fas fa-globe-africa fa-2x text-warning mb-2"></i>
+                                    <h6>Africa's Talking</h6>
+                                    <small class="text-muted">Pan-African SMS gateway with competitive rates</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-center">
+                                    <i class="fas fa-phone fa-2x text-info mb-2"></i>
+                                    <h6>Twilio</h6>
+                                    <small class="text-muted">Global SMS, voice, and messaging platform</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-center">
+                                    <i class="fas fa-sms fa-2x text-secondary mb-2"></i>
+                                    <h6>Autowash Default</h6>
+                                    <small class="text-muted">Built-in SMS provider for basic messaging needs</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#providersTable').DataTable({
+        "order": [[ 3, "asc" ]], // Sort by priority
+        "pageLength": 25,
+        "responsive": true
+    });
+});
+</script>
+{% endblock %}

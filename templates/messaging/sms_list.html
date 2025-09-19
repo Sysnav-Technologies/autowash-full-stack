@@ -1,0 +1,231 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}SMS Messages{% endblock %}
+
+{% block page_title %}SMS Messages{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+    <a href="/business/{{ request.tenant.slug }}/">Dashboard</a>
+</li>
+<li class="breadcrumb-item active">SMS Messages</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">SMS Messages</h3>
+                <div class="card-tools">
+                    <a href="/business/{{ request.tenant.slug }}/messaging/send/" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Send SMS
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/messaging/bulk/" class="btn btn-info btn-sm">
+                        <i class="fas fa-broadcast-tower"></i> Bulk SMS
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card-body border-bottom">
+                <form method="get" class="row">
+                    <div class="col-md-4">
+                        <input type="text" name="search" class="form-control" 
+                               placeholder="Search messages..." value="{{ search_query }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="status" class="form-control">
+                            <option value="">All Status</option>
+                            {% for status, label in status_choices %}
+                                <option value="{{ status }}" {% if status == status_filter %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-secondary">Filter</button>
+                    </div>
+                    <div class="col-md-3 text-right">
+                        <a href="/business/{{ request.tenant.slug }}/messaging/api/statistics/" class="btn btn-outline-info btn-sm" 
+                           id="view-stats">
+                            <i class="fas fa-chart-bar"></i> Statistics
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card-body table-responsive p-0">
+                <table class="table table-hover text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Recipient</th>
+                            <th>Message</th>
+                            <th>Status</th>
+                            <th>Provider</th>
+                            <th>Sent</th>
+                            <th>Delivered</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for message in messages %}
+                        <tr>
+                            <td>{{ message.recipient }}</td>
+                            <td>
+                                <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                    {{ message.message|truncatechars:50 }}
+                                </div>
+                            </td>
+                            <td>
+                                {% if message.status == 'delivered' %}
+                                    <span class="badge badge-success">{{ message.get_status_display }}</span>
+                                {% elif message.status == 'failed' %}
+                                    <span class="badge badge-danger">{{ message.get_status_display }}</span>
+                                {% elif message.status == 'sent' %}
+                                    <span class="badge badge-info">{{ message.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge badge-warning">{{ message.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ message.provider_type|title }}</td>
+                            <td>
+                                {% if message.sent_at %}
+                                    {{ message.sent_at|date:"M d, Y H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if message.delivered_at %}
+                                    {{ message.delivered_at|date:"M d, Y H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-info view-message" 
+                                        data-id="{{ message.id }}" data-toggle="modal" data-target="#messageModal">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% if message.error_message %}
+                                <button class="btn btn-sm btn-outline-danger" 
+                                        title="{{ message.error_message }}">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                No SMS messages found.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="card-footer">
+                <div class="row">
+                    <div class="col-sm-12 col-md-5">
+                        <div class="dataTables_info">
+                            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} entries
+                        </div>
+                    </div>
+                    <div class="col-sm-12 col-md-7">
+                        <div class="dataTables_paginate paging_simple_numbers">
+                            <ul class="pagination">
+                                {% if page_obj.has_previous %}
+                                    <li class="paginate_button page-item previous">
+                                        <a href="?page={{ page_obj.previous_page_number }}&search={{ search_query }}&status={{ status_filter }}" 
+                                           class="page-link">Previous</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="paginate_button page-item active">
+                                    <span class="page-link">{{ page_obj.number }}</span>
+                                </li>
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="paginate_button page-item next">
+                                        <a href="?page={{ page_obj.next_page_number }}&search={{ search_query }}&status={{ status_filter }}" 
+                                           class="page-link">Next</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Message Details Modal -->
+<div class="modal fade" id="messageModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">SMS Message Details</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="message-details">
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('.view-message').click(function() {
+        var messageId = $(this).data('id');
+        $('#message-details').html('Loading...');
+        
+        $.get('/business/{{ request.tenant.slug }}/messaging/api/message/' + messageId + '/status/')
+            .done(function(data) {
+                var html = '<div class="row">' +
+                    '<div class="col-md-6"><strong>Status:</strong> ' + data.status + '</div>' +
+                    '<div class="col-md-6"><strong>Created:</strong> ' + new Date(data.created_at).toLocaleString() + '</div>' +
+                    '</div><br>';
+                
+                if (data.sent_at) {
+                    html += '<div class="row">' +
+                        '<div class="col-md-6"><strong>Sent At:</strong> ' + new Date(data.sent_at).toLocaleString() + '</div>' +
+                        '</div><br>';
+                }
+                
+                if (data.delivered_at) {
+                    html += '<div class="row">' +
+                        '<div class="col-md-6"><strong>Delivered At:</strong> ' + new Date(data.delivered_at).toLocaleString() + '</div>' +
+                        '</div><br>';
+                }
+                
+                if (data.error_message) {
+                    html += '<div class="row">' +
+                        '<div class="col-12"><strong>Error:</strong> <span class="text-danger">' + data.error_message + '</span></div>' +
+                        '</div>';
+                }
+                
+                $('#message-details').html(html);
+            })
+            .fail(function() {
+                $('#message-details').html('<div class="alert alert-danger">Failed to load message details.</div>');
+            });
+    });
+});
+</script>
+{% endblock %}
