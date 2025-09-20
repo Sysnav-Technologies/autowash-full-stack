@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Receipt - {{ service_order.order_number }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Font A", "Font B", Arial, sans-serif;
+            font-size: 9px;
+            line-height: 1.1;
+            color: #000;
+            background: #f5f5f5;
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+        }
+        
+        .receipt {
+            width: 40mm;
+            margin: 0 auto;
+            padding: 1mm;
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        
+        @media print {
+            body {
+                width: 58mm;
+                margin: 0;
+                padding: 0;
+                background: #fff;
+                display: block;
+                min-height: 0;
+            }
+            .receipt {
+                width: 40mm;
+                margin: 0 auto;
+                padding: 1mm;
+                box-shadow: none;
+                border-radius: 0;
+            }
+            @page {
+                size: 58mm auto;
+                margin: 0;
+            }
+        }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 1mm;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 0.5mm;
+        }
+        
+        .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 0.5mm;
+        }
+        
+        .company-info {
+            font-size: 10px;
+            margin-bottom: 0.2mm;
+        }
+        
+        .receipt-title {
+            font-size: 12px;
+            font-weight: bold;
+            margin: 0.5mm 0;
+        }
+        
+        /* Info sections */
+        .info-section {
+            margin: 0.5mm 0;
+        }
+        
+        .info-row {
+            display: block;
+            width: 100%;
+            margin-bottom: 0.2mm;
+            font-size: 10px;
+            overflow: hidden;
+        }
+        
+        .info-label {
+            display: inline-block;
+            width: 45%;
+            text-align: left;
+            float: left;
+        }
+        
+        .info-value {
+            display: inline-block;
+            width: 54%;
+            text-align: right;
+            font-weight: bold;
+            float: right;
+        }
+        
+        .clear-float {
+            clear: both;
+        }
+        
+        /* Separator */
+        .separator {
+            border-bottom: 1px dashed #000;
+            margin: 0.5mm 0;
+            height: 1px;
+        }
+        
+        .double-separator {
+            border-bottom: 2px solid #000;
+            margin: 1mm 0;
+            height: 2px;
+        }
+        
+        /* Services Section */
+        .services-section {
+            margin: 1mm 0;
+        }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            margin: 0.5mm 0;
+        }
+        
+        .service-item {
+            margin: 0.5mm 0;
+            font-size: 10px;
+        }
+        
+        .service-name {
+            font-weight: bold;
+            margin-bottom: 0.2mm;
+        }
+        
+        .service-details {
+            display: block;
+            margin-bottom: 0.2mm;
+        }
+        
+        .service-qty {
+            float: left;
+            width: 30%;
+        }
+        
+        .service-price {
+            float: right;
+            width: 40%;
+            text-align: right;
+        }
+        
+        /* Amount Section */
+        .amount-section {
+            margin: 0.5mm 0;
+        }
+        
+        .amount-large {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            margin: 1mm 0;
+        }
+        
+        /* Status Section */
+        .status-section {
+            margin: 1mm 0;
+            text-align: center;
+        }
+        
+        .thermal-spacing {
+            margin-bottom: 0.2mm;
+            font-size: 10px;
+        }
+        
+        /* VAT */
+        .vat-header {
+            font-size: 7px;
+            text-align: center;
+            margin: 1mm 0 0.5mm 0;
+        }
+        
+        .vat-line {
+            font-size: 7px;
+            margin-bottom: 0.3mm;
+        }
+        
+        .vat-code {
+            display: inline-block;
+            width: 30%;
+        }
+        
+        .vat-taxable {
+            display: inline-block;
+            width: 35%;
+            text-align: center;
+        }
+        
+        .vat-tax {
+            display: inline-block;
+            width: 34%;
+            text-align: right;
+        }
+        
+        /* Payment */
+        .payment-status {
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            margin: 1mm 0;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            font-size: 10px;
+            margin-top: 1mm;
+        }
+        
+        .powered-by {
+            margin-top: 1mm;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        
+        /* QR Section */
+        .qr-section {
+            text-align: center;
+            margin: 1mm 0;
+            font-family: monospace;
+            font-size: 6px;
+            line-height: 0.8;
+        }
+        
+        /* Transaction Reference */
+        .transaction-ref {
+            font-size: 8px;
+            font-weight: normal;
+            margin-bottom: 0.2mm;
+        }
+        
+        .cut-line {
+            text-align: center;
+            font-size: 7px;
+            margin-top: 3mm;
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <!-- Header -->
+        <div class="header">
+            <div class="company-name">{{ business.name|upper }}</div>
+            <div class="company-info">Tel: {{ business.phone_number }}</div>
+            <div class="company-info">{{ business.email }}</div>
+            <div class="receipt-title">RECEIPT</div>
+        </div>
+        
+        <!-- Order Information -->
+        <div class="info-section">
+            <div class="info-row">
+                <span class="info-label">Order No:</span>
+                <span class="info-value">{{ service_order.order_number }}</span>
+                <div class="clear-float"></div>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Date:</span>
+                <span class="info-value">{{ service_order.created_at|date:"d/m/Y H:i" }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% if service_order.assigned_attendant %}
+            <div class="info-row">
+                <span class="info-label">Attendant:</span>
+                <span class="info-value">{{ service_order.assigned_attendant.user.first_name }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="separator"></div>
+        
+        <!-- Customer & Vehicle Information -->
+        {% if service_order.customer or service_order.vehicle %}
+        <div class="info-section">
+            {% if service_order.customer %}
+            <div class="info-row">
+                <span class="info-label">Customer:</span>
+                <span class="info-value">{{ service_order.customer.first_name }} {{ service_order.customer.last_name }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% endif %}
+            {% if service_order.vehicle %}
+            <div class="info-row">
+                <span class="info-label">Vehicle:</span>
+                <span class="info-value">{{ service_order.vehicle.license_plate }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% endif %}
+        </div>
+        <div class="separator"></div>
+        {% endif %}
+        
+        <div class="separator"></div>
+        
+        <!-- Items/Services -->
+        {% if service_order.has_services or service_order.has_inventory_items %}
+        <div class="services-section">
+            <div class="section-title">ITEMS/SERVICES</div>
+            
+            {% if service_order.has_services %}
+            {% for item in service_order.service_items %}
+            <div class="service-item">
+                <div class="service-name">{{ item.service.name }}</div>
+                <div class="service-details">
+                    <span class="service-qty">Qty: {{ item.quantity }}</span>
+                    <span class="service-price">{{ item.total_price|floatformat:0 }}</span>
+                    <div class="clear-float"></div>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+            
+            {% if service_order.has_inventory_items %}
+            {% for item in service_order.inventory_items %}
+            <div class="service-item">
+                <div class="service-name">{{ item.item_name }}</div>
+                <div class="service-details">
+                    <span class="service-qty">Qty: {{ item.quantity }}</span>
+                    <span class="service-price">{{ item.total_price|floatformat:0 }}</span>
+                    <div class="clear-float"></div>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+        <div class="separator"></div>
+        {% endif %}
+        
+        <!-- Totals -->
+        <div class="amount-section">
+            <div class="info-row">
+                <span class="info-label">Sub Total:</span>
+                <span class="info-value">{{ service_order.subtotal|floatformat:0 }}</span>
+                <div class="clear-float"></div>
+            </div>
+            <div class="info-row">
+                <span class="info-label">VAT (16%):</span>
+                <span class="info-value">{{ service_order.tax_amount|floatformat:0 }}</span>
+                <div class="clear-float"></div>
+            </div>
+        </div>
+        
+        <div class="double-separator"></div>
+        
+        <div class="amount-large">
+            TOTAL: {{ service_order.total_amount|floatformat:0 }}
+        </div>
+        
+        <div class="double-separator"></div>
+        
+        <!-- Payment Details -->
+        {% if payments %}
+        <div class="services-section">
+            <div class="section-title">PAYMENT DETAILS</div>
+            {% for payment in payments %}
+            <div class="service-item">
+                <div class="service-details">
+                    <span class="service-qty">{{ payment.payment_method.name }}</span>
+                    <span class="service-price">{{ payment.amount|floatformat:0 }}</span>
+                    <div class="clear-float"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="separator"></div>
+        {% endif %}
+        
+        <!-- Payment Summary -->
+        {% if payments %}
+        <div class="amount-section">
+            <div class="info-row">
+                <span class="info-label">Total Paid:</span>
+                <span class="info-value">{{ total_paid|floatformat:0 }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% if balance_due > 0 %}
+            <div class="info-row">
+                <span class="info-label">Balance Due:</span>
+                <span class="info-value">{{ balance_due|floatformat:0 }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% elif balance_due < 0 %}
+            <div class="info-row">
+                <span class="info-label">Change:</span>
+                <span class="info-value">{{ balance_due|floatformat:0|cut:"-" }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="amount-section">
+            <div class="info-row">
+                <span class="info-label">Amount Due:</span>
+                <span class="info-value">{{ service_order.total_amount|floatformat:0 }}</span>
+                <div class="clear-float"></div>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Balance Due:</span>
+                <span class="info-value">{{ service_order.total_amount|floatformat:0 }}</span>
+                <div class="clear-float"></div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="double-separator"></div>
+        
+        <!-- QR Code Section -->
+        <div class="qr-section">
+            {% if service_order.order_number %}
+                ████ █ █ ████ █ ████ █ █ ████<br>
+                █  █ ██  █  █   █  █  ██ █  █<br>
+                ████ █ █ ████ █ ████ █ █ ████<br>
+                {{ service_order.order_number }}
+            {% else %}
+                ████ █ █ ████ █ ████ █ █ ████<br>
+                █  █ ██  █  █   █  █  ██ █  █<br>
+                ████ █ █ ████ █ ████ █ █ ████<br>
+                {{ service_order.id }}
+            {% endif %}
+        </div>
+        
+        <div class="separator"></div>
+        
+        <!-- Payment Status -->
+        <div class="payment-status">
+            {% if payments %}
+                {% if balance_due > 0 %}
+                    STATUS: PARTIAL PAYMENT
+                {% else %}
+                    STATUS: FULLY PAID
+                {% endif %}
+            {% else %}
+                STATUS: UNPAID
+            {% endif %}
+        </div>
+        
+        <div class="separator"></div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div>Thank you for your business!</div>
+            <div>Visit us again!</div>
+            <div class="powered-by">Powered by AutoWash</div>
+        </div>
+        
+        <div class="cut-line">
+            ----------------------------------------
+        </div>
+    </div>
+    
+    <script>
+        // Auto-print when page loads
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        });
+        
+        // Print when Ctrl+P is pressed
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+        });
+    </script>
+</body>
+</html>
