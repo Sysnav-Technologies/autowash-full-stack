@@ -4,6 +4,8 @@ import io
 import logging
 from decimal import Decimal
 from datetime import datetime, timedelta
+import qrcode
+import base64
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -36,6 +38,31 @@ import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+def generate_qr_code_base64(data, size=3, border=1):
+    """Generate QR code as base64 image string"""
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=size,
+            border=border,
+        )
+        qr.add_data(data)
+        qr.make(fit=True)
+        
+        # Create QR code image
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        img_str = base64.b64encode(buffer.getvalue()).decode()
+        
+        return f"data:image/png;base64,{img_str}"
+    except Exception as e:
+        logger.error(f"QR Code generation failed: {e}")
+        return None
 
 def get_business_url(request, url_name, **kwargs):
     """Helper function to generate URLs with business slug"""
@@ -2533,9 +2560,16 @@ def order_print_view(request, pk):
     order = get_object_or_404(ServiceOrder, pk=pk)
     order_items = order.order_items.all().select_related('service')
     
+    # Generate QR code for order details URL
+    business_slug = request.tenant.slug
+    order_detail_url = f"{request.scheme}://{request.get_host()}/business/{business_slug}/services/orders/{order.id}/"
+    qr_code_image = generate_qr_code_base64(order_detail_url, size=2, border=1)
+    
     context = {
         'order': order,
         'order_items': order_items,
+        'qr_code_image': qr_code_image,
+        'order_detail_url': order_detail_url,
         'title': f'Print Order - {order.order_number}'
     }
     return render(request, 'services/order_print.html', context)
@@ -3747,6 +3781,41 @@ def order_receipt_view(request, pk):
     }
     
     return render(request, 'services/order_receipt.html', context)
+
+
+@login_required
+@employee_required()
+def order_receipt_print_view(request, pk):
+    """Service order thermal print receipt"""
+    order = get_object_or_404(ServiceOrder, id=pk)
+    
+    # Get all payments for this order
+    payments = order.payments.filter(
+        status__in=['completed', 'verified']
+    ).order_by('created_at')
+    
+    # Calculate totals
+    total_paid = sum(payment.amount for payment in payments)
+    balance_due = order.total_amount - total_paid
+    
+    # Generate QR code for order details URL
+    business_slug = request.tenant.slug
+    order_detail_url = f"{request.scheme}://{request.get_host()}/business/{business_slug}/services/orders/{order.id}/"
+    qr_code_image = generate_qr_code_base64(order_detail_url, size=2, border=1)
+    
+    context = {
+        'order': order,
+        'service_order': order,
+        'payments': payments,
+        'total_paid': total_paid,
+        'balance_due': balance_due,
+        'is_fully_paid': balance_due <= 0,
+        'qr_code_image': qr_code_image,
+        'order_detail_url': order_detail_url,
+        'title': f'Print Receipt - {order.order_number}'
+    }
+    
+    return render(request, 'services/order_receipt_print.html', context)
 
 
 @login_required

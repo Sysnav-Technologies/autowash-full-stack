@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order {{ order.order_number }} - Print</title>
+    <title>Service Order - {{ order.order_number }}</title>
     <style>
         * {
             margin: 0;
@@ -12,256 +12,267 @@
         }
         
         body {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.2;
+            font-family: "Font A", "Font B", Arial, sans-serif;
+            font-size: 9px;
+            line-height: 1.1;
             color: #000;
-            background: #fff;
-            padding: 0;
+            background: #f5f5f5;
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
         }
         
-        /* EPOS 80mm thermal printer styles */
+        .receipt {
+            width: 40mm;
+            margin: 0 auto;
+            padding: 1mm;
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        
         @media print {
             body {
-                width: 80mm;
-                max-width: 80mm;
+                width: 58mm;
                 margin: 0;
                 padding: 0;
-                font-family: 'Courier New', monospace;
-                font-size: 12px;
-                line-height: 1.2;
+                background: #fff;
+                display: block;
+                min-height: 0;
             }
-            
-            .order-print {
-                width: 100%;
+            .receipt {
+                width: 40mm;
+                margin: 0 auto;
+                padding: 1mm;
+                box-shadow: none;
+                border-radius: 0;
+            }
+            @page {
+                size: 58mm auto;
                 margin: 0;
-                padding: 0;
-            }
-            
-            .no-print {
-                display: none !important;
             }
         }
         
-        @page {
-            size: 80mm auto;
-            margin: 0;
-        }
-        
-        .order-print {
-            width: 80mm;
-            max-width: 80mm;
-            margin: 0 auto;
-            padding: 5mm;
-        }
-        
+        /* Header */
         .header {
             text-align: center;
-            margin-bottom: 8px;
-            padding-bottom: 8px;
+            margin-bottom: 1mm;
             border-bottom: 1px dashed #000;
+            padding-bottom: 0.5mm;
         }
         
         .company-name {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 2px;
-        }
-        
-        .company-details {
-            font-size: 10px;
-            margin-bottom: 1px;
-        }
-        
-        .document-title {
             font-size: 14px;
             font-weight: bold;
-            margin: 8px 0 4px 0;
-            text-align: center;
+            margin-bottom: 0.5mm;
         }
         
+        .company-info {
+            font-size: 10px;
+            margin-bottom: 0.2mm;
+        }
+        
+        .receipt-title {
+            font-size: 12px;
+            font-weight: bold;
+            margin: 0.5mm 0;
+        }
+        
+        /* Info sections */
         .info-section {
-            margin: 6px 0;
-            font-size: 11px;
+            margin: 0.5mm 0;
         }
         
         .info-row {
-            margin-bottom: 2px;
+            display: block;
             width: 100%;
+            margin-bottom: 0.2mm;
+            font-size: 10px;
             overflow: hidden;
-            clear: both;
         }
         
         .info-label {
+            display: inline-block;
             width: 45%;
             text-align: left;
             float: left;
-            font-size: 10px;
         }
         
         .info-value {
+            display: inline-block;
             width: 54%;
             text-align: right;
             font-weight: bold;
             float: right;
-            font-size: 10px;
-            word-wrap: break-word;
-        }
-        
-        .separator {
-            border-bottom: 1px dashed #000;
-            margin: 6px 0;
-            height: 1px;
-        }
-        
-        .double-separator {
-            border-bottom: 2px solid #000;
-            margin: 6px 0;
-            height: 2px;
-        }
-        
-        .services-section {
-            margin: 8px 0;
-        }
-        
-        .service-item {
-            margin: 2px 0;
-            font-size: 10px;
-            clear: both;
-        }
-        
-        .service-name {
-            font-weight: bold;
-            margin-bottom: 1px;
-        }
-        
-        .service-details {
-            display: block;
-            margin-bottom: 1px;
-        }
-        
-        .service-qty {
-            float: left;
-        }
-        
-        .service-price {
-            float: right;
-        }
-        
-        .service-duration {
-            font-size: 9px;
-        }
-        
-        .service-status {
-            float: right;
-            font-size: 9px;
         }
         
         .clear-float {
             clear: both;
         }
         
+        /* Separator */
+        .separator {
+            border-bottom: 1px dashed #000;
+            margin: 0.5mm 0;
+            height: 1px;
+        }
+        
+        .double-separator {
+            border-bottom: 2px solid #000;
+            margin: 1mm 0;
+            height: 2px;
+        }
+        
+        /* Services Section */
+        .services-section {
+            margin: 1mm 0;
+        }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            margin: 0.5mm 0;
+        }
+        
+        .service-item {
+            margin: 0.5mm 0;
+            font-size: 10px;
+        }
+        
+        .service-name {
+            font-weight: bold;
+            margin-bottom: 0.2mm;
+        }
+        
+        .service-details {
+            display: block;
+            margin-bottom: 0.2mm;
+        }
+        
+        .service-qty {
+            float: left;
+            width: 30%;
+        }
+        
+        .service-price {
+            float: right;
+            width: 40%;
+            text-align: right;
+        }
+        
+        /* Amount Section */
         .amount-section {
-            margin: 8px 0;
+            margin: 0.5mm 0;
         }
         
         .amount-large {
             font-size: 14px;
             font-weight: bold;
             text-align: center;
-            margin: 4px 0;
+            margin: 1mm 0;
         }
         
+        /* Status Section */
         .status-section {
-            margin: 8px 0;
+            margin: 1mm 0;
             text-align: center;
-        }
-        
-        .footer-section {
-            margin-top: 8px;
-            text-align: center;
-            font-size: 10px;
         }
         
         .thermal-spacing {
-            margin-bottom: 2px;
+            margin-bottom: 0.2mm;
+            font-size: 10px;
         }
         
-        .center-text {
+        /* Order Status */
+        .order-status {
             text-align: center;
-        }
-        
-        .section-title {
-            font-weight: bold;
             font-size: 11px;
-        }
-        
-        .discount-amount {
-            color: green;
-        }
-        
-        .notes-title {
             font-weight: bold;
+            margin: 1mm 0;
         }
         
-        .notes-content {
-            font-size: 10px;
+        /* Footer */
+        .footer {
             text-align: center;
+            font-size: 10px;
+            margin-top: 1mm;
         }
         
-        .cut-line {
-            margin-top: 10px;
-            text-align: center;
+        .powered-by {
+            margin-top: 1mm;
+            font-weight: bold;
             font-size: 10px;
+        }
+        
+        /* QR Section */
+        .qr-section {
+            text-align: center;
+            margin: 1mm 0;
+            font-family: monospace;
+            font-size: 6px;
+            line-height: 0.8;
+        }
+        
+        .qr-code {
+            margin: 1mm auto;
+            display: inline-block;
+        }
+        
+        .qr-code canvas {
+            max-width: 15mm;
+            height: auto;
+        }
+        
+        .order-number {
+            font-size: 8px;
+            margin-top: 0.5mm;
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
-    <div class="order-print">
-        <!-- Header Section -->
+    <div class="receipt">
+        <!-- Header -->
         <div class="header">
-            <div class="company-name">{{ request.tenant.name|upper }}</div>
-            {% if request.tenant.address %}
-            <div class="company-details">{{ request.tenant.address }}</div>
-            {% endif %}
-            {% if request.tenant.phone %}
-            <div class="company-details">Tel: {{ request.tenant.phone }}</div>
-            {% endif %}
-            {% if request.tenant.email %}
-            <div class="company-details">{{ request.tenant.email }}</div>
-            {% endif %}
+            <div class="company-name">{{ business.name|upper }}</div>
+            <div class="company-info">Tel: {{ business.phone_number }}</div>
+            <div class="company-info">{{ business.email }}</div>
+            <div class="receipt-title">SERVICE ORDER</div>
         </div>
-        
-        <div class="document-title">SERVICE ORDER</div>
         
         <!-- Order Information -->
         <div class="info-section">
             <div class="info-row">
                 <span class="info-label">Order No:</span>
                 <span class="info-value">{{ order.order_number }}</span>
+                <div class="clear-float"></div>
             </div>
             <div class="info-row">
                 <span class="info-label">Date:</span>
-                <span class="info-value">{{ order.created_at|date:"d/m/Y" }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Time:</span>
-                <span class="info-value">{{ order.created_at|date:"H:i" }}</span>
+                <span class="info-value">{{ order.created_at|date:"d/m/Y H:i" }}</span>
+                <div class="clear-float"></div>
             </div>
             <div class="info-row">
                 <span class="info-label">Priority:</span>
                 <span class="info-value">{{ order.get_priority_display }}</span>
+                <div class="clear-float"></div>
             </div>
             {% if order.scheduled_date %}
             <div class="info-row">
                 <span class="info-label">Scheduled:</span>
                 <span class="info-value">{{ order.scheduled_date|date:"d/m/Y" }}</span>
+                <div class="clear-float"></div>
             </div>
             {% endif %}
             {% if order.assigned_attendant %}
             <div class="info-row">
                 <span class="info-label">Attendant:</span>
                 <span class="info-value">{{ order.assigned_attendant.user.first_name }}</span>
+                <div class="clear-float"></div>
             </div>
             {% endif %}
         </div>
@@ -269,186 +280,139 @@
         <div class="separator"></div>
         
         <!-- Customer & Vehicle Information -->
+        {% if order.customer or order.vehicle %}
         <div class="info-section">
+            {% if order.customer %}
             <div class="info-row">
                 <span class="info-label">Customer:</span>
-                <span class="info-value">{{ order.customer.full_name }}</span>
-            </div>
-            {% if order.customer.phone %}
-            <div class="info-row">
-                <span class="info-label">Phone:</span>
-                <span class="info-value">{{ order.customer.phone }}</span>
+                <span class="info-value">{{ order.customer.first_name }} {{ order.customer.last_name }}</span>
+                <div class="clear-float"></div>
             </div>
             {% endif %}
-            {% if order.customer.customer_id %}
-            <div class="info-row">
-                <span class="info-label">Customer ID:</span>
-                <span class="info-value">{{ order.customer.customer_id }}</span>
-            </div>
-            {% endif %}
+            {% if order.vehicle %}
             <div class="info-row">
                 <span class="info-label">Vehicle:</span>
                 <span class="info-value">{{ order.vehicle.registration_number }}</span>
+                <div class="clear-float"></div>
             </div>
-            <div class="info-row">
-                <span class="info-label">Make/Model:</span>
-                <span class="info-value">{{ order.vehicle.make }} {{ order.vehicle.model }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Color:</span>
-                <span class="info-value">{{ order.vehicle.color }}</span>
-            </div>
+            {% endif %}
         </div>
-        
         <div class="separator"></div>
+        {% endif %}
         
-        <!-- Order Items -->
+        <!-- Package -->
         {% if order.package %}
         <div class="services-section">
-            <div class="center-text thermal-spacing section-title">
-                PACKAGE ORDERED
-            </div>
+            <div class="section-title">PACKAGE</div>
             <div class="service-item">
-                <div class="service-name">Package: {{ order.package.name }}</div>
+                <div class="service-name">{{ order.package.name }}</div>
+                <div class="service-details">
+                    <span class="service-qty">1x</span>
+                    <span class="service-price">{{ order.package.price|floatformat:2 }}</span>
+                    <div class="clear-float"></div>
+                </div>
             </div>
         </div>
         <div class="separator"></div>
         {% endif %}
         
-        {% if order.has_services %}
+        <!-- Services -->
+        {% if order.has_services or order.has_inventory_items %}
         <div class="services-section">
-            <div class="center-text thermal-spacing section-title">
-                SERVICES ORDERED
-            </div>
+            <div class="section-title">ITEMS/SERVICES</div>
+            
+            {% if order.has_services %}
             {% for item in order.service_items %}
             <div class="service-item">
-                <div class="service-name">{{ item.item_name }}</div>
+                <div class="service-name">{{ item.service.name }}</div>
                 <div class="service-details">
                     <span class="service-qty">Qty: {{ item.quantity }}</span>
-                    <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
-                    <div class="clear-float"></div>
-                </div>
-                <div class="service-details">
-                    <span class="service-duration">Duration: {{ item.service.estimated_duration }}min</span>
-                    <span class="service-status">
-                        {% if item.completed_at %}
-                            ✓ Done
-                        {% elif item.started_at %}
-                            ⏳ Progress
-                        {% else %}
-                            ⏸ Pending
-                        {% endif %}
-                    </span>
+                    <span class="service-price">{{ item.total_price|floatformat:2 }}</span>
                     <div class="clear-float"></div>
                 </div>
             </div>
             {% endfor %}
-        </div>
-        <div class="separator"></div>
-        {% endif %}
-        
-        {% if order.has_inventory_items %}
-        <div class="services-section">
-            <div class="center-text thermal-spacing section-title">
-                ITEMS ORDERED
-            </div>
+            {% endif %}
+            
+            {% if order.has_inventory_items %}
             {% for item in order.inventory_items %}
             <div class="service-item">
                 <div class="service-name">{{ item.item_name }}</div>
                 <div class="service-details">
                     <span class="service-qty">Qty: {{ item.quantity }}</span>
-                    <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
-                    <div class="clear-float"></div>
-                </div>
-                <div class="service-details">
-                    {% if item.inventory_item.sku %}
-                    <span class="service-duration">SKU: {{ item.inventory_item.sku }}</span>
-                    {% endif %}
-                    <span class="service-status">✓ Ready</span>
+                    <span class="service-price">{{ item.total_price|floatformat:2 }}</span>
                     <div class="clear-float"></div>
                 </div>
             </div>
             {% endfor %}
+            {% endif %}
         </div>
         <div class="separator"></div>
         {% endif %}
         
-        <div class="separator"></div>
-        
         <!-- Totals -->
         <div class="amount-section">
             <div class="info-row">
-                <span class="info-label">Subtotal (incl VAT):</span>
-                <span class="info-value">KES {{ order.total_amount|floatformat:2 }}</span>
+                <span class="info-label">Sub Total:</span>
+                <span class="info-value">{{ order.subtotal|floatformat:2 }}</span>
+                <div class="clear-float"></div>
             </div>
-            {% if order.discount_amount > 0 %}
             <div class="info-row">
-                <span class="info-label">Discount:</span>
-                <span class="info-value discount-amount">-KES {{ order.discount_amount|floatformat:2 }}</span>
+                <span class="info-label">VAT (16%):</span>
+                <span class="info-value">{{ order.tax_amount|floatformat:2 }}</span>
+                <div class="clear-float"></div>
             </div>
-            {% endif %}
         </div>
         
         <div class="double-separator"></div>
         
         <div class="amount-large">
-            TOTAL: KES {{ order.final_amount|default:order.total_amount|floatformat:2 }}
+            TOTAL: {{ order.total_amount|floatformat:2 }}
         </div>
         
         <div class="double-separator"></div>
         
-        <!-- Status -->
-        <div class="status-section">
-            <div class="thermal-spacing">
-                ORDER STATUS: {{ order.get_status_display|upper }}
+        <!-- QR Code Section -->
+        <div class="qr-section">
+            <div class="qr-code">
+                {% if qr_code_image %}
+                    <img src="{{ qr_code_image }}" alt="Order QR Code" style="width: 60px; height: 60px;">
+                {% else %}
+                    <div style="font-size: 8px; border: 1px solid #000; padding: 2mm; text-align: center; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;">
+                        Order: {{ order.order_number|default:order.id }}
+                    </div>
+                {% endif %}
             </div>
-            <div class="thermal-spacing">
-                PAYMENT: {{ order.get_payment_status_display|upper }}
-            </div>
-            {% if order.payment_method %}
-            <div class="thermal-spacing">
-                METHOD: {{ order.get_payment_method_display|upper }}
-            </div>
-            {% endif %}
+            <div class="order-number">{{ order.order_number|default:order.id }}</div>
         </div>
         
         <div class="separator"></div>
         
-        <!-- Notes -->
-        {% if order.special_instructions %}
-        <div class="info-section">
-            <div class="center-text thermal-spacing notes-title">
-                SPECIAL INSTRUCTIONS
-            </div>
-            <div class="notes-content">
-                {{ order.special_instructions|truncatechars:100 }}
-            </div>
+        <!-- Order Status -->
+        <div class="order-status">
+            STATUS: {{ order.get_status_display|upper }}
         </div>
+        
         <div class="separator"></div>
-        {% endif %}
         
         <!-- Footer -->
-        <div class="footer-section">
-            <div class="thermal-spacing">Thank you for choosing us!</div>
-            <div class="thermal-spacing">Service with Excellence</div>
-            {% if request.tenant.tax_number %}
-            <div class="thermal-spacing">VAT No: {{ request.tenant.tax_number }}</div>
-            {% endif %}
-            <div class="thermal-spacing">Printed: {{ "now"|date:"d/m/Y H:i" }}</div>
+        <div class="footer">
+            <div>Service Order Copy</div>
+            <div>Keep for reference</div>
+            <div class="powered-by">Powered by AutoWash</div>
         </div>
         
-        <!-- Cut line indicator for thermal printer -->
         <div class="cut-line">
-            ........................................
+            ----------------------------------------
         </div>
     </div>
     
     <script>
-        // Auto-print when page loads
+        // Simple auto-print functionality
         window.addEventListener('load', function() {
             setTimeout(function() {
                 window.print();
-            }, 500);
+            }, 1000);
         });
         
         // Print when Ctrl+P is pressed

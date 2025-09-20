@@ -493,6 +493,20 @@ def payment_receipt_view(request, payment_id):
     return render(request, 'payments/receipt.html', context)
 
 
+@login_required
+@employee_required()
+def payment_receipt_print_view(request, payment_id):
+    """Generate thermal print receipt"""
+    payment = get_object_or_404(Payment, payment_id=payment_id)
+    
+    context = {
+        'payment': payment,
+        'title': f'Print Receipt - {payment.payment_id}'
+    }
+    
+    return render(request, 'payments/receipt_print.html', context)
+
+
 def handle_split_payment(request, service_order, split_methods, split_amounts):
     """Handle split payment processing across multiple payment methods"""
     from apps.services.models import ServiceOrder

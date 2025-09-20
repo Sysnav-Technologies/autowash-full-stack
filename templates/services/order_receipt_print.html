@@ -246,6 +246,22 @@
             line-height: 0.8;
         }
         
+        .qr-code {
+            margin: 1mm auto;
+            display: inline-block;
+        }
+        
+        .qr-code canvas {
+            max-width: 15mm;
+            height: auto;
+        }
+        
+        .order-number {
+            font-size: 8px;
+            margin-top: 0.5mm;
+            font-family: monospace;
+        }
+        
         /* Transaction Reference */
         .transaction-ref {
             font-size: 8px;
@@ -327,7 +343,7 @@
                 <div class="service-name">{{ item.service.name }}</div>
                 <div class="service-details">
                     <span class="service-qty">Qty: {{ item.quantity }}</span>
-                    <span class="service-price">{{ item.total_price|floatformat:0 }}</span>
+                    <span class="service-price">{{ item.total_price|floatformat:2 }}</span>
                     <div class="clear-float"></div>
                 </div>
             </div>
@@ -340,7 +356,7 @@
                 <div class="service-name">{{ item.item_name }}</div>
                 <div class="service-details">
                     <span class="service-qty">Qty: {{ item.quantity }}</span>
-                    <span class="service-price">{{ item.total_price|floatformat:0 }}</span>
+                    <span class="service-price">{{ item.total_price|floatformat:2 }}</span>
                     <div class="clear-float"></div>
                 </div>
             </div>
@@ -354,12 +370,12 @@
         <div class="amount-section">
             <div class="info-row">
                 <span class="info-label">Sub Total:</span>
-                <span class="info-value">{{ service_order.subtotal|floatformat:0 }}</span>
+                <span class="info-value">{{ service_order.subtotal|floatformat:2 }}</span>
                 <div class="clear-float"></div>
             </div>
             <div class="info-row">
                 <span class="info-label">VAT (16%):</span>
-                <span class="info-value">{{ service_order.tax_amount|floatformat:0 }}</span>
+                <span class="info-value">{{ service_order.tax_amount|floatformat:2 }}</span>
                 <div class="clear-float"></div>
             </div>
         </div>
@@ -367,7 +383,7 @@
         <div class="double-separator"></div>
         
         <div class="amount-large">
-            TOTAL: {{ service_order.total_amount|floatformat:0 }}
+            TOTAL: {{ service_order.total_amount|floatformat:2 }}
         </div>
         
         <div class="double-separator"></div>
@@ -380,7 +396,7 @@
             <div class="service-item">
                 <div class="service-details">
                     <span class="service-qty">{{ payment.payment_method.name }}</span>
-                    <span class="service-price">{{ payment.amount|floatformat:0 }}</span>
+                    <span class="service-price">{{ payment.amount|floatformat:2 }}</span>
                     <div class="clear-float"></div>
                 </div>
             </div>
@@ -394,19 +410,19 @@
         <div class="amount-section">
             <div class="info-row">
                 <span class="info-label">Total Paid:</span>
-                <span class="info-value">{{ total_paid|floatformat:0 }}</span>
+                <span class="info-value">{{ total_paid|floatformat:2 }}</span>
                 <div class="clear-float"></div>
             </div>
             {% if balance_due > 0 %}
             <div class="info-row">
                 <span class="info-label">Balance Due:</span>
-                <span class="info-value">{{ balance_due|floatformat:0 }}</span>
+                <span class="info-value">{{ balance_due|floatformat:2 }}</span>
                 <div class="clear-float"></div>
             </div>
             {% elif balance_due < 0 %}
             <div class="info-row">
                 <span class="info-label">Change:</span>
-                <span class="info-value">{{ balance_due|floatformat:0|cut:"-" }}</span>
+                <span class="info-value">{{ balance_due|floatformat:2|cut:"-" }}</span>
                 <div class="clear-float"></div>
             </div>
             {% endif %}
@@ -415,12 +431,12 @@
         <div class="amount-section">
             <div class="info-row">
                 <span class="info-label">Amount Due:</span>
-                <span class="info-value">{{ service_order.total_amount|floatformat:0 }}</span>
+                <span class="info-value">{{ service_order.total_amount|floatformat:2 }}</span>
                 <div class="clear-float"></div>
             </div>
             <div class="info-row">
                 <span class="info-label">Balance Due:</span>
-                <span class="info-value">{{ service_order.total_amount|floatformat:0 }}</span>
+                <span class="info-value">{{ service_order.total_amount|floatformat:2 }}</span>
                 <div class="clear-float"></div>
             </div>
         </div>
@@ -430,17 +446,16 @@
         
         <!-- QR Code Section -->
         <div class="qr-section">
-            {% if service_order.order_number %}
-                ████ █ █ ████ █ ████ █ █ ████<br>
-                █  █ ██  █  █   █  █  ██ █  █<br>
-                ████ █ █ ████ █ ████ █ █ ████<br>
-                {{ service_order.order_number }}
-            {% else %}
-                ████ █ █ ████ █ ████ █ █ ████<br>
-                █  █ ██  █  █   █  █  ██ █  █<br>
-                ████ █ █ ████ █ ████ █ █ ████<br>
-                {{ service_order.id }}
-            {% endif %}
+            <div class="qr-code">
+                {% if qr_code_image %}
+                    <img src="{{ qr_code_image }}" alt="Order QR Code" style="width: 60px; height: 60px;">
+                {% else %}
+                    <div style="font-size: 8px; border: 1px solid #000; padding: 2mm; text-align: center; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;">
+                        Order: {{ service_order.order_number|default:service_order.id }}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="order-number">{{ service_order.order_number|default:service_order.id }}</div>
         </div>
         
         <div class="separator"></div>
@@ -473,11 +488,11 @@
     </div>
     
     <script>
-        // Auto-print when page loads
+        // Simple auto-print functionality
         window.addEventListener('load', function() {
             setTimeout(function() {
                 window.print();
-            }, 500);
+            }, 1000);
         });
         
         // Print when Ctrl+P is pressed
