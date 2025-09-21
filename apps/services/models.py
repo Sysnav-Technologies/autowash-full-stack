@@ -238,6 +238,7 @@ class ServiceOrder(TenantTimeStampedModel):
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
         ('in_progress', 'In Progress'),
+        ('paused', 'Paused'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
         ('no_show', 'No Show'),

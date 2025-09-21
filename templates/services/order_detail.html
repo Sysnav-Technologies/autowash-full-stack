@@ -81,6 +81,7 @@
 .status-pending { background: var(--warning-100); color: var(--warning-600); }
 .status-confirmed { background: var(--info-100); color: var(--info-600); }
 .status-in_progress { background: var(--primary-100); color: var(--primary-600); }
+.status-paused { background: #fff3cd; color: #856404; }
 .status-completed { background: var(--success-100); color: var(--success-600); }
 .status-cancelled { background: var(--danger-100); color: var(--danger-600); }
 .status-no_show { background: var(--gray-100); color: var(--gray-600); }
@@ -1028,10 +1029,24 @@
                         {% endif %}
                         
                         {% if order.status == 'in_progress' %}
+                            <button class="btn btn-warning" onclick="pauseService()">
+                                <i class="fas fa-pause"></i>
+                                Pause Service
+                            </button>
                             <button class="btn btn-primary" onclick="completeService()">
                                 <i class="fas fa-check"></i>
                                 Complete Service
                             </button>
+                        {% endif %}
+                        
+                        {% if order.status == 'paused' %}
+                            <button class="btn btn-success" onclick="resumeService()">
+                                <i class="fas fa-play"></i>
+                                Resume Service
+                            </button>
+                            <script>
+                                console.log('Resume button is visible, order status:', '{{ order.status }}');
+                            </script>
                         {% endif %}
                         
                         {% if order.status == 'completed' and order.payment_status != 'paid' %}
@@ -1104,6 +1119,32 @@
                                 {% if order.assigned_attendant %}
                                     <small class="text-muted">by {{ order.assigned_attendant.full_name }}</small>
                                 {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Pause/Resume Events -->
+                    {% for event in timeline_events %}
+                        <div class="timeline-item completed">
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">
+                                    <i class="{{ event.icon }} text-{{ event.color }}"></i>
+                                    {{ event.title }}
+                                </h6>
+                                <p class="timeline-time">{{ event.time|date:"M d, Y g:i A" }}</p>
+                                <small class="text-muted">by {{ event.employee }}</small>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    
+                    {% if order.status == 'paused' %}
+                        <div class="timeline-item current">
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">
+                                    <i class="fas fa-pause-circle text-warning"></i>
+                                    Service Paused
+                                </h6>
+                                <p class="timeline-time">Currently paused</p>
                             </div>
                         </div>
                     {% endif %}
@@ -1537,6 +1578,103 @@ function completeService() {
     openModal('completeServiceModal');
 }
 
+function pauseService() {
+    if (confirm('Are you sure you want to pause this service?')) {
+        const csrfToken = getCSRFToken();
+        console.log('CSRF Token:', csrfToken);
+        console.log('CSRF Token length:', csrfToken ? csrfToken.length : 'null');
+        
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        formData.append('ajax', '1');
+        
+        fetch(`/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/pause/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers.get('content-type'));
+            
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                // If not JSON, return text to see what we got
+                return response.text().then(text => {
+                    console.log('Non-JSON response:', text.substring(0, 200));
+                    throw new Error('Expected JSON response but got HTML');
+                });
+            }
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            if (data.success) {
+                showToast('Service paused successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(data.message || 'Error pausing service', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error pausing service', 'error');
+        });
+    }
+}
+
+function resumeService() {
+    console.log('resumeService function called');
+    if (confirm('Are you sure you want to resume this service?')) {
+        console.log('User confirmed resume action');
+        const csrfToken = getCSRFToken();
+        console.log('CSRF Token:', csrfToken);
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        formData.append('ajax', '1');
+        
+        const url = `/business/{{ request.tenant.slug }}/services/orders/{{ order.id }}/resume/`;
+        console.log('Resume URL:', url);
+        
+        fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            console.log('Response received:', response.status, response.statusText);
+            const contentType = response.headers.get('content-type');
+            console.log('Content-Type:', contentType);
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                throw new Error('Expected JSON response but got HTML');
+            }
+        })
+        .then(data => {
+            console.log('JSON data received:', data);
+            if (data.success) {
+                showToast('Service resumed successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(data.message || 'Error resuming service', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error resuming service', 'error');
+        });
+    }
+}
+
 function cancelService() {
     openModal('cancelServiceModal');
 }
@@ -1690,6 +1828,16 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+function getCSRFToken() {
+    // Try hidden form token first
+    const formToken = document.querySelector('input[name=csrfmiddlewaretoken]');
+    if (formToken && formToken.value) {
+        return formToken.value;
+    }
+    // Fallback to cookie
+    return getCookie('csrftoken');
 }
 
 // Close modal when clicking outside

@@ -367,17 +367,22 @@
                 <!-- Replace with your company logo -->
                 <img src="{% load static %}{% static 'images/logo.png' %}" alt="Company Logo" style="display: none;">
                 <div style="width: 60px; height: 60px; background: #2563eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px;">
-                    {{ request.tenant.name.0|upper }}
+                    {{ business.name.0|upper }}
                 </div>
             </div>
             <div class="company-details">
-                <div class="company-name">{{ request.tenant.name|default:"Your Company Name" }}</div>
+                <div class="company-name">{{ business.name|default:"Your Company Name" }}</div>
                 <div class="company-address">
-                    <!-- Replace with your company details -->
-                    123 Business Street<br>
-                    Nairobi, Kenya<br>
-                    Tel: +254 700 000 000<br>
-                    Email: info@yourcompany.com<br>
+                    {% if tenant_settings.tagline %}{{ tenant_settings.tagline }}<br>{% endif %}
+                    {% if tenant_settings.contact_address %}
+                    {{ tenant_settings.contact_address }}<br>
+                    {% elif business.city %}
+                    {{ business.city }}{% if business.state %}, {{ business.state }}{% endif %}<br>
+                    {% endif %}
+                    {% if tenant_settings.contact_phone %}Tel: {{ tenant_settings.contact_phone }}<br>
+                    {% elif business.phone %}Tel: {{ business.phone }}<br>{% endif %}
+                    {% if tenant_settings.contact_email %}Email: {{ tenant_settings.contact_email }}<br>
+                    {% elif business.email %}Email: {{ business.email }}<br>{% endif %}
                     PIN: P000000000A
                 </div>
             </div>

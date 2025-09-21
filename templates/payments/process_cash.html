@@ -19,47 +19,6 @@
         padding: 1.5rem;
     }
     
-    .denomination-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 1rem;
-        margin-bottom: 2rem;
-    }
-    
-    .denomination-item {
-        background: #f8f9fa;
-        border: 2px solid #e9ecef;
-        border-radius: 10px;
-        padding: 1rem;
-        text-align: center;
-        transition: all 0.3s ease;
-    }
-    
-    .denomination-item:focus-within {
-        border-color: #ffc107;
-        background: #fff3cd;
-    }
-    
-    .denomination-label {
-        font-weight: 600;
-        color: #495057;
-        margin-bottom: 0.5rem;
-    }
-    
-    .denomination-input {
-        border: none;
-        background: transparent;
-        text-align: center;
-        font-weight: 700;
-        font-size: 1.1rem;
-        width: 100%;
-    }
-    
-    .denomination-input:focus {
-        outline: none;
-        box-shadow: none;
-    }
-    
     .calculation-summary {
         background: linear-gradient(135deg, #e3f2fd, #f1f8e9);
         border-radius: 12px;
@@ -89,27 +48,6 @@
     
     .change-negative {
         color: #dc3545;
-    }
-    
-    .quick-amounts {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    .quick-amount-btn {
-        border: 2px solid #e9ecef;
-        background: white;
-        border-radius: 8px;
-        padding: 0.5rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    
-    .quick-amount-btn:hover {
-        border-color: #ffc107;
-        background: #fff3cd;
     }
 </style>
 {% endblock %}
@@ -148,32 +86,6 @@
                     <form method="post" id="cashPaymentForm">
                         {% csrf_token %}
                         
-                        <!-- Quick Amount Buttons -->
-                        <div class="mb-4">
-                            <h5 class="fw-bold mb-3">
-                                <i class="fas fa-bolt text-warning me-2"></i>Quick Amount
-                            </h5>
-                            <div class="quick-amounts">
-                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ payment.amount }})">
-                                    Exact
-                                </button>
-                                {% with payment.amount as amount %}
-                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ amount|add:50 }})">
-                                    +50
-                                </button>
-                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ amount|add:100 }})">
-                                    +100
-                                </button>
-                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ amount|add:200 }})">
-                                    +200
-                                </button>
-                                <button type="button" class="quick-amount-btn" onclick="setAmount({{ amount|add:500 }})">
-                                    +500
-                                </button>
-                                {% endwith %}
-                            </div>
-                        </div>
-                        
                         <!-- Cash Received -->
                         <div class="mb-4">
                             <h5 class="fw-bold mb-3">
@@ -183,63 +95,10 @@
                                 <input type="number" class="form-control form-control-lg" 
                                        id="amountTendered" name="amount_tendered" 
                                        step="0.01" min="{{ payment.amount }}" 
+                                       value="{{ payment.amount }}"
                                        placeholder="0.00" required
                                        oninput="calculateChange()">
                                 <label for="amountTendered">Amount Tendered (KES)</label>
-                            </div>
-                        </div>
-                        
-                        <!-- Denomination Breakdown (Optional) -->
-                        <div class="mb-4">
-                            <h5 class="fw-bold mb-3">
-                                <i class="fas fa-money-bill-wave text-info me-2"></i>Cash Breakdown (Optional)
-                            </h5>
-                            <div class="denomination-grid">
-                                <div class="denomination-item">
-                                    <div class="denomination-label">1000 Notes</div>
-                                    <input type="number" class="denomination-input" name="notes_1000" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
-                                <div class="denomination-item">
-                                    <div class="denomination-label">500 Notes</div>
-                                    <input type="number" class="denomination-input" name="notes_500" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
-                                <div class="denomination-item">
-                                    <div class="denomination-label">200 Notes</div>
-                                    <input type="number" class="denomination-input" name="notes_200" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
-                                <div class="denomination-item">
-                                    <div class="denomination-label">100 Notes</div>
-                                    <input type="number" class="denomination-input" name="notes_100" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
-                                <div class="denomination-item">
-                                    <div class="denomination-label">50 Notes</div>
-                                    <input type="number" class="denomination-input" name="notes_50" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
-                                <div class="denomination-item">
-                                    <div class="denomination-label">20 Notes</div>
-                                    <input type="number" class="denomination-input" name="notes_20" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
-                                <div class="denomination-item">
-                                    <div class="denomination-label">10 Coins</div>
-                                    <input type="number" class="denomination-input" name="coins_10" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
-                                <div class="denomination-item">
-                                    <div class="denomination-label">5 Coins</div>
-                                    <input type="number" class="denomination-input" name="coins_5" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
-                                <div class="denomination-item">
-                                    <div class="denomination-label">1 Coins</div>
-                                    <input type="number" class="denomination-input" name="coins_1" 
-                                           min="0" placeholder="0" oninput="calculateFromDenominations()">
-                                </div>
                             </div>
                         </div>
                         
@@ -263,22 +122,6 @@
                         </div>
                         
                         <input type="hidden" id="changeGiven" name="change_given" value="0">
-                        
-                        <!-- Additional Fields -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" class="form-control" name="till_number" placeholder="Till Number">
-                                    <label>Till Number (Optional)</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" class="form-control" name="receipt_number" placeholder="Receipt Number">
-                                    <label>Receipt Number (Optional)</label>
-                                </div>
-                            </div>
-                        </div>
                         
                         <div class="form-floating mb-4">
                             <textarea class="form-control" name="notes" placeholder="Notes" style="height: 80px;"></textarea>
@@ -305,11 +148,6 @@
 <script>
 const paymentAmount = {{ payment.amount }};
 
-function setAmount(amount) {
-    document.getElementById('amountTendered').value = amount.toFixed(2);
-    calculateChange();
-}
-
 function calculateChange() {
     const tendered = parseFloat(document.getElementById('amountTendered').value) || 0;
     const change = tendered - paymentAmount;
@@ -328,29 +166,6 @@ function calculateChange() {
         document.getElementById('processBtn').disabled = false;
         document.getElementById('processBtn').innerHTML = '<i class="fas fa-check me-2"></i>Process Cash Payment';
     }
-}
-
-function calculateFromDenominations() {
-    const denominations = [
-        { name: 'notes_1000', value: 1000 },
-        { name: 'notes_500', value: 500 },
-        { name: 'notes_200', value: 200 },
-        { name: 'notes_100', value: 100 },
-        { name: 'notes_50', value: 50 },
-        { name: 'notes_20', value: 20 },
-        { name: 'coins_10', value: 10 },
-        { name: 'coins_5', value: 5 },
-        { name: 'coins_1', value: 1 }
-    ];
-    
-    let total = 0;
-    denominations.forEach(denom => {
-        const count = parseInt(document.querySelector(`input[name="${denom.name}"]`).value) || 0;
-        total += count * denom.value;
-    });
-    
-    document.getElementById('amountTendered').value = total.toFixed(2);
-    calculateChange();
 }
 
 // Initialize

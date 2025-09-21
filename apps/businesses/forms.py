@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 import os
 import re
+import pytz
 from apps.accounts.models import Business
 from .models import  BusinessGoal, BusinessAlert, QuickAction, DashboardWidget
 
@@ -279,18 +280,78 @@ class BusinessSettingsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Set timezone choices
-        self.fields['timezone'].choices = [
-            ('Africa/Nairobi', 'Africa/Nairobi (EAT)'),
+        # Set comprehensive timezone choices
+        timezone_choices = []
+        
+        # Common timezones grouped by region
+        common_timezones = [
+            # Africa
+            ('Africa/Abidjan', 'Africa/Abidjan (GMT)'),
+            ('Africa/Accra', 'Africa/Accra (GMT)'),
+            ('Africa/Addis_Ababa', 'Africa/Addis_Ababa (EAT)'),
+            ('Africa/Algiers', 'Africa/Algiers (CET)'),
             ('Africa/Cairo', 'Africa/Cairo (EET)'),
+            ('Africa/Casablanca', 'Africa/Casablanca (WET)'),
+            ('Africa/Dar_es_Salaam', 'Africa/Dar_es_Salaam (EAT)'),
+            ('Africa/Johannesburg', 'Africa/Johannesburg (SAST)'),
+            ('Africa/Kampala', 'Africa/Kampala (EAT)'),
+            ('Africa/Khartoum', 'Africa/Khartoum (CAT)'),
             ('Africa/Lagos', 'Africa/Lagos (WAT)'),
-            ('UTC', 'UTC'),
+            ('Africa/Nairobi', 'Africa/Nairobi (EAT)'),
+            ('Africa/Tunis', 'Africa/Tunis (CET)'),
+            
+            # Asia
+            ('Asia/Bahrain', 'Asia/Bahrain (AST)'),
+            ('Asia/Bangkok', 'Asia/Bangkok (ICT)'),
+            ('Asia/Dubai', 'Asia/Dubai (GST)'),
+            ('Asia/Hong_Kong', 'Asia/Hong_Kong (HKT)'),
+            ('Asia/Jakarta', 'Asia/Jakarta (WIB)'),
+            ('Asia/Kolkata', 'Asia/Kolkata (IST)'),
+            ('Asia/Kuala_Lumpur', 'Asia/Kuala_Lumpur (MYT)'),
+            ('Asia/Manila', 'Asia/Manila (PHT)'),
+            ('Asia/Riyadh', 'Asia/Riyadh (AST)'),
+            ('Asia/Shanghai', 'Asia/Shanghai (CST)'),
+            ('Asia/Singapore', 'Asia/Singapore (SGT)'),
+            ('Asia/Tokyo', 'Asia/Tokyo (JST)'),
+            
+            # Europe
+            ('Europe/Amsterdam', 'Europe/Amsterdam (CET)'),
+            ('Europe/Berlin', 'Europe/Berlin (CET)'),
+            ('Europe/Brussels', 'Europe/Brussels (CET)'),
+            ('Europe/London', 'Europe/London (GMT)'),
+            ('Europe/Madrid', 'Europe/Madrid (CET)'),
+            ('Europe/Paris', 'Europe/Paris (CET)'),
+            ('Europe/Rome', 'Europe/Rome (CET)'),
+            ('Europe/Stockholm', 'Europe/Stockholm (CET)'),
+            ('Europe/Zurich', 'Europe/Zurich (CET)'),
+            
+            # Americas
+            ('America/New_York', 'America/New_York (EST)'),
+            ('America/Chicago', 'America/Chicago (CST)'),
+            ('America/Denver', 'America/Denver (MST)'),
+            ('America/Los_Angeles', 'America/Los_Angeles (PST)'),
+            ('America/Toronto', 'America/Toronto (EST)'),
+            ('America/Vancouver', 'America/Vancouver (PST)'),
+            ('America/Sao_Paulo', 'America/Sao_Paulo (BRT)'),
+            ('America/Mexico_City', 'America/Mexico_City (CST)'),
+            
+            # Pacific/Oceania
+            ('Pacific/Auckland', 'Pacific/Auckland (NZST)'),
+            ('Australia/Sydney', 'Australia/Sydney (AEST)'),
+            ('Australia/Melbourne', 'Australia/Melbourne (AEST)'),
+            ('Australia/Perth', 'Australia/Perth (AWST)'),
+            
+            # UTC
+            ('UTC', 'UTC (Coordinated Universal Time)'),
         ]
+        
+        self.fields['timezone'].choices = common_timezones
         
         # Make required fields
         self.fields['name'].required = True
         self.fields['phone'].required = True
         self.fields['email'].required = True
+        self.fields['timezone'].required = True
         
         # Optional fields
         self.fields['description'].required = False

@@ -485,8 +485,17 @@ def payment_receipt_view(request, payment_id):
     """Generate payment receipt"""
     payment = get_object_or_404(Payment, payment_id=payment_id)
     
+    # Get business profile and tenant settings
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business
+    tenant_settings = get_or_create_tenant_settings(business)
+    
     context = {
         'payment': payment,
+        'business': business,
+        'tenant_settings': tenant_settings,
         'title': f'Receipt - {payment.payment_id}'
     }
     
@@ -499,8 +508,17 @@ def payment_receipt_print_view(request, payment_id):
     """Generate thermal print receipt"""
     payment = get_object_or_404(Payment, payment_id=payment_id)
     
+    # Get business profile and tenant settings
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business
+    tenant_settings = get_or_create_tenant_settings(business)
+    
     context = {
         'payment': payment,
+        'business': business,
+        'tenant_settings': tenant_settings,
         'title': f'Print Receipt - {payment.payment_id}'
     }
     

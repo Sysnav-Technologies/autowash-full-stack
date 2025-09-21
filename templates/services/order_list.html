@@ -366,8 +366,20 @@
                         </td>
                         
                         <td>
-                            <span class="badge badge-{{ order.status|yesno:'success,warning,danger,info,secondary,dark' }}">
-                                {{ order.get_display_status }}
+                            {% if order.get_display_status == 'completed' %}
+                                <span class="badge badge-success">
+                            {% elif order.get_display_status == 'cancelled' %}
+                                <span class="badge badge-danger">
+                            {% elif order.get_display_status == 'in_progress' %}
+                                <span class="badge badge-primary">
+                            {% elif order.get_display_status == 'paused' %}
+                                <span class="badge badge-warning">
+                            {% elif order.get_display_status == 'confirmed' %}
+                                <span class="badge badge-info">
+                            {% else %}
+                                <span class="badge badge-secondary">
+                            {% endif %}
+                                {{ order.get_display_status|title }}
                             </span>
                         </td>
                         
@@ -423,6 +435,12 @@
                                         </a></li>
                                         <li><a class="dropdown-item text-success" href="#" onclick="completeService('{{ order.id }}')">
                                             <i class="fas fa-check"></i> Complete Service
+                                        </a></li>
+                                        {% endif %}
+                                        
+                                        {% if order.status == 'paused' %}
+                                        <li><a class="dropdown-item text-success" href="#" onclick="resumeService('{{ order.id }}')">
+                                            <i class="fas fa-play"></i> Resume Service
                                         </a></li>
                                         {% endif %}
                                         
@@ -644,12 +662,16 @@ function startService(orderId) {
 
 function pauseService(orderId) {
     if (confirm('Are you sure you want to pause this service?')) {
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+        
         fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/pause/`, {
             method: 'POST',
+            body: formData,
             headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json',
-            }
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin'
         })
         .then(response => response.json())
         .then(data => {
@@ -662,6 +684,35 @@ function pauseService(orderId) {
         })
         .catch(error => {
             showErrorToast('Error pausing service');
+        });
+    }
+}
+
+function resumeService(orderId) {
+    if (confirm('Are you sure you want to resume this service?')) {
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+        formData.append('ajax', '1');
+        
+        fetch(`/business/{{ request.tenant.slug }}/services/orders/${orderId}/resume/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessToast('Service resumed');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showErrorToast(data.message || 'Error resuming service');
+            }
+        })
+        .catch(error => {
+            showErrorToast('Error resuming service');
         });
     }
 }

@@ -4,6 +4,7 @@ import io
 import logging
 from decimal import Decimal
 from datetime import datetime, timedelta
+from functools import wraps
 import qrcode
 import base64
 from django.shortcuts import render, redirect, get_object_or_404
@@ -1245,6 +1246,54 @@ def order_detail_view(request, pk):
         payment = None
         payment_id = None
 
+    # Parse timeline events from internal notes
+    timeline_events = []
+    if order.internal_notes:
+        lines = order.internal_notes.split('\n')
+        for line in lines:
+            line = line.strip()
+            if 'Paused by' in line and 'at' in line:
+                # Extract pause event: "Paused by John Doe at 2025-09-21 12:30:45..."
+                try:
+                    parts = line.split(' at ')
+                    if len(parts) >= 2:
+                        employee_part = parts[0].replace('Paused by', '').strip()
+                        datetime_part = parts[1].split('+')[0].strip()  # Remove timezone
+                        from datetime import datetime
+                        event_time = datetime.strptime(datetime_part, '%Y-%m-%d %H:%M:%S.%f')
+                        timeline_events.append({
+                            'type': 'pause',
+                            'title': 'Service Paused',
+                            'time': event_time,
+                            'employee': employee_part,
+                            'icon': 'fas fa-pause-circle',
+                            'color': 'warning'
+                        })
+                except Exception:
+                    pass
+            elif 'Resumed by' in line and 'at' in line:
+                # Extract resume event: "Resumed by John Doe at 2025-09-21 13:00:15..."
+                try:
+                    parts = line.split(' at ')
+                    if len(parts) >= 2:
+                        employee_part = parts[0].replace('Resumed by', '').strip()
+                        datetime_part = parts[1].split('+')[0].strip()  # Remove timezone
+                        from datetime import datetime
+                        event_time = datetime.strptime(datetime_part, '%Y-%m-%d %H:%M:%S.%f')
+                        timeline_events.append({
+                            'type': 'resume',
+                            'title': 'Service Resumed',
+                            'time': event_time,
+                            'employee': employee_part,
+                            'icon': 'fas fa-play-circle',
+                            'color': 'success'
+                        })
+                except Exception:
+                    pass
+    
+    # Sort timeline events by time
+    timeline_events.sort(key=lambda x: x['time'])
+
     context = {
         'order': order,
         'order_items': order_items,
@@ -1253,6 +1302,7 @@ def order_detail_view(request, pk):
         'available_attendants': available_attendants,
         'payment': payment,
         'payment_id': payment_id,
+        'timeline_events': timeline_events,
         'title': f'Order {order.order_number}'
     }
     return render(request, 'services/order_detail.html', context)
@@ -1720,49 +1770,74 @@ def cancel_service(request, order_id):
 @employee_required()
 @require_POST
 def pause_service(request, order_id):
-    """Pause service"""
+    """Pause service - AJAX only"""
+    # Force AJAX-only response
+    is_ajax = (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+        request.POST.get('ajax') == '1'
+    )
+    
+    if not is_ajax:
+        return JsonResponse({
+            'success': False,
+            'message': 'AJAX request required'
+        }, status=400)
+    
     order = get_object_or_404(ServiceOrder, id=order_id)
     
     if order.status != 'in_progress':
-        messages.error(request, 'Service is not in progress.')
-        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+        return JsonResponse({
+            'success': False,
+            'message': 'Service is not in progress.'
+        })
     
-    # Record pause time in internal notes
+    # Change status to paused and record pause time in internal notes
+    order.status = 'paused'
     order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
     order.save()
 
-    messages.success(request, 'Service paused.')
-    
-    # Handle AJAX requests
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({
-            'success': True,
-            'message': 'Service paused.',
-            'order_id': str(order.id),
-            'status': order.status
-        })
+    return JsonResponse({
+        'success': True,
+        'message': 'Service paused.',
+        'order_id': str(order.id),
+        'status': order.status
+    })
 
-    # Use tenant-aware redirect if available
-    from apps.core.utils import get_business_url
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
-    
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 @employee_required()
 @require_POST
 def resume_service(request, order_id):
-    """Resume paused service"""
+    """Resume paused service - AJAX only"""
+    # Force AJAX-only response
+    is_ajax = (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+        request.POST.get('ajax') == '1'
+    )
+    
+    if not is_ajax:
+        return JsonResponse({
+            'success': False,
+            'message': 'AJAX request required'
+        }, status=400)
+    
     order = get_object_or_404(ServiceOrder, id=order_id)
     
-    if order.status != 'in_progress':
-        messages.error(request, 'Service is not paused.')
-        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+    if order.status != 'paused':
+        return JsonResponse({
+            'success': False,
+            'message': 'Service is not paused.'
+        })
     
-    # Record resume time in internal notes
+    # Change status back to in_progress and record resume time in internal notes
+    order.status = 'in_progress'
     order.internal_notes += f"\nResumed by {request.employee.full_name} at {timezone.now()}"
     order.save()
-    
-    messages.success(request, 'Service resumed.')
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+
+    return JsonResponse({
+        'success': True,
+        'message': 'Service resumed.',
+        'order_id': str(order.id),
+        'status': order.status
+    })
 
 @login_required
 @employee_required()
@@ -2607,23 +2682,6 @@ def cancel_service(request, order_id):
         queue_entry.save()
     
     messages.success(request, f'Order {order.order_number} cancelled successfully.')
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
-
-@login_required
-@employee_required()
-@require_POST
-def pause_service(request, order_id):
-    """Pause service"""
-    order = get_object_or_404(ServiceOrder, id=order_id)
-    
-    if order.status != 'in_progress':
-        messages.error(request, 'Service is not in progress.')
-        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
-    
-    order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
-    order.save()
-    
-    messages.success(request, 'Service paused.')
     return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 @login_required
@@ -3761,6 +3819,13 @@ def order_receipt_view(request, pk):
     """Service order receipt"""
     order = get_object_or_404(ServiceOrder, id=pk)
     
+    # Get business profile and tenant settings
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business
+    tenant_settings = get_or_create_tenant_settings(business)
+    
     # Get all payments for this order
     payments = order.payments.filter(
         status__in=['completed', 'verified']
@@ -3773,6 +3838,8 @@ def order_receipt_view(request, pk):
     context = {
         'order': order,
         'service_order': order,
+        'business': business,
+        'tenant_settings': tenant_settings,
         'payments': payments,
         'total_paid': total_paid,
         'balance_due': balance_due,
@@ -3788,6 +3855,13 @@ def order_receipt_view(request, pk):
 def order_receipt_print_view(request, pk):
     """Service order thermal print receipt"""
     order = get_object_or_404(ServiceOrder, id=pk)
+    
+    # Get business profile and tenant settings
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business
+    tenant_settings = get_or_create_tenant_settings(business)
     
     # Get all payments for this order
     payments = order.payments.filter(
@@ -3806,6 +3880,8 @@ def order_receipt_print_view(request, pk):
     context = {
         'order': order,
         'service_order': order,
+        'business': business,
+        'tenant_settings': tenant_settings,
         'payments': payments,
         'total_paid': total_paid,
         'balance_due': balance_due,
