@@ -48,6 +48,7 @@ urlpatterns = [
     path('<str:payment_id>/status/', views.mpesa_payment_status_view, name='mpesa_status'),
     path('<str:payment_id>/verify/', views.verify_payment, name='verify'),
     path('<str:payment_id>/refund/', views.payment_refund_view, name='refund'),
+    path('<str:payment_id>/print/', views.payment_receipt_print_view, name='receipt_print'),
     path('<str:payment_id>/receipt/', views.payment_receipt_view, name='receipt'),
     path('<str:payment_id>/success/', views.payment_success_view, name='success'),
 ]

@@ -19,6 +19,26 @@ from apps.core.database_router import tenant_context
 from .models import BusinessAlert
 
 
+def get_business_url(request, url_name, **kwargs):
+    """Helper to generate URLs with business slug for businesses."""
+    tenant_slug = request.tenant.slug
+    base_url = f"/business/{tenant_slug}"
+    url_mapping = {
+        'businesses:business_settings': f"{base_url}/business/settings/business/",
+        'businesses:notification_settings': f"{base_url}/business/settings/notifications/",
+        'businesses:payment_settings': f"{base_url}/business/settings/payment/",
+        'businesses:service_settings': f"{base_url}/business/settings/services/",
+        'businesses:feature_settings': f"{base_url}/business/settings/features/",
+        'businesses:backup_settings': f"{base_url}/business/settings/backup/",
+        'businesses:business_hours': f"{base_url}/business/settings/hours/",
+        'businesses:dashboard': f"{base_url}/business/dashboard/",
+        'businesses:settings': f"{base_url}/business/settings/",
+    }
+    
+    url_template = url_mapping.get(url_name, f"{base_url}/")
+    return url_template.format(**kwargs)
+
+
 def get_or_create_tenant_settings(business):
     """Helper function to get or create tenant settings with current business info"""
     # Get the actual tenant object if we have a simplified BusinessContext
@@ -176,7 +196,7 @@ def business_settings_view(request):
                     )
                     
                 messages.success(request, 'Business settings updated successfully!')
-                return redirect('businesses:business_settings')
+                return redirect(get_business_url(request, 'businesses:business_settings'))
             except Exception as e:
                 messages.error(request, f'Error updating settings: {str(e)}')
     else:
@@ -214,7 +234,7 @@ def notification_settings_view(request):
                         form.save()
                     
                 messages.success(request, 'Notification settings updated successfully!')
-                return redirect('businesses:notification_settings')
+                return redirect(get_business_url(request, 'businesses:notification_settings'))
             except Exception as e:
                 messages.error(request, f'Error updating notification settings: {str(e)}')
     else:
@@ -252,7 +272,7 @@ def payment_settings_view(request):
                         form.save()
                     
                 messages.success(request, 'Payment settings updated successfully!')
-                return redirect('businesses:payment_settings')
+                return redirect(get_business_url(request, 'businesses:payment_settings'))
             except Exception as e:
                 messages.error(request, f'Error updating payment settings: {str(e)}')
     else:
@@ -290,7 +310,7 @@ def service_settings_view(request):
                         form.save()
                     
                 messages.success(request, 'Service settings updated successfully!')
-                return redirect('businesses:service_settings')
+                return redirect(get_business_url(request, 'businesses:service_settings'))
             except Exception as e:
                 messages.error(request, f'Error updating service settings: {str(e)}')
     else:
@@ -328,7 +348,7 @@ def feature_settings_view(request):
                         form.save()
                     
                 messages.success(request, 'Feature settings updated successfully!')
-                return redirect('businesses:feature_settings')
+                return redirect(get_business_url(request, 'businesses:feature_settings'))
             except Exception as e:
                 messages.error(request, f'Error updating feature settings: {str(e)}')
     else:
@@ -366,7 +386,7 @@ def business_hours_view(request):
                         form.save()
                     
                 messages.success(request, 'Business hours updated successfully!')
-                return redirect('businesses:business_hours')
+                return redirect(get_business_url(request, 'businesses:business_hours'))
             except Exception as e:
                 messages.error(request, f'Error updating business hours: {str(e)}')
     else:
@@ -410,7 +430,7 @@ def backup_settings_view(request):
                         form.save()
                 
                 messages.success(request, 'Backup settings updated successfully!')
-                return redirect('businesses:backup_settings')
+                return redirect(get_business_url(request, 'businesses:backup_settings'))
             except Exception as e:
                 messages.error(request, f'Error updating backup settings: {str(e)}')
     else:
@@ -496,7 +516,7 @@ def download_backup(request, backup_id):
         return backup_manager.get_backup_download_response(backup_id)
     except Exception as e:
         messages.error(request, f'Error downloading backup: {str(e)}')
-        return redirect('businesses:backup_settings')
+        return redirect(get_business_url(request, 'businesses:backup_settings'))
 
 
 @login_required

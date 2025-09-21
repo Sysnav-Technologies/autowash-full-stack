@@ -278,7 +278,7 @@ def dashboard_view(request):
         'active_goals': active_goals,
         'recent_alerts': recent_alerts,
         'quick_actions': available_actions,
-        'pending_items': pending_items,
+        'pending_items': pending_items.get('items', []),  # Pass the items list, not the whole dict
         'performance_comparison': performance_comparison,
         'dashboard_widgets': visible_widgets,
         'business_insights': business_insights,
@@ -836,7 +836,7 @@ def get_pending_dashboard_items(employee, request):
                 'created_at': timezone.now(),
                 'type': 'warning',
                 'icon': 'clock',
-                'url': f'/business/{tenant_slug}/services/orders/?status=pending'
+                'url': f'/business/{tenant_slug}/services/orders/'
             })
         
         # Active queue items - TODAY ONLY
@@ -860,7 +860,7 @@ def get_pending_dashboard_items(employee, request):
                 'created_at': timezone.now(),
                 'type': 'info',
                 'icon': 'credit-card',
-                'url': f'/business/{tenant_slug}/payments/?status=pending'
+                'url': f'/business/{tenant_slug}/payments/list/'
             })
         
         # Low stock alerts (for managers and owners)
@@ -894,7 +894,7 @@ def get_pending_dashboard_items(employee, request):
                     'created_at': timezone.now(),
                     'type': 'primary',
                     'icon': 'user-check',
-                    'url': f'/business/{tenant_slug}/employees/?status=pending'
+                    'url': f'/business/{tenant_slug}/employees/list/'
                 })
         
     except Exception as e:
@@ -1137,8 +1137,12 @@ def resolve_alert(request, alert_id):
     alert = get_object_or_404(BusinessAlert, id=alert_id)
     alert.resolve(request.user)
     
+    # Generate proper business URL with tenant slug
+    tenant_slug = request.tenant.slug
+    alerts_url = f"/business/{tenant_slug}/alerts/"
+    
     messages.success(request, f'Alert "{alert.title}" has been resolved.')
-    return redirect('businesses:alerts')
+    return redirect(alerts_url)
 
 @login_required
 @employee_required()

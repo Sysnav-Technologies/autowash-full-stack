@@ -49,21 +49,27 @@ def suspension_check_required(view_func):
             
             # Check subscription suspension (access from main database, not tenant)
             try:
-                # Note: subscription is accessed from main database via tenant FK, not tenant database
-                if hasattr(request.tenant, 'subscription') and request.tenant.subscription:
-                    subscription = request.tenant.subscription
-                    if subscription.status == 'suspended':
-                        return render(request, 'suspension/subscription_suspended.html', {
-                            'suspension_type': 'subscription',
-                            'business': request.tenant,
-                            'subscription': subscription,
-                            'title': 'Subscription Suspended',
-                            'message': f'The subscription for "{request.tenant.name}" has been suspended.',
-                            'reason': getattr(subscription, 'cancellation_reason', 'Payment issues or policy violation'),
-                        })
+                # Import here to avoid circular imports and use main database
+                from apps.subscriptions.models import Subscription
+                
+                # Access subscription from main database using tenant relationship
+                subscription = Subscription.objects.using('default').filter(
+                    business=request.tenant
+                ).first()
+                
+                if subscription and subscription.status == 'suspended':
+                    return render(request, 'suspension/subscription_suspended.html', {
+                        'suspension_type': 'subscription',
+                        'business': request.tenant,
+                        'subscription': subscription,
+                        'title': 'Subscription Suspended',
+                        'message': f'The subscription for "{request.tenant.name}" has been suspended.',
+                        'reason': getattr(subscription, 'cancellation_reason', 'Payment issues or policy violation'),
+                    })
             except Exception as e:
-                # Handle database errors gracefully
-                print(f"Warning: Could not check subscription status for tenant {request.tenant.slug}: {e}")
+                # Handle database errors gracefully - but only log for actual errors, not missing tables
+                if '1146' not in str(e):  # Don't log "table doesn't exist" errors
+                    print(f"Warning: Could not check subscription status for tenant {request.tenant.slug}: {e}")
                 pass
             
             # Check employee suspension

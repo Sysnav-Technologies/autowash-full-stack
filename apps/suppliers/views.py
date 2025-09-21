@@ -540,8 +540,17 @@ class PurchaseOrderUpdateView(UpdateView):
 def purchase_order_print(request, pk):
     order = get_object_or_404(PurchaseOrder, pk=pk)
     
+    # Get business profile and tenant settings
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business
+    tenant_settings = get_or_create_tenant_settings(business)
+    
     context = {
         'order': order,
+        'business': business,
+        'tenant_settings': tenant_settings,
         'items': order.items.select_related('item').all(),
     }
     
@@ -1642,6 +1651,15 @@ class InvoiceDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         invoice = self.object
         
+        # Get business profile and tenant settings
+        from apps.core.tenant_models import TenantSettings
+        from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+        
+        business = self.request.business
+        tenant_settings = get_or_create_tenant_settings(business)
+        
+        context['business'] = business
+        context['tenant_settings'] = tenant_settings
         context['items'] = invoice.items.all()
         
         context['payments'] = invoice.supplier.payments.filter(

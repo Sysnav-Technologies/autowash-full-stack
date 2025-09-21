@@ -11,13 +11,13 @@
         background: white;
         border-radius: 12px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        padding: 2rem;
+        padding: 1.5rem;
         margin-bottom: 2rem;
     }
     
     .form-section {
-        margin-bottom: 2rem;
-        padding-bottom: 2rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.5rem;
         border-bottom: 1px solid #e9ecef;
     }
     
@@ -28,12 +28,31 @@
     
     .section-title {
         color: #495057;
-        font-size: 1.25rem;
+        font-size: 1.1rem;
         font-weight: 600;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
         padding-bottom: 0.5rem;
         border-bottom: 2px solid #007bff;
         display: inline-block;
+    }
+    
+    @media (max-width: 768px) {
+        .order-form-container {
+            padding: 1rem;
+        }
+        
+        .form-actions {
+            padding: 1.5rem;
+        }
+        
+        .form-actions .btn-action {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-actions .d-flex {
+            flex-direction: column;
+        }
     }
     
     .info-card {
@@ -142,8 +161,54 @@
     }
     
     .btn-action {
-        min-width: 120px;
-        margin: 0 0.25rem;
+        min-width: 140px;
+        margin: 0 0.5rem 0.5rem 0;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-action:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .form-actions {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-top: 2rem;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .form-actions .btn-primary {
+        background: #28a745;
+        border-color: #28a745;
+    }
+    
+    .form-actions .btn-primary:hover {
+        background: #218838;
+        border-color: #1e7e34;
+    }
+    
+    .form-actions .btn-outline-secondary {
+        color: #6c757d;
+        border-color: #6c757d;
+        background: white;
+    }
+    
+    .form-actions .btn-outline-secondary:hover {
+        color: white;
+        background: #6c757d;
+        border-color: #6c757d;
+    }
+    
+    .page-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
     }
     
     .form-control:focus {
@@ -169,26 +234,24 @@
 <div class="container-fluid">
     <!-- Page Header -->
     <div class="page-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h1 class="page-title">
-                    <i class="fas fa-edit"></i>
-                    Edit Order {{ order.order_number }}
-                </h1>
-                <p class="page-subtitle">
-                    Status: <span class="badge badge-{{ order.status }}">{{ order.get_status_display }}</span>
-                    | Created {{ order.created_at|date:"M d, Y \a\t g:i A" }}
-                </p>
-            </div>
-            
-            <div class="d-flex align-items-center" style="gap: 0.5rem;">
-                <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" class="btn btn-outline-secondary btn-action">
-                    <i class="fas fa-eye"></i> View Order
-                </a>
-                <a href="/business/{{ request.tenant.slug }}/services/orders/" class="btn btn-outline-primary btn-action">
-                    <i class="fas fa-arrow-left"></i> Back to Orders
-                </a>
-            </div>
+        <div class="page-header-content">
+            <h1 class="page-title">
+                <i class="fas fa-edit text-primary"></i>
+                Edit Order {{ order.order_number }}
+            </h1>
+            <p class="page-description">
+                Status: <span class="badge badge-{{ order.status }}">{{ order.get_status_display }}</span>
+                • Created {{ order.created_at|date:"M d, Y \a\t g:i A" }}
+            </p>
+        </div>
+        
+        <div class="page-actions">
+            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" class="btn btn-outline-secondary">
+                <i class="fas fa-eye"></i> View Order
+            </a>
+            <a href="/business/{{ request.tenant.slug }}/services/orders/" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i> Back to Orders
+            </a>
         </div>
     </div>
     
@@ -363,24 +426,36 @@
                     </div>
                     
                     <!-- Form Actions -->
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <button type="submit" class="btn btn-primary btn-action">
-                                <i class="fas fa-save"></i> Update Order
-                            </button>
-                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" 
-                               class="btn btn-secondary btn-action">
-                                <i class="fas fa-times"></i> Cancel
-                            </a>
+                    <div class="form-actions">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6 class="mb-3">Save Changes</h6>
+                                <div class="d-flex flex-wrap">
+                                    <button type="submit" class="btn btn-primary btn-action">
+                                        <i class="fas fa-check"></i> Update Changes
+                                    </button>
+                                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" 
+                                       class="btn btn-outline-secondary btn-action">
+                                        <i class="fas fa-times"></i> Ignore Changes & Go Back
+                                    </a>
+                                </div>
+                                <small class="text-muted">
+                                    Click "Update Changes" to save your modifications or "Ignore Changes & Go Back" to discard changes.
+                                </small>
+                            </div>
+                            
+                            {% if order.status == 'pending' %}
+                            <div class="col-md-4">
+                                <h6 class="mb-3">Order Actions</h6>
+                                <button type="button" class="btn btn-success btn-action" onclick="confirmOrder()">
+                                    <i class="fas fa-check-circle"></i> Confirm Order
+                                </button>
+                                <small class="text-muted d-block">
+                                    Confirm to move order to confirmed status.
+                                </small>
+                            </div>
+                            {% endif %}
                         </div>
-                        
-                        {% if order.status == 'pending' %}
-                        <div>
-                            <button type="button" class="btn btn-success btn-action" onclick="confirmOrder()">
-                                <i class="fas fa-check"></i> Confirm Order
-                            </button>
-                        </div>
-                        {% endif %}
                     </div>
                 </form>
             </div>

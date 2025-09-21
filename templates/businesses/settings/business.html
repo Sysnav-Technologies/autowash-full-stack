@@ -105,7 +105,16 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label for="{{ form.timezone.id_for_label }}">Timezone *</label>
-                            {{ form.timezone }}
+                            {% if form.timezone.field.choices %}
+                                <select name="{{ form.timezone.name }}" id="{{ form.timezone.id_for_label }}" class="form-select" required>
+                                    <option value="">Select a timezone...</option>
+                                    {% for value, label in form.timezone.field.choices %}
+                                        <option value="{{ value }}" {% if form.timezone.value == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                {{ form.timezone }}
+                            {% endif %}
                             {% if form.timezone.errors %}
                                 <div class="invalid-feedback d-block">{{ form.timezone.errors.0 }}</div>
                             {% endif %}

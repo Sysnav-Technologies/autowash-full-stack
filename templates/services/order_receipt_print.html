@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Service Order - {{ order.order_number }}</title>
+    <title>Order Receipt - {{ service_order.order_number }}</title>
     <style>
         * {
             margin: 0;
@@ -187,8 +187,37 @@
             font-size: 10px;
         }
         
-        /* Order Status */
-        .order-status {
+        /* VAT */
+        .vat-header {
+            font-size: 7px;
+            text-align: center;
+            margin: 1mm 0 0.5mm 0;
+        }
+        
+        .vat-line {
+            font-size: 7px;
+            margin-bottom: 0.3mm;
+        }
+        
+        .vat-code {
+            display: inline-block;
+            width: 30%;
+        }
+        
+        .vat-taxable {
+            display: inline-block;
+            width: 35%;
+            text-align: center;
+        }
+        
+        .vat-tax {
+            display: inline-block;
+            width: 34%;
+            text-align: right;
+        }
+        
+        /* Payment */
+        .payment-status {
             text-align: center;
             font-size: 11px;
             font-weight: bold;
@@ -232,6 +261,19 @@
             margin-top: 0.5mm;
             font-family: monospace;
         }
+        
+        /* Transaction Reference */
+        .transaction-ref {
+            font-size: 8px;
+            font-weight: normal;
+            margin-bottom: 0.2mm;
+        }
+        
+        .cut-line {
+            text-align: center;
+            font-size: 7px;
+            margin-top: 3mm;
+        }
     </style>
 </head>
 <body>
@@ -241,37 +283,25 @@
             <div class="company-name">{{ business.name|upper }}</div>
             <div class="company-info">Tel: {{ business.phone_number }}</div>
             <div class="company-info">{{ business.email }}</div>
-            <div class="receipt-title">SERVICE ORDER</div>
+            <div class="receipt-title">RECEIPT</div>
         </div>
         
         <!-- Order Information -->
         <div class="info-section">
             <div class="info-row">
                 <span class="info-label">Order No:</span>
-                <span class="info-value">{{ order.order_number }}</span>
+                <span class="info-value">{{ service_order.order_number }}</span>
                 <div class="clear-float"></div>
             </div>
             <div class="info-row">
                 <span class="info-label">Date:</span>
-                <span class="info-value">{{ order.created_at|date:"d/m/Y H:i" }}</span>
+                <span class="info-value">{{ service_order.created_at|date:"d/m/Y H:i" }}</span>
                 <div class="clear-float"></div>
             </div>
-            <div class="info-row">
-                <span class="info-label">Priority:</span>
-                <span class="info-value">{{ order.get_priority_display }}</span>
-                <div class="clear-float"></div>
-            </div>
-            {% if order.scheduled_date %}
-            <div class="info-row">
-                <span class="info-label">Scheduled:</span>
-                <span class="info-value">{{ order.scheduled_date|date:"d/m/Y" }}</span>
-                <div class="clear-float"></div>
-            </div>
-            {% endif %}
-            {% if order.assigned_attendant %}
+            {% if service_order.assigned_attendant %}
             <div class="info-row">
                 <span class="info-label">Attendant:</span>
-                <span class="info-value">{{ order.assigned_attendant.user.first_name }}</span>
+                <span class="info-value">{{ service_order.assigned_attendant.user.first_name }}</span>
                 <div class="clear-float"></div>
             </div>
             {% endif %}
@@ -280,19 +310,19 @@
         <div class="separator"></div>
         
         <!-- Customer & Vehicle Information -->
-        {% if order.customer or order.vehicle %}
+        {% if service_order.customer or service_order.vehicle %}
         <div class="info-section">
-            {% if order.customer %}
+            {% if service_order.customer %}
             <div class="info-row">
                 <span class="info-label">Customer:</span>
-                <span class="info-value">{{ order.customer.first_name }} {{ order.customer.last_name }}</span>
+                <span class="info-value">{{ service_order.customer.first_name }} {{ service_order.customer.last_name }}</span>
                 <div class="clear-float"></div>
             </div>
             {% endif %}
-            {% if order.vehicle %}
+            {% if service_order.vehicle %}
             <div class="info-row">
                 <span class="info-label">Vehicle:</span>
-                <span class="info-value">{{ order.vehicle.registration_number }}</span>
+                <span class="info-value">{{ service_order.vehicle.license_plate }}</span>
                 <div class="clear-float"></div>
             </div>
             {% endif %}
@@ -300,29 +330,15 @@
         <div class="separator"></div>
         {% endif %}
         
-        <!-- Package -->
-        {% if order.package %}
-        <div class="services-section">
-            <div class="section-title">PACKAGE</div>
-            <div class="service-item">
-                <div class="service-name">{{ order.package.name }}</div>
-                <div class="service-details">
-                    <span class="service-qty">1x</span>
-                    <span class="service-price">{{ order.package.price|floatformat:2 }}</span>
-                    <div class="clear-float"></div>
-                </div>
-            </div>
-        </div>
         <div class="separator"></div>
-        {% endif %}
         
-        <!-- Services -->
-        {% if order.has_services or order.has_inventory_items %}
+        <!-- Items/Services -->
+        {% if service_order.has_services or service_order.has_inventory_items %}
         <div class="services-section">
             <div class="section-title">ITEMS/SERVICES</div>
             
-            {% if order.has_services %}
-            {% for item in order.service_items %}
+            {% if service_order.has_services %}
+            {% for item in service_order.service_items %}
             <div class="service-item">
                 <div class="service-name">{{ item.service.name }}</div>
                 <div class="service-details">
@@ -334,8 +350,8 @@
             {% endfor %}
             {% endif %}
             
-            {% if order.has_inventory_items %}
-            {% for item in order.inventory_items %}
+            {% if service_order.has_inventory_items %}
+            {% for item in service_order.inventory_items %}
             <div class="service-item">
                 <div class="service-name">{{ item.item_name }}</div>
                 <div class="service-details">
@@ -354,12 +370,12 @@
         <div class="amount-section">
             <div class="info-row">
                 <span class="info-label">Sub Total:</span>
-                <span class="info-value">{{ order.subtotal|floatformat:2 }}</span>
+                <span class="info-value">{{ service_order.subtotal|floatformat:2 }}</span>
                 <div class="clear-float"></div>
             </div>
             <div class="info-row">
                 <span class="info-label">VAT (16%):</span>
-                <span class="info-value">{{ order.tax_amount|floatformat:2 }}</span>
+                <span class="info-value">{{ service_order.tax_amount|floatformat:2 }}</span>
                 <div class="clear-float"></div>
             </div>
         </div>
@@ -367,8 +383,64 @@
         <div class="double-separator"></div>
         
         <div class="amount-large">
-            TOTAL: {{ order.total_amount|floatformat:2 }}
+            TOTAL: {{ service_order.total_amount|floatformat:2 }}
         </div>
+        
+        <div class="double-separator"></div>
+        
+        <!-- Payment Details -->
+        {% if payments %}
+        <div class="services-section">
+            <div class="section-title">PAYMENT DETAILS</div>
+            {% for payment in payments %}
+            <div class="service-item">
+                <div class="service-details">
+                    <span class="service-qty">{{ payment.payment_method.name }}</span>
+                    <span class="service-price">{{ payment.amount|floatformat:2 }}</span>
+                    <div class="clear-float"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="separator"></div>
+        {% endif %}
+        
+        <!-- Payment Summary -->
+        {% if payments %}
+        <div class="amount-section">
+            <div class="info-row">
+                <span class="info-label">Total Paid:</span>
+                <span class="info-value">{{ total_paid|floatformat:2 }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% if balance_due > 0 %}
+            <div class="info-row">
+                <span class="info-label">Balance Due:</span>
+                <span class="info-value">{{ balance_due|floatformat:2 }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% elif balance_due < 0 %}
+            <div class="info-row">
+                <span class="info-label">Change:</span>
+                <span class="info-value">{{ balance_due|floatformat:2|cut:"-" }}</span>
+                <div class="clear-float"></div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="amount-section">
+            <div class="info-row">
+                <span class="info-label">Amount Due:</span>
+                <span class="info-value">{{ service_order.total_amount|floatformat:2 }}</span>
+                <div class="clear-float"></div>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Balance Due:</span>
+                <span class="info-value">{{ service_order.total_amount|floatformat:2 }}</span>
+                <div class="clear-float"></div>
+            </div>
+        </div>
+        {% endif %}
         
         <div class="double-separator"></div>
         
@@ -379,26 +451,34 @@
                     <img src="{{ qr_code_image }}" alt="Order QR Code" style="width: 60px; height: 60px;">
                 {% else %}
                     <div style="font-size: 8px; border: 1px solid #000; padding: 2mm; text-align: center; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;">
-                        Order: {{ order.order_number|default:order.id }}
+                        Order: {{ service_order.order_number|default:service_order.id }}
                     </div>
                 {% endif %}
             </div>
-            <div class="order-number">{{ order.order_number|default:order.id }}</div>
+            <div class="order-number">{{ service_order.order_number|default:service_order.id }}</div>
         </div>
         
         <div class="separator"></div>
         
-        <!-- Order Status -->
-        <div class="order-status">
-            STATUS: {{ order.get_status_display|upper }}
+        <!-- Payment Status -->
+        <div class="payment-status">
+            {% if payments %}
+                {% if balance_due > 0 %}
+                    STATUS: PARTIAL PAYMENT
+                {% else %}
+                    STATUS: FULLY PAID
+                {% endif %}
+            {% else %}
+                STATUS: UNPAID
+            {% endif %}
         </div>
         
         <div class="separator"></div>
         
         <!-- Footer -->
         <div class="footer">
-            <div>Service Order Copy</div>
-            <div>Keep for reference</div>
+            <div>Thank you for your business!</div>
+            <div>Visit us again!</div>
             <div class="powered-by">Powered by AutoWash</div>
         </div>
         
