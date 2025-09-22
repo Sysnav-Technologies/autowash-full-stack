@@ -122,18 +122,9 @@ class ServicesManager {
         })
         .then(response => {
             if (response.ok) {
-                const row = document.querySelector(`tr[data-id="${serviceId}"]`);
-                if (row) {
-                    row.style.transition = 'all 0.3s ease';
-                    row.style.opacity = '0';
-                    row.style.transform = 'translateX(-100%)';
-                    
-                    setTimeout(() => {
-                        location.reload();
-                    }, 300);
-                } else {
-                    location.reload();
-                }
+                // Service deleted successfully, redirect to services list
+                const tenantSlug = window.location.pathname.split('/')[2];
+                window.location.href = `/business/${tenantSlug}/services/`;
             } else {
                 throw new Error('Delete failed');
             }
@@ -150,8 +141,36 @@ class ServicesManager {
     }
 
     getCSRFToken() {
-        const token = document.querySelector('[name=csrfmiddlewaretoken]');
-        return token ? token.value : '';
+        // First try to get from meta tag
+        const metaToken = document.querySelector('meta[name=csrf-token]');
+        if (metaToken) {
+            return metaToken.getAttribute('content');
+        }
+        
+        // Fallback to form input
+        const formToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (formToken) {
+            return formToken.value;
+        }
+        
+        // Last resort: get from cookie
+        const cookieValue = this.getCookie('csrftoken');
+        return cookieValue || '';
+    }
+    
+    getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
     }
 }
 

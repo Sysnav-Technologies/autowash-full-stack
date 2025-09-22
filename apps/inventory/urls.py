@@ -12,6 +12,7 @@ urlpatterns = [
     path('items/create/', views.item_create_view, name='item_create'),
     path('items/<uuid:pk>/', views.item_detail_view, name='item_detail'),
     path('items/<uuid:pk>/edit/', views.item_edit_view, name='item_edit'),
+    path('items/<uuid:pk>/delete/', views.item_delete_view, name='item_delete'),
     path('items/<uuid:pk>/barcode/', views.generate_barcode, name='generate_barcode'),
     
     # Stock Management

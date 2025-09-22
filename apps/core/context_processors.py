@@ -384,3 +384,22 @@ def sidebar_context(request):
         })
     
     return context
+
+
+def network_status(request):
+    """Add network protection status to templates"""
+    try:
+        from .network_middleware import NetworkProtectionMiddleware
+        return {
+            'network_status': NetworkProtectionMiddleware.get_network_status()
+        }
+    except ImportError:
+        return {
+            'network_status': {
+                'protection_active': False,
+                'slow_connection': False,
+                'last_detection': None,
+                'request_count': 0,
+                'avg_response_time': 0
+            }
+        }
