@@ -754,7 +754,7 @@ def quick_order_view(request):
                 total_amount = Decimal('0')
                 
                 if service_type == 'package':
-                    # Handle service package
+                    # Handle service package with custom price
                     selected_package_id = request.POST.get('selected_package')
                     if not selected_package_id:
                         raise ValueError("Package must be selected")
@@ -762,7 +762,24 @@ def quick_order_view(request):
                     try:
                         package = ServicePackage.objects.get(id=selected_package_id, is_active=True)
                         order.package = package
-                        total_amount = package.total_price
+                        
+                        # Get custom price if provided
+                        package_custom_price = request.POST.get('package_custom_price')
+                        if package_custom_price:
+                            try:
+                                custom_price = Decimal(str(package_custom_price))
+                                # Validate custom price is not below minimum
+                                if custom_price < package.minimum_price:
+                                    logger.warning(f"Custom price {custom_price} for package {package.name} is below minimum {package.minimum_price}")
+                                    total_amount = package.minimum_price
+                                else:
+                                    total_amount = custom_price
+                                logger.info(f"Applied custom price {total_amount} to package {package.name}")
+                            except (ValueError, TypeError):
+                                logger.warning(f"Invalid custom price for package, using base price")
+                                total_amount = package.total_price
+                        else:
+                            total_amount = package.total_price
                         
                         # Add individual services from the package
                         for package_service in package.packageservice_set.all():
@@ -777,35 +794,84 @@ def quick_order_view(request):
                     except ServicePackage.DoesNotExist:
                         raise ValueError("Selected package not found")
                 else:
-                    # Handle individual services and inventory items
+                    # Handle individual services, inventory items, and customer parts
                     selected_services = request.POST.getlist('selected_services')
                     selected_inventory_items = request.POST.getlist('selected_inventory_items')
+                    customer_parts_data = request.POST.get('customer_parts', '[]')
                     
-                    # Validate that at least one service or inventory item is selected
-                    if not selected_services and not selected_inventory_items:
-                        raise ValueError("At least one service or inventory item must be selected")
+                    # Parse customer parts data from JSON
+                    try:
+                        import json
+                        customer_parts = json.loads(customer_parts_data) if customer_parts_data else []
+                    except (json.JSONDecodeError, TypeError):
+                        customer_parts = []
                     
-                    # Process selected services
+                    # Parse services custom prices from JSON
+                    services_custom_prices_data = request.POST.get('services_custom_prices', '{}')
+                    try:
+                        services_custom_prices = json.loads(services_custom_prices_data) if services_custom_prices_data else {}
+                    except (json.JSONDecodeError, TypeError):
+                        services_custom_prices = {}
+                    
+                    # Validate that at least one service, inventory item, or customer part is selected
+                    if not selected_services and not selected_inventory_items and not customer_parts:
+                        raise ValueError("At least one service, inventory item, or customer part must be selected")
+                    
+                    # Process selected services with custom prices
                     for service_id in selected_services:
                         try:
                             service = Service.objects.get(id=service_id, is_active=True)
+                            
+                            # Get custom price if provided
+                            custom_price = services_custom_prices.get(str(service_id))
+                            unit_price = Decimal(str(custom_price)) if custom_price else service.base_price
+                            
+                            # Validate custom price is not below minimum
+                            if custom_price and unit_price < service.minimum_price:
+                                logger.warning(f"Custom price {unit_price} for service {service.name} is below minimum {service.minimum_price}")
+                                unit_price = service.minimum_price
+                            
                             ServiceOrderItem.objects.create(
                                 order=order,
                                 service=service,
                                 quantity=1,
-                                unit_price=service.base_price,
+                                unit_price=unit_price,
                                 assigned_to=getattr(request, 'employee', None)
                             )
-                            total_amount += service.base_price
-                            logger.info(f"Added service: {service.name}")
+                            total_amount += unit_price
+                            logger.info(f"Added service: {service.name} at price {unit_price}")
                         except Service.DoesNotExist:
                             logger.warning(f"Service {service_id} not found, skipping")
                             continue
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Invalid custom price for service {service_id}: {e}")
+                            # Fall back to base price
+                            try:
+                                service = Service.objects.get(id=service_id, is_active=True)
+                                ServiceOrderItem.objects.create(
+                                    order=order,
+                                    service=service,
+                                    quantity=1,
+                                    unit_price=service.base_price,
+                                    assigned_to=getattr(request, 'employee', None)
+                                )
+                                total_amount += service.base_price
+                                logger.info(f"Added service: {service.name} at base price")
+                            except Service.DoesNotExist:
+                                continue
                 
-                # Handle inventory items (new feature)
+                # Handle inventory items with custom prices
                 selected_inventory_items = request.POST.getlist('selected_inventory_items')
                 if selected_inventory_items:
                     from apps.inventory.models import InventoryItem, StockMovement
+                    
+                    # Parse inventory custom prices from JSON
+                    inventory_custom_prices_data = request.POST.get('inventory_custom_prices', '{}')
+                    try:
+                        inventory_custom_prices = json.loads(inventory_custom_prices_data) if inventory_custom_prices_data else {}
+                    except (json.JSONDecodeError, TypeError):
+                        inventory_custom_prices = {}
+                    
                     for item_id in selected_inventory_items:
                         try:
                             inventory_item = InventoryItem.objects.get(id=item_id, is_active=True)
@@ -817,12 +883,22 @@ def quick_order_view(request):
                                 logger.warning(f"Insufficient stock for {inventory_item.name}")
                                 continue
                             
+                            # Get custom price if provided
+                            custom_price = inventory_custom_prices.get(str(item_id))
+                            unit_price = Decimal(str(custom_price)) if custom_price else (inventory_item.selling_price or inventory_item.unit_cost)
+                            
+                            # Validate custom price is not below minimum (unit cost)
+                            minimum_price = inventory_item.unit_cost
+                            if custom_price and unit_price < minimum_price:
+                                logger.warning(f"Custom price {unit_price} for inventory {inventory_item.name} is below minimum {minimum_price}")
+                                unit_price = minimum_price
+                            
                             # Create service order item for inventory item
                             ServiceOrderItem.objects.create(
                                 order=order,
                                 inventory_item=inventory_item,
                                 quantity=quantity,
-                                unit_price=inventory_item.selling_price or inventory_item.unit_cost,
+                                unit_price=unit_price,
                                 assigned_to=getattr(request, 'employee', None)
                             )
                             
@@ -830,11 +906,39 @@ def quick_order_view(request):
                             # - Service orders: Deducted immediately after order creation (old flow)
                             # - Inventory-only orders: Deducted when payment is completed (new flow)
                             
-                            total_amount += (inventory_item.selling_price or inventory_item.unit_cost) * quantity
-                            logger.info(f"Added inventory item: {inventory_item.name} x{quantity}")
+                            total_amount += unit_price * quantity
+                            logger.info(f"Added inventory item: {inventory_item.name} x{quantity} at price {unit_price}")
                             
-                        except (InventoryItem.DoesNotExist, ValueError, TypeError):
-                            logger.warning(f"Inventory item {item_id} not found or invalid quantity, skipping")
+                        except (InventoryItem.DoesNotExist, ValueError, TypeError) as e:
+                            logger.warning(f"Inventory item {item_id} not found or invalid: {e}, skipping")
+                            continue
+                
+                # Handle customer parts (manual entries)
+                if customer_parts:
+                    for part_data in customer_parts:
+                        try:
+                            part_name = part_data.get('name', '').strip()
+                            part_quantity = Decimal(str(part_data.get('quantity', 1)))
+                            
+                            if not part_name:
+                                logger.warning("Customer part without name, skipping")
+                                continue
+                            
+                            # Create service order item for customer part
+                            ServiceOrderItem.objects.create(
+                                order=order,
+                                description=f"Customer Part: {part_name}",
+                                quantity=part_quantity,
+                                unit_price=Decimal('0'),  # Customer parts are free
+                                total_price=Decimal('0'),  # Explicitly set total price
+                                is_customer_provided=True,
+                                assigned_to=getattr(request, 'employee', None)
+                            )
+                            
+                            logger.info(f"Added customer part: {part_name} x{part_quantity}")
+                            
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Invalid customer part data: {e}, skipping")
                             continue
                 
                 # Calculate totals

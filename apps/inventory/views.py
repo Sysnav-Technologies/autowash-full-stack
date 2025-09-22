@@ -302,7 +302,7 @@ def item_create_view(request):
                     new_stock=item.current_stock,
                     reference_type='adjustment',
                     reason='Opening stock',
-                    created_by=request.user
+                    created_by_user_id=request.user.id
                 )
             
             messages.success(request, f'Inventory item "{item.name}" created successfully!')

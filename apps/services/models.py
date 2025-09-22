@@ -143,6 +143,11 @@ class Service(TenantSoftDeleteModel):
             self.created_by_id = None
     
     @property
+    def minimum_price(self):
+        """Get minimum price for price editing"""
+        return self.min_price or self.base_price
+    
+    @property
     def average_rating(self):
         """Calculate average rating from completed orders"""
         ratings = self.order_items.filter(
@@ -197,6 +202,11 @@ class ServicePackage(TenantSoftDeleteModel):
     
     def __str__(self):
         return f"{self.name} - KES {self.total_price}"
+    
+    @property
+    def minimum_price(self):
+        """Get minimum price for price editing (70% of total price)"""
+        return self.total_price * Decimal('0.7')
     
     @property
     def original_price(self):
@@ -640,6 +650,11 @@ class ServiceOrder(TenantTimeStampedModel):
         return self.order_items.filter(inventory_item__isnull=False).exists()
     
     @property
+    def has_customer_parts(self):
+        """Check if this order contains any customer-provided parts"""
+        return self.order_items.filter(is_customer_provided=True).exists()
+    
+    @property
     def service_items(self):
         """Get only service items from this order"""
         return self.order_items.filter(service__isnull=False)
@@ -648,6 +663,11 @@ class ServiceOrder(TenantTimeStampedModel):
     def inventory_items(self):
         """Get only inventory items from this order"""
         return self.order_items.filter(inventory_item__isnull=False)
+    
+    @property
+    def customer_parts(self):
+        """Get only customer-provided parts from this order"""
+        return self.order_items.filter(is_customer_provided=True)
     
     def get_display_status(self):
         """Get appropriate status display based on order type"""
@@ -729,9 +749,18 @@ class ServiceOrderItem(models.Model):
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='order_items', null=True, blank=True)
     inventory_item = models.ForeignKey('inventory.InventoryItem', on_delete=models.CASCADE, related_name='service_orders', null=True, blank=True)
     
+    # Description for custom/customer provided items
+    description = models.TextField(blank=True, help_text="Description for custom items or customer provided parts")
+    
     quantity = models.IntegerField(default=1)
     unit_price = models.DecimalField(max_digits=8, decimal_places=2)
     total_price = models.DecimalField(max_digits=8, decimal_places=2)
+    
+    # Customer-provided parts (no charge for parts, only labor)
+    is_customer_provided = models.BooleanField(
+        default=False,
+        help_text="Whether this inventory item was provided by the customer (no charge)"
+    )
     
     # Service execution
     started_at = models.DateTimeField(null=True, blank=True)
@@ -792,6 +821,13 @@ class ServiceOrderItem(models.Model):
             return self.service.name
         elif self.inventory_item:
             return self.inventory_item.name
+        elif self.is_customer_provided and self.description:
+            # For customer parts, extract name from description
+            # Format is usually "Customer Part: Part Name"
+            desc = self.description.strip()
+            if desc.startswith("Customer Part: "):
+                return desc[15:]  # Remove "Customer Part: " prefix
+            return desc
         return "Unknown Item"
     
     @property 
@@ -805,7 +841,8 @@ class ServiceOrderItem(models.Model):
     
     def clean(self):
         from django.core.exceptions import ValidationError
-        if not self.service and not self.inventory_item:
+        # Allow customer-provided parts without service or inventory item
+        if not self.service and not self.inventory_item and not self.is_customer_provided:
             raise ValidationError("Either service or inventory item must be specified.")
         if self.service and self.inventory_item:
             raise ValidationError("Cannot specify both service and inventory item.")

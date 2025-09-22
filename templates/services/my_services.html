@@ -102,7 +102,19 @@
                 <div class="mb-3">
                     {% with order.order_items.all|slice:":3" as items %}
                         {% for item in items %}
-                            <span class="badge bg-light text-dark mb-1">{{ item.service.name }}</span>
+                            {% if item.is_customer_provided %}
+                                <span class="badge bg-success text-white mb-1">
+                                    <i class="fas fa-gift"></i> {{ item.description|default:"Customer Part" }}
+                                </span>
+                            {% elif item.service %}
+                                <span class="badge bg-light text-dark mb-1">{{ item.service.name }}</span>
+                            {% elif item.inventory_item %}
+                                <span class="badge bg-info text-white mb-1">
+                                    <i class="fas fa-box"></i> {{ item.inventory_item.name }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary text-white mb-1">{{ item.description|default:"Custom Item" }}</span>
+                            {% endif %}
                         {% endfor %}
                         {% if order.order_items.count > 3 %}
                             <span class="badge bg-light text-dark">+{{ order.order_items.count|add:"-3" }} more</span>
@@ -213,7 +225,19 @@
                             <td>
                                 {% with order.order_items.all|slice:":2" as items %}
                                     {% for item in items %}
-                                        <span class="badge bg-light text-dark mb-1">{{ item.service.name }}</span>
+                                        {% if item.is_customer_provided %}
+                                            <span class="badge bg-success text-white mb-1">
+                                                <i class="fas fa-gift"></i> {{ item.description|default:"Customer Part" }}
+                                            </span>
+                                        {% elif item.service %}
+                                            <span class="badge bg-light text-dark mb-1">{{ item.service.name }}</span>
+                                        {% elif item.inventory_item %}
+                                            <span class="badge bg-info text-white mb-1">
+                                                <i class="fas fa-box"></i> {{ item.inventory_item.name }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary text-white mb-1">{{ item.description|default:"Custom Item" }}</span>
+                                        {% endif %}
                                     {% endfor %}
                                     {% if order.order_items.count > 2 %}
                                         <span class="badge bg-light text-dark">+{{ order.order_items.count|add:"-2" }} more</span>
