@@ -22,7 +22,7 @@ class TenantSettingsForm(forms.ModelForm):
             'facebook_url', 'instagram_url', 'twitter_url',
             
             # Branding
-            'primary_color', 'secondary_color', 'logo_url',
+            'primary_color', 'secondary_color', 'logo_url', 'business_logo', 'receipt_footer',
         ]
         
         widgets = {
@@ -76,6 +76,15 @@ class TenantSettingsForm(forms.ModelForm):
             'logo_url': forms.URLInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'https://yourlogo.com/logo.png'
+            }),
+            'business_logo': forms.ClearableFileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*'
+            }),
+            'receipt_footer': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Custom footer text for receipts and invoices (e.g., Thank you for your business!)'
             }),
         }
 

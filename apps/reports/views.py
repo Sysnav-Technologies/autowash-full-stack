@@ -1954,10 +1954,17 @@ class ReportsView(TemplateView):
         # Get all report data (not paginated for export)
         report_data = self._get_export_data(report_type, start_date, end_date, employee_id)
         
+        # Get the actual business object from the public database
+        from apps.core.tenant_models import Tenant
+        from apps.core.database_router import tenant_context
+        
+        # Query the Tenant model from the default database (no context manager needed for public data)
+        business = Tenant.objects.using('default').get(id=request.business.id)
+        
         if export_format == 'pdf':
-            return self._generate_pdf_export(report_data, request.tenant)
+            return self._generate_pdf_export(report_data, business)
         else:  # excel
-            return self._generate_excel_export(report_data, request.tenant)
+            return self._generate_excel_export(report_data, business)
     
     def _get_export_data(self, report_type, start_date, end_date, employee_id=None):
         """Get all data for export (no pagination) - Updated to use order-based data"""
@@ -2198,21 +2205,77 @@ class ReportsView(TemplateView):
             
         return data
     
-    def _generate_pdf_export(self, report_data, tenant):
+    def _generate_pdf_export(self, report_data, business):
         """Generate comprehensive PDF for specific report type"""
         if not PDF_AVAILABLE:
             return JsonResponse({'error': 'PDF generation not available'}, status=500)
+        
+        # Import necessary reportlab components
+        from reportlab.lib.units import inch
+        from reportlab.platypus import Image
         
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.8*inch, bottomMargin=1*inch)
         styles = getSampleStyleSheet()
         story = []
         
-        # Header with tenant information
+        # Header with logo and business information
+        from apps.core.tenant_models import TenantSettings
+        from apps.core.database_router import tenant_context
+        
+        # Get tenant settings for logo
+        tenant_settings = None
+        try:
+            print(f"Business: {business}")
+            print(f"Business ID: {business.id}")
+            
+            with tenant_context(business):
+                tenant_settings = TenantSettings.objects.filter(tenant_id=business.id).first()
+                
+                # If no tenant settings exist, try to create default ones
+                if not tenant_settings:
+                    print("No tenant settings found, creating default ones")
+                    tenant_settings = TenantSettings.objects.create(
+                        tenant_id=business.id,
+                        business_name=business.name
+                    )
+                
+                print(f"Tenant settings found: {tenant_settings}")
+                if tenant_settings:
+                    print(f"Business logo: {tenant_settings.business_logo}")
+                    if hasattr(tenant_settings, 'logo_url'):
+                        print(f"Logo URL: {tenant_settings.logo_url}")
+        except Exception as e:
+            print(f"Error getting tenant settings: {e}")
+            pass
+        
+        # Add logo if available
+        if tenant_settings and tenant_settings.business_logo:
+            try:
+                import os
+                
+                # Debug: Check if file exists
+                logo_path = tenant_settings.business_logo.path
+                print(f"Logo path: {logo_path}")
+                print(f"File exists: {os.path.exists(logo_path)}")
+                
+                if os.path.exists(logo_path):
+                    logo = Image(logo_path, width=2*inch, height=1*inch, hAlign='CENTER')
+                    story.append(logo)
+                    story.append(Spacer(1, 12))
+                    print("Logo added successfully")
+                else:
+                    print("Logo file does not exist")
+            except Exception as e:
+                print(f"Logo loading failed: {e}")  # Debug info
+                pass  # If logo fails to load, continue without it
+        else:
+            print(f"No logo: tenant_settings={tenant_settings}, has_logo={tenant_settings.business_logo if tenant_settings else None}")
+        
         header_data = [
-            [tenant.name, f"Generated: {timezone.now().strftime('%B %d, %Y at %I:%M %p')}"],
-            [getattr(tenant, 'address', 'Address not available'), f"Report Period: {report_data.get('period', '')}"],
-            [getattr(tenant, 'phone', ''), '']
+            [business.name, f"Generated: {timezone.now().strftime('%B %d, %Y at %I:%M %p')}"],
+            [getattr(business, 'address', 'Address not available'), f"Report Period: {report_data.get('period', '')}"],
+            [getattr(business, 'phone', ''), '']
         ]
         header_table = Table(header_data, colWidths=[4*inch, 2.5*inch])
         header_table.setStyle(TableStyle([
@@ -2353,7 +2416,7 @@ class ReportsView(TemplateView):
         
         # Footer
         story.append(Spacer(1, 30))
-        footer_text = f"Report generated by {tenant.name} - AutoWash Management System"
+        footer_text = f"Report generated by {business.name} - AutoWash Management System"
         footer = Paragraph(footer_text, styles['Normal'])
         story.append(footer)
         
@@ -2361,7 +2424,7 @@ class ReportsView(TemplateView):
         buffer.seek(0)
         
         response = HttpResponse(buffer.read(), content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{tenant.name}_{report_data.get("type", "report")}_report.pdf"'
+        response['Content-Disposition'] = f'attachment; filename="{business.name}_{report_data.get("type", "report")}_report.pdf"'
         return response
     
     def _generate_pdf_table_data(self, report_data):
@@ -2749,7 +2812,7 @@ class ReportsView(TemplateView):
         
         return table_data
     
-    def _generate_excel_export(self, report_data, tenant):
+    def _generate_excel_export(self, report_data, business):
         """Generate comprehensive Excel for specific report type"""
         if not EXCEL_AVAILABLE:
             return JsonResponse({'error': 'Excel generation not available'}, status=500)
@@ -2758,13 +2821,13 @@ class ReportsView(TemplateView):
         ws = wb.active
         ws.title = report_data.get('title', 'Report')
         
-        # Header with tenant information
-        ws['A1'] = tenant.name
+        # Header with business information
+        ws['A1'] = business.name
         ws['A1'].font = Font(bold=True, size=16)
         ws['B1'] = f"Generated: {timezone.now().strftime('%B %d, %Y at %I:%M %p')}"
         ws['B1'].font = Font(size=10)
         
-        ws['A2'] = getattr(tenant, 'address', 'Address not available')
+        ws['A2'] = getattr(business, 'address', 'Address not available')
         ws['B2'] = f"Report Period: {report_data.get('period', '')}"
         ws['B2'].font = Font(bold=True)
         
@@ -2873,7 +2936,7 @@ class ReportsView(TemplateView):
         
         # Footer
         current_row += 2
-        ws[f'A{current_row}'] = f"Report generated by {tenant.name} - AutoWash Management System"
+        ws[f'A{current_row}'] = f"Report generated by {business.name} - AutoWash Management System"
         ws[f'A{current_row}'].font = Font(italic=True, size=9)
         
         buffer = io.BytesIO()
@@ -2884,7 +2947,7 @@ class ReportsView(TemplateView):
             buffer.read(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = f'attachment; filename="{tenant.name}_{report_data.get("type", "report")}_report.xlsx"'
+        response['Content-Disposition'] = f'attachment; filename="{business.name}_{report_data.get("type", "report")}_report.xlsx"'
         return response
     
     def _generate_excel_table_data(self, report_data):

@@ -290,6 +290,8 @@ class TenantSettings(models.Model):
     primary_color = models.CharField(max_length=7, default='#007bff')
     secondary_color = models.CharField(max_length=7, default='#6c757d')
     logo_url = models.URLField(blank=True)
+    business_logo = models.ImageField(upload_to='business_logos/', blank=True, null=True, help_text="Upload your business logo")
+    receipt_footer = models.TextField(blank=True, help_text="Custom footer text for receipts and invoices")
     
     # Business Hours
     monday_open = models.TimeField(null=True, blank=True)

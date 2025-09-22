@@ -178,7 +178,7 @@ def business_settings_view(request):
     tenant_settings = get_or_create_tenant_settings(business)
     
     if request.method == 'POST':
-        form = TenantSettingsForm(request.POST, instance=tenant_settings)
+        form = TenantSettingsForm(request.POST, request.FILES, instance=tenant_settings)
         if form.is_valid():
             try:
                 with transaction.atomic():

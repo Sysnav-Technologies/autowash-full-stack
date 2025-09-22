@@ -591,7 +591,28 @@ def purchase_order_pdf(request, pk):
             spaceAfter=30,
         )
         
-        # Add company header
+        # Add company header with logo
+        from apps.core.tenant_models import TenantSettings
+        from django_tenants.utils import tenant_context
+        
+        # Get tenant settings for logo
+        tenant_settings = None
+        try:
+            with tenant_context(request.business):
+                tenant_settings = TenantSettings.objects.filter(tenant_id=request.business.id).first()
+        except:
+            pass
+        
+        # Add logo if available
+        if tenant_settings and tenant_settings.business_logo:
+            try:
+                from reportlab.platypus import Image
+                logo = Image(tenant_settings.business_logo.path, width=2*inch, height=1*inch, hAlign='LEFT')
+                elements.append(logo)
+                elements.append(Spacer(1, 12))
+            except:
+                pass  # If logo fails to load, continue without it
+        
         company_title = Paragraph("Purchase Order", title_style)
         elements.append(company_title)
         elements.append(Spacer(1, 12))
@@ -2013,7 +2034,28 @@ def invoice_pdf(request, pk):
             spaceAfter=30,
         )
         
-        # Add company header
+        # Add company header with logo
+        from apps.core.tenant_models import TenantSettings
+        from django_tenants.utils import tenant_context
+        
+        # Get tenant settings for logo
+        tenant_settings = None
+        try:
+            with tenant_context(request.business):
+                tenant_settings = TenantSettings.objects.filter(tenant_id=request.business.id).first()
+        except:
+            pass
+        
+        # Add logo if available
+        if tenant_settings and tenant_settings.business_logo:
+            try:
+                from reportlab.platypus import Image
+                logo = Image(tenant_settings.business_logo.path, width=2*inch, height=1*inch, hAlign='LEFT')
+                elements.append(logo)
+                elements.append(Spacer(1, 12))
+            except:
+                pass  # If logo fails to load, continue without it
+        
         company_title = Paragraph(f"Invoice - {invoice.invoice_number}", title_style)
         elements.append(company_title)
         elements.append(Spacer(1, 12))
