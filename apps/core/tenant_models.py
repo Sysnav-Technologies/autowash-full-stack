@@ -243,12 +243,16 @@ class TenantSettings(models.Model):
     sms_notifications = models.BooleanField(default=True, help_text="Send SMS notifications to customers")
     email_notifications = models.BooleanField(default=True, help_text="Send email notifications")
     whatsapp_notifications = models.BooleanField(default=False, help_text="Send WhatsApp notifications")
+    push_notifications = models.BooleanField(default=False, help_text="Send push notifications")
     
     # Customer Notifications
     customer_booking_confirmations = models.BooleanField(default=True)
     customer_payment_receipts = models.BooleanField(default=True)
     customer_service_reminders = models.BooleanField(default=True)
     customer_marketing_messages = models.BooleanField(default=False)
+    notify_booking_confirmation = models.BooleanField(default=True, help_text="Notify customers when booking is confirmed")
+    notify_service_reminder = models.BooleanField(default=True, help_text="Send service reminders to customers")
+    notify_service_complete = models.BooleanField(default=True, help_text="Notify customers when service is complete")
     
     # Staff Notifications
     staff_new_bookings = models.BooleanField(default=True)
@@ -268,11 +272,24 @@ class TenantSettings(models.Model):
     require_payment_before_service = models.BooleanField(default=False)
     default_tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     mpesa_auto_confirm = models.BooleanField(default=True)
+    tax_number = models.CharField(max_length=100, blank=True, help_text="Business tax/VAT number")
+    tax_inclusive_pricing = models.BooleanField(default=True, help_text="Include tax in displayed prices")
+    accept_cash = models.BooleanField(default=True, help_text="Accept cash payments")
+    accept_mpesa = models.BooleanField(default=True, help_text="Accept M-Pesa payments")
+    accept_card = models.BooleanField(default=False, help_text="Accept card payments")
+    accept_bank_transfer = models.BooleanField(default=False, help_text="Accept bank transfers")
     
     # Service Settings
     auto_assign_services = models.BooleanField(default=False)
     require_service_confirmation = models.BooleanField(default=True)
     service_buffer_time = models.IntegerField(default=15, help_text="Buffer time between services in minutes")
+    default_service_duration = models.IntegerField(default=30, help_text="Default service duration in minutes")
+    max_advance_booking_days = models.IntegerField(default=30, help_text="Maximum days customers can book in advance")
+    min_advance_booking_hours = models.IntegerField(default=2, help_text="Minimum hours notice required for booking")
+    allow_online_booking = models.BooleanField(default=True, help_text="Enable online booking system")
+    require_customer_phone = models.BooleanField(default=True, help_text="Require phone number for all bookings")
+    allow_same_day_booking = models.BooleanField(default=True, help_text="Allow bookings for the same day")
+    auto_confirm_bookings = models.BooleanField(default=False, help_text="Automatically confirm new bookings")
     
     # Backup Settings
     auto_backup_enabled = models.BooleanField(default=True)
@@ -290,20 +307,29 @@ class TenantSettings(models.Model):
     primary_color = models.CharField(max_length=7, default='#007bff')
     secondary_color = models.CharField(max_length=7, default='#6c757d')
     logo_url = models.URLField(blank=True)
+    business_logo = models.ImageField(upload_to='business_logos/', blank=True, null=True, help_text="Upload your business logo")
+    receipt_footer = models.TextField(blank=True, help_text="Custom footer text for receipts and invoices")
     
     # Business Hours
+    monday_is_open = models.BooleanField(default=True)
     monday_open = models.TimeField(null=True, blank=True)
     monday_close = models.TimeField(null=True, blank=True)
+    tuesday_is_open = models.BooleanField(default=True)
     tuesday_open = models.TimeField(null=True, blank=True)
     tuesday_close = models.TimeField(null=True, blank=True)
+    wednesday_is_open = models.BooleanField(default=True)
     wednesday_open = models.TimeField(null=True, blank=True)
     wednesday_close = models.TimeField(null=True, blank=True)
+    thursday_is_open = models.BooleanField(default=True)
     thursday_open = models.TimeField(null=True, blank=True)
     thursday_close = models.TimeField(null=True, blank=True)
+    friday_is_open = models.BooleanField(default=True)
     friday_open = models.TimeField(null=True, blank=True)
     friday_close = models.TimeField(null=True, blank=True)
+    saturday_is_open = models.BooleanField(default=True)
     saturday_open = models.TimeField(null=True, blank=True)
     saturday_close = models.TimeField(null=True, blank=True)
+    sunday_is_open = models.BooleanField(default=False)
     sunday_open = models.TimeField(null=True, blank=True)
     sunday_close = models.TimeField(null=True, blank=True)
     

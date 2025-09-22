@@ -494,6 +494,7 @@ def payment_receipt_view(request, payment_id):
     
     context = {
         'payment': payment,
+        'service_order': payment.service_order,
         'business': business,
         'tenant_settings': tenant_settings,
         'title': f'Receipt - {payment.payment_id}'
@@ -517,6 +518,7 @@ def payment_receipt_print_view(request, payment_id):
     
     context = {
         'payment': payment,
+        'service_order': payment.service_order,
         'business': business,
         'tenant_settings': tenant_settings,
         'title': f'Print Receipt - {payment.payment_id}'

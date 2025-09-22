@@ -321,7 +321,7 @@
         <!-- Action Buttons (hidden in print) -->
         <div class="receipt-actions no-print">
             <h4 class="mb-3">Payment Receipt</h4>
-            <button class="btn btn-primary me-2" onclick="window.open('/business/{{ request.tenant.slug }}/payments/{{ payment.payment_id }}/print/', '_blank')">
+            <button class="btn btn-primary me-2" onclick="window.open('/business/{{ request.tenant.slug }}/payments/{{ payment.pk }}/receipt/print/', '_blank')">
                 <i class="fas fa-print me-2"></i>Print Receipt
             </button>
             <button class="btn btn-outline-secondary me-2" onclick="downloadPDF()">
@@ -351,11 +351,11 @@
                     </div>
                     <div class="info-row">
                         <span class="info-label">Date:</span>
-                        <span class="info-value">{{ payment.initiated_at|date:"d/m/Y" }}</span>
+                        <span class="info-value">{{ payment.payment_date|date:"d/m/Y" }}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Time:</span>
-                        <span class="info-value">{{ payment.initiated_at|date:"H:i" }}</span>
+                        <span class="info-value">{{ payment.payment_date|date:"H:i" }}</span>
                     </div>
                     {% if payment.reference_number %}
                     <div class="info-row">
@@ -374,6 +374,12 @@
                         <span class="info-label">Customer:</span>
                         <span class="info-value">{{ payment.customer.full_name }}</span>
                     </div>
+                    {% if payment.customer.phone %}
+                    <div class="info-row">
+                        <span class="info-label">Phone:</span>
+                        <span class="info-value">{{ payment.customer.phone }}</span>
+                    </div>
+                    {% endif %}
                     {% if payment.customer.customer_id %}
                     <div class="info-row">
                         <span class="info-label">Customer ID:</span>
@@ -391,28 +397,40 @@
                     </div>
                     <div class="service-item">
                         <div class="service-name">{{ payment.get_payment_method_display }}</div>
+                        {% if payment.payment_context %}
                         <div class="service-details">
-                            <span class="service-qty">{{ payment.description|default:"Payment for service order"|default:"Payment" }}</span>
-                            <span class="service-price">KES {{ payment.amount|floatformat:2 }}</span>
+                            <span class="service-qty">{{ payment.payment_context }}</span>
+                            <span class="service-price">KES {{ payment.amount_paid|floatformat:2 }}</span>
                             <div class="clear-float"></div>
                         </div>
-                        {% if payment.transaction_id %}
-                        <div class="service-description">Transaction ID: {{ payment.transaction_id }}</div>
                         {% endif %}
-                        {% if payment.reference_number %}
-                        <div class="service-description">Reference: {{ payment.reference_number }}</div>
+                        {% if payment.description %}
+                        <div class="service-description">{{ payment.description }}</div>
                         {% endif %}
-                        <div class="service-description">Status: {{ payment.get_status_display }}</div>
-                        <div class="service-description">Date: {{ payment.initiated_at|date:"M d, Y H:i" }}</div>
+                        {% if payment.transaction_reference %}
+                        <div class="service-description">Ref: {{ payment.transaction_reference }}</div>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="separator"></div>
                 
                 <!-- Payment Totals -->
                 <div class="amount-section">
+                    {% if payment.discount_amount and payment.discount_amount > 0 %}
+                    <div class="info-row">
+                        <span class="info-label">Discount:</span>
+                        <span class="info-value">KES {{ payment.discount_amount|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
+                    {% if payment.tax_amount and payment.tax_amount > 0 %}
+                    <div class="info-row">
+                        <span class="info-label">Tax:</span>
+                        <span class="info-value">KES {{ payment.tax_amount|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
                     <div class="info-row">
                         <span class="info-label">Total Paid:</span>
-                        <span class="info-value">KES {{ payment.amount|floatformat:2 }}</span>
+                        <span class="info-value">KES {{ payment.amount_paid|floatformat:2 }}</span>
                     </div>
                 </div>
                 
@@ -444,6 +462,32 @@
                 <div class="center-text thermal-spacing">
                     STATUS: {{ payment.get_status_display|upper }}
                 </div>
+                            <!-- Simple barcode representation -->
+                            <div class="qr-box">
+                                ||||| || ||| |||| | ||| |||||| | || |||<br>
+                                {{ service_order.order_number }}<br>
+                                ||||| || ||| |||| | ||| |||||| | || |||
+                            </div>
+                        {% else %}
+                            <div class="qr-box">
+                                ||||| || ||| |||| | ||| |||||| | || |||<br>
+                                {{ service_order.id }}<br>
+                                ||||| || ||| |||| | ||| |||||| | || |||
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="separator"></div>
+                
+                <!-- Payment Status -->
+                <div class="center-text thermal-spacing">
+                    {% if balance_due > 0 %}
+                        STATUS: PARTIAL PAYMENT
+                    {% else %}
+                        STATUS: FULLY PAID
+                    {% endif %}
+                </div>
                 
                 <div class="double-separator"></div>
                 
@@ -473,7 +517,7 @@
                     </div>
                     <div class="preview-row">
                         <span>Date & Time:</span>
-                        <strong>{{ payment.initiated_at|date:"M d, Y H:i" }}</strong>
+                        <strong>{{ payment.payment_date|date:"M d, Y H:i" }}</strong>
                     </div>
                     {% if payment.reference_number %}
                     <div class="preview-row">
@@ -492,6 +536,12 @@
                         <span>Customer:</span>
                         <strong>{{ payment.customer.full_name }}</strong>
                     </div>
+                    {% if payment.customer.phone %}
+                    <div class="preview-row">
+                        <span>Phone:</span>
+                        <strong>{{ payment.customer.phone }}</strong>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="preview-separator"></div>
                 {% endif %}
@@ -503,44 +553,51 @@
                         <span>Payment Method:</span>
                         <strong>{{ payment.get_payment_method_display }}</strong>
                     </div>
+                    {% if payment.payment_context %}
+                    <div class="preview-row">
+                        <span>Payment For:</span>
+                        <strong>{{ payment.payment_context }}</strong>
+                    </div>
+                    {% endif %}
+                    {% if payment.description %}
                     <div class="preview-row">
                         <span>Description:</span>
-                        <strong>{{ payment.description|default:"Payment for service order" }}</strong>
-                    </div>
-                    {% if payment.transaction_id %}
-                    <div class="preview-row">
-                        <span>Transaction ID:</span>
-                        <strong>{{ payment.transaction_id }}</strong>
+                        <strong>{{ payment.description }}</strong>
                     </div>
                     {% endif %}
-                    {% if payment.reference_number %}
+                    {% if payment.transaction_reference %}
                     <div class="preview-row">
-                        <span>Reference:</span>
-                        <strong>{{ payment.reference_number }}</strong>
+                        <span>Transaction Ref:</span>
+                        <strong>{{ payment.transaction_reference }}</strong>
                     </div>
                     {% endif %}
-                    <div class="preview-row">
-                        <span>Status:</span>
-                        <strong>{{ payment.get_status_display }}</strong>
-                    </div>
-                    <div class="preview-row">
-                        <span>Date & Time:</span>
-                        <strong>{{ payment.initiated_at|date:"M d, Y H:i" }}</strong>
-                    </div>
                 </div>
                 
                 <div class="preview-separator"></div>
                 
+                <div class="preview-info">
+                    {% if payment.discount_amount and payment.discount_amount > 0 %}
+                    <div class="preview-row">
+                        <span>Discount:</span>
+                        <strong>KES {{ payment.discount_amount|floatformat:2 }}</strong>
+                    </div>
+                    {% endif %}
+                    {% if payment.tax_amount and payment.tax_amount > 0 %}
+                    <div class="preview-row">
+                        <span>Tax:</span>
+                        <strong>KES {{ payment.tax_amount|floatformat:2 }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                
                 <div class="preview-amount">
-                    Total Paid: KES {{ payment.amount|floatformat:2 }}
+                    Total Paid: KES {{ payment.amount_paid|floatformat:2 }}
                 </div>
                 
                 <div class="preview-footer">
                     <p><strong>Status:</strong> {{ payment.get_status_display }}</p>
                     <p>Thank you for your payment!</p>
                 </div>
-                
-                {% if service_order %}
                 {% if service_order.vehicle %}
                 <div class="preview-info">
                     <div class="preview-row">
@@ -579,14 +636,82 @@
                 <div class="preview-separator"></div>
                 {% endif %}
                 
+                <!-- Order Items -->
+                {% if service_order.has_services %}
+                <div class="preview-info">
+                    <h6 class="text-center mb-2"><i class="fas fa-tools me-2"></i>Services Provided</h6>
+                    {% for item in service_order.service_items %}
+                    <div class="mb-2">
+                        <div class="preview-row">
+                            <span><strong>{{ item.item_name }}</strong></span>
+                            <strong>KES {{ item.total_price|floatformat:2 }}</strong>
+                        </div>
+                        <div class="preview-row">
+                            <span><small>Qty: {{ item.quantity|default:1 }}</small></span>
+                            <span><small>@ KES {{ item.unit_price|floatformat:2 }}</small></span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="preview-separator"></div>
                 {% endif %}
+                
+                {% if service_order.has_inventory_items %}
+                <div class="preview-info">
+                    <h6 class="text-center mb-2"><i class="fas fa-box me-2"></i>Items Provided</h6>
+                    {% for item in service_order.inventory_items %}
+                    <div class="mb-2">
+                        <div class="preview-row">
+                            <span><strong>{{ item.item_name }}</strong></span>
+                            <strong>KES {{ item.total_price|floatformat:2 }}</strong>
+                        </div>
+                        <div class="preview-row">
+                            <span><small>Qty: {{ item.quantity|default:1 }}</small></span>
+                            <span><small>@ KES {{ item.unit_price|floatformat:2 }}</small></span>
+                        </div>
+                        {% if item.inventory_item.sku %}
+                        <div class="preview-row">
+                            <span><small>SKU: {{ item.inventory_item.sku }}</small></span>
+                            <span><small>Inventory Item</small></span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="preview-separator"></div>
+                {% endif %}
+                
+                <!-- Order Totals -->
+                <div class="preview-info">
+                    <div class="preview-row">
+                        <span>Subtotal (ex VAT):</span>
+                        <strong>KES {{ service_order.subtotal|floatformat:2 }}</strong>
+                    </div>
+                    <div class="preview-row">
+                        <span>VAT (16%):</span>
+                        <strong>KES {{ service_order.tax_amount|floatformat:2 }}</strong>
+                    </div>
+                    <div class="preview-row">
+                        <span><strong>Total Order:</strong></span>
+                        <strong>KES {{ service_order.total_amount|floatformat:2 }}</strong>
+                    </div>
+                    {% if service_order.discount_amount and service_order.discount_amount > 0 %}
+                    <div class="preview-row">
+                        <span>Discount Applied:</span>
+                        <strong>KES {{ service_order.discount_amount|floatformat:2 }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="preview-separator"></div>
                 
                 <!-- Payment Summary -->
                 <div class="preview-info">
                     <h6 class="text-center mb-2">Payment Details</h6>
+                    {% for payment in payments %}
                     <div class="mb-2">
                         <div class="preview-row">
-                            <span>{{ payment.initiated_at|date:"M d H:i" }} - {{ payment.payment_method.name }}</span>
+                            <span>{{ payment.created_at|date:"M d H:i" }} - {{ payment.payment_method.name }}</span>
                             <strong>KES {{ payment.amount|floatformat:2 }}</strong>
                         </div>
                         {% if payment.transaction_id %}
@@ -596,17 +721,28 @@
                         </div>
                         {% endif %}
                     </div>
+                    {% endfor %}
                     
                     <div class="preview-separator"></div>
                     
                     <div class="preview-row">
                         <span><strong>Total Paid:</strong></span>
-                        <strong>KES {{ payment.amount|floatformat:2 }}</strong>
+                        <strong>KES {{ total_paid|floatformat:2 }}</strong>
                     </div>
+                    {% if balance_due > 0 %}
+                    <div class="preview-row">
+                        <span><strong>Balance Due:</strong></span>
+                        <strong class="balance-due">KES {{ balance_due|floatformat:2 }}</strong>
+                    </div>
+                    {% endif %}
                 </div>
                 
                 <div class="preview-amount">
-                    FULLY PAID - KES {{ payment.amount|floatformat:2 }}
+                    {% if balance_due > 0 %}
+                        PARTIAL PAYMENT - BALANCE: KES {{ balance_due|floatformat:2 }}
+                    {% else %}
+                        FULLY PAID - KES {{ total_paid|floatformat:2 }}
+                    {% endif %}
                 </div>
                 
                 <div class="preview-footer">

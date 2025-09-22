@@ -62,7 +62,7 @@
 
 <div class="row">
     <div class="col-lg-8">
-        <form method="post" class="settings-form">
+        <form method="post" enctype="multipart/form-data" class="settings-form">
             {% csrf_token %}
             
             <!-- Business Information -->
@@ -206,8 +206,40 @@
             <!-- Branding -->
             <div class="form-section">
                 <h5 class="section-title">
-                    <i class="fas fa-palette mr-2"></i>Branding & Colors
+                    <i class="fas fa-palette mr-2"></i>Branding & Logo
                 </h5>
+                
+                <!-- Logo Section -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.business_logo.id_for_label }}">Business Logo</label>
+                            {{ form.business_logo }}
+                            <small class="help-text">Upload your business logo (PNG, JPG, SVG)</small>
+                            {% if form.business_logo.errors %}
+                                <div class="invalid-feedback d-block">{{ form.business_logo.errors.0 }}</div>
+                            {% endif %}
+                            {% if tenant_settings.business_logo %}
+                                <div class="mt-2">
+                                    <img src="{{ tenant_settings.business_logo.url }}" alt="Current Logo" style="max-height: 60px; max-width: 150px;" class="border rounded">
+                                    <small class="d-block text-muted">Current logo</small>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="{{ form.logo_url.id_for_label }}">Logo URL (Alternative)</label>
+                            {{ form.logo_url }}
+                            <small class="help-text">Or provide a direct link to your logo</small>
+                            {% if form.logo_url.errors %}
+                                <div class="invalid-feedback d-block">{{ form.logo_url.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Colors Section -->
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
@@ -236,6 +268,20 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Receipt Footer Section -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label for="{{ form.receipt_footer.id_for_label }}">Receipt Footer</label>
+                            {{ form.receipt_footer }}
+                            <small class="help-text">Custom footer text for receipts and invoices (e.g., "Thank you for your business!")</small>
+                            {% if form.receipt_footer.errors %}
+                                <div class="invalid-feedback d-block">{{ form.receipt_footer.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="d-flex justify-content-between">
@@ -260,6 +306,9 @@
                 
                 <h6>Contact Information</h6>
                 <p class="small text-muted">This information will be used for customer communications and invoices.</p>
+                
+                <h6>Business Logo</h6>
+                <p class="small text-muted">Upload your business logo to appear on receipts and customer communications. Supports PNG, JPG, and SVG formats.</p>
                 
                 <h6>Branding Colors</h6>
                 <p class="small text-muted">These colors will be used throughout your customer interface and documents.</p>

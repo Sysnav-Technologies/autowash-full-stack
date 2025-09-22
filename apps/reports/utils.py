@@ -340,6 +340,37 @@ class ReportGenerator:
         styles = getSampleStyleSheet()
         story = []
         
+        # Add business logo if available
+        from apps.core.tenant_models import TenantSettings
+        from django_tenants.utils import tenant_context
+        from django.db import connection
+        
+        # Get current tenant from connection
+        tenant_settings = None
+        try:
+            tenant_schema = connection.schema_name
+            if tenant_schema != 'public':
+                # Get the tenant object
+                from businesses.models import Business
+                tenant = Business.objects.filter(schema_name=tenant_schema).first()
+                if tenant:
+                    with tenant_context(tenant):
+                        tenant_settings = TenantSettings.objects.filter(tenant_id=tenant.id).first()
+        except:
+            pass
+        
+        # Add logo if available
+        if tenant_settings and tenant_settings.business_logo:
+            try:
+                from reportlab.platypus import Image
+                from reportlab.lib.units import inch
+                logo = Image(tenant_settings.business_logo.path, width=2*inch, height=1*inch, hAlign='LEFT')
+                story.append(logo)
+                story.append(Spacer(1, 12))
+            except Exception as e:
+                print(f"Logo loading failed: {e}")  # Debug info
+                pass  # If logo fails to load, continue without it
+        
         # Title
         title = Paragraph(f"<b>{self.template.name}</b>", styles['Title'])
         story.append(title)

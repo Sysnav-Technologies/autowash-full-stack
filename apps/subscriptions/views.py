@@ -907,7 +907,29 @@ def download_invoice_view(request, invoice_id):
             spaceAfter=30,
         )
         
-        # Add company header
+        # Add company header with logo
+        from apps.core.tenant_models import TenantSettings
+        
+        # Get tenant settings for logo
+        tenant_settings = None
+        try:
+            # For main app (AutoWash App Limited), this is a system-level invoice
+            # We can still try to get logo from business if needed
+            if hasattr(business, 'tenant_settings'):
+                tenant_settings = business.tenant_settings
+        except:
+            pass
+        
+        # Add logo if available
+        if tenant_settings and tenant_settings.business_logo:
+            try:
+                from reportlab.platypus import Image
+                logo = Image(tenant_settings.business_logo.path, width=2*inch, height=1*inch, hAlign='LEFT')
+                elements.append(logo)
+                elements.append(Spacer(1, 12))
+            except:
+                pass  # If logo fails to load, continue without it
+        
         company_title = Paragraph("AutoWash App Limited", title_style)
         elements.append(company_title)
         elements.append(Spacer(1, 12))
