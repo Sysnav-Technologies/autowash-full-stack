@@ -902,26 +902,39 @@
                     <div class="service-item">
                         <div class="service-header">
                             <h6 class="service-name">
-                                {% if item.item_type == 'inventory' %}
+                                {% if item.is_customer_provided %}
+                                    <i class="fas fa-gift text-success"></i>
+                                {% elif item.item_type == 'inventory' %}
                                     <i class="fas fa-box text-info"></i>
                                 {% else %}
                                     <i class="fas fa-tools text-primary"></i>
                                 {% endif %}
                                 {{ item.item_name }}
-                                {% if item.item_type == 'inventory' %}
+                                {% if item.is_customer_provided %}
+                                    <span class="badge bg-success">Customer Provided</span>
+                                {% elif item.item_type == 'inventory' %}
                                     <span class="badge bg-info">Inventory Item</span>
                                 {% endif %}
                             </h6>
                             <span class="service-price">
-                                {% if item.quantity > 1 %}
-                                    {{ item.quantity }} × KES {{ item.unit_price }} = 
+                                {% if item.is_customer_provided %}
+                                    {% if item.quantity > 1 %}
+                                        {{ item.quantity }} × Free = 
+                                    {% endif %}
+                                    Free
+                                {% else %}
+                                    {% if item.quantity > 1 %}
+                                        {{ item.quantity }} × KES {{ item.unit_price }} = 
+                                    {% endif %}
+                                    KES {{ item.total_price }}
                                 {% endif %}
-                                KES {{ item.total_price }}
                             </span>
                         </div>
                         
                         <div class="service-details">
-                            {% if item.service %}
+                            {% if item.is_customer_provided %}
+                                <span><i class="fas fa-info-circle"></i> No charge - Customer provided part</span>
+                            {% elif item.service %}
                                 <span><i class="fas fa-clock"></i> {{ item.service.estimated_duration }} min</span>
                             {% elif item.inventory_item %}
                                 <span><i class="fas fa-tag"></i> SKU: {{ item.inventory_item.sku|default:"N/A" }}</span>
@@ -938,7 +951,14 @@
                             {% endif %}
                         </div>
                         
-                        {% if item.service %}
+                        {% if item.is_customer_provided %}
+                            <div class="service-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill progress-completed"></div>
+                                </div>
+                                <span class="progress-text text-success">Customer Provided</span>
+                            </div>
+                        {% elif item.service %}
                             {% if item.started_at and not item.completed_at %}
                                 <div class="service-progress">
                                     <div class="progress-bar">

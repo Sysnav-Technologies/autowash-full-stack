@@ -275,7 +275,16 @@
                             </p>
                             <p class="order-services">
                                 {% for item in order.order_items.all|slice:":2" %}
-                                {{ item.service.name }}{% if not forloop.last %}, {% endif %}
+                                    {% if item.is_customer_provided %}
+                                        <span class="text-success">{{ item.description|default:"Customer Part" }}</span>
+                                    {% elif item.service %}
+                                        {{ item.service.name }}
+                                    {% elif item.inventory_item %}
+                                        <span class="text-info">{{ item.inventory_item.name }}</span>
+                                    {% else %}
+                                        {{ item.description|default:"Custom Item" }}
+                                    {% endif %}
+                                    {% if not forloop.last %}, {% endif %}
                                 {% endfor %}
                                 {% if order.order_items.count > 2 %}
                                 +{{ order.order_items.count|add:"-2" }} more

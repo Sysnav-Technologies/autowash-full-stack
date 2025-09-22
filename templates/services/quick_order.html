@@ -1139,6 +1139,157 @@
     border-color: #9ca3af;
 }
 
+/* Customer Parts Styles */
+.add-customer-part-form {
+    background: var(--success-50);
+    border: 1px solid var(--success-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.customer-parts-list {
+    min-height: 200px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+}
+
+.customer-part-item {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--success-50);
+    border: 1px solid var(--success-200);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.75rem;
+    transition: all var(--transition-fast);
+}
+
+.customer-part-item:hover {
+    background: var(--success-100);
+    border-color: var(--success-300);
+}
+
+.customer-part-info {
+    flex: 1;
+}
+
+.customer-part-name {
+    font-weight: 600;
+    color: var(--success-700);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.customer-part-quantity {
+    color: var(--success-600);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.customer-part-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-edit-part {
+    background: var(--warning-500);
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-edit-part:hover {
+    background: var(--warning-600);
+}
+
+.btn-remove-part {
+    background: var(--gray-500);
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-remove-part:hover {
+    background: var(--gray-600);
+}
+
+/* Price Editing Styles */
+.price-edit-container {
+    position: relative;
+    display: inline-block;
+}
+
+.price-display {
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.price-display:hover {
+    background: var(--primary-50);
+    color: var(--primary-600);
+}
+
+.price-edit-input {
+    width: 80px;
+    padding: 0.25rem;
+    border: 1px solid var(--primary-300);
+    border-radius: var(--radius-sm);
+    text-align: right;
+    font-size: 0.875rem;
+}
+
+.price-edit-controls {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    padding: 0.5rem;
+    display: none;
+    z-index: 10;
+    gap: 0.25rem;
+}
+
+.price-edit-controls.active {
+    display: flex;
+}
+
+.btn-save-price, .btn-cancel-price {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.btn-save-price {
+    background: var(--success-500);
+    color: white;
+}
+
+.btn-cancel-price {
+    background: var(--gray-500);
+    color: white;
+}
+
 .inventory-category-btn.active {
     background: #3b82f6;
     color: white;
@@ -1457,6 +1608,10 @@
                                         <i class="fas fa-boxes"></i>
                                         Inventory Items
                                     </button>
+                                    <button type="button" class="btn btn-outline-success" id="customerPartsBtn" onclick="showServiceType('customerParts')">
+                                        <i class="fas fa-gift"></i>
+                                        Customer Parts
+                                    </button>
                                 </div>
                             </div>
 
@@ -1492,7 +1647,20 @@
                                     <div class="service-card" onclick="toggleService('{{ service.id }}')" data-service-id="{{ service.id }}" data-category="{{ service.category.id }}">
                                         <div class="service-header">
                                             <h6 class="service-name">{{ service.name }}</h6>
-                                            <div class="service-price">KES {{ service.base_price }}</div>
+                                            <div class="price-edit-container">
+                                                <div class="service-price price-display" onclick="event.stopPropagation(); editPrice('service', '{{ service.id }}', {{ service.base_price }}, {{ service.minimum_price|default:service.base_price }})">
+                                                    KES {{ service.base_price }}
+                                                </div>
+                                                <div class="price-edit-controls">
+                                                    <input type="number" class="price-edit-input" step="0.01" min="{{ service.minimum_price|default:service.base_price }}" onclick="event.stopPropagation();">
+                                                    <button class="btn-save-price" onclick="event.stopPropagation(); savePrice('service', '{{ service.id }}')">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <button class="btn-cancel-price" onclick="event.stopPropagation(); cancelPriceEdit()">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                         <p class="service-description">{{ service.description|truncatewords:15 }}</p>
                                         <div class="service-details">
@@ -1552,10 +1720,36 @@
                                             <div class="package-pricing">
                                                 {% if package.discount_percentage > 0 %}
                                                 <div class="original-price">KES {{ package.original_price|floatformat:2 }}</div>
-                                                <div class="package-price">KES {{ package.total_price }}</div>
+                                                <div class="price-edit-container">
+                                                    <div class="package-price price-display" onclick="event.stopPropagation(); editPrice('package', '{{ package.id }}', {{ package.total_price }}, {{ package.minimum_price|default:package.total_price }})">
+                                                        KES {{ package.total_price }}
+                                                    </div>
+                                                    <div class="price-edit-controls">
+                                                        <input type="number" class="price-edit-input" step="0.01" min="{{ package.minimum_price|default:package.total_price }}" onclick="event.stopPropagation();">
+                                                        <button type="button" class="btn-save-price" onclick="event.stopPropagation(); savePrice('package', '{{ package.id }}')">
+                                                            <i class="fas fa-check"></i>
+                                                        </button>
+                                                        <button type="button" class="btn-cancel-price" onclick="event.stopPropagation(); cancelPriceEdit()">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
                                                 <div class="savings">Save KES {{ package.savings_amount|floatformat:2 }}</div>
                                                 {% else %}
-                                                <div class="package-price">KES {{ package.total_price }}</div>
+                                                <div class="price-edit-container">
+                                                    <div class="package-price price-display" onclick="event.stopPropagation(); editPrice('package', '{{ package.id }}', {{ package.total_price }}, {{ package.minimum_price|default:package.total_price }})">
+                                                        KES {{ package.total_price }}
+                                                    </div>
+                                                    <div class="price-edit-controls">
+                                                        <input type="number" class="price-edit-input" step="0.01" min="{{ package.minimum_price|default:package.total_price }}" onclick="event.stopPropagation();">
+                                                        <button type="button" class="btn-save-price" onclick="event.stopPropagation(); savePrice('package', '{{ package.id }}')">
+                                                            <i class="fas fa-check"></i>
+                                                        </button>
+                                                        <button type="button" class="btn-cancel-price" onclick="event.stopPropagation(); cancelPriceEdit()">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -1635,7 +1829,20 @@
                                     <div class="inventory-card" onclick="selectInventoryCard('{{ item.id }}')" data-item-id="{{ item.id }}" data-category="{{ item.category.id|default:'other' }}">
                                         <div class="service-header">
                                             <h6 class="service-name">{{ item.name }}</h6>
-                                            <div class="service-price">KES {{ item.selling_price }}</div>
+                                            <div class="price-edit-container">
+                                                <div class="service-price price-display" onclick="event.stopPropagation(); editPrice('inventory', '{{ item.id }}', {{ item.selling_price }}, {{ item.minimum_price|default:item.selling_price }})">
+                                                    KES {{ item.selling_price }}
+                                                </div>
+                                                <div class="price-edit-controls">
+                                                    <input type="number" class="price-edit-input" step="0.01" min="{{ item.minimum_price|default:item.selling_price }}" onclick="event.stopPropagation();">
+                                                    <button type="button" class="btn-save-price" onclick="event.stopPropagation(); savePrice('inventory', '{{ item.id }}')">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <button type="button" class="btn-cancel-price" onclick="event.stopPropagation(); cancelPriceEdit()">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                         {% if item.description %}
                                         <p class="service-description">{{ item.description|truncatewords:15 }}</p>
@@ -1696,6 +1903,50 @@
                         </div>
                     </div>
                 </div>
+
+                            <!-- Customer Parts Section -->
+                            <div id="customerPartsSection" style="display: none;">
+                                <!-- Add Custom Part Form -->
+                                <div class="add-customer-part-form">
+                                    <h6 class="section-subtitle">
+                                        <i class="fas fa-gift text-success"></i>
+                                        Add Customer-Provided Parts
+                                    </h6>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label for="customerPartName" class="form-label">Part Name</label>
+                                            <input type="text" class="form-control" id="customerPartName" 
+                                                   placeholder="Enter part name (e.g., Oil Filter, Brake Pads)">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="customerPartQuantity" class="form-label">Quantity</label>
+                                            <input type="number" class="form-control" id="customerPartQuantity" 
+                                                   min="1" value="1" placeholder="1">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">&nbsp;</label>
+                                            <button type="button" class="btn btn-success w-100" onclick="addCustomerPart()">
+                                                <i class="fas fa-plus"></i> Add Part
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>Note:</strong> Customer-provided parts appear on the receipt but are not charged and don't affect inventory.
+                                    </div>
+                                </div>
+
+                                <!-- Added Customer Parts List -->
+                                <div class="added-customer-parts">
+                                    <h6 class="section-subtitle">Added Customer Parts</h6>
+                                    <div id="customerPartsListDisplay" class="customer-parts-list">
+                                        <div class="empty-state">
+                                            <i class="fas fa-gift"></i>
+                                            <p>No customer parts added yet</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                 
                 <div class="col-lg-4">
                     <!-- Order Summary -->
@@ -1932,8 +2183,9 @@ let vehicleCustomer = null; // Customer from selected vehicle
 let selectedServices = [];
 let selectedPackage = null;
 let selectedInventoryItems = []; // Initialize inventory items array
+let selectedCustomerParts = []; // Initialize customer parts array
 let allServices = [];
-let serviceType = 'individual'; // 'individual', 'package', or 'inventory'
+let serviceType = 'individual'; // 'individual', 'package', 'inventory', or 'customerParts'
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -1945,6 +2197,24 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeGlobalSearch();
     initializePagination();
     initializeMobileSummary();
+    updateCustomerPartsDisplay();
+    
+    // Add Enter key support for customer parts
+    const customerPartName = document.getElementById('customerPartName');
+    if (customerPartName) {
+        customerPartName.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addCustomerPart();
+            }
+        });
+    }
+    
+    // Close price edit when clicking outside
+    document.addEventListener('click', function(e) {
+        if (currentPriceEdit && !e.target.closest('.price-edit-container')) {
+            cancelPriceEdit();
+        }
+    });
 });
 
 // Function to toggle vehicle registration section
@@ -2659,46 +2929,81 @@ function showServiceType(type) {
     document.getElementById('individualServicesBtn').classList.toggle('active', type === 'individual');
     document.getElementById('packagesBtn').classList.toggle('active', type === 'packages');
     document.getElementById('inventoryBtn').classList.toggle('active', type === 'inventory');
+    document.getElementById('customerPartsBtn').classList.toggle('active', type === 'customerParts');
     
     // Show/hide sections
     document.getElementById('individualServicesSection').style.display = type === 'individual' ? 'block' : 'none';
     document.getElementById('packagesSection').style.display = type === 'packages' ? 'block' : 'none';
     document.getElementById('inventorySection').style.display = type === 'inventory' ? 'block' : 'none';
+    document.getElementById('customerPartsSection').style.display = type === 'customerParts' ? 'block' : 'none';
     
     // Clear section-specific searches when switching tabs
     if (type === 'individual') {
         clearPackageSearch();
         clearInventorySearch();
+        clearCustomerPartsSearch();
         selectedPackage = null;
         selectedInventoryItems = [];
+        selectedCustomerParts = [];
         document.querySelectorAll('.package-card').forEach(card => {
             card.classList.remove('selected');
         });
         document.querySelectorAll('.inventory-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        document.querySelectorAll('.customer-part-card').forEach(card => {
             card.classList.remove('selected');
         });
     } else if (type === 'packages') {
         clearServiceSearch();
         clearInventorySearch();
+        clearCustomerPartsSearch();
         selectedServices = [];
         selectedInventoryItems = [];
+        selectedCustomerParts = [];
         document.querySelectorAll('.service-card').forEach(card => {
             card.classList.remove('selected');
         });
         document.querySelectorAll('.inventory-card').forEach(card => {
             card.classList.remove('selected');
         });
+        document.querySelectorAll('.customer-part-card').forEach(card => {
+            card.classList.remove('selected');
+        });
     } else if (type === 'inventory') {
         clearServiceSearch();
         clearPackageSearch();
+        clearCustomerPartsSearch();
         selectedServices = [];
         selectedPackage = null;
+        selectedCustomerParts = [];
         document.querySelectorAll('.service-card').forEach(card => {
             card.classList.remove('selected');
         });
         document.querySelectorAll('.package-card').forEach(card => {
             card.classList.remove('selected');
         });
+        document.querySelectorAll('.customer-part-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+    } else if (type === 'customerParts') {
+        clearServiceSearch();
+        clearPackageSearch();
+        clearInventorySearch();
+        selectedServices = [];
+        selectedPackage = null;
+        selectedInventoryItems = [];
+        document.querySelectorAll('.service-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        document.querySelectorAll('.package-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        document.querySelectorAll('.inventory-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        // Don't clear customer parts when switching to customer parts tab
+        updateCustomerPartsDisplay();
     }
     
     updateOrderSummary();
@@ -2945,6 +3250,12 @@ function clearInventorySearch() {
     if (existingEmptyState) {
         existingEmptyState.remove();
     }
+}
+
+function clearCustomerPartsSearch() {
+    // Customer parts don't have a search function, but this function is called
+    // We can use it to reset customer parts display if needed
+    updateCustomerPartsDisplay();
 }
 
 // Global search functionality
@@ -3250,7 +3561,7 @@ function updateMobileSummary() {
     const mobileSelectedServices = document.getElementById('mobileSelectedServices');
     const mobileSummaryTotals = document.getElementById('mobileSummaryTotals');
     
-    const totalItems = selectedServices.length + (selectedPackage ? 1 : 0) + selectedInventoryItems.length;
+    const totalItems = selectedServices.length + (selectedPackage ? 1 : 0) + selectedInventoryItems.length + selectedCustomerParts.length;
     const totalAmount = calculateTotalAmount();
     
     if (totalItems > 0) {
@@ -3325,15 +3636,33 @@ function updateMobileDetailedSummary() {
         subtotal += item.price * item.quantity;
     });
     
+    // Add selected customer parts (always free)
+    selectedCustomerParts.forEach(part => {
+        html += `
+            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                    <div class="fw-medium">
+                        <i class="fas fa-gift text-success me-1"></i>
+                        ${part.name}
+                    </div>
+                    <small class="text-muted">Qty: ${part.quantity} - Customer Part</small>
+                </div>
+                <div class="text-success">FREE</div>
+            </div>
+        `;
+        // Customer parts don't add to subtotal
+    });
+    
     container.innerHTML = html;
     
-    // Update totals
-    const tax = subtotal * 0.16;
-    const total = subtotal + tax;
+    // Update totals - assume prices are VAT inclusive
+    const totalVatInclusive = subtotal; // Subtotal already includes VAT
+    const taxAmount = totalVatInclusive / 1.16 * 0.16; // Extract VAT amount
+    const subtotalExVat = totalVatInclusive - taxAmount; // Ex-VAT amount
     
-    if (subtotalElement) subtotalElement.textContent = `KES ${subtotal.toFixed(2)}`;
-    if (taxElement) taxElement.textContent = `KES ${tax.toFixed(2)}`;
-    if (totalElement) totalElement.textContent = `KES ${total.toFixed(2)}`;
+    if (subtotalElement) subtotalElement.textContent = `KES ${subtotalExVat.toFixed(2)}`;
+    if (taxElement) taxElement.textContent = `KES ${taxAmount.toFixed(2)}`;
+    if (totalElement) totalElement.textContent = `KES ${totalVatInclusive.toFixed(2)}`;
     if (durationElement) durationElement.textContent = totalDuration;
 }
 
@@ -3352,7 +3681,7 @@ function calculateTotalAmount() {
         total += item.price * item.quantity;
     });
     
-    return total * 1.16; // Including 16% VAT
+    return total; // Prices are already VAT inclusive
 }
 
 function toggleService(serviceId) {
@@ -3363,6 +3692,8 @@ function toggleService(serviceId) {
     const serviceCard = document.querySelector(`[data-service-id="${serviceId}"]`);
     const isSelected = serviceCard.classList.contains('selected');
     
+    console.log('toggleService called for:', serviceId, 'currently selected:', isSelected);
+    
     if (!isSelected && skipVehicle) {
         // Prevent selecting services when vehicle is skipped
         showToast('Cannot select services when vehicle registration is skipped. Enable vehicle registration or select inventory items only.', 'warning');
@@ -3372,6 +3703,7 @@ function toggleService(serviceId) {
     if (isSelected) {
         // Remove service
         serviceCard.classList.remove('selected');
+        console.log('Removing service from selectedServices:', serviceId);
         selectedServices = selectedServices.filter(s => s.id !== serviceId);
     } else {
         // Add service
@@ -3383,11 +3715,27 @@ function toggleService(serviceId) {
         const servicePrice = parseFloat(servicePriceText.replace(/[^0-9.]/g, ''));
         const serviceDuration = parseInt(serviceCard.querySelector('.service-duration').textContent);
         
+        // Check if this service had a custom price before (from previous selection)
+        const existingService = selectedServices.find(s => s.id === serviceId);
+        let customPrice = existingService && existingService.customPrice ? existingService.customPrice : null;
+        
+        // Check for pending custom price (set before service was selected)
+        if (!customPrice && window.pendingCustomPrices && window.pendingCustomPrices.services && window.pendingCustomPrices.services[serviceId]) {
+            customPrice = window.pendingCustomPrices.services[serviceId];
+            console.log('Found pending custom price for service:', serviceId, customPrice);
+            // Clear the pending price since we're using it now
+            delete window.pendingCustomPrices.services[serviceId];
+        }
+        
+        const finalPrice = customPrice || servicePrice;
+        
+        console.log('Adding service to selectedServices:', serviceId, 'with custom price:', customPrice);
         selectedServices.push({
             id: serviceId,
             name: serviceName,
-            price: servicePrice,
-            duration: serviceDuration
+            price: finalPrice,
+            duration: serviceDuration,
+            customPrice: customPrice  // This will be sent to backend if set
         });
     }
     
@@ -3540,6 +3888,14 @@ function updateReviewStep() {
         });
     }
     
+    // Show customer parts if selected (always free)
+    if (selectedCustomerParts && selectedCustomerParts.length > 0) {
+        selectedCustomerParts.forEach(part => {
+            inventoryHtml += `<div class="d-flex justify-content-between"><span><i class="fas fa-gift text-success me-2"></i>${part.name} (Qty: ${part.quantity}) - Customer Part</span><span class="text-success">FREE</span></div>`;
+            // Customer parts don't add to total
+        });
+    }
+    
     // Update services section visibility and content
     const servicesSection = document.getElementById('reviewServicesSection');
     const servicesInfo = document.getElementById('reviewServicesInfo');
@@ -3556,14 +3912,28 @@ function updateReviewStep() {
     if (inventoryHtml) {
         inventorySection.style.display = 'block';
         inventoryInfo.innerHTML = inventoryHtml;
+        
+        // Update section title if it includes customer parts
+        const hasCustomerParts = selectedCustomerParts && selectedCustomerParts.length > 0;
+        const hasInventoryItems = selectedInventoryItems && selectedInventoryItems.length > 0;
+        const sectionTitle = document.querySelector('#reviewInventorySection h6');
+        if (sectionTitle) {
+            if (hasCustomerParts && hasInventoryItems) {
+                sectionTitle.innerHTML = '<i class="fas fa-box me-2"></i>Inventory Items & Customer Parts';
+            } else if (hasCustomerParts) {
+                sectionTitle.innerHTML = '<i class="fas fa-gift me-2"></i>Customer Parts';
+            } else {
+                sectionTitle.innerHTML = '<i class="fas fa-box me-2"></i>Inventory Items';
+            }
+        }
     } else {
         inventorySection.style.display = 'none';
     }
     
     // Update total info with inclusive VAT
     if (totalInclusiveVAT > 0) {
-        const taxAmount = totalInclusiveVAT * 0.16 / 1.16; // Extract VAT from inclusive price
-        const subtotalExVAT = totalInclusiveVAT - taxAmount; // Subtotal without VAT
+        const taxAmount = totalInclusiveVAT / 1.16 * 0.16; // Extract VAT amount
+        const subtotalExVAT = totalInclusiveVAT - taxAmount; // Ex-VAT amount
         
         document.getElementById('reviewTotalInfo').innerHTML = `
             <div class="d-flex justify-content-between"><span>Subtotal (ex VAT):</span><span>KES ${subtotalExVAT.toFixed(2)}</span></div>
@@ -3664,9 +4034,11 @@ function submitOrder() {
         const selectedServicesDataElement = document.getElementById('selectedServicesData');
         const selectedServicesDataValue = selectedServicesDataElement ? selectedServicesDataElement.value : '';
         console.log('Raw selectedServicesData value:', selectedServicesDataValue);
+        console.log('Current selectedServices array at submission:', JSON.stringify(selectedServices, null, 2));
         
         const selectionData = JSON.parse(selectedServicesDataValue || '{}');
         console.log('Parsed selection data:', selectionData);
+        console.log('Services custom prices in selectionData:', selectionData.services_custom_prices);
         
         if (selectionData.type === 'package' && selectionData.package_id) {
             formData.set('service_type', 'package');
@@ -3676,24 +4048,63 @@ function submitOrder() {
             selectionData.service_ids.forEach(serviceId => {
                 formData.append('selected_services', serviceId);
             });
+            // Add custom prices if they exist
+            if (selectionData.services_custom_prices) {
+                formData.set('services_custom_prices', JSON.stringify(selectionData.services_custom_prices));
+            }
         } else if (selectionData.type === 'inventory' && selectionData.inventory_items && selectionData.inventory_items.length > 0) {
             formData.set('service_type', 'inventory');
             selectionData.inventory_items.forEach(item => {
                 formData.append('selected_inventory_items', item.id);
                 formData.append(`inventory_quantity_${item.id}`, item.quantity);
             });
+            // Add custom prices for inventory items
+            const inventoryCustomPrices = {};
+            selectionData.inventory_items.forEach(item => {
+                if (item.custom_price) {
+                    inventoryCustomPrices[item.id] = item.custom_price;
+                }
+            });
+            if (Object.keys(inventoryCustomPrices).length > 0) {
+                formData.set('inventory_custom_prices', JSON.stringify(inventoryCustomPrices));
+            }
         } else if (selectionData.type === 'mixed') {
             formData.set('service_type', 'mixed');
             if (selectionData.service_ids && selectionData.service_ids.length > 0) {
                 selectionData.service_ids.forEach(serviceId => {
                     formData.append('selected_services', serviceId);
                 });
+                // Add custom prices for services
+                if (selectionData.services_custom_prices) {
+                    formData.set('services_custom_prices', JSON.stringify(selectionData.services_custom_prices));
+                }
             }
             if (selectionData.inventory_items && selectionData.inventory_items.length > 0) {
                 selectionData.inventory_items.forEach(item => {
                     formData.append('selected_inventory_items', item.id);
                     formData.append(`inventory_quantity_${item.id}`, item.quantity);
                 });
+                // Add custom prices for inventory items
+                const inventoryCustomPrices = {};
+                selectionData.inventory_items.forEach(item => {
+                    if (item.custom_price) {
+                        inventoryCustomPrices[item.id] = item.custom_price;
+                    }
+                });
+                if (Object.keys(inventoryCustomPrices).length > 0) {
+                    formData.set('inventory_custom_prices', JSON.stringify(inventoryCustomPrices));
+                }
+            }
+            // Add customer parts
+            if (selectionData.customer_parts && selectionData.customer_parts.length > 0) {
+                formData.set('customer_parts', JSON.stringify(selectionData.customer_parts));
+            }
+        } else if (selectionData.type === 'package' && selectionData.package_id) {
+            formData.set('service_type', 'package');
+            formData.set('selected_package', selectionData.package_id);
+            // Add custom price for package
+            if (selectionData.custom_price) {
+                formData.set('package_custom_price', selectionData.custom_price);
             }
         } else {
             throw new Error('Please select at least one service, package, or inventory item');
@@ -4397,11 +4808,13 @@ function showServiceType(type) {
     document.getElementById('individualServicesBtn').classList.toggle('active', type === 'individual');
     document.getElementById('packagesBtn').classList.toggle('active', type === 'packages');
     document.getElementById('inventoryBtn').classList.toggle('active', type === 'inventory');
+    document.getElementById('customerPartsBtn').classList.toggle('active', type === 'customerParts');
     
     // Show/hide sections
     document.getElementById('individualServicesSection').style.display = type === 'individual' ? 'block' : 'none';
     document.getElementById('packagesSection').style.display = type === 'packages' ? 'block' : 'none';
     document.getElementById('inventorySection').style.display = type === 'inventory' ? 'block' : 'none';
+    document.getElementById('customerPartsSection').style.display = type === 'customerParts' ? 'block' : 'none';
     
     // Don't clear selections - just maintain current state
     // Users should be able to switch between tabs and keep their selections
@@ -4475,17 +4888,26 @@ function updateInventoryItemSelection(itemId, quantity) {
     const itemPriceText = itemCard.querySelector('.service-price').textContent;
     const itemPrice = parseFloat(itemPriceText.replace(/[^0-9.]/g, ''));
     
+    // Check if item already exists to preserve custom price
+    const existingItem = selectedInventoryItems.find(item => item.id === itemId);
+    
     // Remove existing entry if any
     selectedInventoryItems = selectedInventoryItems.filter(item => item.id !== itemId);
     
     if (quantity > 0) {
         // Add or update inventory item
         itemCard.classList.add('selected');
+        
+        // Preserve custom price if it exists, otherwise use current display price
+        const finalPrice = existingItem && existingItem.customPrice ? existingItem.customPrice : itemPrice;
+        const customPrice = existingItem && existingItem.customPrice ? existingItem.customPrice : null;
+        
         selectedInventoryItems.push({
             id: itemId,
             name: itemName,
-            price: itemPrice,
-            quantity: quantity
+            price: finalPrice,
+            quantity: quantity,
+            customPrice: customPrice  // This will be sent to backend if set
         });
     } else {
         // Remove inventory item
@@ -4510,6 +4932,244 @@ function onInventoryQuantityChange(input, itemId) {
     updateInventoryItemSelection(itemId, parseInt(input.value));
 }
 
+// Customer Parts Functions
+let customerPartIdCounter = 1; // For generating unique IDs for custom parts
+
+function addCustomerPart() {
+    const nameInput = document.getElementById('customerPartName');
+    const quantityInput = document.getElementById('customerPartQuantity');
+    
+    const name = nameInput.value.trim();
+    const quantity = parseInt(quantityInput.value) || 1;
+    
+    if (!name) {
+        showToast('Please enter a part name', 'warning');
+        return;
+    }
+    
+    if (quantity < 1) {
+        showToast('Quantity must be at least 1', 'warning');
+        return;
+    }
+    
+    // Create customer part object
+    const customerPart = {
+        id: 'custom_' + customerPartIdCounter++,
+        name: name,
+        quantity: quantity,
+        isCustom: true
+    };
+    
+    // Add to selected customer parts
+    selectedCustomerParts.push(customerPart);
+    
+    // Clear inputs
+    nameInput.value = '';
+    quantityInput.value = 1;
+    
+    // Update display
+    updateCustomerPartsDisplay();
+    updateOrderSummary();
+    
+    showToast('Customer part added successfully', 'success');
+}
+
+function updateCustomerPartsDisplay() {
+    const display = document.getElementById('customerPartsListDisplay');
+    
+    if (selectedCustomerParts.length === 0) {
+        display.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-gift"></i>
+                <p>No customer parts added yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    selectedCustomerParts.forEach((part, index) => {
+        html += `
+            <div class="customer-part-item" data-part-id="${part.id}">
+                <div class="customer-part-info">
+                    <h6 class="customer-part-name">
+                        <i class="fas fa-gift text-success"></i>
+                        ${part.name}
+                    </h6>
+                    <p class="customer-part-quantity">Quantity: ${part.quantity}</p>
+                </div>
+                <div class="customer-part-actions">
+                    <button type="button" class="btn-edit-part" onclick="editCustomerPart('${part.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn-remove-part" onclick="removeCustomerPart('${part.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    display.innerHTML = html;
+}
+
+function editCustomerPart(partId) {
+    const part = selectedCustomerParts.find(p => p.id === partId);
+    if (!part) return;
+    
+    const newName = prompt('Edit part name:', part.name);
+    if (newName === null) return; // User cancelled
+    
+    if (!newName.trim()) {
+        showToast('Part name cannot be empty', 'warning');
+        return;
+    }
+    
+    const newQuantity = prompt('Edit quantity:', part.quantity);
+    if (newQuantity === null) return; // User cancelled
+    
+    const quantity = parseInt(newQuantity);
+    if (isNaN(quantity) || quantity < 1) {
+        showToast('Quantity must be a number greater than 0', 'warning');
+        return;
+    }
+    
+    // Update the part
+    part.name = newName.trim();
+    part.quantity = quantity;
+    
+    // Update displays
+    updateCustomerPartsDisplay();
+    updateOrderSummary();
+    
+    showToast('Customer part updated successfully', 'success');
+}
+
+function removeCustomerPart(partId) {
+    if (!confirm('Are you sure you want to remove this customer part?')) {
+        return;
+    }
+    
+    // Remove from selected customer parts
+    selectedCustomerParts = selectedCustomerParts.filter(part => part.id !== partId);
+    
+    // Update displays
+    updateCustomerPartsDisplay();
+    updateOrderSummary();
+    
+    showToast('Customer part removed successfully', 'success');
+}
+
+// Price Editing Functions
+let currentPriceEdit = null;
+
+function editPrice(type, itemId, currentPrice, minimumPrice) {
+    // Close any existing price edit
+    if (currentPriceEdit) {
+        cancelPriceEdit();
+    }
+    
+    const priceDisplay = event.target;
+    const controls = priceDisplay.nextElementSibling;
+    const input = controls.querySelector('.price-edit-input');
+    
+    // Set current edit context
+    currentPriceEdit = {
+        type: type,
+        itemId: itemId,
+        element: priceDisplay,
+        controls: controls,
+        originalPrice: currentPrice,
+        minimumPrice: minimumPrice
+    };
+    
+    // Set input value and constraints
+    input.value = currentPrice;
+    input.min = minimumPrice;
+    
+    // Show controls
+    controls.classList.add('active');
+    input.focus();
+    input.select();
+}
+
+function savePrice(type, itemId) {
+    if (!currentPriceEdit || currentPriceEdit.itemId !== itemId) return;
+    
+    const input = currentPriceEdit.controls.querySelector('.price-edit-input');
+    const newPrice = parseFloat(input.value);
+    
+    if (isNaN(newPrice) || newPrice < currentPriceEdit.minimumPrice) {
+        showToast(`Price cannot be less than KES ${currentPriceEdit.minimumPrice}`, 'warning');
+        return;
+    }
+    
+    // Update the display
+    currentPriceEdit.element.textContent = `KES ${newPrice.toFixed(2)}`;
+    
+    // Update the item's price in memory
+    updateItemPrice(type, itemId, newPrice);
+    
+    // Debug with alert to make sure this function is being called
+    alert(`Price updated for ${type} ${itemId} to ${newPrice}. Check console for detailed logs.`);
+    
+    // Debug logging
+    console.log('Price updated for', type, itemId, 'to', newPrice);
+    if (type === 'service') {
+        console.log('Current selectedServices:', JSON.stringify(selectedServices, null, 2));
+    }
+    
+    // Close the edit
+    cancelPriceEdit();
+    
+    // Update order summary
+    updateOrderSummary();
+    
+    showToast('Price updated successfully', 'success');
+}
+
+function cancelPriceEdit() {
+    if (!currentPriceEdit) return;
+    
+    currentPriceEdit.controls.classList.remove('active');
+    currentPriceEdit = null;
+}
+
+function updateItemPrice(type, itemId, newPrice) {
+    if (type === 'service') {
+        const service = selectedServices.find(s => s.id === itemId || s.id === itemId.toString());
+        if (service) {
+            service.price = newPrice;
+            service.customPrice = newPrice;
+            console.log('Updated existing service in selectedServices:', service);
+        } else {
+            // Service not in selectedServices yet, store the custom price for when it gets selected
+            console.log('Service not found in selectedServices, storing custom price for later');
+            // Store in a global object for later use
+            if (!window.pendingCustomPrices) window.pendingCustomPrices = {};
+            if (!window.pendingCustomPrices.services) window.pendingCustomPrices.services = {};
+            window.pendingCustomPrices.services[itemId] = newPrice;
+            console.log('Stored pending custom price:', window.pendingCustomPrices.services);
+        }
+    } else if (type === 'package') {
+        if (selectedPackage && (selectedPackage.id === itemId || selectedPackage.id === itemId.toString())) {
+            selectedPackage.price = newPrice;
+            selectedPackage.customPrice = newPrice;
+        }
+    } else if (type === 'inventory') {
+        const item = selectedInventoryItems.find(i => i.id === itemId || i.id === itemId.toString());
+        if (item) {
+            item.price = newPrice;
+            item.customPrice = newPrice;
+        } else {
+            // Store pending custom price for inventory too
+            if (!window.pendingCustomPrices) window.pendingCustomPrices = {};
+            if (!window.pendingCustomPrices.inventory) window.pendingCustomPrices.inventory = {};
+            window.pendingCustomPrices.inventory[itemId] = newPrice;
+        }
+    }
+}
+
 // Update the existing updateOrderSummary function to handle inventory items
 function updateOrderSummary() {
     const selectedServicesDisplay = document.getElementById('selectedServicesDisplay');
@@ -4525,12 +5185,16 @@ function updateOrderSummary() {
     let activeType = null;
     if (selectedPackage) {
         activeType = 'package';
-    } else if (selectedServices.length > 0 && selectedInventoryItems.length > 0) {
-        activeType = 'mixed'; // Both services and inventory
+    } else if (selectedServices.length > 0 && (selectedInventoryItems.length > 0 || selectedCustomerParts.length > 0)) {
+        activeType = 'mixed'; // Services and inventory/customer parts
     } else if (selectedServices.length > 0) {
         activeType = 'individual';
+    } else if (selectedInventoryItems.length > 0 && selectedCustomerParts.length > 0) {
+        activeType = 'mixed'; // Both inventory and customer parts
     } else if (selectedInventoryItems.length > 0) {
         activeType = 'inventory';
+    } else if (selectedCustomerParts.length > 0) {
+        activeType = 'customerParts';
     }
     
     if (activeType === 'package' && selectedPackage) {
@@ -4575,6 +5239,23 @@ function updateOrderSummary() {
                 `;
             });
         }
+        
+        // Add customer-provided parts (always free)
+        if (activeType === 'mixed' || activeType === 'customerParts') {
+            selectedCustomerParts.forEach(item => {
+                hasSelection = true;
+                // Customer parts don't add to subtotal (they're free)
+                servicesHtml += `
+                    <div class="selected-service-item customer-part-item">
+                        <div class="service-item-name">
+                            <i class="fas fa-gift text-success me-1"></i>
+                            ${item.name} (x${item.quantity}) - Customer Part
+                        </div>
+                        <div class="service-item-price text-success">FREE</div>
+                    </div>
+                `;
+            });
+        }
     } else if (activeType === 'inventory') {
         // Only inventory items selected
         selectedInventoryItems.forEach(item => {
@@ -4588,6 +5269,21 @@ function updateOrderSummary() {
                 </div>
             `;
         });
+    } else if (activeType === 'customerParts') {
+        // Only customer-provided parts selected
+        selectedCustomerParts.forEach(item => {
+            hasSelection = true;
+            // Customer parts don't add to subtotal (they're free)
+            servicesHtml += `
+                <div class="selected-service-item customer-part-item">
+                    <div class="service-item-name">
+                        <i class="fas fa-gift text-success me-1"></i>
+                        ${item.name} (x${item.quantity}) - Customer Part
+                    </div>
+                    <div class="service-item-price text-success">FREE</div>
+                </div>
+            `;
+        });
     }
     
     if (hasSelection) {
@@ -4597,12 +5293,14 @@ function updateOrderSummary() {
         
         summaryTotals.style.display = 'block';
         
-        const tax = subtotal * 0.16;
-        const total = subtotal + tax;
+        // Assume prices are VAT inclusive - calculate breakdown
+        const totalVatInclusive = subtotal; // Subtotal already includes VAT
+        const taxAmount = totalVatInclusive / 1.16 * 0.16; // Extract VAT amount
+        const subtotalExVat = totalVatInclusive - taxAmount; // Ex-VAT amount
         
-        document.getElementById('subtotalAmount').textContent = `KES ${subtotal.toFixed(2)}`;
-        document.getElementById('taxAmount').textContent = `KES ${tax.toFixed(2)}`;
-        document.getElementById('totalAmount').textContent = `KES ${total.toFixed(2)}`;
+        document.getElementById('subtotalAmount').textContent = `KES ${subtotalExVat.toFixed(2)}`;
+        document.getElementById('taxAmount').textContent = `KES ${taxAmount.toFixed(2)}`;
+        document.getElementById('totalAmount').textContent = `KES ${totalVatInclusive.toFixed(2)}`;
         document.getElementById('estimatedDuration').textContent = totalDuration;
     } else {
         selectedServicesDisplay.style.display = 'block';
@@ -4622,28 +5320,54 @@ function updateOrderSummary() {
         if (selectedPackage) {
             dataToSubmit = {
                 type: 'package',
-                package_id: selectedPackage.id
+                package_id: selectedPackage.id,
+                custom_price: selectedPackage.customPrice || null
             };
-        } else if (selectedServices.length > 0 && selectedInventoryItems.length > 0) {
+        } else if (selectedServices.length > 0 && (selectedInventoryItems.length > 0 || selectedCustomerParts.length > 0)) {
             dataToSubmit = {
                 type: 'mixed',
                 service_ids: selectedServices.map(s => s.id),
+                services_custom_prices: selectedServices.reduce((acc, s) => {
+                    console.log('Processing service for custom prices (mixed):', s.id, 'customPrice:', s.customPrice);
+                    if (s.customPrice) acc[s.id] = s.customPrice;
+                    return acc;
+                }, {}),
                 inventory_items: selectedInventoryItems.map(item => ({
                     id: item.id,
-                    quantity: item.quantity
+                    quantity: item.quantity,
+                    custom_price: item.customPrice || null
+                })),
+                customer_parts: selectedCustomerParts.map(part => ({
+                    id: part.id,
+                    name: part.name,
+                    quantity: part.quantity,
+                    is_custom: part.isCustom || false
                 }))
             };
         } else if (selectedServices.length > 0) {
             dataToSubmit = {
                 type: 'individual',
-                service_ids: selectedServices.map(s => s.id)
+                service_ids: selectedServices.map(s => s.id),
+                services_custom_prices: selectedServices.reduce((acc, s) => {
+                    console.log('Processing service for custom prices:', s.id, 'customPrice:', s.customPrice);
+                    if (s.customPrice) acc[s.id] = s.customPrice;
+                    return acc;
+                }, {})
             };
-        } else if (selectedInventoryItems.length > 0) {
+            console.log('Individual services dataToSubmit:', JSON.stringify(dataToSubmit, null, 2));
+        } else if (selectedInventoryItems.length > 0 || selectedCustomerParts.length > 0) {
             dataToSubmit = {
-                type: 'inventory',
+                type: selectedInventoryItems.length > 0 ? 'inventory' : 'customerParts',
                 inventory_items: selectedInventoryItems.map(item => ({
                     id: item.id,
-                    quantity: item.quantity
+                    quantity: item.quantity,
+                    custom_price: item.customPrice || null
+                })),
+                customer_parts: selectedCustomerParts.map(part => ({
+                    id: part.id,
+                    name: part.name,
+                    quantity: part.quantity,
+                    is_custom: part.isCustom || false
                 }))
             };
         } else {
@@ -4744,8 +5468,8 @@ function updateOrderSummaryDisplay() {
     
     // Update totals with inclusive VAT
     const totalInclusiveVAT = subtotal;
-    const taxAmount = totalInclusiveVAT * 0.16 / 1.16;
-    const subtotalExVAT = totalInclusiveVAT - taxAmount;
+    const taxAmount = totalInclusiveVAT / 1.16 * 0.16; // Extract VAT amount  
+    const subtotalExVAT = totalInclusiveVAT - taxAmount; // Ex-VAT amount
     
     document.getElementById('subtotalAmount').textContent = `KES ${subtotalExVAT.toFixed(2)}`;
     document.getElementById('taxAmount').textContent = `KES ${taxAmount.toFixed(2)}`;
@@ -4790,9 +5514,10 @@ function validateServicesStep() {
     const hasPackage = selectedPackage !== null;
     const hasServices = selectedServices.length > 0;
     const hasInventoryItems = selectedInventoryItems.length > 0;
+    const hasCustomerParts = selectedCustomerParts.length > 0;
     
-    if (!hasPackage && !hasServices && !hasInventoryItems) {
-        showToast('Please select at least one service, package, or inventory item', 'error');
+    if (!hasPackage && !hasServices && !hasInventoryItems && !hasCustomerParts) {
+        showToast('Please select at least one service, package, inventory item, or customer part', 'error');
         return false;
     }
     
