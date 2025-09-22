@@ -2434,7 +2434,7 @@ def category_create_view(request):
             category.created_by = request.user
             category.save()
             messages.success(request, f'Category "{category.name}" created successfully!')
-            return redirect('services:category_list')
+            return redirect(get_business_url(request, 'services:category_list'))
     else:
         form = ServiceCategoryForm()
     
@@ -2455,7 +2455,7 @@ def category_edit_view(request, pk):
         if form.is_valid():
             category = form.save()
             messages.success(request, f'Category "{category.name}" updated successfully!')
-            return redirect('services:category_list')
+            return redirect(get_business_url(request, 'services:category_list'))
     else:
         form = ServiceCategoryForm(instance=category)
     

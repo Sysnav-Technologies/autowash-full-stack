@@ -1,10 +1,9 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Receipt {{ payment.payment_id }} - Print</title>
+    <title>Payment Receipt - {{ payment.payment_id }}</title>
     {% include 'includes/business_styles.html' %}
     <style>
         * {
@@ -14,141 +13,100 @@
         }
         
         body {
-            font-family: 'Courier New', monospace;
-            font-size: 8px;
-            line-height: 0.9;
+            font-family: "Font A", "Font B", Arial, sans-serif;
+            font-size: 9px;
+            line-height: 1.1;
             color: #000;
-            background: #fff;
-            padding: 0;
+            background: #f5f5f5;
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
         }
         
-        /* MPT-II 58mm thermal printer styles */
+        .receipt {
+            width: 40mm;
+            margin: 0 auto;
+            padding: 1mm;
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        
         @media print {
             body {
                 width: 58mm;
-                max-width: 58mm;
                 margin: 0;
                 padding: 0;
-                font-family: 'Courier New', monospace;
-                font-size: 8px;
-                line-height: 0.9;
+                background: #fff;
+                display: block;
+                min-height: 0;
             }
-            
-            .receipt-print {
-                width: 100%;
+            .receipt {
+                width: 40mm;
+                margin: 0 auto;
+                padding: 1mm;
+                box-shadow: none;
+                border-radius: 0;
+            }
+            @page {
+                size: 58mm auto;
                 margin: 0;
-                padding: 0;
-            }
-            
-            .no-print {
-                display: none !important;
             }
         }
         
-        @page {
-            size: 58mm auto;
-            margin: 0;
-        }
-        
-        .receipt-print {
-            width: 58mm;
-            max-width: 58mm;
-            margin: 0 auto;
-            padding: 2mm;
-        }
-        
+        /* Header */
         .header {
             text-align: center;
-            margin-bottom: 3px;
-            padding-bottom: 3px;
+            margin-bottom: 1mm;
             border-bottom: 1px dashed #000;
+            padding-bottom: 0.5mm;
         }
         
         .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 0.5mm;
+        }
+        
+        .company-info {
             font-size: 10px;
+            margin-bottom: 0.2mm;
+        }
+        
+        .receipt-title {
+            font-size: 12px;
             font-weight: bold;
-            margin-bottom: 1px;
+            margin: 0.5mm 0;
         }
         
-        .company-details {
-            font-size: 7px;
-            margin-bottom: 1px;
-        }
-        
-        .document-title {
-            font-size: 9px;
-            font-weight: bold;
-            margin: 2px 0 1px 0;
-            text-align: center;
-        }
-        
+        /* Info sections */
         .info-section {
-            margin: 1px 0;
-            font-size: 7px;
+            margin: 0.5mm 0;
         }
         
         .info-row {
-            margin-bottom: 1px;
+            display: block;
             width: 100%;
+            margin-bottom: 0.2mm;
+            font-size: 10px;
             overflow: hidden;
-            clear: both;
         }
         
         .info-label {
+            display: inline-block;
             width: 45%;
             text-align: left;
             float: left;
-            font-size: 6px;
         }
         
         .info-value {
+            display: inline-block;
             width: 54%;
             text-align: right;
             font-weight: bold;
-            float: right;
-            font-size: 6px;
-            word-wrap: break-word;
-        }
-        
-        .separator {
-            border-bottom: 1px dashed #000;
-            margin: 1px 0;
-            height: 1px;
-        }
-        
-        .double-separator {
-            border-bottom: 1px solid #000;
-            margin: 1px 0;
-            height: 1px;
-        }
-        
-        .services-section {
-            margin: 2px 0;
-        }
-        
-        .service-item {
-            margin: 1px 0;
-            font-size: 6px;
-            clear: both;
-        }
-        
-        .service-name {
-            font-weight: bold;
-            margin-bottom: 1px;
-            font-size: 7px;
-        }
-        
-        .service-details {
-            display: block;
-            margin-bottom: 1px;
-            font-size: 6px;
-        }
-        
-        .service-qty {
-            float: left;
-        }
-        
-        .service-price {
             float: right;
         }
         
@@ -156,71 +114,182 @@
             clear: both;
         }
         
+        /* Separator */
+        .separator {
+            border-bottom: 1px dashed #000;
+            margin: 0.5mm 0;
+            height: 1px;
+        }
+        
+        .double-separator {
+            border-bottom: 2px solid #000;
+            margin: 1mm 0;
+            height: 2px;
+        }
+        
+        /* Payment Section */
+        .payment-section {
+            margin: 1mm 0;
+        }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            margin: 0.5mm 0;
+        }
+        
+        .payment-item {
+            margin: 0.5mm 0;
+            font-size: 10px;
+        }
+        
+        .payment-name {
+            font-weight: bold;
+            margin-bottom: 0.2mm;
+        }
+        
+        .payment-details {
+            display: block;
+            margin-bottom: 0.2mm;
+        }
+        
+        .payment-method {
+            float: left;
+            width: 60%;
+        }
+        
+        .payment-amount {
+            float: right;
+            width: 39%;
+            text-align: right;
+        }
+        
+        /* Amount Section */
         .amount-section {
-            margin: 2px 0;
+            margin: 0.5mm 0;
         }
         
         .amount-large {
-            font-size: 9px;
+            font-size: 14px;
             font-weight: bold;
             text-align: center;
-            margin: 1px 0;
+            margin: 1mm 0;
         }
         
-        .footer-section {
-            margin-top: 2px;
+        /* Status Section */
+        .status-section {
+            margin: 1mm 0;
             text-align: center;
-            font-size: 6px;
-        }
-        
-        .center-text {
-            text-align: center;
-        }
-        
-        .cut-line {
-            margin-top: 3px;
-            text-align: center;
-            font-size: 6px;
         }
         
         .thermal-spacing {
-            margin-bottom: 1px;
+            margin-bottom: 0.2mm;
+            font-size: 10px;
         }
         
-        .service-section-title {
+        /* Payment */
+        .payment-status {
+            text-align: center;
+            font-size: 11px;
             font-weight: bold;
+            margin: 1mm 0;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            font-size: 10px;
+            margin-top: 1mm;
+        }
+        
+        .powered-by {
+            margin-top: 1mm;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        
+        /* QR Section */
+        .qr-section {
+            text-align: center;
+            margin: 1mm 0;
+            font-family: monospace;
+            font-size: 6px;
+            line-height: 0.8;
+        }
+        
+        .qr-code {
+            margin: 1mm auto;
+            display: inline-block;
+        }
+        
+        .qr-code canvas {
+            max-width: 15mm;
+            height: auto;
+        }
+        
+        .qr-code img {
+            width: 60px;
+            height: 60px;
+        }
+        
+        .qr-placeholder {
+            font-size: 8px;
+            border: 1px solid #000;
+            padding: 2mm;
+            text-align: center;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .payment-number {
+            font-size: 8px;
+            margin-top: 0.5mm;
+            font-family: monospace;
+        }
+        
+        /* Transaction Reference */
+        .transaction-ref {
+            font-size: 8px;
+            font-weight: normal;
+            margin-bottom: 0.2mm;
+        }
+        
+        .cut-line {
+            text-align: center;
             font-size: 7px;
-            margin: 1px 0;
+            margin-top: 3mm;
         }
     </style>
 </head>
 <body>
-    <div class="receipt-print">
-        <!-- Header Section -->
+    <div class="receipt">
+        <!-- Header -->
         <div class="header">
             {% include 'includes/business_header.html' %}
+            <div class="receipt-title">PAYMENT RECEIPT</div>
         </div>
-        
-        <div class="document-title">PAYMENT RECEIPT</div>
         
         <!-- Payment Information -->
         <div class="info-section">
             <div class="info-row">
                 <span class="info-label">Receipt No:</span>
                 <span class="info-value">{{ payment.payment_id }}</span>
+                <div class="clear-float"></div>
             </div>
             <div class="info-row">
                 <span class="info-label">Date:</span>
-                <span class="info-value">{{ payment.created_at|date:"d/m/Y" }}</span>
+                <span class="info-value">{{ payment.initiated_at|date:"d/m/Y H:i" }}</span>
+                <div class="clear-float"></div>
             </div>
+            {% if payment.reference_number %}
             <div class="info-row">
-                <span class="info-label">Time:</span>
-                <span class="info-value">{{ payment.created_at|date:"H:i" }}</span>
-            </div>
-            {% if payment.processed_by %}
-            <div class="info-row">
-                <span class="info-label">Cashier:</span>
-                <span class="info-value">{{ payment.processed_by.user.first_name }}</span>
+                <span class="info-label">Reference:</span>
+                <span class="info-value">{{ payment.reference_number }}</span>
+                <div class="clear-float"></div>
             </div>
             {% endif %}
         </div>
@@ -232,292 +301,94 @@
         <div class="info-section">
             <div class="info-row">
                 <span class="info-label">Customer:</span>
-                <span class="info-value">{{ payment.customer.display_name }}</span>
+                <span class="info-value">{{ payment.customer.full_name }}</span>
+                <div class="clear-float"></div>
             </div>
-            {% if payment.customer.phone %}
-            <div class="info-row">
-                <span class="info-label">Phone:</span>
-                <span class="info-value">{{ payment.customer.phone }}</span>
-            </div>
-            {% endif %}
-            {% if payment.customer.customer_id %}
-            <div class="info-row">
-                <span class="info-label">Customer ID:</span>
-                <span class="info-value">{{ payment.customer.customer_id }}</span>
-            </div>
-            {% endif %}
         </div>
         <div class="separator"></div>
         {% endif %}
         
-        <!-- Service Order Information -->
-        {% if payment.service_order %}
-        <div class="info-section">
-            <div class="info-row">
-                <span class="info-label">Order No:</span>
-                <span class="info-value">{{ payment.service_order.order_number }}</span>
-            </div>
-            {% if payment.service_order.service_date %}
-            <div class="info-row">
-                <span class="info-label">Service Date:</span>
-                <span class="info-value">{{ payment.service_order.service_date|date:"d/m/Y" }}</span>
-            </div>
-            {% endif %}
-            {% if payment.service_order.vehicle %}
-            <div class="info-row">
-                <span class="info-label">Vehicle:</span>
-                <span class="info-value">{{ payment.service_order.vehicle.license_plate }}</span>
-            </div>
-            {% endif %}
-        </div>
         <div class="separator"></div>
-        
-        <!-- Service Order Items -->
-        {% if payment.service_order.has_services %}
-        <div class="info-section">
-            <div class="center-text thermal-spacing service-section-title">
-                SERVICES PROVIDED
-            </div>
-            {% for item in payment.service_order.service_items %}
-            <div class="service-item">
-                <div class="service-name">{{ item.item_name }}</div>
-                <div class="service-details">
-                    <span class="service-qty">Qty: {{ item.quantity }}</span>
-                    <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
-                    <div class="clear-float"></div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        <div class="separator"></div>
-        {% endif %}
-        
-        {% if payment.service_order.has_inventory_items %}
-        <div class="info-section">
-            <div class="center-text thermal-spacing service-section-title">
-                ITEMS PROVIDED
-            </div>
-            {% for item in payment.service_order.inventory_items %}
-            <div class="service-item">
-                <div class="service-name">{{ item.item_name }}
-                    {% if item.inventory_item.sku %}
-                        <small>({{ item.inventory_item.sku }})</small>
-                    {% endif %}
-                </div>
-                <div class="service-details">
-                    <span class="service-qty">Qty: {{ item.quantity }}</span>
-                    <span class="service-price">KES {{ item.total_price|floatformat:2 }}</span>
-                    <div class="clear-float"></div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        <div class="separator"></div>
-        {% endif %}
-        
-        <!-- Fallback for legacy orders -->
-        {% if not payment.service_order.has_services and not payment.service_order.has_inventory_items %}
-        <div class="info-section">
-            <div class="center-text thermal-spacing service-section-title">
-                ITEMS PROVIDED
-            </div>
-            {% if payment.service_order.services.all %}
-                {% for service in payment.service_order.services.all %}
-                <div class="service-item">
-                    <div class="service-name">[SERVICE] {{ service.name }}</div>
-                    <div class="service-details">
-                        <span class="service-qty">Qty: 1</span>
-                        <span class="service-price">KES {{ service.price|floatformat:2 }}</span>
-                        <div class="clear-float"></div>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="service-item">
-                    <div class="service-name">
-                        {% if payment.service_order.service_type %}
-                            {{ payment.service_order.service_type }}
-                        {% else %}
-                            Service Order #{{ payment.service_order.order_number }}
-                        {% endif %}
-                    </div>
-                    <div class="service-details">
-                        <span class="service-price">KES {{ payment.amount|floatformat:2 }}</span>
-                        <div class="clear-float"></div>
-                    </div>
-                </div>
-            {% endif %}
-        </div>
-        <div class="separator"></div>
-        {% endif %}
-        {% else %}
-        <!-- Direct Payment (No Service Order) -->
-        <div class="info-section">
-            <div class="center-text thermal-spacing service-section-title">
-                PAYMENT DETAILS
-            </div>
-            <div class="service-item">
-                <div class="service-name">
-                    {% if payment.description %}
-                        {{ payment.description }}
-                    {% else %}
-                        General Payment
-                    {% endif %}
-                </div>
-                <div class="service-details">
-                    <span class="service-price">KES {{ payment.amount|floatformat:2 }}</span>
-                    <div class="clear-float"></div>
-                </div>
-            </div>
-        </div>
-        <div class="separator"></div>
-        {% endif %}
         
         <!-- Payment Details -->
-        <div class="info-section">
-            <div class="info-row">
-                <span class="info-label">Payment Type:</span>
-                <span class="info-value">{{ payment.get_payment_type_display }}</span>
+        <div class="payment-section">
+            <div class="section-title">PAYMENT DETAILS</div>
+            
+            <div class="payment-item">
+                <div class="payment-name">{{ payment.get_payment_method_display }}</div>
+                <div class="payment-details">
+                    <span class="payment-method">{{ payment.description|default:"Payment for service"|default:"Payment" }}</span>
+                    <span class="payment-amount">{{ payment.amount|floatformat:2 }}</span>
+                    <div class="clear-float"></div>
+                </div>
+                {% if payment.transaction_id %}
+                <div class="transaction-ref">Transaction ID: {{ payment.transaction_id }}</div>
+                {% endif %}
+                {% if payment.reference_number %}
+                <div class="transaction-ref">Reference: {{ payment.reference_number }}</div>
+                {% endif %}
+                <div class="transaction-ref">Status: {{ payment.get_status_display }}</div>
             </div>
-            <div class="info-row">
-                <span class="info-label">Method:</span>
-                <span class="info-value">{{ payment.payment_method.name }}</span>
-            </div>
-            {% if payment.transaction_id %}
-            <div class="info-row">
-                <span class="info-label">Trans ID:</span>
-                <span class="info-value">{{ payment.transaction_id|truncatechars:15 }}</span>
-            </div>
-            {% endif %}
         </div>
-        
         <div class="separator"></div>
         
-        <!-- Amount Section -->
-        <div class="amount-section">
-            {% if payment.service_order %}
-            <!-- Service Order Payment Breakdown -->
-            <div class="info-row">
-                <span class="info-label">Subtotal (ex VAT):</span>
-                <span class="info-value">KES {{ payment.service_order.subtotal|floatformat:2 }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">VAT (16%):</span>
-                <span class="info-value">KES {{ payment.service_order.tax_amount|floatformat:2 }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Total Order:</span>
-                <span class="info-value">KES {{ payment.service_order.total_amount|floatformat:2 }}</span>
-            </div>
-            
-            <!-- Payment Details -->
-            <div class="separator"></div>
-            <div class="info-row">
-                <span class="info-label">Payment Amount:</span>
-                <span class="info-value">KES {{ payment.amount|floatformat:2 }}</span>
-            </div>
-            {% if payment.processing_fee > 0 %}
-            <div class="info-row">
-                <span class="info-label">Processing Fee:</span>
-                <span class="info-value">KES {{ payment.processing_fee|floatformat:2 }}</span>
-            </div>
-            {% endif %}
-            
-            <!-- Show partial payment info if applicable -->
-            {% with payment.service_order.total_paid as total_paid %}
-            {% if total_paid < payment.service_order.total_amount %}
-            <div class="info-row">
-                <span class="info-label">Total Paid:</span>
-                <span class="info-value">KES {{ total_paid|floatformat:2 }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Balance Due:</span>
-                <span class="info-value">KES {{ payment.service_order.total_amount|floatformat:2|add:"-"|add:total_paid|floatformat:2 }}</span>
-            </div>
-            {% endif %}
-            {% endwith %}
-            {% else %}
-            <!-- Direct Payment -->
-            <div class="info-row">
-                <span class="info-label">Amount:</span>
-                <span class="info-value">KES {{ payment.amount|floatformat:2 }}</span>
-            </div>
-            {% if payment.processing_fee > 0 %}
-            <div class="info-row">
-                <span class="info-label">Processing Fee:</span>
-                <span class="info-value">KES {{ payment.processing_fee|floatformat:2 }}</span>
-            </div>
-            {% endif %}
-            {% endif %}
-        </div>
-        
+        <!-- Totals -->
         <div class="double-separator"></div>
         
         <div class="amount-large">
-            TOTAL: KES {{ payment.amount|add:payment.processing_fee|floatformat:2 }}
+            TOTAL PAID: {{ payment.amount|floatformat:2 }}
         </div>
         
         <div class="double-separator"></div>
         
+        <!-- QR Code Section -->
+        <div class="qr-section">
+            <div class="qr-code">
+                {% if qr_code_image %}
+                    <img src="{{ qr_code_image }}" alt="Payment QR Code">
+                {% else %}
+                    <div class="qr-placeholder">
+                        Payment: {{ payment.payment_id|default:payment.id }}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="payment-number">{{ payment.payment_id|default:payment.id }}</div>
+        </div>
+        
+        <div class="separator"></div>
+        
         <!-- Payment Status -->
-        <div class="center-text thermal-spacing">
+        <div class="payment-status">
             STATUS: {{ payment.get_status_display|upper }}
         </div>
         
-        <!-- Refund Information -->
-        {% if payment.total_refunded > 0 %}
-        <div class="separator"></div>
-        <div class="center-text thermal-spacing">
-            REFUNDED: KES {{ payment.total_refunded|floatformat:2 }}
-        </div>
-        {% if payment.status == 'refunded' %}
-        <div class="center-text thermal-spacing">
-            ** FULLY REFUNDED **
-        </div>
-        {% elif payment.refundable_amount > 0 %}
-        <div class="center-text thermal-spacing">
-            REMAINING: KES {{ payment.refundable_amount|floatformat:2 }}
-        </div>
-        {% endif %}
-        {% endif %}
-        
-        {% if payment.description %}
-        <div class="separator"></div>
-        <div class="center-text thermal-spacing">
-            {{ payment.description|truncatechars:40 }}
-        </div>
-        {% endif %}
-        
         <div class="separator"></div>
         
-        <!-- Footer -->
-        <div class="footer-section">
+        <!-- Footer (no PIN duplication) -->
+        <div class="footer">
             {% if tenant_settings.receipt_footer %}
-            <div class="thermal-spacing">{{ tenant_settings.receipt_footer }}</div>
+            <div>{{ tenant_settings.receipt_footer }}</div>
             {% else %}
-            <div class="thermal-spacing">Thank you for your business!</div>
+            <div>Thank you for your business!</div>
             {% endif %}
-            <div class="thermal-spacing">Visit us again soon</div>
+            <div>Visit us again!</div>
             {% if tenant_settings.website_url %}
-            <div class="thermal-spacing">{{ tenant_settings.website_url }}</div>
-            {% else %}
-            <div class="thermal-spacing">www.autowash.co.ke</div>
+            <div>{{ tenant_settings.website_url }}</div>
             {% endif %}
-            <div class="thermal-spacing">Powered by AutoWash</div>
+            <div class="powered-by">Powered by AutoWash</div>
         </div>
         
-        <!-- Cut line indicator for thermal printer -->
         <div class="cut-line">
-            ........................................
+            ----------------------------------------
         </div>
     </div>
-
+    
     <script>
-        // Auto-print when page loads
+        // Simple auto-print functionality
         window.addEventListener('load', function() {
             setTimeout(function() {
                 window.print();
-            }, 500);
+            }, 1000);
         });
         
         // Print when Ctrl+P is pressed

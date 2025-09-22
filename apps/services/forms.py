@@ -1,4 +1,5 @@
 from django import forms
+from django.db import models
 from django.core.exceptions import ValidationError
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column, Field, HTML, Div
@@ -7,28 +8,31 @@ from phonenumber_field.formfields import PhoneNumberField
 from .models import Service, ServiceBay, ServiceCategory, ServicePackage, ServiceOrder, ServiceOrderItem
 
 class ServiceCategoryForm(forms.ModelForm):
-    """Service category form"""
+    """Service category form - simplified version"""
     
     class Meta:
         model = ServiceCategory
-        fields = ['name', 'description', 'icon', 'color', 'display_order', 'is_active']
+        fields = ['name', 'description', 'is_active']
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 3}),
-            'color': forms.TextInput(attrs={'type': 'color'}),
+            'description': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Briefly describe what services this category includes...'}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
+        # Set default values for hidden fields
+        if not self.instance.pk:  # New category
+            # Auto-generate display_order based on existing categories
+            from .models import ServiceCategory
+            max_order = ServiceCategory.objects.aggregate(max_order=models.Max('display_order'))['max_order'] or 0
+            self.instance.display_order = max_order + 1
+            self.instance.icon = 'fas fa-car-wash'  # Default icon
+            self.instance.color = '#3b82f6'  # Default blue color
+        
         self.helper = FormHelper()
         self.helper.layout = Layout(
             'name',
             'description',
-            Row(
-                Column('icon', css_class='form-group col-md-4'),
-                Column('color', css_class='form-group col-md-4'),
-                Column('display_order', css_class='form-group col-md-4'),
-            ),
             'is_active',
             FormActions(
                 Submit('submit', 'Save Category', css_class='btn btn-primary')
