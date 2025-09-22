@@ -1663,17 +1663,63 @@ def service_edit_view(request, pk):
 @login_required
 @employee_required(['owner', 'manager'])
 def service_delete_view(request, pk):
-    """Delete service (soft delete)"""
+    """Delete service with proper validation"""
     service = get_object_or_404(Service, pk=pk)
     
     if request.method == 'POST':
-        service.delete()  # Soft delete
-        messages.success(request, f'Service "{service.name}" deleted successfully!')
+        # Check if service is used in any active/pending orders
+        active_order_items = ServiceOrderItem.objects.filter(
+            service=service,
+            order__status__in=['pending', 'confirmed', 'in_progress', 'paused']
+        )
+        active_count = active_order_items.count()
+        
+        # Check total usage for information
+        total_order_items = ServiceOrderItem.objects.filter(service=service).count()
+        
+        if active_count > 0:
+            # Get the order statuses for better error message
+            active_orders = active_order_items.values_list('order__order_number', 'order__status').distinct()[:5]
+            order_info = ', '.join([f"{order[0]} ({order[1]})" for order in active_orders])
+            if active_count > 5:
+                order_info += f" and {active_count - 5} more"
+                
+            messages.error(
+                request, 
+                f'Cannot delete "{service.name}" because it is used in {active_count} active order(s): {order_info}. '
+                'Complete or cancel these orders first.'
+            )
+        else:
+            # Safe to delete
+            service_name = service.name
+            service.delete()  # Soft delete
+            
+            if total_order_items > 0:
+                messages.success(
+                    request, 
+                    f'Service "{service_name}" deleted successfully! '
+                    f'Note: This service was used in {total_order_items} completed order(s) which remain in history.'
+                )
+            else:
+                messages.success(request, f'Service "{service_name}" deleted successfully!')
+        
         return redirect(get_business_url(request, 'services:list'))
+    
+    # Check order usage for display
+    active_order_items = ServiceOrderItem.objects.filter(
+        service=service,
+        order__status__in=['pending', 'confirmed', 'in_progress', 'paused']
+    ).count()
+    total_order_items = ServiceOrderItem.objects.filter(service=service).count()
+    completed_order_items = total_order_items - active_order_items
     
     context = {
         'service': service,
-        'title': f'Delete Service - {service.name}'
+        'title': f'Delete Service - {service.name}',
+        'active_order_items': active_order_items,
+        'total_order_items': total_order_items,
+        'completed_order_items': completed_order_items,
+        'can_delete': active_order_items == 0
     }
     return render(request, 'services/service_confirm_delete.html', context)
 
@@ -2386,21 +2432,6 @@ def service_edit_view(request, pk):
 
 @login_required
 @employee_required(['owner', 'manager'])
-def service_delete_view(request, pk):
-    """Delete service (soft delete)"""
-    service = get_object_or_404(Service, pk=pk)
-    
-    if request.method == 'POST':
-        service.delete()  # Soft delete
-        messages.success(request, f'Service "{service.name}" deleted successfully!')
-        return redirect('services:list')
-    
-    context = {
-        'service': service,
-        'title': f'Delete Service - {service.name}'
-    }
-    return render(request, 'services/service_confirm_delete.html', context)
-
 # Category Management Views
 
 @login_required
@@ -2527,7 +2558,7 @@ def category_delete(request, pk):
 @login_required
 @employee_required()
 def order_edit_view(request, pk):
-    """Edit service order - simplified approach like quick order"""
+    """Edit service order - handles both services and inventory items"""
     order = get_object_or_404(ServiceOrder, pk=pk)
     
     # Only allow editing pending/confirmed orders
@@ -2560,14 +2591,13 @@ def order_edit_view(request, pk):
             if scheduled_time:
                 order.scheduled_time = scheduled_time
             
-            # Handle services selection - Clear and recreate
-            selected_services = request.POST.getlist('services')
-            
-            # Clear existing services
+            # Clear existing order items (both services and inventory)
             order.order_items.all().delete()
             
-            # Add selected services
             total_amount = Decimal('0')
+            
+            # Handle services selection
+            selected_services = request.POST.getlist('services')
             if selected_services:
                 for service_id in selected_services:
                     try:
@@ -2581,6 +2611,33 @@ def order_edit_view(request, pk):
                         )
                         total_amount += service.base_price
                     except Service.DoesNotExist:
+                        continue
+            
+            # Handle inventory items selection
+            selected_inventory = request.POST.getlist('inventory_items')
+            if selected_inventory:
+                from apps.inventory.models import InventoryItem
+                for inventory_id in selected_inventory:
+                    try:
+                        inventory_item = InventoryItem.objects.get(id=inventory_id)
+                        # Get quantity for this inventory item
+                        quantity_key = f'inventory_quantity_{inventory_id}'
+                        quantity = int(request.POST.get(quantity_key, 1))
+                        
+                        # Check stock availability
+                        if inventory_item.current_stock >= quantity:
+                            item_total = inventory_item.selling_price * quantity
+                            ServiceOrderItem.objects.create(
+                                order=order,
+                                inventory_item=inventory_item,
+                                quantity=quantity,
+                                unit_price=inventory_item.selling_price,
+                                total_price=item_total
+                            )
+                            total_amount += item_total
+                        else:
+                            messages.warning(request, f'Insufficient stock for {inventory_item.name}. Available: {inventory_item.current_stock}')
+                    except (InventoryItem.DoesNotExist, ValueError):
                         continue
             
             # Calculate totals (VAT inclusive pricing)
@@ -2613,6 +2670,14 @@ def order_edit_view(request, pk):
         services_count=Count('services', filter=Q(services__is_active=True))
     ).filter(services_count__gt=0)
     
+    # Get inventory items for selection
+    from apps.inventory.models import InventoryItem, InventoryCategory
+    inventory_categories = InventoryCategory.objects.filter(is_active=True).prefetch_related(
+        'items'
+    ).annotate(
+        items_count=Count('items', filter=Q(items__is_active=True, items__current_stock__gt=0))
+    ).filter(items_count__gt=0)
+    
     # Get employees for assignment
     from apps.employees.models import Employee
     employees = Employee.objects.filter(
@@ -2623,6 +2688,7 @@ def order_edit_view(request, pk):
     context = {
         'order': order,
         'service_categories': service_categories,
+        'inventory_categories': inventory_categories,
         'employees': employees,
         'title': f'Edit Order - {order.order_number}'
     }

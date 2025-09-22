@@ -70,6 +70,7 @@ def get_business_url(request, url_name, **kwargs):
         'inventory:list': f"{base_url}/items/",
         'inventory:item_create': f"{base_url}/items/create/",
         'inventory:item_detail': f"{base_url}/items/{{pk}}/",
+        'inventory:item_delete': f"{base_url}/items/{{pk}}/delete/",
         'inventory:stock_adjustment': f"{base_url}/stock/adjustments/",
         'inventory:stock_adjustment_item': f"{base_url}/stock/adjustments/{{item_id}}/",
         'inventory:stock_movements': f"{base_url}/stock/movements/",
@@ -1067,6 +1068,62 @@ def item_detail_view(request, pk):
         'urls': get_inventory_urls(request),
     }
     return render(request, 'inventory/item_detail.html', context)
+
+@login_required
+@employee_required(['owner', 'manager'])
+def item_delete_view(request, pk):
+    """Delete inventory item with proper validation"""
+    item = get_object_or_404(InventoryItem, pk=pk)
+    
+    if request.method == 'POST':
+        try:
+            # Check if item is used in any active orders
+            from apps.services.models import ServiceOrderItem
+            active_order_items = ServiceOrderItem.objects.filter(
+                inventory_item=item,
+                order__status__in=['pending', 'confirmed', 'in_progress', 'paused']
+            )
+            active_count = active_order_items.count()
+            
+            # Check total usage for information
+            total_order_items = ServiceOrderItem.objects.filter(inventory_item=item).count()
+            
+            if active_count > 0:
+                # Get the order information for better error message
+                active_orders = active_order_items.values_list('order__order_number', 'order__status').distinct()[:5]
+                order_info = ', '.join([f"{order[0]} ({order[1]})" for order in active_orders])
+                if active_count > 5:
+                    order_info += f" and {active_count - 5} more"
+                    
+                messages.error(
+                    request, 
+                    f'Cannot delete "{item.name}" because it is used in {active_count} active order(s): {order_info}. '
+                    'Complete or cancel these orders first.'
+                )
+                return redirect(get_business_url(request, 'inventory:item_detail', pk=item.pk))
+            
+            # Check if item has stock movements
+            movements_count = item.stock_movements.count()
+            if movements_count > 0:
+                messages.warning(request, f'Item "{item.name}" has {movements_count} stock movements. All movement history will be deleted.')
+            
+            item_name = item.name
+            item.delete()
+            
+            if total_order_items > 0:
+                messages.success(
+                    request, 
+                    f'Item "{item_name}" deleted successfully! '
+                    f'Note: This item was used in {total_order_items} completed order(s) which remain in history.'
+                )
+            else:
+                messages.success(request, f'Item "{item_name}" deleted successfully!')
+            
+        except Exception as e:
+            messages.error(request, f'Error deleting item: {str(e)}')
+            return redirect(get_business_url(request, 'inventory:item_detail', pk=item.pk))
+    
+    return redirect(get_business_url(request, 'inventory:item_list'))
 
 @login_required
 @employee_required(['owner', 'manager'])

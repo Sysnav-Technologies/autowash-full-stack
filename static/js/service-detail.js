@@ -50,6 +50,92 @@ function editService(serviceId) {
 }
 
 /**
+ * Delete service
+ * @param {string} serviceId - The ID of the service to delete
+ */
+function deleteService(serviceId) {
+    const confirmed = confirm('Are you sure you want to delete this service? This action cannot be undone.');
+    
+    if (!confirmed) return;
+
+    const deleteBtn = document.querySelector(`[onclick="deleteService('${serviceId}')"]`);
+    if (deleteBtn) {
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+    }
+
+    const tenantSlug = document.querySelector('[data-tenant-slug]')?.dataset.tenantSlug || window.location.pathname.split('/')[2];
+
+    fetch(`/business/${tenantSlug}/services/${serviceId}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.ok) {
+            // Redirect to services list after successful deletion
+            window.location.href = `/business/${tenantSlug}/services/`;
+        } else {
+            throw new Error('Delete failed');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deleting service. Please try again.');
+        
+        if (deleteBtn) {
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Service';
+        }
+    });
+}
+
+/**
+ * Get CSRF token for AJAX requests
+ * @returns {string} CSRF token
+ */
+function getCSRFToken() {
+    // First try to get from meta tag
+    const metaToken = document.querySelector('meta[name=csrf-token]');
+    if (metaToken) {
+        return metaToken.getAttribute('content');
+    }
+    
+    // Fallback to form input
+    const formToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (formToken) {
+        return formToken.value;
+    }
+    
+    // Last resort: get from cookie
+    const cookieValue = getCookie('csrftoken');
+    return cookieValue || '';
+}
+
+/**
+ * Get cookie value by name
+ * @param {string} name - Cookie name
+ * @returns {string} Cookie value
+ */
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+/**
  * Toggle service active status
  * @param {string} serviceId - The ID of the service
  * @param {boolean} currentStatus - Current active status
@@ -66,7 +152,7 @@ function toggleServiceStatus(serviceId, currentStatus) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                'X-CSRFToken': getCSRFToken(),
             },
             body: JSON.stringify({
                 active: !currentStatus

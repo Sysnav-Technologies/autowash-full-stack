@@ -209,6 +209,11 @@
 {% endblock %}
 
 {% block content %}
+<!-- Hidden CSRF token for JavaScript forms -->
+<form style="display: none;">
+    {% csrf_token %}
+</form>
+
 <div class="container-fluid">
     <!-- Header -->
     <div class="inventory-header">
@@ -353,6 +358,9 @@
                     <a href="/business/{{ request.tenant.slug }}/inventory/stock/adjustments/{{ item.pk }}/" class="btn-action btn-secondary-action">
                         <i class="fas fa-edit me-1"></i>Adjust
                     </a>
+                    <button type="button" class="btn-action btn-danger-action" onclick="confirmDelete('{{ item.pk }}', '{{ item.name|escapejs }}')">
+                        <i class="fas fa-trash me-1"></i>Delete
+                    </button>
                 </div>
             </div>
         </div>
@@ -495,5 +503,27 @@ document.addEventListener('DOMContentLoaded', function() {
         gridView.classList.add('d-none');
     });
 });
+
+function confirmDelete(itemId, itemName) {
+    if (confirm(`Are you sure you want to delete "${itemName}"? This action cannot be undone.`)) {
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/business/{{ request.tenant.slug }}/inventory/items/${itemId}/delete/`;
+        
+        // Add CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
 </script>
 {% endblock %}

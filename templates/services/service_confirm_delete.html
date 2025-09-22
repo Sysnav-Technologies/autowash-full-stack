@@ -1,0 +1,154 @@
+{% extends 'base/dashboard_base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-header">
+        <div class="page-header-content">
+            <h1>Delete Service</h1>
+            <div class="page-breadcrumb">
+                <a href="/business/{{ request.tenant.slug }}/services/">Services</a>
+                <span>/</span>
+                <a href="/business/{{ request.tenant.slug }}/services/{{ service.pk }}/">{{ service.name }}</a>
+                <span>/</span>
+                <span>Delete</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                            Confirm Service Deletion
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Warning:</strong> This action cannot be undone.
+                        </div>
+
+                        <div class="service-info mb-4">
+                            <h6>Service Details:</h6>
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <span class="label">Name:</span>
+                                    <span class="value">{{ service.name }}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Category:</span>
+                                    <span class="value">{{ service.category.name|default:"No category" }}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Price:</span>
+                                    <span class="value">Ksh {{ service.base_price|floatformat:0 }}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Duration:</span>
+                                    <span class="value">{{ service.estimated_duration }} minutes</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if not can_delete %}
+                        <div class="alert alert-danger" role="alert">
+                            <i class="fas fa-ban me-2"></i>
+                            <strong>Cannot Delete:</strong> This service is currently used in {{ active_order_items }} active order(s). 
+                            Please complete or cancel these orders before deleting.
+                            {% if total_order_items > active_order_items %}
+                            <br><small class="text-muted">
+                                Note: This service was also used in {{ completed_order_items }} completed order(s) which will remain in history.
+                            </small>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <p class="mb-4">
+                            Are you sure you want to delete the service <strong>"{{ service.name }}"</strong>? 
+                            This action will permanently remove the service and cannot be undone.
+                        </p>
+                        {% if total_order_items > 0 %}
+                        <div class="alert alert-info" role="alert">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Note:</strong> This service was used in {{ total_order_items }} completed order(s) which will remain in order history.
+                        </div>
+                        {% endif %}
+                        {% endif %}
+
+                        <div class="form-actions d-flex gap-2">
+                            {% if can_delete %}
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="fas fa-trash me-2"></i>
+                                    Yes, Delete Service
+                                </button>
+                            </form>
+                            {% endif %}
+                            <a href="/business/{{ request.tenant.slug }}/services/{{ service.pk }}/" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Cancel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.service-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.375rem;
+    border: 1px solid #dee2e6;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-item .label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.info-item .value {
+    font-weight: 600;
+    color: #212529;
+}
+
+.form-actions {
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+
+@media (max-width: 576px) {
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}

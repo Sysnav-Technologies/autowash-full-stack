@@ -177,6 +177,9 @@ MIDDLEWARE.extend([
     'apps.core.middleware.TimezoneMiddleware',
     'apps.core.middleware.UserActivityMiddleware',
     
+    # Network protection middleware
+    'apps.core.network_middleware.NetworkProtectionMiddleware',
+    
     # AllAuth middleware at the end
     'allauth.account.middleware.AccountMiddleware',
 ])
@@ -261,6 +264,7 @@ TEMPLATES = [
                 'apps.core.context_processors.verification_context',
                 'apps.core.context_processors.subscription_flow_context',
                 'apps.core.context_processors.sidebar_context',
+                'apps.core.context_processors.network_status',
             ],
         },
     },
@@ -709,3 +713,9 @@ if CPANEL or RENDER:
         '.ttf': 'font/ttf',
         '.eot': 'application/vnd.ms-fontobject',
     }
+
+# Network Protection Settings
+# These settings help prevent duplicate database operations during slow internet connections
+NETWORK_SLOW_THRESHOLD = 3.0  # seconds - requests slower than this are considered slow
+NETWORK_DUPLICATE_WINDOW = 5.0  # seconds - time window to detect duplicate submissions
+NETWORK_PROTECTION_DURATION = 30.0  # seconds - how long protection stays active after slow connection detected

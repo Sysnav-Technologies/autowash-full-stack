@@ -227,6 +227,190 @@
     .alert-info {
         border-left: 4px solid #17a2b8;
     }
+    
+    /* Current Inventory Items Styles */
+    .current-inventory {
+        background: #e8f0ff;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #007bff;
+    }
+    
+    .current-inventory-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .current-inventory-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .item-info {
+        flex-grow: 1;
+    }
+    
+    .item-name {
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 0.25rem;
+    }
+    
+    .item-details {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+    }
+    
+    .item-quantity {
+        font-weight: 500;
+    }
+    
+    .item-unit-price {
+        color: #28a745;
+    }
+    
+    .item-description {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin: 0;
+    }
+    
+    .item-price {
+        font-weight: 600;
+        color: #007bff;
+        margin-right: 1rem;
+    }
+    
+    .btn-remove-item {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 0.375rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: background-color 0.15s ease-in-out;
+    }
+    
+    .btn-remove-item:hover {
+        background: #c82333;
+    }
+    
+    /* Inventory Items Styles */
+    .inventory-selection {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    .inventory-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .inventory-item-card {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .inventory-item-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+    }
+    
+    .item-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .item-name {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #212529;
+        margin: 0;
+        flex-grow: 1;
+    }
+    
+    .item-price {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #28a745;
+    }
+    
+    .item-description {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+    }
+    
+    .item-details {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    .stock-info {
+        color: #495057;
+    }
+    
+    .item-brand {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .item-selection {
+        border-top: 1px solid #e9ecef;
+        padding-top: 0.75rem;
+    }
+    
+    .quantity-controls {
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .quantity-controls label {
+        margin: 0;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    
+    .quantity-input {
+        width: 80px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+    
+    .empty-state i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.5;
+    }
 </style>
 {% endblock %}
 
@@ -299,6 +483,7 @@
                             <h6 class="text-success">Currently Selected Services:</h6>
                             <div id="current-services-list">
                                 {% for item in order.order_items.all %}
+                                {% if item.service %}
                                 <div class="service-item current-service" data-service-id="{{ item.service.id }}">
                                     <div class="service-info">
                                         <div class="service-name">{{ item.service.name }}</div>
@@ -315,8 +500,48 @@
                                         </button>
                                     </div>
                                 </div>
+                                {% endif %}
                                 {% empty %}
                                 <p class="text-muted">No services currently selected</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Inventory Items Section -->
+                    <div class="form-section">
+                        <h5 class="section-title">
+                            <i class="fas fa-boxes"></i> Current Inventory Items
+                        </h5>
+                        
+                        <div class="current-inventory">
+                            <h6 class="text-success">Currently Selected Inventory Items:</h6>
+                            <div id="current-inventory-list">
+                                {% for item in order.order_items.all %}
+                                {% if item.inventory_item %}
+                                <div class="inventory-item current-inventory-item" data-item-id="{{ item.inventory_item.id }}">
+                                    <div class="item-info">
+                                        <div class="item-name">{{ item.inventory_item.name }}</div>
+                                        <div class="item-details">
+                                            <span class="item-quantity">Qty: {{ item.quantity }}</span>
+                                            <span class="item-unit-price">@ KSh {{ item.unit_price|floatformat:2 }}</span>
+                                        </div>
+                                        {% if item.inventory_item.description %}
+                                        <div class="item-description">{{ item.inventory_item.description|truncatechars:100 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="item-price">
+                                        KSh {{ item.total_price|floatformat:2 }}
+                                    </div>
+                                    <div class="item-actions">
+                                        <button type="button" class="btn-remove-item" onclick="removeInventoryItem('{{ item.inventory_item.id }}')">
+                                            <i class="fas fa-times"></i> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% empty %}
+                                <p class="text-muted">No inventory items currently selected</p>
                                 {% endfor %}
                             </div>
                         </div>
@@ -359,6 +584,75 @@
                                 </div>
                                 {% endfor %}
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Inventory Items Section -->
+                    <div class="form-section">
+                        <h5 class="section-title">
+                            <i class="fas fa-boxes"></i> Add Inventory Items
+                        </h5>
+                        
+                        <div class="inventory-selection" id="inventory-selection">
+                            {% for category in inventory_categories %}
+                            <div class="category-group">
+                                <h6 class="category-title">{{ category.name }}</h6>
+                                <div class="inventory-grid">
+                                    {% for item in category.items.all %}
+                                    {% if item.is_active and item.current_stock > 0 %}
+                                    <div class="inventory-item-card">
+                                        <div class="item-header">
+                                            <h6 class="item-name">{{ item.name }}</h6>
+                                            <div class="item-price">KSh {{ item.selling_price|floatformat:2 }}</div>
+                                        </div>
+                                        {% if item.description %}
+                                        <p class="item-description">{{ item.description|truncatewords:10 }}</p>
+                                        {% endif %}
+                                        <div class="item-details">
+                                            <div class="stock-info">
+                                                <i class="fas fa-box"></i>
+                                                Stock: {{ item.current_stock }}
+                                            </div>
+                                            {% if item.brand %}
+                                            <div class="item-brand">{{ item.brand }}</div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="item-selection">
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input inventory-item-checkbox" 
+                                                       name="inventory_items" 
+                                                       value="{{ item.id }}"
+                                                       id="inventory_{{ item.id }}"
+                                                       {% for order_item in order.order_items.all %}
+                                                           {% if order_item.inventory_item.id == item.id %}checked{% endif %}
+                                                       {% endfor %}>
+                                                <label class="form-check-label" for="inventory_{{ item.id }}">
+                                                    Add to Order
+                                                </label>
+                                            </div>
+                                            
+                                            <div class="quantity-controls">
+                                                <label for="inventory_quantity_{{ item.id }}">Quantity:</label>
+                                                <input type="number" class="form-control form-control-sm quantity-input" 
+                                                       name="inventory_quantity_{{ item.id }}" 
+                                                       id="inventory_quantity_{{ item.id }}"
+                                                       min="1" max="{{ item.current_stock }}" 
+                                                       value="{% for order_item in order.order_items.all %}{% if order_item.inventory_item.id == item.id %}{{ order_item.quantity }}{% endif %}{% endfor %}"
+                                                       data-item-id="{{ item.id }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="empty-state">
+                                <i class="fas fa-boxes"></i>
+                                <p class="text-muted">No inventory items available</p>
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                     
@@ -655,6 +949,34 @@ function removeService(serviceId) {
     }
 }
 
+function removeInventoryItem(itemId) {
+    if (confirm('Are you sure you want to remove this inventory item?')) {
+        // Uncheck the checkbox
+        $(`#inventory_${itemId}`).prop('checked', false);
+        
+        // Reset quantity
+        $(`#inventory_quantity_${itemId}`).val('').prop('disabled', true);
+        
+        // Remove from current inventory display
+        $(`.current-inventory-item[data-item-id="${itemId}"]`).remove();
+        
+        // Update summary
+        updateOrderSummary();
+        
+        // Mark for removal in form submission
+        if (!$('#inventory-to-remove').length) {
+            $('#order-form').append('<input type="hidden" id="inventory-to-remove" name="remove_inventory" value="">');
+        }
+        
+        let removedItems = $('#inventory-to-remove').val();
+        removedItems = removedItems ? removedItems.split(',') : [];
+        if (!removedItems.includes(itemId)) {
+            removedItems.push(itemId);
+            $('#inventory-to-remove').val(removedItems.join(','));
+        }
+    }
+}
+
 // Quick action functions
 function confirmOrder() {
     if (confirm('Are you sure you want to confirm this order?')) {
@@ -728,6 +1050,101 @@ function cancelOrder() {
             }
         });
     }
+}
+
+// Inventory Items JavaScript
+$(document).ready(function() {
+    // Handle inventory item checkbox changes
+    $('.inventory-item-checkbox').change(function() {
+        const itemId = $(this).val();
+        const quantityInput = $(`#inventory_quantity_${itemId}`);
+        
+        if ($(this).is(':checked')) {
+            // Set default quantity to 1 if not already set
+            if (quantityInput.val() === '' || quantityInput.val() === '0') {
+                quantityInput.val(1);
+            }
+            quantityInput.prop('disabled', false);
+        } else {
+            // Reset quantity and disable input
+            quantityInput.val('');
+            quantityInput.prop('disabled', true);
+        }
+        
+        updateOrderSummary();
+    });
+    
+    // Handle quantity input changes
+    $('.quantity-input').change(function() {
+        const itemId = $(this).data('item-id');
+        const checkbox = $(`#inventory_${itemId}`);
+        const quantity = parseInt($(this).val()) || 0;
+        
+        if (quantity > 0) {
+            checkbox.prop('checked', true);
+        } else {
+            checkbox.prop('checked', false);
+        }
+        
+        updateOrderSummary();
+    });
+    
+    // Initialize inventory items state
+    $('.inventory-item-checkbox:checked').each(function() {
+        const itemId = $(this).val();
+        $(`#inventory_quantity_${itemId}`).prop('disabled', false);
+    });
+    
+    $('.inventory-item-checkbox:not(:checked)').each(function() {
+        const itemId = $(this).val();
+        $(`#inventory_quantity_${itemId}`).prop('disabled', true);
+    });
+});
+
+function updateOrderSummary() {
+    let subtotal = 0;
+    
+    // Calculate services total
+    $('.service-checkbox:checked').each(function() {
+        const servicePrice = parseFloat($(this).closest('.service-item').data('price')) || 0;
+        subtotal += servicePrice;
+    });
+    
+    // Calculate inventory items total
+    $('.inventory-item-checkbox:checked').each(function() {
+        const itemId = $(this).val();
+        const quantity = parseInt($(`#inventory_quantity_${itemId}`).val()) || 0;
+        const itemCard = $(this).closest('.inventory-item-card');
+        const itemPriceText = itemCard.find('.item-price').text();
+        const itemPrice = parseFloat(itemPriceText.replace(/[^\d.]/g, '')) || 0;
+        subtotal += (itemPrice * quantity);
+    });
+    
+    // Add existing order items that are being kept
+    $('.current-service:not(.removing)').each(function() {
+        const priceText = $(this).find('.service-price').text();
+        const price = parseFloat(priceText.replace(/[^\d.]/g, '')) || 0;
+        subtotal += price;
+    });
+    
+    $('.current-inventory-item:not(.removing)').each(function() {
+        const priceText = $(this).find('.item-price').text();
+        const price = parseFloat(priceText.replace(/[^\d.]/g, '')) || 0;
+        subtotal += price;
+    });
+    
+    // Calculate VAT (16%)
+    const vatAmount = subtotal * 0.16;
+    const total = subtotal + vatAmount;
+    
+    // Update display if summary section exists
+    if ($('#order-summary').length) {
+        $('#subtotal-amount').text(`KSh ${subtotal.toFixed(2)}`);
+        $('#vat-amount').text(`KSh ${vatAmount.toFixed(2)}`);
+        $('#total-amount').text(`KSh ${total.toFixed(2)}`);
+    }
+    
+    console.log(`Order summary updated - Subtotal: ${subtotal}, VAT: ${vatAmount}, Total: ${total}`);
 }
 </script>
 {% endblock %}
