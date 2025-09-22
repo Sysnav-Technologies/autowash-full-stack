@@ -12,7 +12,7 @@ from apps.core.tenant_models import TenantSettings, TenantBackup
 from apps.core.forms import (
     TenantSettingsForm, NotificationSettingsForm, PaymentSettingsForm,
     ServiceSettingsForm, FeatureSettingsForm, BackupSettingsForm,
-    BusinessHoursForm, CreateBackupForm
+    BusinessHoursForm, CreateBackupForm, SMSManagementForm
 )
 from apps.core.backup_utils import TenantBackupManager, get_selected_tables
 from apps.core.database_router import tenant_context
@@ -592,3 +592,55 @@ def export_settings(request):
     except Exception as e:
         messages.error(request, f'Error exporting settings: {str(e)}')
         return redirect('businesses:settings_overview')
+
+
+@login_required
+@employee_required(['owner'])
+def sms_management_view(request):
+    """SMS settings management"""
+    business = request.business
+    
+    if SMSManagementForm is None:
+        messages.error(request, 'SMS management is not available. Please check messaging app configuration.')
+        return redirect(get_business_url(request, 'businesses:settings'))
+    
+    # Get or create SMS settings
+    try:
+        from messaging.models import TenantSMSSettings
+        with tenant_context(business):
+            sms_settings, created = TenantSMSSettings.objects.get_or_create(
+                tenant_id=business.id,
+                defaults={
+                    'tenant_name': business.name,
+                    'is_active': False,
+                    'daily_limit': 100,
+                    'monthly_limit': 1000,
+                }
+            )
+    except ImportError:
+        messages.error(request, 'SMS settings are not available.')
+        return redirect(get_business_url(request, 'businesses:settings'))
+    
+    if request.method == 'POST':
+        form = SMSManagementForm(request.POST, instance=sms_settings)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    with tenant_context(business):
+                        form.save()
+                    
+                messages.success(request, 'SMS settings updated successfully!')
+                return redirect(get_business_url(request, 'businesses:sms_management'))
+            except Exception as e:
+                messages.error(request, f'Error updating SMS settings: {str(e)}')
+    else:
+        form = SMSManagementForm(instance=sms_settings)
+    
+    context = {
+        'form': form,
+        'business': business,
+        'sms_settings': sms_settings,
+        'title': 'SMS Management'
+    }
+    
+    return render(request, 'businesses/settings/sms.html', context)

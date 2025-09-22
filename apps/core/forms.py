@@ -5,6 +5,17 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column, Field, HTML, Div, Fieldset
 from crispy_forms.bootstrap import FormActions
 
+# Import SMS form from messaging app
+try:
+    from messaging.forms import TenantSMSSettingsForm
+except ImportError:
+    # Fallback if messaging app is not available
+    TenantSMSSettingsForm = None
+
+
+# Create alias for SMS settings form
+SMSManagementForm = TenantSMSSettingsForm
+
 
 class TenantSettingsForm(forms.ModelForm):
     """Form for tenant settings"""
@@ -182,27 +193,36 @@ class NotificationSettingsForm(forms.ModelForm):
         model = TenantSettings
         fields = [
             # General Notification Settings
-            'sms_notifications', 'email_notifications', 'whatsapp_notifications',
+            'sms_notifications', 'email_notifications', 'whatsapp_notifications', 'push_notifications',
             
             # Customer Notifications
             'customer_booking_confirmations', 'customer_payment_receipts',
             'customer_service_reminders', 'customer_marketing_messages',
+            'notify_booking_confirmation', 'notify_service_reminder', 'notify_service_complete',
             
             # Staff Notifications
             'staff_new_bookings', 'staff_payment_alerts', 'staff_daily_summaries',
+            
+            # Auto actions
+            'auto_payment_confirmation',
         ]
         
         widgets = {
             'sms_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'email_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'whatsapp_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'push_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'customer_booking_confirmations': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'customer_payment_receipts': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'customer_service_reminders': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'customer_marketing_messages': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_booking_confirmation': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_service_reminder': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_service_complete': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'staff_new_bookings': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'staff_payment_alerts': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'staff_daily_summaries': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'auto_payment_confirmation': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 
@@ -213,19 +233,29 @@ class PaymentSettingsForm(forms.ModelForm):
         model = TenantSettings
         fields = [
             'auto_payment_confirmation', 'require_payment_before_service',
-            'default_tax_rate', 'mpesa_auto_confirm',
+            'default_tax_rate', 'mpesa_auto_confirm', 'tax_number', 'tax_inclusive_pricing',
+            'accept_cash', 'accept_mpesa', 'accept_card', 'accept_bank_transfer',
         ]
         
         widgets = {
             'auto_payment_confirmation': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'require_payment_before_service': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'mpesa_auto_confirm': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'tax_inclusive_pricing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'accept_cash': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'accept_mpesa': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'accept_card': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'accept_bank_transfer': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'default_tax_rate': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'min': '0',
                 'max': '100',
                 'step': '0.01',
                 'placeholder': '16.00'
+            }),
+            'tax_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter your business tax/VAT number'
             }),
         }
 
@@ -237,6 +267,9 @@ class ServiceSettingsForm(forms.ModelForm):
         model = TenantSettings
         fields = [
             'auto_assign_services', 'require_service_confirmation', 'service_buffer_time',
+            'default_service_duration', 'max_advance_booking_days', 'min_advance_booking_hours',
+            'allow_online_booking', 'require_customer_phone', 'allow_same_day_booking', 
+            'auto_confirm_bookings',
         ]
         
         widgets = {
@@ -248,6 +281,28 @@ class ServiceSettingsForm(forms.ModelForm):
                 'max': '120',
                 'placeholder': '15'
             }),
+            'default_service_duration': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '5',
+                'max': '480',
+                'placeholder': '30'
+            }),
+            'max_advance_booking_days': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'max': '365',
+                'placeholder': '30'
+            }),
+            'min_advance_booking_hours': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'max': '72',
+                'placeholder': '2'
+            }),
+            'allow_online_booking': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'require_customer_phone': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'allow_same_day_booking': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'auto_confirm_bookings': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 
@@ -305,28 +360,35 @@ class BusinessHoursForm(forms.ModelForm):
     class Meta:
         model = TenantSettings
         fields = [
-            'monday_open', 'monday_close',
-            'tuesday_open', 'tuesday_close',
-            'wednesday_open', 'wednesday_close',
-            'thursday_open', 'thursday_close',
-            'friday_open', 'friday_close',
-            'saturday_open', 'saturday_close',
-            'sunday_open', 'sunday_close',
+            'monday_is_open', 'monday_open', 'monday_close',
+            'tuesday_is_open', 'tuesday_open', 'tuesday_close',
+            'wednesday_is_open', 'wednesday_open', 'wednesday_close',
+            'thursday_is_open', 'thursday_open', 'thursday_close',
+            'friday_is_open', 'friday_open', 'friday_close',
+            'saturday_is_open', 'saturday_open', 'saturday_close',
+            'sunday_is_open', 'sunday_open', 'sunday_close',
         ]
         
         widgets = {
+            'monday_is_open': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'monday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
             'monday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'tuesday_is_open': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'tuesday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
             'tuesday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'wednesday_is_open': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'wednesday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
             'wednesday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'thursday_is_open': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'thursday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
             'thursday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'friday_is_open': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'friday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
             'friday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'saturday_is_open': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'saturday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
             'saturday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
+            'sunday_is_open': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'sunday_open': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
             'sunday_close': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
         }

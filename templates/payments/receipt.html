@@ -4,6 +4,7 @@
 {% block title %}Payment Receipt - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
+{% include 'includes/business_styles.html' %}
 <style>
     /* Screen display styles */
     .receipt-container {
@@ -198,6 +199,19 @@
             margin-bottom: 2px;
         }
         
+        /* Logo styling for thermal printer */
+        .business-logo {
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        
+        .logo-img {
+            max-height: 30px;
+            max-width: 100px;
+            height: auto;
+            width: auto;
+        }
+        
         .center-text {
             text-align: center;
         }
@@ -242,6 +256,19 @@
         font-size: 12px;
         color: #666;
         margin-bottom: 2px;
+    }
+    
+    /* Preview logo styling */
+    .preview-header .business-logo {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    
+    .preview-header .logo-img {
+        max-height: 50px;
+        max-width: 150px;
+        height: auto;
+        width: auto;
     }
     
     .preview-title {
@@ -318,39 +345,7 @@
             <div class="d-print-block d-none">
                 <!-- Header Section -->
                 <div class="header-section">
-                    <!-- Business Logo -->
-                    {% if tenant_settings.business_logo %}
-                    <div class="business-logo" style="text-align: center; margin-bottom: 10px;">
-                        <img src="{{ tenant_settings.business_logo.url }}" alt="{{ business.name }} Logo" style="max-height: 40px; max-width: 120px;">
-                    </div>
-                    {% elif tenant_settings.logo_url %}
-                    <div class="business-logo" style="text-align: center; margin-bottom: 10px;">
-                        <img src="{{ tenant_settings.logo_url }}" alt="{{ business.name }} Logo" style="max-height: 40px; max-width: 120px;">
-                    </div>
-                    {% endif %}
-                    
-                    <div class="business-name">{{ business.name|upper }}</div>
-                    {% if tenant_settings.tagline %}
-                    <div class="business-details">{{ tenant_settings.tagline }}</div>
-                    {% endif %}
-                    {% if tenant_settings.contact_address %}
-                    <div class="business-details">{{ tenant_settings.contact_address }}</div>
-                    {% elif business.city %}
-                    <div class="business-details">{{ business.city }}{% if business.state %}, {{ business.state }}{% endif %}</div>
-                    {% endif %}
-                    {% if tenant_settings.contact_phone %}
-                    <div class="business-details">Tel: {{ tenant_settings.contact_phone }}</div>
-                    {% elif business.phone %}
-                    <div class="business-details">Tel: {{ business.phone }}</div>
-                    {% endif %}
-                    {% if tenant_settings.contact_email %}
-                    <div class="business-details">{{ tenant_settings.contact_email }}</div>
-                    {% elif business.email %}
-                    <div class="business-details">{{ business.email }}</div>
-                    {% endif %}
-                    {% if tenant_settings.website_url %}
-                    <div class="business-details">{{ tenant_settings.website_url }}</div>
-                    {% endif %}
+                    {% include 'includes/business_header.html' %}
                 </div>
                 
                 <div class="receipt-title">PAYMENT RECEIPT</div>
@@ -643,16 +638,7 @@
                 <div class="separator"></div>
                 
                 <!-- Footer -->
-                <div class="footer-section">
-                    {% if tenant_settings.receipt_footer %}
-                    <div class="thermal-spacing">{{ tenant_settings.receipt_footer }}</div>
-                    {% else %}
-                    <div class="thermal-spacing">Thank you for your business!</div>
-                    {% endif %}
-                    <div class="thermal-spacing">Visit us again soon</div>
-                    <div class="thermal-spacing">{{ tenant_settings.website_url|default:"www.autowash.co.ke" }}</div>
-                    <div class="thermal-spacing">Powered by AutoWash</div>
-                </div>
+                {% include 'includes/business_footer.html' %}
                 
                 <!-- Cut line indicator for thermal printer -->
                 <div class="cut-line">
@@ -664,36 +650,7 @@
             <div class="receipt-preview d-print-none">
                 <!-- Header -->
                 <div class="preview-header">
-                    <!-- Business Logo -->
-                    {% if tenant_settings.business_logo %}
-                    <div class="business-logo" style="text-align: center; margin-bottom: 10px;">
-                        <img src="{{ tenant_settings.business_logo.url }}" alt="{{ business.name }} Logo" style="max-height: 50px; max-width: 150px;">
-                    </div>
-                    {% elif tenant_settings.logo_url %}
-                    <div class="business-logo" style="text-align: center; margin-bottom: 10px;">
-                        <img src="{{ tenant_settings.logo_url }}" alt="{{ business.name }} Logo" style="max-height: 50px; max-width: 150px;">
-                    </div>
-                    {% endif %}
-                    
-                    <div class="preview-business-name">{{ business.name|upper }}</div>
-                    {% if tenant_settings.tagline %}
-                    <div class="preview-business-details">{{ tenant_settings.tagline }}</div>
-                    {% endif %}
-                    {% if tenant_settings.contact_address %}
-                    <div class="preview-business-details">{{ tenant_settings.contact_address }}</div>
-                    {% elif business.city %}
-                    <div class="preview-business-details">{{ business.city }}{% if business.state %}, {{ business.state }}{% endif %}</div>
-                    {% endif %}
-                    {% if tenant_settings.contact_phone %}
-                    <div class="preview-business-details">Tel: {{ tenant_settings.contact_phone }}</div>
-                    {% elif business.phone %}
-                    <div class="preview-business-details">Tel: {{ business.phone }}</div>
-                    {% endif %}
-                    {% if tenant_settings.contact_email %}
-                    <div class="preview-business-details">{{ tenant_settings.contact_email }}</div>
-                    {% elif business.email %}
-                    <div class="preview-business-details">{{ business.email }}</div>
-                    {% endif %}
+                    {% include 'includes/business_header.html' %}
                 </div>
                 
                 <div class="preview-title">PAYMENT RECEIPT</div>
@@ -939,7 +896,15 @@
                     {% else %}
                     <p class="mb-1"><strong>Thank you for your business!</strong></p>
                     {% endif %}
+                    
+                    <p class="mb-1">Visit us again soon</p>
                     <p class="mb-1">{{ tenant_settings.website_url|default:"www.autowash.co.ke" }}</p>
+                    
+                    <!-- QR Code section for future implementation -->
+                    <div class="qr-code text-center my-2">
+                        <!-- QR code will be generated here -->
+                    </div>
+                    
                     <p class="mb-0"><small>Powered by AutoWash</small></p>
                 </div>
             </div>
