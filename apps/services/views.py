@@ -813,11 +813,18 @@ def quick_order_view(request):
                     except (json.JSONDecodeError, TypeError):
                         services_custom_prices = {}
                     
+                    # Parse services quantities from JSON
+                    services_quantities_data = request.POST.get('services_quantities', '{}')
+                    try:
+                        services_quantities = json.loads(services_quantities_data) if services_quantities_data else {}
+                    except (json.JSONDecodeError, TypeError):
+                        services_quantities = {}
+                    
                     # Validate that at least one service, inventory item, or customer part is selected
                     if not selected_services and not selected_inventory_items and not customer_parts:
                         raise ValueError("At least one service, inventory item, or customer part must be selected")
                     
-                    # Process selected services with custom prices
+                    # Process selected services with custom prices and quantities
                     for service_id in selected_services:
                         try:
                             service = Service.objects.get(id=service_id, is_active=True)
@@ -826,20 +833,31 @@ def quick_order_view(request):
                             custom_price = services_custom_prices.get(str(service_id))
                             unit_price = Decimal(str(custom_price)) if custom_price else service.base_price
                             
+                            # Get quantity if provided (default to 1)
+                            quantity = services_quantities.get(str(service_id), 1)
+                            try:
+                                quantity = Decimal(str(quantity))
+                                if quantity <= 0:
+                                    quantity = Decimal('1')
+                            except (ValueError, TypeError, InvalidOperation):
+                                quantity = Decimal('1')
+                            
                             # Validate custom price is not below minimum
                             if custom_price and unit_price < service.minimum_price:
                                 logger.warning(f"Custom price {unit_price} for service {service.name} is below minimum {service.minimum_price}")
                                 unit_price = service.minimum_price
                             
+                            item_total = unit_price * quantity
                             ServiceOrderItem.objects.create(
                                 order=order,
                                 service=service,
-                                quantity=1,
+                                quantity=quantity,
                                 unit_price=unit_price,
+                                total_price=item_total,
                                 assigned_to=getattr(request, 'employee', None)
                             )
-                            total_amount += unit_price
-                            logger.info(f"Added service: {service.name} at price {unit_price}")
+                            total_amount += item_total
+                            logger.info(f"Added service: {service.name} quantity {quantity} at price {unit_price} (total: {item_total})")
                         except Service.DoesNotExist:
                             logger.warning(f"Service {service_id} not found, skipping")
                             continue
@@ -848,15 +866,27 @@ def quick_order_view(request):
                             # Fall back to base price
                             try:
                                 service = Service.objects.get(id=service_id, is_active=True)
+                                
+                                # Get quantity for fallback too
+                                quantity = services_quantities.get(str(service_id), 1)
+                                try:
+                                    quantity = Decimal(str(quantity))
+                                    if quantity <= 0:
+                                        quantity = Decimal('1')
+                                except (ValueError, TypeError, InvalidOperation):
+                                    quantity = Decimal('1')
+                                
+                                item_total = service.base_price * quantity
                                 ServiceOrderItem.objects.create(
                                     order=order,
                                     service=service,
-                                    quantity=1,
+                                    quantity=quantity,
                                     unit_price=service.base_price,
+                                    total_price=item_total,
                                     assigned_to=getattr(request, 'employee', None)
                                 )
-                                total_amount += service.base_price
-                                logger.info(f"Added service: {service.name} at base price")
+                                total_amount += item_total
+                                logger.info(f"Added service: {service.name} quantity {quantity} at base price")
                             except Service.DoesNotExist:
                                 continue
                 
@@ -876,41 +906,85 @@ def quick_order_view(request):
                         try:
                             inventory_item = InventoryItem.objects.get(id=item_id, is_active=True)
                             quantity_field = f'inventory_quantity_{item_id}'
-                            quantity = Decimal(request.POST.get(quantity_field, '1'))
                             
-                            # Check stock availability
-                            if inventory_item.current_stock < quantity:
-                                logger.warning(f"Insufficient stock for {inventory_item.name}")
-                                continue
+                            # Safely get and validate quantity
+                            try:
+                                quantity_str = request.POST.get(quantity_field, '1')
+                                quantity = Decimal(str(quantity_str)) if quantity_str else Decimal('1')
+                                if quantity <= 0:
+                                    quantity = Decimal('1')
+                            except (ValueError, TypeError, InvalidOperation):
+                                logger.warning(f"Invalid quantity for {inventory_item.name}, using 1")
+                                quantity = Decimal('1')
+                            
+                            # Check stock availability - adjust quantity if insufficient
+                            available_stock = inventory_item.current_stock
+                            if available_stock < quantity:
+                                logger.warning(f"Insufficient stock for {inventory_item.name}. Requested: {quantity}, Available: {available_stock}")
+                                if available_stock > 0:
+                                    # Use available stock instead of skipping
+                                    quantity = available_stock
+                                    logger.info(f"Adjusted quantity to available stock: {quantity}")
+                                else:
+                                    # Skip item if no stock
+                                    logger.warning(f"No stock available for {inventory_item.name}, skipping")
+                                    continue
                             
                             # Get custom price if provided
                             custom_price = inventory_custom_prices.get(str(item_id))
-                            unit_price = Decimal(str(custom_price)) if custom_price else (inventory_item.selling_price or inventory_item.unit_cost)
+                            
+                            # Safely determine unit price
+                            try:
+                                if custom_price:
+                                    unit_price = Decimal(str(custom_price))
+                                else:
+                                    unit_price = inventory_item.selling_price or inventory_item.unit_cost or Decimal('0')
+                            except (ValueError, TypeError, InvalidOperation):
+                                logger.warning(f"Invalid custom price for {inventory_item.name}, using selling price")
+                                unit_price = inventory_item.selling_price or inventory_item.unit_cost or Decimal('0')
                             
                             # Validate custom price is not below minimum (unit cost)
-                            minimum_price = inventory_item.unit_cost
-                            if custom_price and unit_price < minimum_price:
-                                logger.warning(f"Custom price {unit_price} for inventory {inventory_item.name} is below minimum {minimum_price}")
+                            minimum_price = inventory_item.unit_cost or Decimal('0')
+                            if unit_price < minimum_price:
+                                logger.warning(f"Price {unit_price} for inventory {inventory_item.name} is below minimum {minimum_price}, adjusting")
                                 unit_price = minimum_price
                             
+                            # Calculate total price safely
+                            try:
+                                total_price = unit_price * quantity
+                            except (ValueError, TypeError, InvalidOperation):
+                                logger.error(f"Failed to calculate total price for {inventory_item.name}")
+                                continue
+                            
                             # Create service order item for inventory item
-                            ServiceOrderItem.objects.create(
-                                order=order,
-                                inventory_item=inventory_item,
-                                quantity=quantity,
-                                unit_price=unit_price,
-                                assigned_to=getattr(request, 'employee', None)
-                            )
+                            try:
+                                ServiceOrderItem.objects.create(
+                                    order=order,
+                                    inventory_item=inventory_item,
+                                    quantity=quantity,
+                                    unit_price=unit_price,
+                                    total_price=total_price,
+                                    assigned_to=getattr(request, 'employee', None)
+                                )
+                                
+                                # Note: Stock deduction timing depends on order type:
+                                # - Service orders: Deducted immediately after order creation (old flow)
+                                # - Inventory-only orders: Deducted when payment is completed (new flow)
+                                
+                                total_amount += total_price
+                                logger.info(f"Added inventory item: {inventory_item.name} x{quantity} at price {unit_price} (total: {total_price})")
+                                
+                            except Exception as db_error:
+                                logger.error(f"Database error creating order item for {inventory_item.name}: {db_error}")
+                                # Continue with other items instead of failing entire order
+                                continue
                             
-                            # Note: Stock deduction timing depends on order type:
-                            # - Service orders: Deducted immediately after order creation (old flow)
-                            # - Inventory-only orders: Deducted when payment is completed (new flow)
-                            
-                            total_amount += unit_price * quantity
-                            logger.info(f"Added inventory item: {inventory_item.name} x{quantity} at price {unit_price}")
-                            
-                        except (InventoryItem.DoesNotExist, ValueError, TypeError) as e:
-                            logger.warning(f"Inventory item {item_id} not found or invalid: {e}, skipping")
+                        except InventoryItem.DoesNotExist:
+                            logger.warning(f"Inventory item {item_id} not found, skipping")
+                            continue
+                        except Exception as e:
+                            logger.error(f"Unexpected error processing inventory item {item_id}: {e}")
+                            # Continue with other items instead of failing entire order
                             continue
                 
                 # Handle customer parts (manual entries)
@@ -2816,8 +2890,28 @@ def order_edit_view(request, pk):
         is_active=True
     )
     
+    # Pre-process existing order items for easier template access
+    existing_services = {}
+    existing_inventory = {}
+    
+    for item in order.order_items.all():
+        if item.service:
+            existing_services[str(item.service.id)] = {
+                'quantity': item.quantity,
+                'unit_price': item.unit_price,
+                'total_price': item.total_price
+            }
+        elif item.inventory_item:
+            existing_inventory[str(item.inventory_item.id)] = {
+                'quantity': item.quantity,
+                'unit_price': item.unit_price,
+                'total_price': item.total_price
+            }
+    
     context = {
         'order': order,
+        'existing_services': existing_services,
+        'existing_inventory': existing_inventory,
         'service_categories': service_categories,
         'inventory_categories': inventory_categories,
         'employees': employees,

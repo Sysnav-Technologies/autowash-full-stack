@@ -117,6 +117,51 @@
         margin-left: 1rem;
     }
     
+    .service-controls {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .quantity-control,
+    .price-control {
+        flex: 1;
+    }
+    
+    .quantity-control label,
+    .price-control label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+    
+    .quantity-control input,
+    .price-control input {
+        width: 100%;
+    }
+    
+    .price-controls {
+        margin-top: 0.5rem;
+    }
+    
+    .price-controls label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+    
+    .service-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    
     .service-actions {
         display: flex;
         gap: 0.5rem;
@@ -560,24 +605,48 @@
                                     <h6 class="text-primary">{{ category.name }}</h6>
                                     {% for service in category.services.all %}
                                     <div class="service-item" data-service-id="{{ service.id }}" data-price="{{ service.base_price }}">
-                                        <div class="form-check">
-                                            <input class="form-check-input service-checkbox" 
-                                                   type="checkbox" 
-                                                   id="service_{{ service.id }}"
-                                                   name="services"
-                                                   value="{{ service.id }}"
-                                                   {% if service in order.services.all %}checked{% endif %}>
-                                            <label class="form-check-label" for="service_{{ service.id }}">
-                                                <div class="service-info">
-                                                    <div class="service-name">{{ service.name }}</div>
-                                                    {% if service.description %}
-                                                    <div class="service-description">{{ service.description|truncatechars:100 }}</div>
-                                                    {% endif %}
-                                                </div>
-                                            </label>
+                                        <div class="service-header">
+                                            <div class="form-check">
+                                                <input class="form-check-input service-checkbox" 
+                                                       type="checkbox" 
+                                                       id="service_{{ service.id }}"
+                                                       name="services"
+                                                       value="{{ service.id }}"
+                                                       {% for item in order.order_items.all %}{% if item.service and item.service.id == service.id %}checked{% endif %}{% endfor %}>
+                                                <label class="form-check-label" for="service_{{ service.id }}">
+                                                    <div class="service-info">
+                                                        <div class="service-name">{{ service.name }}</div>
+                                                        {% if service.description %}
+                                                        <div class="service-description">{{ service.description|truncatechars:100 }}</div>
+                                                        {% endif %}
+                                                    </div>
+                                                </label>
+                                            </div>
+                                            <div class="service-price">
+                                                KSh {{ service.base_price|floatformat:2 }}
+                                            </div>
                                         </div>
-                                        <div class="service-price">
-                                            KSh {{ service.base_price|floatformat:2 }}
+                                        
+                                        <!-- Service Quantity and Price Controls -->
+                                        <div class="service-controls">
+                                            <div class="quantity-control">
+                                                <label for="service_quantity_{{ service.id }}">Quantity:</label>
+                                                <input type="number" class="form-control form-control-sm" 
+                                                       name="service_quantity_{{ service.id }}" 
+                                                       id="service_quantity_{{ service.id }}"
+                                                       min="0.1" step="0.1" 
+                                                       value="{% for item in order.order_items.all %}{% if item.service and item.service.id == service.id %}{{ item.quantity|floatformat:-2 }}{% endif %}{% empty %}1{% endfor %}">
+                                            </div>
+                                            
+                                            <div class="price-control">
+                                                <label for="service_price_{{ service.id }}">Custom Price (KSh):</label>
+                                                <input type="number" class="form-control form-control-sm" 
+                                                       name="service_price_{{ service.id }}" 
+                                                       id="service_price_{{ service.id }}"
+                                                       min="{{ service.minimum_price|default:service.base_price }}" step="0.01" 
+                                                       value="{% for item in order.order_items.all %}{% if item.service and item.service.id == service.id %}{{ item.unit_price|floatformat:2 }}{% endif %}{% endfor %}"
+                                                       placeholder="{{ service.base_price|floatformat:2 }}">
+                                            </div>
                                         </div>
                                     </div>
                                     {% endfor %}
@@ -624,9 +693,7 @@
                                                        name="inventory_items" 
                                                        value="{{ item.id }}"
                                                        id="inventory_{{ item.id }}"
-                                                       {% for order_item in order.order_items.all %}
-                                                           {% if order_item.inventory_item.id == item.id %}checked{% endif %}
-                                                       {% endfor %}>
+                                                       {% for order_item in order.order_items.all %}{% if order_item.inventory_item and order_item.inventory_item.id == item.id %}checked{% endif %}{% endfor %}>
                                                 <label class="form-check-label" for="inventory_{{ item.id }}">
                                                     Add to Order
                                                 </label>
@@ -637,9 +704,19 @@
                                                 <input type="number" class="form-control form-control-sm quantity-input" 
                                                        name="inventory_quantity_{{ item.id }}" 
                                                        id="inventory_quantity_{{ item.id }}"
-                                                       min="1" max="{{ item.current_stock }}" 
-                                                       value="{% for order_item in order.order_items.all %}{% if order_item.inventory_item.id == item.id %}{{ order_item.quantity }}{% endif %}{% endfor %}"
+                                                       min="0.1" step="0.1" max="{{ item.current_stock }}" 
+                                                       value="{% for order_item in order.order_items.all %}{% if order_item.inventory_item and order_item.inventory_item.id == item.id %}{{ order_item.quantity|floatformat:-2 }}{% endif %}{% empty %}1{% endfor %}"
                                                        data-item-id="{{ item.id }}">
+                                            </div>
+                                            
+                                            <div class="price-controls">
+                                                <label for="inventory_price_{{ item.id }}">Custom Price (KSh):</label>
+                                                <input type="number" class="form-control form-control-sm price-input" 
+                                                       name="inventory_price_{{ item.id }}" 
+                                                       id="inventory_price_{{ item.id }}"
+                                                       min="0.01" step="0.01" 
+                                                       value="{% for order_item in order.order_items.all %}{% if order_item.inventory_item and order_item.inventory_item.id == item.id %}{{ order_item.unit_price|floatformat:2 }}{% endif %}{% endfor %}"
+                                                       placeholder="{{ item.selling_price|floatformat:2 }}">
                                             </div>
                                         </div>
                                     </div>
