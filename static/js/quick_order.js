@@ -1584,11 +1584,32 @@ function toggleService(serviceId) {
             name: serviceName,
             price: finalPrice,
             duration: serviceDuration,
+            quantity: 1, // Default quantity
             customPrice: customPrice  // This will be sent to backend if set
         });
     }
     
     updateOrderSummary();
+}
+
+// Service quantity change function
+function onServiceQuantityChange(input, serviceId) {
+    const quantity = parseFloat(input.value) || 1;
+    
+    // Update minimum to 0.1 for services (they can have decimal quantities)
+    if (quantity < 0.1) {
+        input.value = 0.1;
+        showToast('Service quantity cannot be less than 0.1', 'warning');
+        return;
+    }
+    
+    // Find and update the service in selectedServices
+    const service = selectedServices.find(s => s.id === serviceId || s.id === serviceId.toString());
+    if (service) {
+        service.quantity = quantity;
+        console.log('Updated service quantity:', serviceId, 'to', quantity);
+        updateOrderSummary();
+    }
 }
 
 function togglePackage(packageId) {
@@ -1722,9 +1743,17 @@ function updateReviewStep() {
     // Show individual services if selected
     if (selectedServices && selectedServices.length > 0) {
         selectedServices.forEach(service => {
-            servicesHtml += `<div class="d-flex justify-content-between"><span><i class="fas fa-tools me-2"></i>${service.name}</span><span>KES ${service.price.toFixed(2)}</span></div>`;
-            totalInclusiveVAT += service.price;
-            totalDuration += service.duration;
+            const serviceQuantity = service.quantity || 1;
+            const servicePrice = service.price || service.customPrice || service.base_price;
+            const serviceTotalPrice = servicePrice * serviceQuantity;
+            
+            let quantityDisplay = serviceQuantity === 1 ? '' : ` (x${serviceQuantity})`;
+            servicesHtml += `<div class="d-flex justify-content-between">
+                <span><i class="fas fa-tools me-2"></i>${service.name}${quantityDisplay}</span>
+                <span>KES ${serviceTotalPrice.toFixed(2)}</span>
+            </div>`;
+            totalInclusiveVAT += serviceTotalPrice;
+            totalDuration += (service.duration || 0) * serviceQuantity;
         });
     }
     
@@ -1796,12 +1825,47 @@ function updateReviewStep() {
     }
 }
 
+// Pre-submission validation
+function preSubmissionValidation() {
+    let hasErrors = false;
+    let errorMessages = [];
+    
+    // Check inventory stock availability
+    for (const item of selectedInventoryItems) {
+        if (item.quantity > item.available_stock) {
+            hasErrors = true;
+            errorMessages.push(`Insufficient stock for ${item.name}. Available: ${item.available_stock}, Required: ${item.quantity}`);
+        }
+    }
+    
+    // Check if we have at least one item selected
+    if (selectedServices.length === 0 && selectedInventoryItems.length === 0 && !selectedPackage && selectedCustomerParts.length === 0) {
+        hasErrors = true;
+        errorMessages.push('Please select at least one service, package, or inventory item');
+    }
+    
+    // Show errors if any
+    if (hasErrors) {
+        errorMessages.forEach(message => {
+            showToast(message, 'error');
+        });
+        return false;
+    }
+    
+    return true;
+}
+
 // Form Submission
 function submitOrder() {
     // Validate that we have all required data
     if (!validateAllSteps()) {
         showToast('Please complete all required fields', 'error');
         return;
+    }
+    
+    // Pre-submission validation
+    if (!preSubmissionValidation()) {
+        return; // Validation function will show appropriate error messages
     }
     
     const form = document.getElementById('quickOrderForm');
@@ -1901,6 +1965,10 @@ function submitOrder() {
             if (selectionData.services_custom_prices) {
                 formData.set('services_custom_prices', JSON.stringify(selectionData.services_custom_prices));
             }
+            // Add service quantities if they exist
+            if (selectionData.services_quantities) {
+                formData.set('services_quantities', JSON.stringify(selectionData.services_quantities));
+            }
         } else if (selectionData.type === 'inventory' && selectionData.inventory_items && selectionData.inventory_items.length > 0) {
             formData.set('service_type', 'inventory');
             selectionData.inventory_items.forEach(item => {
@@ -1926,6 +1994,10 @@ function submitOrder() {
                 // Add custom prices for services
                 if (selectionData.services_custom_prices) {
                     formData.set('services_custom_prices', JSON.stringify(selectionData.services_custom_prices));
+                }
+                // Add service quantities for services
+                if (selectionData.services_quantities) {
+                    formData.set('services_quantities', JSON.stringify(selectionData.services_quantities));
                 }
             }
             if (selectionData.inventory_items && selectionData.inventory_items.length > 0) {
@@ -3060,12 +3132,16 @@ function updateOrderSummary() {
         if (selectedServices.length > 0) {
             hasSelection = true;
             selectedServices.forEach(service => {
-                subtotal += service.price;
-                totalDuration += service.duration;
+                const serviceQuantity = service.quantity || 1;
+                const serviceTotal = service.price * serviceQuantity;
+                subtotal += serviceTotal;
+                totalDuration += service.duration * serviceQuantity;
+                
+                const quantityDisplay = serviceQuantity !== 1 ? ` (x${serviceQuantity})` : '';
                 servicesHtml += `
                     <div class="selected-service-item">
-                        <div class="service-item-name">${service.name}</div>
-                        <div class="service-item-price">KES ${service.price.toFixed(2)}</div>
+                        <div class="service-item-name">${service.name}${quantityDisplay}</div>
+                        <div class="service-item-price">KES ${serviceTotal.toFixed(2)}</div>
                     </div>
                 `;
             });
@@ -3178,6 +3254,11 @@ function updateOrderSummary() {
                     if (s.customPrice) acc[s.id] = s.customPrice;
                     return acc;
                 }, {}),
+                services_quantities: selectedServices.reduce((acc, s) => {
+                    // Always include quantity, even if it's 1, to ensure consistency
+                    acc[s.id] = s.quantity || 1;
+                    return acc;
+                }, {}),
                 inventory_items: selectedInventoryItems.map(item => ({
                     id: item.id,
                     quantity: item.quantity,
@@ -3197,6 +3278,11 @@ function updateOrderSummary() {
                 services_custom_prices: selectedServices.reduce((acc, s) => {
                     console.log('Processing service for custom prices:', s.id, 'customPrice:', s.customPrice);
                     if (s.customPrice) acc[s.id] = s.customPrice;
+                    return acc;
+                }, {}),
+                services_quantities: selectedServices.reduce((acc, s) => {
+                    // Always include quantity, even if it's 1, to ensure consistency
+                    acc[s.id] = s.quantity || 1;
                     return acc;
                 }, {})
             };
@@ -3229,131 +3315,6 @@ function updateOrderSummary() {
 }
 
 // Package selected function
-function updateOrderSummaryDisplay() {
-    let hasSelection = false;
-    let subtotal = 0;
-    let totalDuration = 0;
-    let servicesHtml = '';
-    let activeType = 'individual';
-    
-    // Determine active type
-    if (selectedPackage) {
-        activeType = 'package';
-    } else if (selectedServices.length > 0 && selectedInventoryItems.length > 0) {
-        activeType = 'mixed';
-    } else if (selectedServices.length > 0) {
-        activeType = 'services';
-    } else if (selectedInventoryItems.length > 0) {
-        activeType = 'inventory';
-    }
-    
-    // Package selected
-    if (selectedPackage) {
-        hasSelection = true;
-        subtotal = selectedPackage.price;
-        totalDuration = selectedPackage.duration;
-        
-        servicesHtml = `
-            <div class="selected-service-item">
-                <div class="service-item-name">
-                    <strong>${selectedPackage.name}</strong>
-                    <br><small>${selectedPackage.servicesCount} services included</small>
-                </div>
-                <div class="service-item-price">KES ${selectedPackage.price.toFixed(2)}</div>
-            </div>
-        `;
-    }
-    
-    // Individual services selected
-    if (selectedServices.length > 0) {
-        hasSelection = true;
-        
-        selectedServices.forEach(service => {
-            servicesHtml += `
-                <div class="selected-service-item">
-                    <div class="service-item-name">${service.name}</div>
-                    <div class="service-item-price">KES ${service.price.toFixed(2)}</div>
-                </div>
-            `;
-            subtotal += service.price;
-            totalDuration += service.duration;
-        });
-    }
-    
-    // Inventory items selected
-    if (selectedInventoryItems.length > 0) {
-        hasSelection = true;
-        
-        selectedInventoryItems.forEach(item => {
-            const itemTotal = item.price * item.quantity;
-            servicesHtml += `
-                <div class="selected-service-item">
-                    <div class="service-item-name">
-                        ${item.name}
-                        <br><small>Qty: ${item.quantity} × KES ${item.price.toFixed(2)}</small>
-                    </div>
-                    <div class="service-item-price">KES ${itemTotal.toFixed(2)}</div>
-                </div>
-            `;
-            subtotal += itemTotal;
-        });
-    }
-    
-    if (!hasSelection) {
-        selectedServicesDisplay.style.display = 'block';
-        selectedServicesList.style.display = 'none';
-        summaryTotals.style.display = 'none';
-        return;
-    }
-    
-    selectedServicesDisplay.style.display = 'none';
-    selectedServicesList.style.display = 'block';
-    summaryTotals.style.display = 'block';
-    
-    selectedServicesList.innerHTML = servicesHtml;
-    
-    // Update totals with inclusive VAT
-    const totalInclusiveVAT = subtotal;
-    const taxAmount = totalInclusiveVAT / 1.16 * 0.16; // Extract VAT amount  
-    const subtotalExVAT = totalInclusiveVAT - taxAmount; // Ex-VAT amount
-    
-    document.getElementById('subtotalAmount').textContent = `KES ${subtotalExVAT.toFixed(2)}`;
-    document.getElementById('taxAmount').textContent = `KES ${taxAmount.toFixed(2)}`;
-    document.getElementById('totalAmount').textContent = `KES ${totalInclusiveVAT.toFixed(2)}`;
-    document.getElementById('estimatedDuration').textContent = totalDuration;
-    
-    // Update hidden field based on what's selected
-    if (selectedPackage) {
-        document.getElementById('selectedServicesData').value = JSON.stringify({
-            type: 'package',
-            package_id: selectedPackage.id
-        });
-    } else if (selectedServices.length > 0 && selectedInventoryItems.length > 0) {
-        // Mixed selection
-        document.getElementById('selectedServicesData').value = JSON.stringify({
-            type: 'mixed',
-            service_ids: selectedServices.map(s => s.id),
-            inventory_items: selectedInventoryItems.map(item => ({
-                id: item.id,
-                quantity: item.quantity
-            }))
-        });
-    } else if (selectedInventoryItems.length > 0) {
-        document.getElementById('selectedServicesData').value = JSON.stringify({
-            type: 'inventory',
-            inventory_items: selectedInventoryItems.map(item => ({
-                id: item.id,
-                quantity: item.quantity
-            }))
-        });
-    } else {
-        document.getElementById('selectedServicesData').value = JSON.stringify({
-            type: 'individual',
-            service_ids: selectedServices.map(s => s.id)
-        });
-    }
-}
-
 // Update the existing validateServicesStep function to handle inventory
 function validateServicesStep() {
     // Check if any selection exists

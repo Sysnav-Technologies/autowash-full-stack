@@ -1265,7 +1265,7 @@ def ajax_purchase_order_items(request):
 @employee_required(['owner', 'manager'])
 def supplier_categories(request):
     categories = SupplierCategory.objects.filter(is_active=True).annotate(
-        supplier_count=Count('suppliers', filter=Q(suppliers__is_deleted=False))
+        active_supplier_count=Count('suppliers', filter=Q(suppliers__is_deleted=False))
     )
     
     if request.method == 'POST':

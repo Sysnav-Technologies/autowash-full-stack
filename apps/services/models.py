@@ -754,8 +754,8 @@ class ServiceOrderItem(models.Model):
     description = models.TextField(blank=True, help_text="Description for custom items or customer provided parts")
     
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
-    unit_price = models.DecimalField(max_digits=8, decimal_places=2)
-    total_price = models.DecimalField(max_digits=8, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    total_price = models.DecimalField(max_digits=12, decimal_places=2)
     
     # Customer-provided parts (no charge for parts, only labor)
     is_customer_provided = models.BooleanField(
@@ -1582,8 +1582,8 @@ class QuotationItem(models.Model):
     
     # Pricing and quantity
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
-    unit_price = models.DecimalField(max_digits=8, decimal_places=2)
-    total_price = models.DecimalField(max_digits=8, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    total_price = models.DecimalField(max_digits=12, decimal_places=2)
     
     # Item type for better organization
     item_type = models.CharField(
