@@ -2,7 +2,7 @@
 import csv
 import io
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, timedelta
 from functools import wraps
 import qrcode
@@ -1082,10 +1082,17 @@ def quick_order_view(request):
             messages.warning(request, 'Selected unit not found.')
     
     # Get available inventory items for the quick order
-    inventory_items = InventoryItem.objects.filter(
+    from django.core.paginator import Paginator
+    
+    all_inventory_items = InventoryItem.objects.filter(
         is_active=True,
         current_stock__gt=0  # Only show items with stock
-    ).select_related('category', 'unit').order_by('name')[:20]
+    ).select_related('category', 'unit').order_by('name')
+    
+    # Add pagination for inventory items
+    paginator = Paginator(all_inventory_items, 50)  # Show 50 items per page
+    page_number = request.GET.get('page', 1)
+    inventory_items = paginator.get_page(page_number)
     
     # Get inventory categories that have items with stock
     from apps.inventory.models import InventoryCategory
@@ -2441,11 +2448,11 @@ def calculate_order_price(request):
     for i, service_id in enumerate(service_ids):
         try:
             service = Service.objects.get(id=service_id)
-            quantity = int(quantities[i]) if i < len(quantities) else 1
+            quantity = Decimal(str(quantities[i])) if i < len(quantities) else Decimal('1')
             
             total_price += service.base_price * quantity
             estimated_duration += service.estimated_duration * quantity
-        except (Service.DoesNotExist, ValueError):
+        except (Service.DoesNotExist, ValueError, InvalidOperation):
             continue
     
     # Prices are VAT inclusive (16% VAT for Kenya)
@@ -2700,48 +2707,68 @@ def order_edit_view(request, pk):
             
             total_amount = Decimal('0')
             
-            # Handle services selection
+            # Handle services selection with custom pricing and quantities
             selected_services = request.POST.getlist('services')
             if selected_services:
                 for service_id in selected_services:
                     try:
                         service = Service.objects.get(id=service_id)
+                        
+                        # Get custom quantity and price for this service
+                        quantity_key = f'service_quantity_{service_id}'
+                        price_key = f'service_price_{service_id}'
+                        
+                        quantity = Decimal(str(request.POST.get(quantity_key, '1')))
+                        custom_price = request.POST.get(price_key)
+                        unit_price = Decimal(str(custom_price)) if custom_price else service.base_price
+                        
+                        # Validate custom price is not below minimum if set
+                        if custom_price and unit_price < service.minimum_price:
+                            logger.warning(f"Custom price {unit_price} for service {service.name} is below minimum {service.minimum_price}")
+                            unit_price = service.minimum_price
+                        
+                        item_total = unit_price * quantity
                         ServiceOrderItem.objects.create(
                             order=order,
                             service=service,
-                            quantity=1,
-                            unit_price=service.base_price,
-                            total_price=service.base_price
+                            quantity=quantity,
+                            unit_price=unit_price,
+                            total_price=item_total
                         )
-                        total_amount += service.base_price
-                    except Service.DoesNotExist:
+                        total_amount += item_total
+                    except (Service.DoesNotExist, ValueError, InvalidOperation):
                         continue
             
-            # Handle inventory items selection
+            # Handle inventory items selection with custom pricing and decimal quantities
             selected_inventory = request.POST.getlist('inventory_items')
             if selected_inventory:
                 from apps.inventory.models import InventoryItem
                 for inventory_id in selected_inventory:
                     try:
                         inventory_item = InventoryItem.objects.get(id=inventory_id)
-                        # Get quantity for this inventory item
-                        quantity_key = f'inventory_quantity_{inventory_id}'
-                        quantity = int(request.POST.get(quantity_key, 1))
                         
-                        # Check stock availability
+                        # Get quantity and custom price for this inventory item
+                        quantity_key = f'inventory_quantity_{inventory_id}'
+                        price_key = f'inventory_price_{inventory_id}'
+                        
+                        quantity = Decimal(str(request.POST.get(quantity_key, '1')))
+                        custom_price = request.POST.get(price_key)
+                        unit_price = Decimal(str(custom_price)) if custom_price else inventory_item.selling_price
+                        
+                        # Check stock availability for decimal quantities
                         if inventory_item.current_stock >= quantity:
-                            item_total = inventory_item.selling_price * quantity
+                            item_total = unit_price * quantity
                             ServiceOrderItem.objects.create(
                                 order=order,
                                 inventory_item=inventory_item,
                                 quantity=quantity,
-                                unit_price=inventory_item.selling_price,
+                                unit_price=unit_price,
                                 total_price=item_total
                             )
                             total_amount += item_total
                         else:
                             messages.warning(request, f'Insufficient stock for {inventory_item.name}. Available: {inventory_item.current_stock}')
-                    except (InventoryItem.DoesNotExist, ValueError):
+                    except (InventoryItem.DoesNotExist, ValueError, InvalidOperation):
                         continue
             
             # Calculate totals (VAT inclusive pricing)
@@ -3821,39 +3848,6 @@ def get_current_service(request):
         })
     else:
         return JsonResponse({'current_service': None})
-
-@login_required
-@employee_required()
-@ajax_required
-def calculate_order_price(request):
-    """Calculate order price via AJAX"""
-    service_ids = request.POST.getlist('service_ids[]')
-    quantities = request.POST.getlist('quantities[]')
-    
-    total_price = 0
-    estimated_duration = 0
-    
-    for i, service_id in enumerate(service_ids):
-        try:
-            service = Service.objects.get(id=service_id)
-            quantity = int(quantities[i]) if i < len(quantities) else 1
-            
-            total_price += service.base_price * quantity
-            estimated_duration += service.estimated_duration * quantity
-        except (Service.DoesNotExist, ValueError):
-            continue
-    
-    # Prices are VAT inclusive (16% VAT for Kenya)
-    # Calculate VAT amount from inclusive price
-    tax_amount = total_price * Decimal('0.16') / Decimal('1.16')
-    subtotal = total_price - tax_amount
-    
-    return JsonResponse({
-        'subtotal': float(subtotal),
-        'tax_amount': float(tax_amount),
-        'total_amount': float(total_price),  # This is already VAT inclusive
-        'estimated_duration': estimated_duration
-    })
 
 @login_required
 @employee_required()

@@ -114,7 +114,8 @@
         }
         
         .invoice-items th {
-            background-color: #f8f9fa;
+            background-color: #9966CC;
+            color: white;
             padding: 12px;
             text-align: left;
             font-weight: bold;
@@ -153,9 +154,10 @@
         .total-row.final {
             font-weight: bold;
             font-size: 14px;
-            border-bottom: 2px solid #007bff;
-            border-top: 2px solid #007bff;
-            background-color: #f8f9fa;
+            border-bottom: 2px solid #9966CC;
+            border-top: 2px solid #9966CC;
+            background-color: #DDA0DD;
+            color: #4B0082;
             padding: 12px 0;
         }
         
@@ -377,29 +379,37 @@
         <div class="payment-info">
             <h4>Payment Information</h4>
             <div class="payment-details">
-                <div>
-                    <strong>Payment Methods:</strong><br>
-                    • M-Pesa: Pay via AutoWash App Limited<br>
-                    • Bank Transfer: See details below<br>
-                    • Credit/Debit Card: Online payment
-                </div>
-                <div>
-                    <strong>Bank Details:</strong><br>
-                    Bank: {{ bank_details.bank_name }}<br>
-                    Account: {{ bank_details.account_number }}<br>
-                    Name: {{ bank_details.account_name }}<br>
-                    Branch: {{ bank_details.branch }}<br>
-                    Swift Code: {{ bank_details.swift_code }}<br>
-                    Reference: {{ bank_details.reference }}
-                </div>
+                {% if tenant_settings.invoice_payment_details %}
+                    <div>{{ tenant_settings.invoice_payment_details|linebreaks }}</div>
+                {% else %}
+                    <div>
+                        <strong>Payment Methods:</strong><br>
+                        • M-Pesa: Pay via AutoWash App Limited<br>
+                        • Bank Transfer: See details below<br>
+                        • Credit/Debit Card: Online payment
+                    </div>
+                    <div>
+                        <strong>Bank Details:</strong><br>
+                        Bank: {{ bank_details.bank_name }}<br>
+                        Account: {{ bank_details.account_number }}<br>
+                        Name: {{ bank_details.account_name }}<br>
+                        Branch: {{ bank_details.branch }}<br>
+                        Swift Code: {{ bank_details.swift_code }}<br>
+                        Reference: {{ bank_details.reference }}
+                    </div>
+                {% endif %}
             </div>
         </div>
 
         <!-- Footer -->
         <div class="footer-notes">
             <p><strong>Terms & Conditions:</strong></p>
-            <p>Payment is due within 30 days of invoice date. Late payments may incur additional charges.</p>
-            <p>For support or questions about this invoice, please contact us at support@autowash.co.ke</p>
+            {% if tenant_settings.invoice_terms_and_conditions %}
+                <p>{{ tenant_settings.invoice_terms_and_conditions|linebreaks }}</p>
+            {% else %}
+                <p>Payment is due within 30 days of invoice date. Late payments may incur additional charges.</p>
+                <p>For support or questions about this invoice, please contact us at support@autowash.co.ke</p>
+            {% endif %}
             <p class="company-footer">
                 <strong>AutoWash App Limited</strong> | Smart Car Care Management Solutions<br>
                 This is a computer-generated invoice. Thank you for your business!

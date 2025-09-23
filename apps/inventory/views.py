@@ -842,22 +842,20 @@ def inventory_valuation_report(request):
         try:
             min_val = float(min_value)
             items_queryset = items_queryset.annotate(
-                total_value=F('current_stock') * F('selling_price')
+                total_value=F('current_stock') * F('unit_cost')
             ).filter(total_value__gte=min_val)
         except ValueError:
             pass
-    
+
     # Annotate with calculated fields
     items_queryset = items_queryset.annotate(
-        total_value=F('current_stock') * F('selling_price'),
+        total_value=F('current_stock') * F('unit_cost'),
         profit_margin=Case(
             When(unit_cost__gt=0, then=(F('selling_price') - F('unit_cost')) / F('unit_cost') * 100),
             default=Value(0),
             output_field=FloatField()
         )
-    )
-    
-    # Apply sorting
+    )    # Apply sorting
     if sort_by == 'value_desc':
         items_queryset = items_queryset.order_by('-total_value')
     elif sort_by == 'value_asc':
@@ -881,9 +879,9 @@ def inventory_valuation_report(request):
     page = request.GET.get('page')
     inventory_items = paginator.get_page(page)
     
-    # Calculate summary statistics
-    all_items = InventoryItem.objects.filter(is_active=True).annotate(
-        total_value=F('current_stock') * F('selling_price'),
+    # Calculate summary statistics from ALL items (not filtered)
+    all_items_for_totals = InventoryItem.objects.filter(is_active=True).annotate(
+        total_value=F('current_stock') * F('unit_cost'),
         profit_margin=Case(
             When(unit_cost__gt=0, then=(F('selling_price') - F('unit_cost')) / F('unit_cost') * 100),
             default=Value(0),
@@ -891,20 +889,20 @@ def inventory_valuation_report(request):
         )
     )
     
-    # Calculate totals
-    total_inventory_value = all_items.aggregate(
+    # Calculate totals from all items
+    total_inventory_value = all_items_for_totals.aggregate(
         total=Sum('total_value')
     )['total'] or 0
     
-    total_items = all_items.count()
+    total_items = all_items_for_totals.count()
     
-    average_margin = all_items.filter(
+    average_margin = all_items_for_totals.filter(
         unit_cost__gt=0, selling_price__gt=0
     ).aggregate(
         avg=Avg('profit_margin')
     )['avg'] or 0
     
-    potential_profit = all_items.aggregate(
+    potential_profit = all_items_for_totals.aggregate(
         total=Sum((F('selling_price') - F('unit_cost')) * F('current_stock'))
     )['total'] or 0
     
@@ -913,7 +911,7 @@ def inventory_valuation_report(request):
     
     # Chart data for categories
     category_chart_data = []
-    category_stats = all_items.values('category__name').annotate(
+    category_stats = all_items_for_totals.values('category__name').annotate(
         total_value=Sum('total_value'),
         item_count=Count('id')
     ).filter(total_value__gt=0).order_by('-total_value')
@@ -927,7 +925,7 @@ def inventory_valuation_report(request):
     
     # Chart data for margins
     margin_chart_data = []
-    margin_stats = all_items.filter(
+    margin_stats = all_items_for_totals.filter(
         unit_cost__gt=0, selling_price__gt=0
     ).values('name', 'profit_margin').order_by('-profit_margin')[:10]
     

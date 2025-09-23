@@ -27,10 +27,13 @@ class TenantSettingsForm(forms.ModelForm):
             'business_name', 'tagline', 'default_currency', 'timezone', 'tax_number',
             
             # Contact Settings
-            'contact_phone', 'contact_email', 'contact_address', 'website_url',
+            'contact_phone', 'contact_email', 'contact_address', 'po_box', 'website_url',
             
             # Social Media
             'facebook_url', 'instagram_url', 'twitter_url',
+            
+            # Invoice Customization
+            'invoice_terms_and_conditions', 'invoice_payment_details',
             
             # Branding
             'primary_color', 'secondary_color', 'logo_url', 'business_logo', 'receipt_footer',
@@ -64,6 +67,10 @@ class TenantSettingsForm(forms.ModelForm):
                 'rows': 3,
                 'placeholder': 'Your business address'
             }),
+            'po_box': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'P.O. BOX 1267-30100'
+            }),
             'website_url': forms.URLInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'https://yourwebsite.com'
@@ -79,6 +86,16 @@ class TenantSettingsForm(forms.ModelForm):
             'twitter_url': forms.URLInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'https://twitter.com/yourprofile'
+            }),
+            'invoice_terms_and_conditions': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Terms and conditions for invoices, receipts, and quotations'
+            }),
+            'invoice_payment_details': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Payment details and bank information'
             }),
             'primary_color': forms.TextInput(attrs={
                 'class': 'form-control',

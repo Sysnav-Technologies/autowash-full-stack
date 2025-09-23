@@ -2778,7 +2778,7 @@ function onInventoryQuantityChange(input, itemId) {
         input.value = 0;
     }
     
-    updateInventoryItemSelection(itemId, parseInt(input.value));
+    updateInventoryItemSelection(itemId, parseFloat(input.value));
 }
 
 // Customer Parts Functions
@@ -2958,9 +2958,6 @@ function savePrice(type, itemId) {
     
     // Update the item's price in memory
     updateItemPrice(type, itemId, newPrice);
-    
-    // Debug with alert to make sure this function is being called
-    alert(`Price updated for ${type} ${itemId} to ${newPrice}. Check console for detailed logs.`);
     
     // Debug logging
     console.log('Price updated for', type, itemId, 'to', newPrice);
