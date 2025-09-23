@@ -24,7 +24,7 @@ class TenantSettingsForm(forms.ModelForm):
         model = TenantSettings
         fields = [
             # Basic Business Settings
-            'business_name', 'tagline', 'default_currency', 'timezone',
+            'business_name', 'tagline', 'default_currency', 'timezone', 'tax_number',
             
             # Contact Settings
             'contact_phone', 'contact_email', 'contact_address', 'website_url',
@@ -47,6 +47,10 @@ class TenantSettingsForm(forms.ModelForm):
             }),
             'default_currency': forms.Select(attrs={'class': 'form-select'}),
             'timezone': forms.Select(attrs={'class': 'form-select'}),
+            'tax_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'KRA PIN / Tax Number'
+            }),
             'contact_phone': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': '+254712345678'

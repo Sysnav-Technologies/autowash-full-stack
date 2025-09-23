@@ -183,7 +183,7 @@ class BusinessSettingsForm(forms.ModelForm):
         model = Business
         fields = [
             'name', 'business_type', 'description', 'logo',
-            'phone', 'email',
+            'phone', 'email', 'registration_number', 'tax_number',
             'opening_time', 'closing_time', 'timezone'
         ]
         widgets = {
@@ -211,6 +211,14 @@ class BusinessSettingsForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'business@email.com'
+            }),
+            'registration_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Business registration number'
+            }),
+            'tax_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'KRA PIN number'
             }),
             'opening_time': forms.TimeInput(attrs={
                 'class': 'form-control',
