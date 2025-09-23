@@ -1,0 +1,352 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Invoices - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+{% include 'includes/business_styles.html' %}
+<style>
+    .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        text-align: center;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .filters-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 0.3rem 0.8rem;
+        border-radius: 15px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-draft { background: #fff3cd; color: #856404; }
+    .status-sent { background: #d1ecf1; color: #0c5460; }
+    .status-paid { background: #d4edda; color: #155724; }
+    .status-overdue { background: #f8d7da; color: #721c24; }
+    .status-cancelled { background: #e2e3e5; color: #383d41; }
+    
+    .invoice-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .invoice-actions .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">Invoice Management</h1>
+            <p class="text-muted">Manage and track all service invoices</p>
+        </div>
+        <div>
+            <a href="/business/{{ request.tenant.slug }}/services/orders/" class="btn btn-outline-primary">
+                <i class="fas fa-list"></i> Service Orders
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-cards">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total_invoices }}</div>
+            <div class="stat-label">Total Invoices</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">KES {{ stats.total_amount|floatformat:0 }}</div>
+            <div class="stat-label">Total Amount</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.paid_count }}</div>
+            <div class="stat-label">Paid Invoices</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.overdue_count }}</div>
+            <div class="stat-label">Overdue Invoices</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-card">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="search" class="form-label">Search</label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       value="{{ current_search }}" placeholder="Invoice number, customer name...">
+            </div>
+            <div class="col-md-2">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-control" id="status" name="status">
+                    <option value="">All Statuses</option>
+                    <option value="draft" {% if current_status == 'draft' %}selected{% endif %}>Draft</option>
+                    <option value="sent" {% if current_status == 'sent' %}selected{% endif %}>Sent</option>
+                    <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>Paid</option>
+                    <option value="overdue" {% if current_status == 'overdue' %}selected{% endif %}>Overdue</option>
+                    <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="type" class="form-label">Type</label>
+                <select class="form-control" id="type" name="type">
+                    <option value="">All Types</option>
+                    <option value="credit" {% if current_type == 'credit' %}selected{% endif %}>Credit</option>
+                    <option value="cash" {% if current_type == 'cash' %}selected{% endif %}>Cash</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="date_from" class="form-label">From Date</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="col-md-2">
+                <label for="date_to" class="form-label">To Date</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search"></i> Filter
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Invoices Table -->
+    <div class="card">
+        <div class="card-header">
+            <h6 class="m-0 font-weight-bold text-primary">Invoices</h6>
+        </div>
+        <div class="card-body">
+            {% if invoices %}
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Order #</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invoice in invoices %}
+                        <tr>
+                            <td>
+                                <strong>{{ invoice.invoice_number }}</strong>
+                            </td>
+                            <td>{{ invoice.issue_date|date:"d M Y" }}</td>
+                            <td>
+                                <div>{{ invoice.service_order.customer.display_name }}</div>
+                                {% if invoice.service_order.customer.phone %}
+                                <small class="text-muted">{{ invoice.service_order.customer.phone }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/business/{{ request.tenant.slug }}/services/orders/{{ invoice.service_order.pk }}/" 
+                                   class="text-decoration-none">
+                                    {{ invoice.service_order.order_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge badge-info">{{ invoice.get_invoice_type_display }}</span>
+                            </td>
+                            <td>
+                                <strong>KES {{ invoice.total_amount|floatformat:2 }}</strong>
+                            </td>
+                            <td>
+                                {{ invoice.due_date|date:"d M Y" }}
+                                {% if invoice.is_overdue %}
+                                <br><small class="text-danger">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    {{ invoice.days_until_due|add:"-1" }} days overdue
+                                </small>
+                                {% elif invoice.days_until_due <= 7 and invoice.status != 'paid' %}
+                                <br><small class="text-warning">
+                                    <i class="fas fa-clock"></i> 
+                                    Due in {{ invoice.days_until_due }} days
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ invoice.status }}">
+                                    {{ invoice.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="invoice-actions">
+                                    <a href="/business/{{ request.tenant.slug }}/services/invoices/{{ invoice.id }}/" 
+                                       class="btn btn-outline-primary btn-sm" title="View Invoice">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="/business/{{ request.tenant.slug }}/services/invoices/{{ invoice.id }}/print/" 
+                                       class="btn btn-outline-secondary btn-sm" title="Print Invoice" target="_blank">
+                                        <i class="fas fa-print"></i>
+                                    </a>
+                                    <a href="/business/{{ request.tenant.slug }}/services/invoices/{{ invoice.id }}/pdf/" 
+                                       class="btn btn-outline-success btn-sm" title="Download PDF">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </a>
+                                    {% if invoice.status == 'draft' %}
+                                    <form method="post" action="/business/{{ request.tenant.slug }}/services/invoices/{{ invoice.id }}/mark-sent/" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline-info btn-sm" title="Mark as Sent">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if invoice.status != 'paid' %}
+                                    <button type="button" class="btn btn-outline-success btn-sm mark-paid-btn" 
+                                            title="Mark as Paid" 
+                                            data-invoice-id="{{ invoice.id }}" 
+                                            data-invoice-number="{{ invoice.invoice_number }}">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Invoice pagination">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Previous</a>
+                        </li>
+                    {% endif %}
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_type %}&type={{ current_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Next</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                <h5>No Invoices Found</h5>
+                <p class="text-muted">No invoices match your current filters.</p>
+                <a href="/business/{{ request.tenant.slug }}/services/orders/" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create New Invoice
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Mark as Paid Modal -->
+<div class="modal fade" id="markPaidModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Mark Invoice as Paid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="markPaidForm" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="payment_date">Payment Date:</label>
+                        <input type="date" class="form-control" id="payment_date" name="payment_date" 
+                               value="{{ current_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <p>Are you sure you want to mark invoice <strong id="invoiceNumber"></strong> as paid?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Mark as Paid</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Mark as paid functionality
+    $('.mark-paid-btn').click(function() {
+        var invoiceId = $(this).data('invoice-id');
+        var invoiceNumber = $(this).data('invoice-number');
+        
+        $('#invoiceNumber').text(invoiceNumber);
+        $('#markPaidForm').attr('action', '/business/{{ request.tenant.slug }}/services/invoices/' + invoiceId + '/mark-paid/');
+        var myModal = new bootstrap.Modal(document.getElementById('markPaidModal'));
+        myModal.show();
+    });
+    
+    // Auto-submit filter form on select change
+    $('#status, #type').change(function() {
+        $(this).closest('form').submit();
+    });
+    
+    // Clear filters
+    function clearFilters() {
+        window.location.href = '/business/{{ request.tenant.slug }}/services/invoices/';
+    }
+    
+    // Initialize tooltips
+    $('[title]').tooltip();
+});
+</script>
+{% endblock %}

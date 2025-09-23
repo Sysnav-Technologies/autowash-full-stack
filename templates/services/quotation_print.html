@@ -1,0 +1,496 @@
+{% load static %}
+{% load currency_tags %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quotation - {{ quotation.quotation_number }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #fff;
+            color: #000;
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .quotation-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border: 2px solid #000;
+        }
+
+        /* Header styles matching invoice exactly */
+        .header-section {
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 20px;
+        }
+
+        .company-name-row {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .main-company-name {
+            font-size: 28px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 0;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .logo-section {
+            flex: 0 0 auto;
+            margin-right: 20px;
+        }
+
+        .company-logo {
+            max-height: 80px;
+            max-width: 150px;
+            object-fit: contain;
+        }
+
+        .business-info-center {
+            flex: 1;
+            text-align: center;
+        }
+
+        .company-details {
+            font-size: 11px;
+            line-height: 1.4;
+            margin-bottom: 2px;
+        }
+
+        .quotation-title {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .credit-quotation {
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: 2px solid #000;
+            padding: 10px 20px;
+            display: inline-block;
+        }
+
+        /* Info section styles matching invoice */
+        .info-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            border: 2px solid #000;
+            background-color: #f8f8f8;
+        }
+
+        .customer-info, .quotation-meta {
+            flex: 1;
+            padding: 15px;
+        }
+
+        .quotation-meta {
+            border-left: 2px solid #000;
+        }
+
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .info-table td {
+            padding: 3px 0;
+            vertical-align: top;
+        }
+
+        .info-table .label {
+            font-weight: bold;
+            width: 100px;
+            padding-right: 10px;
+        }
+
+        .info-table .value {
+            text-transform: uppercase;
+        }
+
+        /* Items section styles matching invoice */
+        .items-section {
+            margin-bottom: 20px;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+        }
+
+        .items-table th {
+            background-color: #f0f0f0;
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .items-table td {
+            border: 1px solid #000;
+            padding: 8px;
+            vertical-align: top;
+        }
+
+        .description-col {
+            width: 40%;
+            text-align: left;
+        }
+
+        .qty-col {
+            width: 10%;
+            text-align: center;
+        }
+
+        .rate-col {
+            width: 20%;
+            text-align: right;
+        }
+
+        .discount-col {
+            width: 10%;
+            text-align: center;
+        }
+
+        .amount-col {
+            width: 20%;
+            text-align: right;
+        }
+
+        /* Totals section styles matching invoice */
+        .totals-section {
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .totals-table {
+            border-collapse: collapse;
+            border: 2px solid #000;
+            min-width: 300px;
+        }
+
+        .totals-table td {
+            border: 1px solid #000;
+            padding: 8px 15px;
+        }
+
+        .totals-table .label {
+            font-weight: bold;
+            text-align: left;
+            background-color: #f8f8f8;
+        }
+
+        .totals-table .amount {
+            text-align: right;
+            min-width: 100px;
+        }
+
+        .total-amount-row {
+            font-weight: bold;
+            background-color: #f0f0f0;
+        }
+
+        /* Footer section styles matching invoice */
+        .footer-section {
+            border-top: 2px solid #000;
+            padding-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+        }
+
+        .signature-section {
+            flex: 1;
+            text-align: center;
+        }
+
+        .signature-line {
+            border-bottom: 1px solid #000;
+            margin: 40px 0 10px 0;
+            width: 200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .terms-section {
+            flex: 2;
+        }
+
+        .terms-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .payment-details {
+            flex: 1;
+            margin-top: 20px;
+        }
+
+        .payment-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            
+            .quotation-container {
+                border: none;
+                padding: 0;
+                margin: 0;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="quotation-container">
+        <!-- Header Section matching invoice design exactly -->
+        <div class="header-section">
+            <!-- Company Name - Top Row Alone -->
+            <div class="company-name-row">
+                <div class="main-company-name">{{ business.name|upper }}</div>
+            </div>
+            
+            <!-- Logo, Business Details, and Quotation Type - Second Row -->
+            <div class="header-content">
+                <!-- Logo section on left -->
+                <div class="logo-section">
+                    {% if tenant_settings.business_logo %}
+                    <img src="{{ tenant_settings.business_logo.url }}" alt="{{ business.name }} Logo" class="company-logo">
+                    {% elif tenant_settings.logo_url %}
+                    <img src="{{ tenant_settings.logo_url }}" alt="{{ business.name }} Logo" class="company-logo">
+                    {% endif %}
+                </div>
+
+                <!-- Business Information centered -->
+                <div class="business-info-center">
+                    <!-- Contact Information -->
+                    {% if tenant_settings.contact_address %}
+                    <div class="company-details">{{ tenant_settings.contact_address }}</div>
+                    {% elif business.city %}
+                    <div class="company-details">{{ business.city }}{% if business.state %}, {{ business.state }}{% endif %}</div>
+                    {% endif %}
+                    
+                    {% if tenant_settings.contact_phone %}
+                    <div class="company-details">TEL NO: {{ tenant_settings.contact_phone }}</div>
+                    {% elif business.phone %}
+                    <div class="company-details">TEL NO: {{ business.phone }}</div>
+                    {% endif %}
+                    
+                    {% if tenant_settings.contact_email %}
+                    <div class="company-details">E-MAIL: {{ tenant_settings.contact_email }}</div>
+                    {% elif business.email %}
+                    <div class="company-details">E-MAIL: {{ business.email }}</div>
+                    {% endif %}
+
+                    <!-- PIN Number -->
+                    {% if tenant_settings.tax_number %}
+                    <div class="company-details">PIN No: {{ tenant_settings.tax_number }}</div>
+                    {% endif %}
+                    
+                    <!-- VAT Number -->
+                    {% if tenant_settings.vat_number %}
+                    <div class="company-details">VAT No: {{ tenant_settings.vat_number }}</div>
+                    {% endif %}
+                </div>
+                
+                <!-- Quotation title on right -->
+                <div class="quotation-title">
+                    <div class="credit-quotation">QUOTATION</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer and Quotation Information -->
+        <div class="info-section">
+            <div class="customer-info">
+                <table class="info-table">
+                    <tr>
+                        <td class="label">TO:</td>
+                        <td class="value">
+                            {% if quotation.customer %}
+                                {{ quotation.customer.first_name|upper }} {{ quotation.customer.last_name|upper }}
+                            {% elif quotation.customer_name %}
+                                {{ quotation.customer_name|upper }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if quotation.vehicle %}
+                    <tr>
+                        <td class="label">REG NO:</td>
+                        <td class="value">{{ quotation.vehicle.registration_number|upper }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">VEH TYPE:</td>
+                        <td class="value">{{ quotation.vehicle.make|upper }} {{ quotation.vehicle.model|upper }}</td>
+                    </tr>
+                    {% elif quotation.vehicle_registration %}
+                    <tr>
+                        <td class="label">REG NO:</td>
+                        <td class="value">{{ quotation.vehicle_registration|upper }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">VEH TYPE:</td>
+                        <td class="value">{{ quotation.vehicle_make|upper }} {{ quotation.vehicle_model|upper }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+            
+            <div class="quotation-meta">
+                <table class="info-table">
+                    <tr>
+                        <td class="label">QUOTE NO</td>
+                        <td class="value">{{ quotation.quotation_number }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">DATE</td>
+                        <td class="value">{{ quotation.created_at|date:"d M Y" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">VALID UNTIL</td>
+                        <td class="value">{{ quotation.valid_until|date:"d M Y" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">STATUS</td>
+                        <td class="value">{{ quotation.get_status_display|upper }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="items-section">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th class="description-col">DESCRIPTION</th>
+                        <th class="qty-col">QTY</th>
+                        <th class="rate-col">RATE ({{ "1"|currency|slice:":2" }})</th>
+                        <th class="discount-col">DISCOUNT</th>
+                        <th class="amount-col">AMOUNT ({{ "1"|currency|slice:":2" }})</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in quotation.quotation_items.all %}
+                    <tr>
+                        <td class="description-col">
+                            {% if item.service %}
+                                {{ item.service.name|upper }}
+                            {% elif item.inventory_item %}
+                                {{ item.inventory_item.name|upper }}
+                            {% else %}
+                                {{ item.description|upper }}
+                            {% endif %}
+                            {% if item.description and item.description != item.service.name %}
+                            <br><small>{{ item.description|upper }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="qty-col">{{ item.quantity }}</td>
+                        <td class="rate-col">{{ item.unit_price|floatformat:2 }}</td>
+                        <td class="discount-col">-</td>
+                        <td class="amount-col">{{ item.total_price|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; font-style: italic;">No items found</td>
+                    </tr>
+                    {% endfor %}
+                    
+                    <!-- Empty rows to maintain table structure like the invoice -->
+                    {% for i in "12345" %}
+                    <tr>
+                        <td class="description-col">&nbsp;</td>
+                        <td class="qty-col">&nbsp;</td>
+                        <td class="rate-col">&nbsp;</td>
+                        <td class="discount-col">&nbsp;</td>
+                        <td class="amount-col">&nbsp;</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Totals -->
+        <div class="totals-section">
+            <table class="totals-table">
+                <tr>
+                    <td class="label">NET AMOUNT ({{ "1"|currency|slice:":2" }})</td>
+                    <td class="amount">{{ quotation.subtotal|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td class="label">VAT {{ quotation.tax_percentage|default:"16" }}%</td>
+                    <td class="amount">{{ quotation.tax_amount|floatformat:2 }}</td>
+                </tr>
+                <tr class="total-amount-row">
+                    <td class="label">TOTAL AMOUNT ({{ "1"|currency|slice:":2" }})</td>
+                    <td class="amount">{{ quotation.total_amount|floatformat:2 }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Footer Section -->
+        <div class="footer-section">
+            <div class="signature-section">
+                <p><strong>WITH THANKS</strong></p>
+                <br>
+                <div class="signature-line"></div>
+                <p>{% if quotation.created_by %}{{ quotation.created_by.get_full_name|upper }}{% else %}AUTHORIZED SIGNATURE{% endif %}</p>
+                <p><strong>SIGNATURE</strong></p>
+            </div>
+
+            <div class="terms-section">
+                <div class="terms-title">TERMS AND CONDITIONS:</div>
+                <p>This quotation is valid until {{ quotation.valid_until|date:"d M Y" }}.</p>
+                <p>Prices are subject to change without notice after expiry date.</p>
+                <p>All work will be performed according to our standard terms and conditions.</p>
+                {% if quotation.notes %}
+                <p><strong>Notes:</strong> {{ quotation.notes }}</p>
+                {% endif %}
+            </div>
+
+            {% if business.bank_details %}
+            <div class="payment-details">
+                <div class="payment-title">PAYMENT DETAILS:</div>
+                <p>{{ business.bank_details|linebreaks }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Auto-print when opened
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+</body>
+</html>

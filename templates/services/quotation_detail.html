@@ -1,0 +1,522 @@
+
+{% extends 'base/base.html' %}
+{% load static %}
+{% load currency_tags %}
+
+{% block title %}Quotation {{ quotation.quotation_number }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+{% include 'includes/business_styles.html' %}
+<style>
+    .quotation-container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .quotation-header {
+        background: var(--primary-color);
+        color: white;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .quotation-actions {
+        padding: 1rem;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        text-align: center;
+    }
+    
+    .quotation-content {
+        padding: 2rem;
+    }
+    
+    .company-section, .customer-section {
+        margin-bottom: 2rem;
+    }
+    
+    .quotation-meta {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    
+    .quotation-meta h6 {
+        color: var(--primary-color);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .meta-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .meta-item:last-child {
+        border-bottom: none;
+    }
+    
+    .meta-label {
+        font-weight: 500;
+        color: #6c757d;
+    }
+    
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 2rem 0;
+    }
+    
+    .items-table th {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+    }
+    
+    .items-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .items-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .quantity-cell, .price-cell, .total-cell {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+    }
+    
+    .total-section {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-top: 2rem;
+    }
+    
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .total-row:last-child {
+        border-bottom: 2px solid var(--primary-color);
+        font-weight: bold;
+        font-size: 1.2rem;
+        color: var(--primary-color);
+        margin-top: 0.5rem;
+        padding-top: 1rem;
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .status-pending { background-color: #fff3cd; color: #856404; }
+    .status-approved { background-color: #d4edda; color: #155724; }
+    .status-declined { background-color: #f8d7da; color: #721c24; }
+    .status-expired { background-color: #f8f9fa; color: #6c757d; }
+    
+    .notes-section {
+        background: #fff8e1;
+        border-left: 4px solid #ffc107;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .validity-warning {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        color: #856404;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+    
+    .validity-expired {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+    
+    @media print {
+        .quotation-actions {
+            display: none;
+        }
+        
+        .quotation-container {
+            box-shadow: none;
+            border: 1px solid #ddd;
+        }
+        
+        body {
+            background: white;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="quotation-container">
+        <!-- Header -->
+        <div class="quotation-header">
+            <h1>QUOTATION</h1>
+            <h2>{{ quotation.quotation_number }}</h2>
+            <div class="status-badge status-{{ quotation.status }}">
+                {{ quotation.get_status_display }}
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="quotation-actions">
+            <div class="btn-group" role="group">
+                <a href="/business/{{ request.tenant.slug }}/services/quotations/" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Quotations
+                </a>
+                <a href="/business/{{ request.tenant.slug }}/services/quotations/{{ quotation.pk }}/print/" class="btn btn-outline-primary" target="_blank">
+                    <i class="fas fa-print me-2"></i>Print
+                </a>
+                <a href="/business/{{ request.tenant.slug }}/services/quotations/{{ quotation.pk }}/pdf/" class="btn btn-outline-success">
+                    <i class="fas fa-file-pdf me-2"></i>Download PDF
+                </a>
+                {% if quotation.status == 'pending' %}
+                <button class="btn btn-success" onclick="approveQuotation('{{ quotation.pk }}')">
+                    <i class="fas fa-check me-2"></i>Approve
+                </button>
+                <button class="btn btn-danger" onclick="declineQuotation('{{ quotation.pk }}')">
+                    <i class="fas fa-times me-2"></i>Decline
+                </button>
+                {% endif %}
+                {% if quotation.status == 'approved' %}
+                <a href="/business/{{ request.tenant.slug }}/services/quotations/{{ quotation.pk }}/convert-to-order/" class="btn btn-primary">
+                    <i class="fas fa-shopping-cart me-2"></i>Convert to Order
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="quotation-content">
+            <!-- Company and Customer Info -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="company-section">
+                        <h5>From:</h5>
+                        <strong>{{ request.business.name }}</strong><br>
+                        {% if request.business.address %}{{ request.business.address }}<br>{% endif %}
+                        {% if request.business.phone %}Phone: {{ request.business.phone }}<br>{% endif %}
+                        {% if request.business.email %}Email: {{ request.business.email }}{% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="customer-section">
+                        <h5>To:</h5>
+                        <strong>
+                            {% if quotation.customer %}
+                                {{ quotation.customer.first_name }} {{ quotation.customer.last_name }}
+                            {% elif quotation.customer_name %}
+                                {{ quotation.customer_name }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </strong><br>
+                        {% if quotation.customer and quotation.customer.address %}{{ quotation.customer.address }}<br>{% endif %}
+                        {% if quotation.customer and quotation.customer.email %}Email: {{ quotation.customer.email }}{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quotation Meta Information -->
+            <div class="quotation-meta">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Quotation Details</h6>
+                        <div class="meta-item">
+                            <span class="meta-label">Quote Number:</span>
+                            <span>{{ quotation.quotation_number }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Date:</span>
+                            <span>{{ quotation.created_at|date:"F d, Y" }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Valid Until:</span>
+                            <span>{{ quotation.valid_until|date:"F d, Y" }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Status:</span>
+                            <span class="status-badge status-{{ quotation.status }}">{{ quotation.get_status_display }}</span>
+                        </div>
+                    </div>
+                    {% if quotation.vehicle %}
+                    <div class="col-md-6">
+                        <h6>Vehicle Information</h6>
+                        <div class="meta-item">
+                            <span class="meta-label">Vehicle:</span>
+                            <span>{{ quotation.vehicle.make }} {{ quotation.vehicle.model }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">License Plate:</span>
+                            <span>{{ quotation.vehicle.license_plate }}</span>
+                        </div>
+                        {% if quotation.vehicle.year %}
+                        <div class="meta-item">
+                            <span class="meta-label">Year:</span>
+                            <span>{{ quotation.vehicle.year }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Validity Check -->
+            {% if quotation.valid_until < today %}
+            <div class="validity-warning validity-expired">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>This quotation has expired.</strong> It was valid until {{ quotation.valid_until|date:"F d, Y" }}.
+            </div>
+            {% elif quotation.days_until_expiry <= 3 %}
+            <div class="validity-warning">
+                <i class="fas fa-clock me-2"></i>
+                <strong>This quotation expires soon.</strong> It will expire on {{ quotation.valid_until|date:"F d, Y" }} ({{ quotation.days_until_expiry }} day{{ quotation.days_until_expiry|pluralize }} remaining).
+            </div>
+            {% endif %}
+
+            <!-- Items Table -->
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th>Type</th>
+                        <th style="text-align: right;">Quantity</th>
+                        <th style="text-align: right;">Unit Price</th>
+                        <th style="text-align: right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in quotation.quotation_items.all %}
+                    <tr>
+                        <td>
+                            <strong>
+                                {% if item.service %}
+                                    {{ item.service.name }}
+                                {% elif item.inventory_item %}
+                                    {{ item.inventory_item.name }}
+                                {% else %}
+                                    Custom Item
+                                {% endif %}
+                            </strong>
+                            {% if item.description %}
+                            <br><small class="text-muted">{{ item.description }}</small>
+                            {% elif item.service and item.service.description %}
+                            <br><small class="text-muted">{{ item.service.description }}</small>
+                            {% elif item.inventory_item and item.inventory_item.description %}
+                            <br><small class="text-muted">{{ item.inventory_item.description }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ item.item_type|default:'secondary' }}">
+                                {{ item.get_item_type_display|default:'Item' }}
+                            </span>
+                        </td>
+                        <td class="quantity-cell">{{ item.quantity }}</td>
+                        <td class="price-cell">{{ item.unit_price|currency }}</td>
+                        <td class="total-cell">{{ item.total_price|currency }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">No items in this quotation</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Total Section -->
+            <div class="total-section">
+                <div class="total-row">
+                    <span>Net Amount:</span>
+                    <span>{{ quotation.subtotal|currency }}</span>
+                </div>
+                <div class="total-row">
+                    <span>VAT {{ quotation.tax_percentage|default:"16" }}%:</span>
+                    <span>{{ quotation.tax_amount|currency }}</span>
+                </div>
+                <div class="total-row">
+                    <span>Total Amount:</span>
+                    <span>{{ quotation.total_amount|currency }}</span>
+                </div>
+            </div>
+
+            <!-- Notes Section -->
+            {% if quotation.notes %}
+            <div class="notes-section">
+                <h6><i class="fas fa-sticky-note me-2"></i>Notes</h6>
+                <p class="mb-0">{{ quotation.notes|linebreaks }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Terms and Conditions -->
+            <div class="mt-4">
+                <h6>Terms and Conditions</h6>
+                <ul class="small text-muted">
+                    <li>This quotation is valid until {{ quotation.valid_until|date:"F d, Y" }}</li>
+                    <li>Prices are subject to change without notice after expiry date</li>
+                    <li>All work will be performed according to our standard terms and conditions</li>
+                    <li>Payment is due upon completion of services</li>
+                    <li>Additional charges may apply for extra services not included in this quotation</li>
+                </ul>
+            </div>
+
+            <!-- Approval/Decline History -->
+            {% if quotation.approved_at or quotation.declined_at %}
+            <div class="mt-4">
+                <h6>Status History</h6>
+                {% if quotation.approved_at %}
+                <div class="text-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Approved on {{ quotation.approved_at|date:"F d, Y g:i A" }}
+                    {% if quotation.approved_by %}by {{ quotation.approved_by.get_full_name }}{% endif %}
+                </div>
+                {% endif %}
+                {% if quotation.declined_at %}
+                <div class="text-danger">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Declined on {{ quotation.declined_at|date:"F d, Y g:i A" }}
+                    {% if quotation.declined_by %}by {{ quotation.declined_by.get_full_name }}{% endif %}
+                    {% if quotation.decline_reason %}
+                    <br><small>Reason: {{ quotation.decline_reason }}</small>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Approval Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Approve Quotation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to approve this quotation?</p>
+                <p class="text-muted">This action will mark the quotation as approved and allow it to be converted to an order.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmApprove">Approve Quotation</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Decline Modal -->
+<div class="modal fade" id="declineModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Decline Quotation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to decline this quotation?</p>
+                <div class="mb-3">
+                    <label for="declineReason" class="form-label">Reason for declining (optional)</label>
+                    <textarea class="form-control" id="declineReason" rows="3" placeholder="Enter reason for declining..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDecline">Decline Quotation</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentQuotationId = null;
+
+    function approveQuotation(quotationId) {
+        currentQuotationId = quotationId;
+        new bootstrap.Modal(document.getElementById('approveModal')).show();
+    }
+
+    function declineQuotation(quotationId) {
+        currentQuotationId = quotationId;
+        new bootstrap.Modal(document.getElementById('declineModal')).show();
+    }
+
+    document.getElementById('confirmApprove').addEventListener('click', function() {
+        if (currentQuotationId) {
+            fetch(`/business/{{ request.tenant.slug }}/services/quotations/${currentQuotationId}/approve/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error approving quotation: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error approving quotation');
+            });
+        }
+    });
+
+    document.getElementById('confirmDecline').addEventListener('click', function() {
+        if (currentQuotationId) {
+            const reason = document.getElementById('declineReason').value;
+            fetch(`/business/{{ request.tenant.slug }}/services/quotations/${currentQuotationId}/decline/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ reason: reason }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error declining quotation: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error declining quotation');
+            });
+        }
+    });
+</script>
+{% endblock %}

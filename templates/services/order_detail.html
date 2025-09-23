@@ -1028,11 +1028,17 @@
                                 <i class="fas fa-check-circle"></i>
                                 Items ready for pickup
                             </div>
-                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-outline-primary">
-                                <i class="fas fa-receipt"></i>
-                                Print Receipt
-                            </a>
                         {% endif %}
+                        
+                        <!-- Receipt and Invoice always available for inventory orders -->
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-outline-primary">
+                            <i class="fas fa-receipt"></i>
+                            Print Receipt
+                        </a>
+                        <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/generate-invoice/" class="btn btn-outline-success">
+                            <i class="fas fa-file-invoice"></i>
+                            Generate Invoice
+                        </a>
                     {% else %}
                         <!-- Service order actions -->
                         {% if order.status == 'pending' or order.status == 'confirmed' %}
@@ -1076,10 +1082,19 @@
                             </a>
                         {% endif %}
                         
+                        <!-- Receipt and Invoice always available for completed orders -->
                         {% if order.status == 'completed' %}
                             <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/receipt/" class="btn btn-outline-primary">
                                 <i class="fas fa-receipt"></i>
                                 Print Receipt
+                            </a>
+                        {% endif %}
+                        
+                        <!-- Invoice can be generated for any order with items -->
+                        {% if order.order_items.exists %}
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/generate-invoice/" class="btn btn-outline-success">
+                                <i class="fas fa-file-invoice"></i>
+                                Generate Invoice
                             </a>
                         {% endif %}
                     {% endif %}

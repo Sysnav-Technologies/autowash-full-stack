@@ -1,0 +1,816 @@
+<!-- templates/services/quick_quotation.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+{% load currency_tags %}
+
+{% block title %}Quick Quotation - {{ block.super }}{% endblock %}
+
+{% block extra_head %}
+<meta name="csrf-token" content="{{ csrf_token }}">
+{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+    --primary-500: #3b82f6;
+    --primary-50: #eff6ff;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --success-500: #10b981;
+    --success-50: #ecfdf5;
+    --success-600: #059669;
+    --warning-500: #f59e0b;
+    --warning-50: #fffbeb;
+    --info-500: #06b6d4;
+    --info-50: #f0f9ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --transition-fast: 0.15s ease-in-out;
+}
+
+.page-header {
+    background: linear-gradient(135deg, var(--primary-50), var(--success-50));
+    border: 1px solid var(--primary-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.page-subtitle {
+    color: var(--gray-600);
+    margin: 0.25rem 0 0 0;
+}
+
+.card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-200);
+}
+
+.card-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+.form-label {
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
+}
+
+.btn {
+    padding: 0.625rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: var(--primary-500);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-600);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+    background: var(--gray-500);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: var(--gray-600);
+}
+
+.btn-success {
+    background: var(--success-500);
+    color: white;
+}
+
+.btn-success:hover {
+    background: var(--success-600);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--gray-300);
+    color: var(--gray-700);
+}
+
+.btn-outline:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+}
+
+.items-section {
+    margin-top: 2rem;
+}
+
+.item-row {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: all var(--transition-fast);
+}
+
+.item-row:hover {
+    background: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.remove-item {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.remove-item:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+.total-section {
+    background: linear-gradient(135deg, var(--primary-50), var(--success-50));
+    border: 2px solid var(--primary-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-top: 2rem;
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.total-row:last-child {
+    border-bottom: none;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary-700);
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
+
+.alert-info {
+    background: var(--info-50);
+    border: 1px solid var(--info-200);
+    color: var(--info-700);
+}
+
+.text-muted {
+    color: var(--gray-500);
+}
+
+.d-none {
+    display: none !important;
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: -0.5rem;
+}
+
+.col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+    padding: 0.5rem;
+}
+
+.col-md-4 {
+    flex: 0 0 33.333333%;
+    max-width: 33.333333%;
+    padding: 0.5rem;
+}
+
+.col-md-3 {
+    flex: 0 0 25%;
+    max-width: 25%;
+    padding: 0.5rem;
+}
+
+.col-md-2 {
+    flex: 0 0 16.666667%;
+    max-width: 16.666667%;
+    padding: 0.5rem;
+}
+
+.col-12 {
+    flex: 0 0 100%;
+    max-width: 100%;
+    padding: 0.5rem;
+}
+
+.mb-3 {
+    margin-bottom: 1rem;
+}
+
+.me-2 {
+    margin-right: 0.5rem;
+}
+
+.text-end {
+    text-align: right;
+}
+
+@media (max-width: 768px) {
+    .col-md-6, .col-md-4, .col-md-3, .col-md-2 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    
+    .page-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="fas fa-file-invoice-dollar"></i>
+                Quick Quotation
+            </h1>
+            <p class="page-subtitle">Create professional quotations quickly and efficiently</p>
+        </div>
+        <div>
+            <a href="/business/{{ request.tenant.slug }}/services/quotations/" class="btn btn-outline">
+                <i class="fas fa-list me-2"></i>View All Quotations
+            </a>
+        </div>
+    </div>
+
+    <form method="post" id="quotationForm">
+        {% csrf_token %}
+        
+        <!-- Customer Information -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-user"></i>
+                    Customer Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="customer" class="form-label">Customer *</label>
+                            <select name="customer" id="customer" class="form-select" required>
+                                <option value="">Select Customer</option>
+                                {% for customer in customers %}
+                                <option value="{{ customer.id }}">{{ customer.full_name }} - {{ customer.phone }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="vehicle" class="form-label">Vehicle</label>
+                            <select name="vehicle" id="vehicle" class="form-select">
+                                <option value="">Select Vehicle</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="valid_until" class="form-label">Valid Until *</label>
+                            <input type="date" name="valid_until" id="valid_until" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea name="notes" id="notes" class="form-control" rows="3" placeholder="Additional notes or special requirements..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services Section -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-cogs"></i>
+                    Services
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="service-select" class="form-label">Add Service</label>
+                            <select id="service-select" class="form-select">
+                                <option value="">Select a service to add</option>
+                                {% for service in services %}
+                                <option value="{{ service.id }}" 
+                                        data-name="{{ service.name }}" 
+                                        data-price="{{ service.base_price }}"
+                                        data-duration="{{ service.estimated_duration }}">
+                                    {{ service.name }} - {{ service.base_price|currency }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="package-select" class="form-label">Add Package</label>
+                            <select id="package-select" class="form-select">
+                                <option value="">Select a package to add</option>
+                                {% for package in packages %}
+                                <option value="{{ package.id }}" 
+                                        data-name="{{ package.name }}" 
+                                        data-price="{{ package.total_price }}">
+                                    {{ package.name }} - {{ package.total_price|currency }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="services-container">
+                    <!-- Services will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Items Section -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-box"></i>
+                    Inventory Items
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="inventory-select" class="form-label">Add Inventory Item</label>
+                            <select id="inventory-select" class="form-select">
+                                <option value="">Select an item to add</option>
+                                {% for item in inventory_items %}
+                                <option value="{{ item.id }}" 
+                                        data-name="{{ item.name }}" 
+                                        data-price="{{ item.selling_price }}"
+                                        data-stock="{{ item.current_stock }}">
+                                    {{ item.name }} - {{ item.selling_price|currency }} (Stock: {{ item.current_stock }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="inventory-container">
+                    <!-- Inventory items will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Section -->
+        <div class="total-section">
+            <div class="total-row">
+                <span>Subtotal:</span>
+                <span id="subtotal">KSh 0.00</span>
+            </div>
+            <div class="total-row">
+                <span>Tax ({{ tax_rate }}%):</span>
+                <span id="tax-amount">KSh 0.00</span>
+            </div>
+            <div class="total-row">
+                <span>Total:</span>
+                <span id="total-amount">KSh 0.00</span>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        
+        <!-- Hidden fields for custom prices -->
+        <input type="hidden" name="services_custom_prices" id="services_custom_prices">
+        <input type="hidden" name="inventory_custom_prices" id="inventory_custom_prices">
+        
+        <div class="text-end" style="margin-top: 2rem;">
+            <button type="button" class="btn btn-secondary me-2" onclick="window.history.back()">
+                <i class="fas fa-times me-2"></i>Cancel
+            </button>
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-file-invoice-dollar me-2"></i>Create Quotation
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Hidden template for service rows -->
+<template id="service-row-template">
+    <div class="item-row service-item fade-in">
+        <div class="row">
+            <div class="col-md-4">
+                <label class="form-label">Service</label>
+                <input type="text" class="form-control service-name" readonly>
+                <input type="hidden" class="service-id" name="selected_services">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Quantity</label>
+                <input type="number" class="form-control service-quantity" name="service_quantities[]" value="1" min="0.1" step="0.1">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Unit Price</label>
+                <input type="number" class="form-control service-price" name="service_prices[]" step="0.01" min="0">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Total</label>
+                <input type="text" class="form-control service-total" readonly>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Action</label>
+                <div>
+                    <button type="button" class="remove-item" onclick="removeServiceItem(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Hidden template for inventory rows -->
+<template id="inventory-row-template">
+    <div class="item-row inventory-item fade-in">
+        <div class="row">
+            <div class="col-md-4">
+                <label class="form-label">Item</label>
+                <input type="text" class="form-control inventory-name" readonly>
+                <input type="hidden" class="inventory-id" name="selected_inventory_items">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Quantity</label>
+                <input type="number" class="form-control inventory-quantity" name="inventory_quantities[]" value="1" min="0.1" step="0.1">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Unit Price</label>
+                <input type="number" class="form-control inventory-price" name="inventory_prices[]" step="0.01" min="0">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Total</label>
+                <input type="text" class="form-control inventory-total" readonly>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Action</label>
+                <div>
+                    <button type="button" class="remove-item" onclick="removeInventoryItem(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Set default valid until date (30 days from today)
+document.addEventListener('DOMContentLoaded', function() {
+    const validUntilInput = document.getElementById('valid_until');
+    const today = new Date();
+    const defaultDate = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days from now
+    validUntilInput.value = defaultDate.toISOString().split('T')[0];
+});
+
+// Tax rate from server
+const TAX_RATE = {{ tax_rate|default:0 }};
+
+// Customer and vehicle handling
+document.getElementById('customer').addEventListener('change', function() {
+    const customerId = this.value;
+    const vehicleSelect = document.getElementById('vehicle');
+    
+    console.log('Customer selected:', customerId); // Debug
+    
+    // Clear vehicle options
+    vehicleSelect.innerHTML = '<option value="">Select Vehicle</option>';
+    
+    if (customerId) {
+        const url = `/business/{{ request.tenant.slug }}/services/ajax/vehicle/customer/?customer_id=${customerId}`;
+        console.log('Fetching vehicles from:', url); // Debug
+        
+        // Fetch customer vehicles via AJAX
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => {
+            console.log('Response status:', response.status); // Debug
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data); // Debug
+            if (data.success && data.vehicles) {
+                data.vehicles.forEach(vehicle => {
+                    const option = document.createElement('option');
+                    option.value = vehicle.id;
+                    option.textContent = `${vehicle.make} ${vehicle.model} (${vehicle.license_plate}) - ${vehicle.customer_name} - ${vehicle.customer_phone}`;
+                    vehicleSelect.appendChild(option);
+                });
+                console.log('Added', data.vehicles.length, 'vehicles to dropdown'); // Debug
+            } else {
+                console.log('No vehicles found or request failed:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching vehicles:', error);
+        });
+    }
+});
+
+// Service selection
+document.getElementById('service-select').addEventListener('change', function() {
+    if (this.value) {
+        addServiceItem(this.value, this.selectedOptions[0]);
+        this.value = '';
+    }
+});
+
+// Package selection  
+document.getElementById('package-select').addEventListener('change', function() {
+    if (this.value) {
+        addPackageItem(this.value, this.selectedOptions[0]);
+        this.value = '';
+    }
+});
+
+// Inventory selection
+document.getElementById('inventory-select').addEventListener('change', function() {
+    if (this.value) {
+        addInventoryItem(this.value, this.selectedOptions[0]);
+        this.value = '';
+    }
+});
+
+function addServiceItem(serviceId, option) {
+    const template = document.getElementById('service-row-template');
+    const clone = template.content.cloneNode(true);
+    
+    const serviceNameInput = clone.querySelector('.service-name');
+    const serviceIdInput = clone.querySelector('.service-id');
+    const servicePriceInput = clone.querySelector('.service-price');
+    const serviceQuantityInput = clone.querySelector('.service-quantity');
+    
+    serviceNameInput.value = option.dataset.name;
+    serviceIdInput.value = serviceId;
+    servicePriceInput.value = parseFloat(option.dataset.price).toFixed(2);
+    
+    // Add event listeners for calculation
+    const quantityInput = clone.querySelector('.service-quantity');
+    const priceInput = clone.querySelector('.service-price');
+    
+    [quantityInput, priceInput].forEach(input => {
+        input.addEventListener('input', calculateServiceTotal);
+        input.addEventListener('input', calculateGrandTotal);
+    });
+    
+    document.getElementById('services-container').appendChild(clone);
+    calculateServiceTotal({ target: quantityInput });
+    calculateGrandTotal();
+}
+
+function addPackageItem(packageId, option) {
+    // Treat packages as services for quotation purposes
+    addServiceItem(packageId, option);
+}
+
+function addInventoryItem(inventoryId, option) {
+    const template = document.getElementById('inventory-row-template');
+    const clone = template.content.cloneNode(true);
+    
+    const inventoryNameInput = clone.querySelector('.inventory-name');
+    const inventoryIdInput = clone.querySelector('.inventory-id');
+    const inventoryPriceInput = clone.querySelector('.inventory-price');
+    
+    inventoryNameInput.value = option.dataset.name;
+    inventoryIdInput.value = inventoryId;
+    inventoryPriceInput.value = parseFloat(option.dataset.price).toFixed(2);
+    
+    // Add event listeners for calculation
+    const quantityInput = clone.querySelector('.inventory-quantity');
+    const priceInput = clone.querySelector('.inventory-price');
+    
+    [quantityInput, priceInput].forEach(input => {
+        input.addEventListener('input', calculateInventoryTotal);
+        input.addEventListener('input', calculateGrandTotal);
+    });
+    
+    document.getElementById('inventory-container').appendChild(clone);
+    calculateInventoryTotal({ target: quantityInput });
+    calculateGrandTotal();
+}
+
+function removeServiceItem(button) {
+    button.closest('.service-item').remove();
+    calculateGrandTotal();
+}
+
+function removeInventoryItem(button) {
+    button.closest('.inventory-item').remove();
+    calculateGrandTotal();
+}
+
+function calculateServiceTotal(event) {
+    const row = event.target.closest('.service-item');
+    const quantity = parseFloat(row.querySelector('.service-quantity').value) || 0;
+    const price = parseFloat(row.querySelector('.service-price').value) || 0;
+    const total = quantity * price;
+    
+    row.querySelector('.service-total').value = 'KSh ' + total.toFixed(2);
+}
+
+function calculateInventoryTotal(event) {
+    const row = event.target.closest('.inventory-item');
+    const quantity = parseFloat(row.querySelector('.inventory-quantity').value) || 0;
+    const price = parseFloat(row.querySelector('.inventory-price').value) || 0;
+    const total = quantity * price;
+    
+    row.querySelector('.inventory-total').value = 'KSh ' + total.toFixed(2);
+}
+
+function calculateGrandTotal() {
+    let subtotal = 0;
+    
+    // Calculate service totals
+    document.querySelectorAll('.service-item').forEach(row => {
+        const quantity = parseFloat(row.querySelector('.service-quantity').value) || 0;
+        const price = parseFloat(row.querySelector('.service-price').value) || 0;
+        subtotal += quantity * price;
+    });
+    
+    // Calculate inventory totals
+    document.querySelectorAll('.inventory-item').forEach(row => {
+        const quantity = parseFloat(row.querySelector('.inventory-quantity').value) || 0;
+        const price = parseFloat(row.querySelector('.inventory-price').value) || 0;
+        subtotal += quantity * price;
+    });
+    
+    const taxAmount = subtotal * (TAX_RATE / 100);
+    const total = subtotal + taxAmount;
+    
+    document.getElementById('subtotal').textContent = 'KSh ' + subtotal.toFixed(2);
+    document.getElementById('tax-amount').textContent = 'KSh ' + taxAmount.toFixed(2);
+    document.getElementById('total-amount').textContent = 'KSh ' + total.toFixed(2);
+}
+
+// Form submission
+document.getElementById('quotationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Validate that we have at least one service or inventory item
+    const hasServices = document.querySelectorAll('.service-item').length > 0;
+    const hasInventory = document.querySelectorAll('.inventory-item').length > 0;
+    
+    if (!hasServices && !hasInventory) {
+        alert('Please add at least one service or inventory item to the quotation.');
+        return;
+    }
+    
+    // Populate hidden fields for custom prices
+    const servicesPrices = {};
+    const inventoryPrices = {};
+    
+    // Collect service prices
+    document.querySelectorAll('.service-item').forEach(item => {
+        const serviceId = item.querySelector('.service-id').value;
+        const servicePrice = item.querySelector('.service-price').value;
+        if (serviceId && servicePrice) {
+            servicesPrices[serviceId] = servicePrice;
+        }
+    });
+    
+    // Collect inventory prices
+    document.querySelectorAll('.inventory-item').forEach(item => {
+        const inventoryId = item.querySelector('.inventory-id').value;
+        const inventoryPrice = item.querySelector('.inventory-price').value;
+        if (inventoryId && inventoryPrice) {
+            inventoryPrices[inventoryId] = inventoryPrice;
+        }
+    });
+    
+    // Set hidden field values
+    document.getElementById('services_custom_prices').value = JSON.stringify(servicesPrices);
+    document.getElementById('inventory_custom_prices').value = JSON.stringify(inventoryPrices);
+    
+    // Submit the form
+    this.submit();
+});
+</script>
+{% endblock %}
