@@ -337,12 +337,25 @@ class TenantSettings(models.Model):
     contact_phone = models.CharField(max_length=20, blank=True)
     contact_email = models.EmailField(blank=True)
     contact_address = models.TextField(blank=True)
+    po_box = models.CharField(max_length=50, blank=True, help_text="Business PO Box number")
     website_url = models.URLField(blank=True)
     
     # Social Media
     facebook_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
     twitter_url = models.URLField(blank=True)
+    
+    # Invoice Customization
+    invoice_terms_and_conditions = models.TextField(
+        blank=True, 
+        help_text="Terms and conditions to display on invoices, receipts, and quotations",
+        default="All accounts are payable strictly 30 days from the date of invoice or on demand. Interest of 3% per Month will be surcharged on all overdue debts."
+    )
+    invoice_payment_details = models.TextField(
+        blank=True,
+        help_text="Payment details and instructions to display on invoices",
+        default="BANK DETAILS: EQUITY BANK KENYA LIMITED, BRANCH: ELDORET SUPREME BRANCH ACC NUMBER: 1640279535252 SWIFT CODE: EQBLKENA (BRANCH CODE 164)"
+    )
     
     # Timestamps
     created_at = models.DateTimeField(default=django_timezone.now)

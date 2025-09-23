@@ -137,33 +137,104 @@
         }
 
         .items-table th {
-            background-color: #f0f0f0;
-            border: 1px solid #000;
+            background-color: #9966CC;
+            color: white;
+            border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
             padding: 8px;
             text-align: center;
-            font-weight: bold;
+            font-weight: 900;
             text-transform: uppercase;
         }
 
-        .items-table td {
-            border: 1px solid #000;
-            padding: 8px;
+        .items-table {
+            border: 2px solid #000;
+            border-collapse: collapse;
+        }
+
+        .item-col {
+            width: 8%;
+            text-align: center;
             vertical-align: top;
+            padding: 8px 4px;
         }
 
         .description-col {
-            width: 40%;
+            width: 44%;
             text-align: left;
+            vertical-align: top;
+            padding: 8px 4px;
         }
 
         .qty-col {
-            width: 10%;
-            text-align: center;
+            width: 12%;
+            text-align: right;
+            vertical-align: top;
+            padding: 8px 4px;
         }
 
         .rate-col {
-            width: 20%;
+            width: 12%;
             text-align: right;
+            vertical-align: top;
+            padding: 8px 4px;
+        }
+
+        .discount-col {
+            width: 12%;
+            text-align: right;
+            vertical-align: top;
+            padding: 8px 4px;
+        }
+
+        .amount-col {
+            width: 12%;
+            text-align: right;
+            vertical-align: top;
+            padding: 8px 4px;
+        }
+        
+        /* Table headers */
+        .items-table th {
+            padding: 8px 4px;
+            font-weight: bold;
+            vertical-align: middle;
+            border: 1px solid #000;
+            background-color: #9966CC;
+            color: white;
+        }
+        
+        /* Specific header alignments to match content */
+        .items-table th.item-col {
+            text-align: center;
+        }
+        
+        .items-table th.description-col {
+            text-align: left;
+        }
+        
+        .items-table th.qty-col,
+        .items-table th.rate-col,
+        .items-table th.discount-col,
+        .items-table th.amount-col {
+            text-align: right;
+        }
+        
+        /* Table body cells */
+        .items-table td {
+            border-left: 1px solid #000;
+            border-right: 1px solid #000;
+            padding: 8px 4px;
+            vertical-align: top;
+        }
+        
+        /* Keep borders for all columns */
+        .items-table td:first-child {
+            border-left: 1px solid #000;
+        }
+        
+        .items-table td:last-child {
+            border-right: 1px solid #000;
         }
 
         .discount-col {
@@ -195,9 +266,10 @@
         }
 
         .totals-table .label {
-            font-weight: bold;
+            font-weight: 900;
             text-align: left;
-            background-color: #f8f8f8;
+            background-color: #DDA0DD;
+            color: #4B0082;
         }
 
         .totals-table .amount {
@@ -206,8 +278,9 @@
         }
 
         .total-amount-row {
-            font-weight: bold;
-            background-color: #f0f0f0;
+            font-weight: 900;
+            background-color: #9966CC;
+            color: white;
         }
 
         /* Footer section styles matching invoice */
@@ -352,6 +425,10 @@
                         <td class="label">VEH TYPE:</td>
                         <td class="value">{{ quotation.vehicle.make|upper }} {{ quotation.vehicle.model|upper }}</td>
                     </tr>
+                    <tr>
+                        <td class="label">MILEAGE:</td>
+                        <td class="value">{% if quotation.vehicle.mileage %}{{ quotation.vehicle.mileage }} KM{% else %}-{% endif %}</td>
+                    </tr>
                     {% elif quotation.vehicle_registration %}
                     <tr>
                         <td class="label">REG NO:</td>
@@ -360,6 +437,10 @@
                     <tr>
                         <td class="label">VEH TYPE:</td>
                         <td class="value">{{ quotation.vehicle_make|upper }} {{ quotation.vehicle_model|upper }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">MILEAGE:</td>
+                        <td class="value">-</td>
                     </tr>
                     {% endif %}
                 </table>
@@ -392,6 +473,7 @@
             <table class="items-table">
                 <thead>
                     <tr>
+                        <th class="item-col">ITEM</th>
                         <th class="description-col">DESCRIPTION</th>
                         <th class="qty-col">QTY</th>
                         <th class="rate-col">RATE ({{ "1"|currency|slice:":2" }})</th>
@@ -402,6 +484,7 @@
                 <tbody>
                     {% for item in quotation.quotation_items.all %}
                     <tr>
+                        <td class="item-col">{{ forloop.counter }}</td>
                         <td class="description-col">
                             {% if item.service %}
                                 {{ item.service.name|upper }}
@@ -414,20 +497,21 @@
                             <br><small>{{ item.description|upper }}</small>
                             {% endif %}
                         </td>
-                        <td class="qty-col">{{ item.quantity }}</td>
+                        <td class="qty-col">{{ item.quantity|floatformat:-2 }}</td>
                         <td class="rate-col">{{ item.unit_price|floatformat:2 }}</td>
                         <td class="discount-col">-</td>
                         <td class="amount-col">{{ item.total_price|floatformat:2 }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" style="text-align: center; font-style: italic;">No items found</td>
+                        <td colspan="6" style="text-align: center; font-style: italic;">No items found</td>
                     </tr>
                     {% endfor %}
                     
                     <!-- Empty rows to maintain table structure like the invoice -->
                     {% for i in "12345" %}
                     <tr>
+                        <td class="item-col">&nbsp;</td>
                         <td class="description-col">&nbsp;</td>
                         <td class="qty-col">&nbsp;</td>
                         <td class="rate-col">&nbsp;</td>
@@ -469,20 +553,26 @@
 
             <div class="terms-section">
                 <div class="terms-title">TERMS AND CONDITIONS:</div>
-                <p>This quotation is valid until {{ quotation.valid_until|date:"d M Y" }}.</p>
-                <p>Prices are subject to change without notice after expiry date.</p>
-                <p>All work will be performed according to our standard terms and conditions.</p>
+                {% if tenant_settings.invoice_terms_and_conditions %}
+                    <p>{{ tenant_settings.invoice_terms_and_conditions|linebreaks }}</p>
+                {% else %}
+                    <p>This quotation is valid until {{ quotation.valid_until|date:"d M Y" }}.</p>
+                    <p>Prices are subject to change without notice after expiry date.</p>
+                    <p>All work will be performed according to our standard terms and conditions.</p>
+                {% endif %}
                 {% if quotation.notes %}
                 <p><strong>Notes:</strong> {{ quotation.notes }}</p>
                 {% endif %}
             </div>
 
-            {% if business.bank_details %}
             <div class="payment-details">
                 <div class="payment-title">PAYMENT DETAILS:</div>
-                <p>{{ business.bank_details|linebreaks }}</p>
+                {% if tenant_settings.invoice_payment_details %}
+                    <p>{{ tenant_settings.invoice_payment_details|linebreaks }}</p>
+                {% elif business.bank_details %}
+                    <p>{{ business.bank_details|linebreaks }}</p>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </div>
 
