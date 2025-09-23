@@ -91,4 +91,26 @@ urlpatterns = [
     # Export & Import
     path('export/', views.service_export_view, name='export'),
     path('import/', views.service_import_view, name='import'),
+    
+    # Invoice Management
+    path('orders/<uuid:order_id>/generate-invoice/', views.generate_invoice, name='generate_invoice'),
+    path('invoices/', views.invoice_list, name='invoice_list'),
+    path('invoices/<uuid:invoice_id>/', views.invoice_preview, name='invoice_preview'),
+    path('invoices/<uuid:invoice_id>/print/', views.invoice_print, name='invoice_print'),
+    path('invoices/<uuid:invoice_id>/pdf/', views.invoice_pdf, name='invoice_pdf'),
+    path('invoices/<uuid:invoice_id>/mark-sent/', views.invoice_mark_sent, name='invoice_mark_sent'),
+    path('invoices/<uuid:invoice_id>/mark-paid/', views.invoice_mark_paid, name='invoice_mark_paid'),
+    
+    # Quotation Management
+    path('quotations/', views.quotation_list, name='quotation_list'),
+    path('quotations/create/', views.quotation_create, name='quotation_create'),
+    path('quotations/quick/', views.quick_quotation_view, name='quick_quotation'),
+    path('quotations/<uuid:quotation_id>/', views.quotation_detail, name='quotation_detail'),
+    path('quotations/<uuid:quotation_id>/edit/', views.quotation_edit, name='quotation_edit'),
+    path('quotations/<uuid:quotation_id>/print/', views.quotation_print, name='quotation_print'),
+    path('quotations/<uuid:quotation_id>/pdf/', views.quotation_pdf, name='quotation_pdf'),
+    path('quotations/<uuid:quotation_id>/send/', views.quotation_send, name='quotation_send'),
+    path('quotations/<uuid:quotation_id>/accept/', views.quotation_accept, name='quotation_accept'),
+    path('quotations/<uuid:quotation_id>/reject/', views.quotation_reject, name='quotation_reject'),
+    path('quotations/<uuid:quotation_id>/convert/', views.quotation_convert_to_order, name='quotation_convert'),
 ]

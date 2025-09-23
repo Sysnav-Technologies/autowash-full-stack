@@ -1,0 +1,246 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Generate Invoice - {{ order.        <div>
+            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Order
+            </a>
+        </div>_number }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+{% include 'includes/business_styles.html' %}
+<style>
+    .invoice-form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .form-header {
+        background: var(--primary-color);
+        color: white;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    
+    .order-summary {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-left: 4px solid var(--primary-color);
+        margin-bottom: 1.5rem;
+    }
+    
+    .invoice-type-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .invoice-type-option {
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .invoice-type-option:hover {
+        border-color: var(--primary-color);
+        background: rgba(var(--primary-color-rgb), 0.05);
+    }
+    
+    .invoice-type-option.selected {
+        border-color: var(--primary-color);
+        background: rgba(var(--primary-color-rgb), 0.1);
+    }
+    
+    .invoice-type-option input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+    }
+    
+    .invoice-type-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        color: var(--primary-color);
+    }
+    
+    .existing-invoices {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .existing-invoice {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .existing-invoice:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">Generate Invoice</h1>
+            <p class="text-muted">Create an invoice for service order {{ order.order_number }}</p>
+        </div>
+        <div>
+            <a href="{% url 'services:order_detail' order.pk %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Order
+            </a>
+        </div>
+    </div>
+
+    <div class="invoice-form-container">
+        <div class="form-header">
+            <h2><i class="fas fa-file-invoice"></i> Invoice Generation</h2>
+            <p class="mb-0">Order: {{ order.order_number }} | Customer: {{ order.customer.display_name }}</p>
+        </div>
+
+        <div class="p-4">
+            <!-- Order Summary -->
+            <div class="order-summary">
+                <h5><i class="fas fa-info-circle"></i> Order Summary</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Order Number:</strong> {{ order.order_number }}</p>
+                        <p><strong>Customer:</strong> {{ order.customer.display_name }}</p>
+                        {% if order.vehicle %}
+                        <p><strong>Vehicle:</strong> {{ order.vehicle.make }} {{ order.vehicle.model }} ({{ order.vehicle.registration_number }})</p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Order Date:</strong> {{ order.created_at|date:"d M Y" }}</p>
+                        <p><strong>Status:</strong> 
+                            <span class="badge badge-{{ order.status|default:'secondary' }}">{{ order.get_status_display }}</span>
+                        </p>
+                        <p><strong>Total Amount:</strong> <span class="h5 text-success">KES {{ order.total_amount|floatformat:2 }}</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Existing Invoices Warning -->
+            {% if existing_invoices %}
+            <div class="existing-invoices">
+                <h6><i class="fas fa-exclamation-triangle"></i> Existing Invoices</h6>
+                <p class="mb-2">This order already has the following invoices:</p>
+                {% for invoice in existing_invoices %}
+                <div class="existing-invoice">
+                    <div>
+                        <strong>{{ invoice.invoice_number }}</strong> - {{ invoice.get_invoice_type_display }}
+                        <span class="badge badge-{{ invoice.status }}">{{ invoice.get_status_display }}</span>
+                    </div>
+                    <div>
+                        <a href="/business/{{ request.tenant.slug }}/services/invoices/{{ invoice.id }}/" class="btn btn-sm btn-outline-primary">View</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Invoice Generation Form -->
+            <form method="post" id="invoiceForm">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label class="form-label"><strong>Select Invoice Type:</strong></label>
+                    <div class="invoice-type-selector">
+                        <div class="invoice-type-option {% if not has_credit_invoice %}{% else %}disabled{% endif %}" 
+                             onclick="selectInvoiceType('credit', this)">
+                            <input type="radio" name="invoice_type" value="credit" 
+                                   aria-label="Credit Invoice - Payment due in 30 days"
+                                   {% if not has_credit_invoice %}{% else %}disabled{% endif %}>
+                            <div class="invoice-type-icon">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                            <h5>Credit Invoice</h5>
+                            <p class="text-muted mb-0">Payment due in 30 days</p>
+                            {% if has_credit_invoice %}
+                            <small class="text-warning"><i class="fas fa-check-circle"></i> Already created</small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="invoice-type-option {% if not has_cash_invoice %}{% else %}disabled{% endif %}" 
+                             onclick="selectInvoiceType('cash', this)">
+                            <input type="radio" name="invoice_type" value="cash" 
+                                   aria-label="Cash Invoice - Payment due immediately"
+                                   {% if not has_cash_invoice %}{% else %}disabled{% endif %}>
+                            <div class="invoice-type-icon">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <h5>Cash Invoice</h5>
+                            <p class="text-muted mb-0">Payment due immediately</p>
+                            {% if has_cash_invoice %}
+                            <small class="text-warning"><i class="fas fa-check-circle"></i> Already created</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes" class="form-label">Additional Notes (Optional)</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                              placeholder="Add any additional notes for this invoice..."></textarea>
+                </div>
+
+                <div class="text-center pt-3">
+                    <button type="submit" class="btn btn-primary btn-lg" id="generateBtn" disabled>
+                        <i class="fas fa-file-invoice"></i> Generate Invoice
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function selectInvoiceType(type, element) {
+    // Check if option is disabled
+    if (element.classList.contains('disabled')) {
+        return;
+    }
+    
+    // Remove selected class from all options
+    document.querySelectorAll('.invoice-type-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Add selected class to clicked option
+    element.classList.add('selected');
+    
+    // Check the radio button
+    const radio = element.querySelector('input[type="radio"]');
+    radio.checked = true;
+    
+    // Enable the generate button
+    document.getElementById('generateBtn').disabled = false;
+}
+
+// Initialize form
+document.addEventListener('DOMContentLoaded', function() {
+    // Pre-select if only one type is available
+    const availableOptions = document.querySelectorAll('.invoice-type-option:not(.disabled)');
+    if (availableOptions.length === 1) {
+        selectInvoiceType(availableOptions[0].querySelector('input').value, availableOptions[0]);
+    }
+});
+</script>
+{% endblock %}

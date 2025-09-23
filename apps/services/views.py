@@ -14,7 +14,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_protect
 from django.db import transaction, models
-from django.db.models import Q, Count, Sum, Avg, F, Case, When, Value, IntegerField
+from django.db.models import Q, Count, Sum, Avg, F, Case, When, Value, IntegerField, Prefetch
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
@@ -3963,7 +3963,7 @@ def add_order_to_queue(order):
     ).aggregate(max_num=models.Max('queue_number'))['max_num'] or 0
     
     # Calculate estimated times
-    estimated_duration = order.estimated_duration  # This is a property method
+    estimated_duration = int(order.estimated_duration)  # Ensure it's an integer for timedelta
     estimated_start_time = timezone.now()
     
     # Check for orders ahead in queue
@@ -4068,35 +4068,79 @@ def order_receipt_print_view(request, pk):
 @employee_required()
 @ajax_required
 def vehicle_customer_ajax(request):
-    """Get customer details for a vehicle"""
+    """Get vehicles for a customer or customer details for a vehicle"""
     vehicle_id = request.GET.get('vehicle_id')
+    customer_id = request.GET.get('customer_id')
     
-    if not vehicle_id:
-        return JsonResponse({'success': False, 'error': 'Vehicle ID required'})
+    # Add debugging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"vehicle_customer_ajax called with vehicle_id={vehicle_id}, customer_id={customer_id}")
     
-    try:
-        from apps.customers.models import Vehicle
-        vehicle = Vehicle.objects.select_related('customer').get(id=vehicle_id, is_active=True)
-        
-        customer_data = {
-            'id': str(vehicle.customer.id),
-            'name': vehicle.customer.full_name,
-            'full_name': vehicle.customer.full_name,
-            'phone': str(vehicle.customer.phone) if vehicle.customer.phone else '',
-            'customer_id': vehicle.customer.customer_id,
-            'email': vehicle.customer.email or '',
-            'is_walk_in': vehicle.customer.is_walk_in
-        }
-        
-        return JsonResponse({
-            'success': True,
-            'customer': customer_data
-        })
-        
-    except Vehicle.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Vehicle not found'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+    # Handle getting vehicles for a customer
+    if customer_id:
+        try:
+            from apps.customers.models import Vehicle, Customer
+            customer = Customer.objects.get(id=customer_id, is_active=True)
+            vehicles = Vehicle.objects.filter(customer=customer, is_active=True)
+            
+            logger.info(f"Found {vehicles.count()} vehicles for customer {customer.full_name}")
+            
+            vehicles_data = []
+            for vehicle in vehicles:
+                vehicles_data.append({
+                    'id': vehicle.id,
+                    'make': vehicle.make,
+                    'model': vehicle.model,
+                    'license_plate': vehicle.registration_number,
+                    'year': vehicle.year,
+                    'color': vehicle.color,
+                    'customer_name': customer.full_name,
+                    'customer_phone': str(customer.phone) if customer.phone else ''
+                })
+            
+            logger.info(f"Returning vehicles data: {vehicles_data}")
+            
+            return JsonResponse({
+                'success': True,
+                'vehicles': vehicles_data
+            })
+            
+        except Customer.DoesNotExist:
+            logger.error(f"Customer with id {customer_id} not found")
+            return JsonResponse({'success': False, 'error': 'Customer not found'})
+        except Exception as e:
+            logger.error(f"Error in vehicle_customer_ajax: {str(e)}")
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    # Handle getting customer details for a vehicle (original functionality)
+    elif vehicle_id:
+        try:
+            from apps.customers.models import Vehicle
+            vehicle = Vehicle.objects.select_related('customer').get(id=vehicle_id, is_active=True)
+            
+            customer_data = {
+                'id': str(vehicle.customer.id),
+                'name': vehicle.customer.full_name,
+                'full_name': vehicle.customer.full_name,
+                'phone': str(vehicle.customer.phone) if vehicle.customer.phone else '',
+                'customer_id': vehicle.customer.customer_id,
+                'email': vehicle.customer.email or '',
+                'is_walk_in': vehicle.customer.is_walk_in
+            }
+            
+            return JsonResponse({
+                'success': True,
+                'customer': customer_data
+            })
+            
+        except Vehicle.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Vehicle not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    else:
+        return JsonResponse({'success': False, 'error': 'Either vehicle_id or customer_id is required'})
 
 
 @login_required
@@ -4143,3 +4187,1248 @@ def payment_status_ajax(request):
         return JsonResponse({'success': False, 'error': 'Order not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+# ================================
+# INVOICE MANAGEMENT VIEWS
+# ================================
+
+@login_required
+@employee_required()
+def generate_invoice(request, order_id):
+    """Generate invoice for a service order"""
+    from .models import ServiceInvoice
+    
+    order = get_object_or_404(ServiceOrder, pk=order_id)
+    
+    if request.method == 'POST':
+        invoice_type = request.POST.get('invoice_type')
+        notes = request.POST.get('notes', '')
+        
+        if invoice_type not in ['credit', 'cash']:
+            messages.error(request, 'Invalid invoice type selected.')
+            return redirect('services:order_detail', pk=order_id)
+        
+        try:
+            with transaction.atomic():
+                # Ensure order totals are calculated
+                if order.total_amount == 0:
+                    order.calculate_totals()
+                    order.save()
+                
+                # Create the invoice with amounts from order
+                invoice = ServiceInvoice.objects.create(
+                    service_order=order,
+                    invoice_type=invoice_type,
+                    subtotal=order.subtotal,
+                    discount_amount=order.discount_amount,
+                    tax_amount=order.tax_amount,
+                    total_amount=order.total_amount,
+                    notes=notes,
+                    created_by=request.user
+                )
+                
+                messages.success(
+                    request, 
+                    f'{invoice_type.title()} Invoice {invoice.invoice_number} generated successfully.'
+                )
+                
+                # Redirect to invoice preview using manual tenant slug format
+                return redirect(f'/business/{request.tenant.slug}/services/invoices/{invoice.id}/')
+                
+        except Exception as e:
+            messages.error(request, f'Error generating invoice: {str(e)}')
+            return redirect(f'/business/{request.tenant.slug}/services/orders/{order_id}/')
+    
+    # Check if order already has invoices
+    existing_invoices = order.invoices.all()
+    
+    context = {
+        'order': order,
+        'existing_invoices': existing_invoices,
+        'has_credit_invoice': existing_invoices.filter(invoice_type='credit').exists(),
+        'has_cash_invoice': existing_invoices.filter(invoice_type='cash').exists(),
+    }
+    
+    return render(request, 'services/generate_invoice.html', context)
+
+
+@login_required
+@employee_required()
+def invoice_preview(request, invoice_id):
+    """Preview invoice before sending/printing"""
+    from .models import ServiceInvoice
+    
+    invoice = get_object_or_404(ServiceInvoice, pk=invoice_id)
+    
+    # Get business information and tenant settings for invoice header
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business if hasattr(request, 'business') else request.tenant
+    tenant_settings = get_or_create_tenant_settings(business)
+    
+    # Get invoice items
+    invoice_items = invoice.get_invoice_items()
+    
+    context = {
+        'invoice': invoice,
+        'business': business,
+        'tenant_settings': tenant_settings,
+        'order': invoice.service_order,
+        'customer': invoice.service_order.customer,
+        'vehicle': invoice.service_order.vehicle,
+        'invoice_items': invoice_items,
+        'current_date': timezone.now().date(),
+    }
+    
+    return render(request, 'services/invoice_preview.html', context)
+
+
+@login_required
+@employee_required()
+def invoice_print(request, invoice_id):
+    """Print-friendly invoice view"""
+    from .models import ServiceInvoice
+    
+    invoice = get_object_or_404(ServiceInvoice, pk=invoice_id)
+    
+    # Get business information and tenant settings for invoice header
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business if hasattr(request, 'business') else request.tenant
+    tenant_settings = get_or_create_tenant_settings(business)
+    
+    # Get invoice items
+    invoice_items = invoice.get_invoice_items()
+    
+    context = {
+        'invoice': invoice,
+        'business': business,
+        'tenant_settings': tenant_settings,
+        'order': invoice.service_order,
+        'customer': invoice.service_order.customer,
+        'vehicle': invoice.service_order.vehicle,
+        'invoice_items': invoice_items,
+        'current_date': timezone.now().date(),
+        'print_mode': True,
+    }
+    
+    return render(request, 'services/invoice_print.html', context)
+
+
+@login_required
+@employee_required()
+def invoice_pdf(request, invoice_id):
+    """Generate and download invoice as PDF"""
+    from .models import ServiceInvoice
+    from django.http import FileResponse
+    import os
+    
+    invoice = get_object_or_404(ServiceInvoice, pk=invoice_id)
+    
+    # Check if PDF already exists
+    if invoice.pdf_file and os.path.exists(invoice.pdf_file.path):
+        return FileResponse(
+            invoice.pdf_file,
+            as_attachment=True,
+            filename=f'Invoice_{invoice.invoice_number}.pdf'
+        )
+    
+    # Generate PDF if it doesn't exist
+    try:
+        # Get tenant settings for comprehensive business info
+        from apps.core.tenant_models import TenantSettings
+        from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+        business = request.business if hasattr(request, 'business') else request.tenant
+        tenant_settings = get_or_create_tenant_settings(business)
+        
+        pdf_content = generate_invoice_pdf(invoice, business, tenant_settings)
+        
+        # Save PDF to file
+        pdf_filename = f'invoice_{invoice.invoice_number}.pdf'
+        pdf_path = f'invoices/pdf/{pdf_filename}'
+        
+        # Save the PDF content to the file field
+        from django.core.files.base import ContentFile
+        invoice.pdf_file.save(
+            pdf_filename,
+            ContentFile(pdf_content),
+            save=True
+        )
+        
+        invoice.pdf_generated = True
+        invoice.save()
+        
+        return FileResponse(
+            invoice.pdf_file,
+            as_attachment=True,
+            filename=f'Invoice_{invoice.invoice_number}.pdf'
+        )
+        
+    except Exception as e:
+        messages.error(request, f'Error generating PDF: {str(e)}')
+        return redirect(f'/business/{request.tenant.slug}/services/invoices/{invoice_id}/')
+
+
+@login_required
+@employee_required()
+def invoice_list(request):
+    """List all invoices with filtering and search"""
+    from .models import ServiceInvoice
+    
+    # Get filter parameters
+    status = request.GET.get('status', '')
+    invoice_type = request.GET.get('type', '')
+    search = request.GET.get('search', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    # Base queryset
+    invoices = ServiceInvoice.objects.select_related(
+        'service_order', 
+        'service_order__customer'
+    ).order_by('-created_at')
+    
+    # Apply filters
+    if status:
+        invoices = invoices.filter(status=status)
+    
+    if invoice_type:
+        invoices = invoices.filter(invoice_type=invoice_type)
+    
+    if search:
+        invoices = invoices.filter(
+            Q(invoice_number__icontains=search) |
+            Q(service_order__customer__first_name__icontains=search) |
+            Q(service_order__customer__last_name__icontains=search) |
+            Q(service_order__order_number__icontains=search)
+        )
+    
+    if date_from:
+        invoices = invoices.filter(issue_date__gte=date_from)
+    
+    if date_to:
+        invoices = invoices.filter(issue_date__lte=date_to)
+    
+    # Pagination
+    paginator = Paginator(invoices, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Summary statistics
+    stats = {
+        'total_invoices': invoices.count(),
+        'total_amount': invoices.aggregate(Sum('total_amount'))['total_amount__sum'] or 0,
+        'draft_count': invoices.filter(status='draft').count(),
+        'sent_count': invoices.filter(status='sent').count(),
+        'paid_count': invoices.filter(status='paid').count(),
+        'overdue_count': invoices.filter(status='overdue').count(),
+    }
+    
+    context = {
+        'page_obj': page_obj,
+        'invoices': page_obj,
+        'stats': stats,
+        'current_status': status,
+        'current_type': invoice_type,
+        'current_search': search,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    
+    return render(request, 'services/invoice_list.html', context)
+
+
+@login_required
+@employee_required()
+@require_POST
+def invoice_mark_sent(request, invoice_id):
+    """Mark invoice as sent"""
+    from .models import ServiceInvoice
+    
+    invoice = get_object_or_404(ServiceInvoice, pk=invoice_id)
+    
+    try:
+        invoice.mark_as_sent(request.user)
+        messages.success(request, f'Invoice {invoice.invoice_number} marked as sent.')
+    except Exception as e:
+        messages.error(request, f'Error marking invoice as sent: {str(e)}')
+    
+    return redirect(f'/business/{request.tenant.slug}/services/invoices/{invoice_id}/')
+
+
+@login_required
+@employee_required()
+@require_POST
+def invoice_mark_paid(request, invoice_id):
+    """Mark invoice as paid"""
+    from .models import ServiceInvoice
+    
+    invoice = get_object_or_404(ServiceInvoice, pk=invoice_id)
+    
+    try:
+        payment_date = request.POST.get('payment_date')
+        if payment_date:
+            from datetime import datetime
+            payment_date = datetime.strptime(payment_date, '%Y-%m-%d').date()
+        
+        invoice.mark_as_paid(payment_date)
+        messages.success(request, f'Invoice {invoice.invoice_number} marked as paid.')
+    except Exception as e:
+        messages.error(request, f'Error marking invoice as paid: {str(e)}')
+    
+    return redirect(f'/business/{request.tenant.slug}/services/invoices/{invoice_id}/')
+
+
+def generate_invoice_pdf(invoice, business, tenant_settings):
+    """Generate PDF content for invoice"""
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm, inch
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
+        import io
+        
+        buffer = io.BytesIO()
+        
+        # Create PDF document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=20*mm,
+            leftMargin=20*mm,
+            topMargin=20*mm,
+            bottomMargin=20*mm
+        )
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Add company name first
+        elements.extend(story)
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=10*mm,
+            alignment=TA_CENTER,
+            textColor=colors.black
+        )
+        
+        company_style = ParagraphStyle(
+            'Company',
+            parent=styles['Normal'],
+            fontSize=14,
+            spaceBefore=5*mm,
+            spaceAfter=5*mm,
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=10,
+            spaceAfter=3*mm,
+            alignment=TA_LEFT
+        )
+        
+        # Header Section - Company Name First Row
+        story = []
+        
+        # Company Name - Top Row Alone
+        company_name_style = ParagraphStyle(
+            'CompanyName',
+            parent=styles['Normal'],
+            fontSize=24,
+            alignment=TA_CENTER,
+            spaceAfter=10*mm,
+            fontName='Helvetica-Bold'
+        )
+        
+        story.append(Paragraph(business.name.upper(), company_name_style))
+        
+        # Second Row - Logo, Business Details, Invoice Type
+        header_data = []
+        
+        # Business details for center
+        business_details = f"""
+        {tenant_settings.contact_address if tenant_settings.contact_address else (f'{business.city}, {business.state}' if business.city else '')}<br/>
+        {f'TEL NO: {tenant_settings.contact_phone}' if tenant_settings.contact_phone else (f'TEL NO: {business.phone}' if business.phone else '')}<br/>
+        {f'E-MAIL: {tenant_settings.contact_email}' if tenant_settings.contact_email else (f'E-MAIL: {business.email}' if business.email else '')}<br/>
+        {f'PIN No: {tenant_settings.tax_number}' if tenant_settings.tax_number else ''}
+        """
+        
+        invoice_title = f"""
+        <b style="font-size:18pt">{invoice.get_invoice_type_display().upper()} INVOICE</b>
+        """
+        
+        header_data.append([
+            Paragraph("", normal_style),  # Logo space (empty for now)
+            Paragraph(business_details, ParagraphStyle('BusinessDetails', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)),
+            Paragraph(invoice_title, ParagraphStyle('InvoiceTitle', parent=styles['Normal'], fontSize=18, alignment=TA_RIGHT))
+        ])
+        
+        header_table = Table(header_data, colWidths=[1.5*inch, 3*inch, 2.5*inch])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LINEBELOW', (0, 0), (-1, 0), 2, colors.black),
+            ('SPACEAFTER', (0, 0), (-1, -1), 15*mm),
+        ]))
+        
+        elements.append(header_table)
+        elements.append(Spacer(1, 10*mm))
+        
+        # Customer and Invoice Info
+        customer_invoice_data = []
+        
+        customer_info = f"""
+        <b>TO:</b> {invoice.service_order.customer.display_name.upper()}<br/>
+        <b>REG NO:</b> {invoice.service_order.vehicle.registration_number.upper() if invoice.service_order.vehicle else '-'}<br/>
+        <b>VEH TYPE:</b> {f"{invoice.service_order.vehicle.make.upper()} {invoice.service_order.vehicle.model.upper()}" if invoice.service_order.vehicle else '-'}
+        """
+        
+        invoice_info = f"""
+        <b>INVOICE NO:</b> {invoice.invoice_number}<br/>
+        <b>DATE:</b> {invoice.issue_date.strftime('%d %b %Y')}<br/>
+        <b>SALES PERSON:</b> {invoice.created_by.get_full_name().upper() if invoice.created_by else 'SYSTEM'}
+        """
+        
+        customer_invoice_data.append([
+            Paragraph(customer_info, normal_style),
+            Paragraph(invoice_info, normal_style)
+        ])
+        
+        customer_invoice_table = Table(customer_invoice_data, colWidths=[3*inch, 3*inch])
+        customer_invoice_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('INNERGRID', (0, 0), (-1, -1), 1, colors.black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        
+        elements.append(customer_invoice_table)
+        elements.append(Spacer(1, 10*mm))
+        
+        # Items Table
+        items_data = [['DESCRIPTION', 'QTY', 'RATE (KSh)', 'DISCOUNT', 'AMOUNT (KSh)']]
+        
+        # Get invoice items
+        invoice_items = invoice.get_invoice_items()
+        
+        for item in invoice_items:
+            if item['type'] == 'customer_part':
+                items_data.append([
+                    f"{item['description'].upper()}\n(CUSTOMER PROVIDED - NO CHARGE)",
+                    str(item['quantity']),
+                    '-',
+                    '-',
+                    '-'
+                ])
+            else:
+                items_data.append([
+                    item['description'].upper(),
+                    str(item['quantity']),
+                    f"{item['unit_price']:.2f}",
+                    '-',
+                    f"{item['total_price']:.2f}"
+                ])
+        
+        # Add empty rows to match the image format
+        for _ in range(5):
+            items_data.append(['', '', '', '', ''])
+        
+        items_table = Table(items_data, colWidths=[2.5*inch, 0.8*inch, 1*inch, 1*inch, 1*inch])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Description column left-aligned
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('INNERGRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        
+        elements.append(items_table)
+        elements.append(Spacer(1, 10*mm))
+        
+        # Totals Table (right-aligned)
+        totals_data = [
+            ['NET AMOUNT (KSh)', f'{invoice.subtotal:.2f}'],
+            ['VAT 16%', f'{invoice.tax_amount:.2f}'],
+            ['TOTAL AMOUNT (KSh)', f'{invoice.total_amount:.2f}']
+        ]
+        
+        totals_table = Table(totals_data, colWidths=[1.5*inch, 1*inch])
+        totals_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 2), (-1, 2), colors.lightgrey),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('INNERGRID', (0, 0), (-1, -1), 1, colors.black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        # Create a table to position totals on the right
+        totals_position_data = [['', totals_table]]
+        totals_position_table = Table(totals_position_data, colWidths=[4*inch, 2.5*inch])
+        totals_position_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        
+        elements.append(totals_position_table)
+        elements.append(Spacer(1, 15*mm))
+        
+        # Footer Section
+        footer_text = f"""
+        <b>WITH THANKS</b><br/><br/>
+        
+        _____________________<br/>
+        {invoice.created_by.get_full_name().upper() if invoice.created_by else 'AUTHORIZED SIGNATURE'}<br/>
+        <b>SIGNATURE</b>
+        """
+        
+        elements.append(Paragraph(footer_text, normal_style))
+        elements.append(Spacer(1, 10*mm))
+        
+        # Terms and Conditions
+        terms_text = f"""
+        <b>TERMS AND CONDITIONS:</b><br/>
+        {invoice.terms_and_conditions}
+        """
+        
+        if invoice.notes:
+            terms_text += f"<br/><br/><b>Notes:</b> {invoice.notes}"
+        
+        terms_para = Paragraph(terms_text, ParagraphStyle('Terms', parent=styles['Normal'], fontSize=8, leftIndent=10))
+        
+        # Create terms box
+        terms_data = [[terms_para]]
+        terms_table = Table(terms_data, colWidths=[6*inch])
+        terms_table.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        
+        elements.append(terms_table)
+        
+        # Payment Details if available
+        if hasattr(business, 'bank_details') and business.bank_details:
+            elements.append(Spacer(1, 5*mm))
+            payment_text = f"""
+            <b>PAYMENT DETAILS:</b><br/>
+            {business.bank_details}
+            """
+            elements.append(Paragraph(payment_text, ParagraphStyle('Payment', parent=styles['Normal'], fontSize=8)))
+        
+        # Build PDF
+        doc.build(elements)
+        
+        buffer.seek(0)
+        return buffer.getvalue()
+        
+    except ImportError:
+        # Fallback if reportlab is not installed
+        raise Exception("PDF generation library not available. Please install reportlab.")
+    except Exception as e:
+        raise Exception(f"Error generating PDF: {str(e)}")
+
+
+# ===== QUOTATION VIEWS =====
+
+@login_required
+@employee_required()
+def quotation_list(request):
+    """List all quotations"""
+    from .models import Quotation
+    
+    quotations = Quotation.objects.all().select_related('customer', 'vehicle')
+    
+    # Filters
+    status = request.GET.get('status')
+    customer = request.GET.get('customer')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    search = request.GET.get('search')
+    
+    if status:
+        quotations = quotations.filter(status=status)
+    
+    if customer:
+        quotations = quotations.filter(customer_name__icontains=customer)
+    
+    if date_from:
+        try:
+            from datetime import datetime
+            date_from_parsed = datetime.strptime(date_from, '%Y-%m-%d').date()
+            quotations = quotations.filter(created_at__date__gte=date_from_parsed)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            from datetime import datetime
+            date_to_parsed = datetime.strptime(date_to, '%Y-%m-%d').date()
+            quotations = quotations.filter(created_at__date__lte=date_to_parsed)
+        except ValueError:
+            pass
+    
+    if search:
+        quotations = quotations.filter(
+            Q(quotation_number__icontains=search) |
+            Q(customer_name__icontains=search) |
+            Q(customer_email__icontains=search) |
+            Q(customer_phone__icontains=search)
+        )
+    
+    # Sort by status priority and creation date
+    quotations = quotations.order_by(
+        Case(
+            When(status='draft', then=Value(1)),
+            When(status='sent', then=Value(2)),
+            When(status='accepted', then=Value(3)),
+            When(status='expired', then=Value(4)),
+            When(status='rejected', then=Value(5)),
+            When(status='converted', then=Value(6)),
+            default=Value(3),
+            output_field=IntegerField(),
+        ),
+        '-created_at'
+    )
+    
+    # Pagination
+    paginator = Paginator(quotations, 20)
+    page = request.GET.get('page')
+    quotations_page = paginator.get_page(page)
+    
+    # Statistics
+    today = timezone.now().date()
+    stats = {
+        'total_quotations': quotations.count(),
+        'draft_quotations': quotations.filter(status='draft').count(),
+        'sent_quotations': quotations.filter(status='sent').count(),
+        'accepted_quotations': quotations.filter(status='accepted').count(),
+        'conversion_rate': 0,
+    }
+    
+    # Calculate conversion rate
+    sent_count = quotations.filter(status__in=['sent', 'accepted', 'converted']).count()
+    converted_count = quotations.filter(status__in=['accepted', 'converted']).count()
+    if sent_count > 0:
+        stats['conversion_rate'] = (converted_count / sent_count) * 100
+    
+    context = {
+        'quotations': quotations_page,
+        'stats': stats,
+        'status_choices': Quotation.STATUS_CHOICES,
+        'current_filters': {
+            'status': status or '',
+            'customer': customer or '',
+            'date_from': date_from or '',
+            'date_to': date_to or '',
+            'search': search or ''
+        },
+        'title': 'Quotations'
+    }
+    return render(request, 'services/quotation_list.html', context)
+
+
+@login_required
+@employee_required()
+def quotation_create(request):
+    """Create new quotation"""
+    from .forms import QuotationForm
+    from .models import Quotation
+    
+    if request.method == 'POST':
+        form = QuotationForm(request.POST)
+        if form.is_valid():
+            quotation = form.save(commit=False)
+            quotation.created_by = request.user
+            quotation.save()
+            
+            messages.success(request, f'Quotation {quotation.quotation_number} created successfully!')
+            return redirect(get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk))
+    else:
+        form = QuotationForm()
+    
+    # Get services and categories for selection
+    categories = ServiceCategory.objects.filter(is_active=True).prefetch_related('services')
+    
+    # Get inventory items for selection
+    from apps.inventory.models import InventoryItem
+    inventory_items = InventoryItem.objects.filter(is_active=True, current_stock__gt=0)
+    
+    context = {
+        'form': form,
+        'categories': categories,
+        'inventory_items': inventory_items,
+        'title': 'Create Quotation'
+    }
+    return render(request, 'services/quotation_form.html', context)
+
+
+@csrf_protect
+@employee_required()
+@require_http_methods(["GET", "POST"])
+def quick_quotation_view(request):
+    """Quick quotation creation similar to quick order"""
+    from .forms import QuickQuotationForm
+    from .models import Quotation, QuotationItem
+    import json
+    from decimal import Decimal
+    
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                logger.info(f"Quick quotation POST data: {request.POST}")
+                
+                # Handle customer data - either from existing customer or manual entry
+                customer_id = request.POST.get('customer')
+                selected_customer = None
+                
+                if customer_id:
+                    # Use existing customer
+                    from apps.customers.models import Customer
+                    try:
+                        selected_customer = Customer.objects.get(id=customer_id)
+                        quotation = Quotation.objects.create(
+                            customer=selected_customer,
+                            customer_name=f"{selected_customer.first_name} {selected_customer.last_name}",
+                            customer_email=selected_customer.email,
+                            customer_phone=selected_customer.phone,
+                            vehicle_registration=request.POST.get('vehicle_registration', '').strip().upper(),
+                            vehicle_make=request.POST.get('vehicle_make', '').strip(),
+                            vehicle_model=request.POST.get('vehicle_model', '').strip(),
+                            quotation_type=request.POST.get('quotation_type', 'standard'),
+                            description=request.POST.get('description', '').strip(),
+                            created_by=request.user
+                        )
+                    except Customer.DoesNotExist:
+                        # Fallback to manual entry
+                        quotation = Quotation.objects.create(
+                            customer_name=request.POST.get('customer_name', '').strip(),
+                            customer_email=request.POST.get('customer_email', '').strip(),
+                            customer_phone=request.POST.get('customer_phone', '').strip(),
+                            vehicle_registration=request.POST.get('vehicle_registration', '').strip().upper(),
+                            vehicle_make=request.POST.get('vehicle_make', '').strip(),
+                            vehicle_model=request.POST.get('vehicle_model', '').strip(),
+                            quotation_type=request.POST.get('quotation_type', 'standard'),
+                            description=request.POST.get('description', '').strip(),
+                            created_by=request.user
+                        )
+                else:
+                    # Use manual customer entry
+                    quotation = Quotation.objects.create(
+                        customer_name=request.POST.get('customer_name', '').strip(),
+                        customer_email=request.POST.get('customer_email', '').strip(),
+                        customer_phone=request.POST.get('customer_phone', '').strip(),
+                        vehicle_registration=request.POST.get('vehicle_registration', '').strip().upper(),
+                        vehicle_make=request.POST.get('vehicle_make', '').strip(),
+                        vehicle_model=request.POST.get('vehicle_model', '').strip(),
+                        quotation_type=request.POST.get('quotation_type', 'standard'),
+                        description=request.POST.get('description', '').strip(),
+                        created_by=request.user
+                    )
+                
+                total_amount = Decimal('0.00')
+                
+                # Process selected services
+                selected_services = request.POST.getlist('selected_services')
+                service_quantities = request.POST.getlist('service_quantities[]')
+                services_custom_prices_data = request.POST.get('services_custom_prices', '{}')
+                try:
+                    services_custom_prices = json.loads(services_custom_prices_data) if services_custom_prices_data else {}
+                except (json.JSONDecodeError, TypeError):
+                    services_custom_prices = {}
+                
+                for i, service_id in enumerate(selected_services):
+                    try:
+                        service = Service.objects.get(id=service_id, is_active=True)
+                        
+                        # Get quantity from array (default to 1 if not provided)
+                        quantity = Decimal(service_quantities[i]) if i < len(service_quantities) else Decimal('1')
+                        
+                        # Get custom price if provided
+                        custom_price = services_custom_prices.get(str(service_id))
+                        unit_price = Decimal(str(custom_price)) if custom_price else service.base_price
+                        
+                        QuotationItem.objects.create(
+                            quotation=quotation,
+                            service=service,
+                            quantity=quantity,
+                            unit_price=unit_price,
+                            item_type='service'
+                        )
+                        total_amount += quantity * unit_price
+                        logger.info(f"Added service to quotation: {service.name} x{quantity} at price {unit_price}")
+                    except Service.DoesNotExist:
+                        logger.warning(f"Service {service_id} not found, skipping")
+                        continue
+                
+                # Process selected inventory items
+                selected_inventory_items = request.POST.getlist('selected_inventory_items')
+                inventory_quantities = request.POST.getlist('inventory_quantities[]')
+                inventory_custom_prices_data = request.POST.get('inventory_custom_prices', '{}')
+                try:
+                    inventory_custom_prices = json.loads(inventory_custom_prices_data) if inventory_custom_prices_data else {}
+                except (json.JSONDecodeError, TypeError):
+                    inventory_custom_prices = {}
+                
+                if selected_inventory_items:
+                    from apps.inventory.models import InventoryItem
+                    
+                    for i, item_id in enumerate(selected_inventory_items):
+                        try:
+                            inventory_item = InventoryItem.objects.get(id=item_id, is_active=True)
+                            # Get quantity from array (default to 1 if not provided)
+                            quantity = Decimal(inventory_quantities[i]) if i < len(inventory_quantities) else Decimal('1')
+                            
+                            # Get custom price if provided
+                            custom_price = inventory_custom_prices.get(str(item_id))
+                            unit_price = Decimal(str(custom_price)) if custom_price else (inventory_item.selling_price or inventory_item.unit_cost)
+                            
+                            QuotationItem.objects.create(
+                                quotation=quotation,
+                                inventory_item=inventory_item,
+                                quantity=quantity,
+                                unit_price=unit_price,
+                                item_type='inventory'
+                            )
+                            total_amount += quantity * unit_price
+                            logger.info(f"Added inventory item to quotation: {inventory_item.name} x{quantity} at price {unit_price}")
+                        except InventoryItem.DoesNotExist:
+                            logger.warning(f"Inventory item {item_id} not found, skipping")
+                            continue
+                
+                # Process customer parts
+                customer_parts_data = request.POST.get('customer_parts', '[]')
+                try:
+                    customer_parts = json.loads(customer_parts_data) if customer_parts_data else []
+                except (json.JSONDecodeError, TypeError):
+                    customer_parts = []
+                
+                for part in customer_parts:
+                    if isinstance(part, dict) and part.get('name'):
+                        QuotationItem.objects.create(
+                            quotation=quotation,
+                            description=part['name'],
+                            quantity=Decimal(str(part.get('quantity', 1))),
+                            unit_price=Decimal('0.00'),  # Customer parts are free
+                            item_type='custom'
+                        )
+                        logger.info(f"Added customer part to quotation: {part['name']}")
+                
+                # Calculate totals with proper VAT
+                quotation.tax_percentage = Decimal('16.00')  # Set 16% VAT
+                quotation.calculate_totals()
+                
+                success_message = f'Quotation {quotation.quotation_number} created successfully!'
+                
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'message': success_message,
+                        'quotation_id': str(quotation.id),
+                        'quotation_number': quotation.quotation_number,
+                        'redirect_url': get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk)
+                    })
+                else:
+                    messages.success(request, success_message)
+                    return redirect(get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk))
+                    
+        except Exception as e:
+            logger.error(f"Exception in quick quotation creation: {str(e)}")
+            error_message = f'Error creating quotation: {str(e)}'
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': error_message,
+                    'errors': {'general': [error_message]}
+                })
+            else:
+                messages.error(request, error_message)
+                return redirect(get_business_url(request, 'services:quick_quotation'))
+    
+    # GET request - show the form
+    form = QuickQuotationForm()
+    
+    # Get customers
+    from apps.customers.models import Customer
+    customers = Customer.objects.filter(is_active=True).order_by('first_name', 'last_name')
+    
+    # Get services organized by category
+    categories = ServiceCategory.objects.filter(is_active=True).prefetch_related(
+        Prefetch('services', queryset=Service.objects.filter(is_active=True))
+    ).order_by('display_order', 'name')
+    
+    # Get all active services for dropdown
+    services = Service.objects.filter(is_active=True).select_related('category').order_by('category__name', 'name')
+    
+    # Get service packages
+    packages = ServicePackage.objects.filter(is_active=True).order_by('name')
+    
+    # Get inventory items organized by category
+    from apps.inventory.models import InventoryCategory, InventoryItem
+    inventory_categories = InventoryCategory.objects.filter(is_active=True).prefetch_related(
+        Prefetch('items', queryset=InventoryItem.objects.filter(is_active=True, current_stock__gt=0))
+    ).order_by('name')
+    
+    # Get inventory items for dropdown
+    inventory_items = InventoryItem.objects.filter(
+        is_active=True, 
+        current_stock__gt=0
+    ).select_related('category', 'unit').order_by('category__name', 'name')
+    
+    context = {
+        'form': form,
+        'customers': customers,
+        'categories': categories,
+        'services': services,
+        'packages': packages,
+        'inventory_categories': inventory_categories,
+        'inventory_items': inventory_items,
+        'title': 'Quick Quotation'
+    }
+    return render(request, 'services/quick_quotation.html', context)
+
+
+@login_required
+@employee_required()
+def quotation_detail(request, quotation_id):
+    """Quotation detail view"""
+    from .models import Quotation
+    
+    quotation = get_object_or_404(Quotation, pk=quotation_id)
+    quotation_items = quotation.quotation_items.all().select_related('service', 'inventory_item')
+    
+    # Get business information and tenant settings
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business if hasattr(request, 'business') else request.tenant
+    tenant_settings = get_or_create_tenant_settings(business)
+    
+    context = {
+        'quotation': quotation,
+        'quotation_items': quotation_items,
+        'business': business,
+        'tenant_settings': tenant_settings,
+        'title': 'Quotation ' + str(quotation.quotation_number)
+    }
+    return render(request, 'services/quotation_detail.html', context)
+
+
+@login_required
+@employee_required()
+def quotation_edit(request, quotation_id):
+    """Edit quotation"""
+    from .models import Quotation
+    from .forms import QuotationForm
+    
+    quotation = get_object_or_404(Quotation, pk=quotation_id)
+    
+    if request.method == 'POST':
+        form = QuotationForm(request.POST, instance=quotation)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Quotation {quotation.quotation_number} updated successfully!')
+            return redirect(get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk))
+    else:
+        form = QuotationForm(instance=quotation)
+    
+    context = {
+        'form': form,
+        'quotation': quotation,
+        'title': f'Edit Quotation {quotation.quotation_number}'
+    }
+    return render(request, 'services/quotation_form.html', context)
+
+
+@login_required
+@employee_required()
+def quotation_print(request, quotation_id):
+    """Print quotation"""
+    from .models import Quotation
+    
+    quotation = get_object_or_404(Quotation, pk=quotation_id)
+    quotation_items = quotation.quotation_items.all().select_related('service', 'inventory_item')
+    
+    # Get business information and tenant settings for quotation header
+    from apps.core.tenant_models import TenantSettings
+    from apps.businesses.views_tenant_settings import get_or_create_tenant_settings
+    
+    business = request.business if hasattr(request, 'business') else request.tenant
+    tenant_settings = get_or_create_tenant_settings(business)
+    
+    context = {
+        'quotation': quotation,
+        'quotation_items': quotation_items,
+        'business': business,
+        'tenant_settings': tenant_settings,
+        'customer': quotation.customer,
+        'vehicle': quotation.vehicle if hasattr(quotation, 'vehicle') else None,
+        'current_date': timezone.now().date(),
+        'today': timezone.now().date(),
+        'title': f'Quotation {quotation.quotation_number}'
+    }
+    return render(request, 'services/quotation_print.html', context)
+
+
+@login_required
+@employee_required()
+def quotation_pdf(request, quotation_id):
+    """Generate quotation PDF"""
+    from .models import Quotation
+    from django.http import HttpResponse
+    
+    quotation = get_object_or_404(Quotation, pk=quotation_id)
+    
+    try:
+        pdf_content = generate_quotation_pdf(quotation, request.tenant)
+        
+        response = HttpResponse(pdf_content, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="quotation_{quotation.quotation_number}.pdf"'
+        
+        return response
+    except Exception as e:
+        messages.error(request, f'Error generating PDF: {str(e)}')
+        return redirect(get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk))
+
+
+@login_required
+@employee_required()
+@require_POST
+def quotation_send(request, quotation_id):
+    """Send quotation to customer"""
+    from .models import Quotation
+    
+    quotation = get_object_or_404(Quotation, pk=quotation_id)
+    
+    try:
+        quotation.mark_as_sent()
+        messages.success(request, f'Quotation {quotation.quotation_number} marked as sent.')
+    except Exception as e:
+        messages.error(request, f'Error sending quotation: {str(e)}')
+    
+    return redirect(get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk))
+
+
+@login_required
+@employee_required()
+@require_POST
+def quotation_accept(request, quotation_id):
+    """Accept quotation"""
+    from .models import Quotation
+    
+    quotation = get_object_or_404(Quotation, pk=quotation_id)
+    
+    try:
+        quotation.mark_as_accepted()
+        messages.success(request, f'Quotation {quotation.quotation_number} marked as accepted.')
+    except Exception as e:
+        messages.error(request, f'Error accepting quotation: {str(e)}')
+    
+    return redirect(get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk))
+
+
+@login_required
+@employee_required()
+@require_POST
+def quotation_reject(request, quotation_id):
+    """Reject quotation"""
+    from .models import Quotation
+    
+    quotation = get_object_or_404(Quotation, pk=quotation_id)
+    
+    try:
+        quotation.mark_as_rejected()
+        messages.success(request, f'Quotation {quotation.quotation_number} marked as rejected.')
+    except Exception as e:
+        messages.error(request, f'Error rejecting quotation: {str(e)}')
+    
+    return redirect(get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk))
+
+
+@login_required
+@employee_required()
+@require_POST
+def quotation_convert_to_order(request, quotation_id):
+    """Convert quotation to service order"""
+    from .models import Quotation
+    
+    quotation = get_object_or_404(Quotation, pk=quotation_id)
+    
+    try:
+        order = quotation.convert_to_order()
+        messages.success(request, f'Quotation {quotation.quotation_number} converted to order {order.order_number}.')
+        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+    except Exception as e:
+        messages.error(request, f'Error converting quotation: {str(e)}')
+        return redirect(get_business_url(request, 'services:quotation_detail', quotation_id=quotation.pk))
+
+
+def generate_quotation_pdf(quotation, business):
+    """Generate PDF content for quotation"""
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm, inch
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
+        from reportlab.lib.colors import HexColor
+        import io
+        
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+        
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=HexColor('#2563eb'),
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+        
+        # Title
+        elements.append(Paragraph(f"QUOTATION {quotation.quotation_number}", title_style))
+        elements.append(Spacer(1, 20))
+        
+        # Business and customer info table
+        info_data = [
+            ['From:', 'To:'],
+            [f'{business.name}', f'{quotation.customer_name}'],
+            [f'{business.address or ""}', f'{quotation.customer_email or ""}'],
+            [f'{business.phone or ""}', f'{quotation.customer_phone or ""}'],
+        ]
+        
+        info_table = Table(info_data, colWidths=[3*inch, 3*inch])
+        info_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(info_table)
+        elements.append(Spacer(1, 20))
+        
+        # Quotation details
+        details_data = [
+            ['Quotation Date:', quotation.created_at.strftime('%B %d, %Y')],
+            ['Valid Until:', quotation.valid_until.strftime('%B %d, %Y')],
+            ['Status:', quotation.get_status_display()],
+        ]
+        
+        if quotation.vehicle_registration:
+            details_data.append(['Vehicle:', f'{quotation.vehicle_registration} - {quotation.vehicle_make} {quotation.vehicle_model}'])
+        
+        details_table = Table(details_data, colWidths=[2*inch, 4*inch])
+        details_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(details_table)
+        elements.append(Spacer(1, 30))
+        
+        # Items table
+        items_data = [['Description', 'Quantity', 'Unit Price', 'Total']]
+        
+        for item in quotation.quotation_items.all():
+            if item.service:
+                description = item.service.name
+            elif item.inventory_item:
+                description = item.inventory_item.name
+            else:
+                description = item.description
+            
+            items_data.append([
+                description,
+                str(item.quantity),
+                f'KES {item.unit_price:,.2f}',
+                f'KES {item.total_price:,.2f}'
+            ])
+        
+        items_table = Table(items_data, colWidths=[3*inch, 1*inch, 1.5*inch, 1.5*inch])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), HexColor('#f3f4f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(items_table)
+        elements.append(Spacer(1, 20))
+        
+        # Totals table
+        totals_data = [
+            ['Subtotal:', f'KES {quotation.subtotal:,.2f}'],
+        ]
+        
+        if quotation.discount_amount > 0:
+            totals_data.append(['Discount:', f'-KES {quotation.discount_amount:,.2f}'])
+        
+        if quotation.tax_amount > 0:
+            totals_data.append(['Tax:', f'KES {quotation.tax_amount:,.2f}'])
+        
+        totals_data.append(['Total:', f'KES {quotation.total_amount:,.2f}'])
+        
+        totals_table = Table(totals_data, colWidths=[4*inch, 2*inch])
+        totals_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(totals_table)
+        elements.append(Spacer(1, 30))
+        
+        # Terms and conditions
+        if quotation.terms_and_conditions:
+            elements.append(Paragraph('Terms and Conditions:', styles['Heading3']))
+            elements.append(Paragraph(quotation.terms_and_conditions, styles['Normal']))
+        
+        # Build PDF
+        doc.build(elements)
+        
+        buffer.seek(0)
+        return buffer.getvalue()
+        
+    except ImportError:
+        raise Exception("PDF generation library not available. Please install reportlab.")
+    except Exception as e:
+        raise Exception(f"Error generating PDF: {str(e)}")

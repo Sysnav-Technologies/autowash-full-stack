@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 from apps.core.tenant_models import TenantTimeStampedModel, TenantSoftDeleteModel
 from apps.core.utils import generate_unique_code, upload_to_path
 from decimal import Decimal
@@ -234,7 +235,7 @@ class PackageService(models.Model):
     """Through model for service packages"""
     package = models.ForeignKey(ServicePackage, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
-    quantity = models.IntegerField(default=1)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     custom_price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     is_optional = models.BooleanField(default=False)
     
@@ -690,9 +691,9 @@ class ServiceOrder(TenantTimeStampedModel):
         total_duration = 0
         for item in self.order_items.all():
             if item.service:  # Only add duration for service items
-                total_duration += item.service.estimated_duration * item.quantity
+                total_duration += item.service.estimated_duration * float(item.quantity)
             # Inventory items don't contribute to service duration
-        return total_duration
+        return int(total_duration)
     
     @property
     def is_overdue(self):
@@ -752,7 +753,7 @@ class ServiceOrderItem(models.Model):
     # Description for custom/customer provided items
     description = models.TextField(blank=True, help_text="Description for custom items or customer provided parts")
     
-    quantity = models.IntegerField(default=1)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     unit_price = models.DecimalField(max_digits=8, decimal_places=2)
     total_price = models.DecimalField(max_digits=8, decimal_places=2)
     
@@ -1056,3 +1057,567 @@ class ServiceBay(TenantTimeStampedModel):
         verbose_name = "Service Bay"
         verbose_name_plural = "Service Bays"
         ordering = ['bay_number']
+
+
+class ServiceInvoice(TenantTimeStampedModel):
+    """Invoice generation for service orders"""
+    
+    INVOICE_TYPES = [
+        ('credit', 'Credit Invoice'),
+        ('cash', 'Cash Invoice'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('sent', 'Sent'),
+        ('paid', 'Paid'),
+        ('overdue', 'Overdue'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    # Invoice identification
+    invoice_number = models.CharField(max_length=50, unique=True)
+    invoice_type = models.CharField(max_length=20, choices=INVOICE_TYPES)
+    
+    # Related order
+    service_order = models.ForeignKey(
+        ServiceOrder, 
+        on_delete=models.CASCADE, 
+        related_name='invoices'
+    )
+    
+    # Amounts (copied from order at time of invoice creation)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # Invoice dates
+    issue_date = models.DateField(default=timezone.now)
+    due_date = models.DateField()
+    sent_date = models.DateTimeField(null=True, blank=True)
+    paid_date = models.DateTimeField(null=True, blank=True)
+    
+    # Status tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    
+    # Additional invoice details
+    terms_and_conditions = models.TextField(
+        blank=True,
+        default="Payment is due within 30 days of invoice date. Late payments may incur additional charges."
+    )
+    notes = models.TextField(blank=True)
+    
+    # PDF generation tracking
+    pdf_generated = models.BooleanField(default=False)
+    pdf_file = models.FileField(
+        upload_to='invoices/pdf/', 
+        blank=True, 
+        null=True,
+        help_text="Generated PDF file"
+    )
+    
+    # Cross-schema user tracking
+    created_by_id = models.IntegerField(null=True, blank=True, help_text="User ID from public schema")
+    
+    def __str__(self):
+        return f"Invoice {self.invoice_number} - {self.service_order.customer.display_name}"
+    
+    @property
+    def created_by(self):
+        """Get the user who created this invoice from public schema"""
+        if not self.created_by_id:
+            return None
+        try:
+            from django.contrib.auth.models import User
+            return User.objects.using('default').get(id=self.created_by_id)
+        except User.DoesNotExist:
+            return None
+    
+    @created_by.setter
+    def created_by(self, user):
+        """Set the user who created this invoice"""
+        if user:
+            self.created_by_id = user.id
+        else:
+            self.created_by_id = None
+    
+    def save(self, *args, **kwargs):
+        # Generate invoice number if not set
+        if not self.invoice_number:
+            self.invoice_number = self.generate_invoice_number()
+        
+        # Set due date based on invoice type if not set
+        if not self.due_date:
+            if self.invoice_type == 'cash':
+                self.due_date = self.issue_date  # Due immediately for cash invoices
+            else:
+                # 30 days for credit invoices
+                from datetime import timedelta
+                self.due_date = self.issue_date + timedelta(days=30)
+        
+        super().save(*args, **kwargs)
+    
+    def generate_invoice_number(self):
+        """Generate unique invoice number"""
+        import datetime
+        today = datetime.date.today()
+        
+        # Format: INV-YYYYMM-XXXX (where XXXX is sequential)
+        prefix = f"INV-{today.strftime('%Y%m')}"
+        
+        # Get the last invoice number for this month
+        last_invoice = ServiceInvoice.objects.filter(
+            invoice_number__startswith=prefix
+        ).order_by('-invoice_number').first()
+        
+        if last_invoice:
+            # Extract the sequential number and increment
+            last_num = int(last_invoice.invoice_number.split('-')[-1])
+            new_num = last_num + 1
+        else:
+            new_num = 1
+        
+        return f"{prefix}-{new_num:04d}"
+    
+    @property
+    def is_overdue(self):
+        """Check if invoice is overdue"""
+        from django.utils import timezone
+        return (
+            self.status not in ['paid', 'cancelled'] and 
+            self.due_date < timezone.now().date()
+        )
+    
+    @property
+    def days_until_due(self):
+        """Get days until due date (negative if overdue)"""
+        from django.utils import timezone
+        delta = self.due_date - timezone.now().date()
+        return delta.days
+    
+    def mark_as_sent(self, user=None):
+        """Mark invoice as sent"""
+        from django.utils import timezone
+        self.status = 'sent'
+        self.sent_date = timezone.now()
+        if user:
+            self.created_by = user
+        self.save()
+    
+    def mark_as_paid(self, payment_date=None):
+        """Mark invoice as paid"""
+        from django.utils import timezone
+        self.status = 'paid'
+        self.paid_date = payment_date or timezone.now()
+        self.save()
+    
+    def get_invoice_items(self):
+        """Get formatted invoice items from the service order"""
+        items = []
+        
+        # Get all order items
+        for item in self.service_order.order_items.all():
+            if item.service:
+                # Service item
+                items.append({
+                    'description': item.service.name,
+                    'quantity': item.quantity,
+                    'unit_price': item.unit_price,
+                    'total_price': item.total_price,
+                    'type': 'service'
+                })
+            elif item.inventory_item:
+                # Inventory item
+                if item.is_customer_provided:
+                    # Customer provided part (no charge)
+                    items.append({
+                        'description': f"{item.inventory_item.name} (Customer Provided)",
+                        'quantity': item.quantity,
+                        'unit_price': Decimal('0.00'),
+                        'total_price': Decimal('0.00'),
+                        'type': 'customer_part'
+                    })
+                else:
+                    # Regular inventory item
+                    items.append({
+                        'description': item.inventory_item.name,
+                        'quantity': item.quantity,
+                        'unit_price': item.unit_price,
+                        'total_price': item.total_price,
+                        'type': 'inventory'
+                    })
+            elif item.description:
+                # Custom item with description
+                items.append({
+                    'description': item.description,
+                    'quantity': item.quantity,
+                    'unit_price': item.unit_price,
+                    'total_price': item.total_price,
+                    'type': 'custom'
+                })
+        
+        return items
+    
+    def copy_order_amounts(self):
+        """Copy amounts from the related service order"""
+        self.subtotal = self.service_order.subtotal
+        self.discount_amount = self.service_order.discount_amount
+        self.tax_amount = self.service_order.tax_amount
+        self.total_amount = self.service_order.total_amount
+    
+    class Meta:
+        verbose_name = "Service Invoice"
+        verbose_name_plural = "Service Invoices"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['invoice_number']),
+            models.Index(fields=['status']),
+            models.Index(fields=['due_date']),
+        ]
+
+
+class Quotation(TenantTimeStampedModel):
+    """Quotation/Estimate generation for potential customers"""
+    
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('sent', 'Sent'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+        ('expired', 'Expired'),
+        ('converted', 'Converted to Order'),
+    ]
+    
+    QUOTATION_TYPES = [
+        ('standard', 'Standard Quotation'),
+        ('detailed', 'Detailed Quotation'),
+        ('service_only', 'Service Only'),
+        ('parts_only', 'Parts Only'),
+    ]
+    
+    # Quotation identification
+    quotation_number = models.CharField(max_length=50, unique=True)
+    quotation_type = models.CharField(max_length=20, choices=QUOTATION_TYPES, default='standard')
+    
+    # Customer information (can be potential customer or existing)
+    customer_name = models.CharField(max_length=200)
+    customer_email = models.EmailField(blank=True)
+    customer_phone = models.CharField(max_length=20, blank=True)
+    customer_address = models.TextField(blank=True)
+    
+    # Existing customer link (optional)
+    customer = models.ForeignKey(
+        'customers.Customer',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='quotations'
+    )
+    
+    # Vehicle information (optional)
+    vehicle_registration = models.CharField(max_length=20, blank=True)
+    vehicle_make = models.CharField(max_length=50, blank=True)
+    vehicle_model = models.CharField(max_length=50, blank=True)
+    vehicle_year = models.CharField(max_length=4, blank=True)
+    vehicle_color = models.CharField(max_length=30, blank=True)
+    
+    # Existing vehicle link (optional)
+    vehicle = models.ForeignKey(
+        'customers.Vehicle',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='quotations'
+    )
+    
+    # Pricing
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=16)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    # Validity and dates
+    valid_from = models.DateField(default=timezone.now)
+    valid_until = models.DateField()
+    sent_date = models.DateTimeField(null=True, blank=True)
+    response_date = models.DateTimeField(null=True, blank=True)
+    
+    # Status tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    
+    # Additional quotation details
+    description = models.TextField(blank=True, help_text="Brief description of work to be done")
+    terms_and_conditions = models.TextField(
+        blank=True,
+        default="This quotation is valid for 30 days. Prices may vary based on actual work required."
+    )
+    notes = models.TextField(blank=True, help_text="Internal notes")
+    
+    # Conversion tracking
+    converted_order = models.ForeignKey(
+        ServiceOrder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='source_quotation'
+    )
+    
+    # PDF generation tracking
+    pdf_generated = models.BooleanField(default=False)
+    pdf_file = models.FileField(
+        upload_to='quotations/pdf/', 
+        blank=True, 
+        null=True,
+        help_text="Generated PDF file"
+    )
+    
+    # Cross-schema user tracking
+    created_by_id = models.IntegerField(null=True, blank=True, help_text="User ID from public schema")
+    
+    def __str__(self):
+        return f"Quotation {self.quotation_number} - {self.customer_name}"
+    
+    @property
+    def created_by(self):
+        """Get the user who created this quotation from public schema"""
+        if not self.created_by_id:
+            return None
+        try:
+            from django.contrib.auth.models import User
+            return User.objects.using('default').get(id=self.created_by_id)
+        except User.DoesNotExist:
+            return None
+    
+    @created_by.setter
+    def created_by(self, user):
+        """Set the user who created this quotation"""
+        if user:
+            self.created_by_id = user.id
+        else:
+            self.created_by_id = None
+    
+    def save(self, *args, **kwargs):
+        # Generate quotation number if not set
+        if not self.quotation_number:
+            self.quotation_number = self.generate_quotation_number()
+        
+        # Set valid_until if not set (30 days from valid_from)
+        if not self.valid_until:
+            from datetime import timedelta
+            self.valid_until = self.valid_from + timedelta(days=30)
+        
+        super().save(*args, **kwargs)
+    
+    def generate_quotation_number(self):
+        """Generate unique quotation number"""
+        from apps.core.utils import generate_unique_code
+        prefix = "QUO"
+        return generate_unique_code(prefix, 8)
+    
+    def calculate_totals(self):
+        """Calculate quotation totals with inclusive VAT (16%)"""
+        items = self.quotation_items.all()
+        
+        # Calculate total from items (VAT inclusive prices)
+        items_total = sum(item.total_price for item in items)
+        
+        # Apply discount to the total amount first
+        if self.discount_percentage > 0:
+            self.discount_amount = (items_total * self.discount_percentage) / Decimal('100')
+        
+        # Total amount after discount (still VAT inclusive)
+        self.total_amount = items_total - self.discount_amount
+        
+        # Calculate VAT amount from inclusive price (16% VAT rate)
+        # Formula: VAT = total * (VAT_rate / (100 + VAT_rate))
+        # For 16% VAT: VAT = total * 0.16 / 1.16
+        if self.tax_percentage > 0:
+            vat_rate = Decimal(str(self.tax_percentage))
+            hundred = Decimal('100')
+            vat_multiplier = vat_rate / (hundred + vat_rate)
+            self.tax_amount = self.total_amount * vat_multiplier
+        else:
+            self.tax_amount = Decimal('0.00')
+        
+        # Subtotal is total amount minus VAT
+        self.subtotal = self.total_amount - self.tax_amount
+        
+        self.save()
+    
+    @property
+    def is_expired(self):
+        """Check if quotation has expired"""
+        from django.utils import timezone
+        return timezone.now().date() > self.valid_until
+    
+    @property
+    def days_until_expiry(self):
+        """Days until quotation expires"""
+        from django.utils import timezone
+        delta = self.valid_until - timezone.now().date()
+        return delta.days if delta.days > 0 else 0
+    
+    def mark_as_sent(self):
+        """Mark quotation as sent"""
+        self.status = 'sent'
+        self.sent_date = timezone.now()
+        self.save()
+    
+    def mark_as_accepted(self):
+        """Mark quotation as accepted"""
+        self.status = 'accepted'
+        self.response_date = timezone.now()
+        self.save()
+    
+    def mark_as_rejected(self):
+        """Mark quotation as rejected"""
+        self.status = 'rejected'
+        self.response_date = timezone.now()
+        self.save()
+    
+    def convert_to_order(self):
+        """Convert quotation to service order"""
+        if self.status != 'accepted':
+            raise ValueError("Only accepted quotations can be converted to orders")
+        
+        # Create customer if not exists
+        customer = self.customer
+        if not customer and self.customer_name:
+            from apps.customers.models import Customer
+            name_parts = self.customer_name.split(' ', 1)
+            customer = Customer.objects.create(
+                first_name=name_parts[0],
+                last_name=name_parts[1] if len(name_parts) > 1 else '',
+                email=self.customer_email,
+                phone=self.customer_phone,
+                created_by_user_id=self.created_by_id
+            )
+        
+        # Create vehicle if not exists
+        vehicle = self.vehicle
+        if not vehicle and self.vehicle_registration and customer:
+            from apps.customers.models import Vehicle
+            vehicle = Vehicle.objects.create(
+                customer=customer,
+                registration_number=self.vehicle_registration,
+                make=self.vehicle_make,
+                model=self.vehicle_model,
+                year=self.vehicle_year,
+                color=self.vehicle_color
+            )
+        
+        # Create service order
+        order = ServiceOrder.objects.create(
+            customer=customer,
+            vehicle=vehicle,
+            status='pending',
+            subtotal=self.subtotal,
+            discount_amount=self.discount_amount,
+            tax_amount=self.tax_amount,
+            total_amount=self.total_amount,
+            special_instructions=self.description
+        )
+        
+        # Copy quotation items to order items
+        for quotation_item in self.quotation_items.all():
+            ServiceOrderItem.objects.create(
+                order=order,
+                service=quotation_item.service,
+                inventory_item=quotation_item.inventory_item,
+                description=quotation_item.description,
+                quantity=quotation_item.quantity,
+                unit_price=quotation_item.unit_price,
+                total_price=quotation_item.total_price
+            )
+        
+        # Update quotation status
+        self.status = 'converted'
+        self.converted_order = order
+        self.save()
+        
+        return order
+    
+    class Meta:
+        verbose_name = "Quotation"
+        verbose_name_plural = "Quotations"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['quotation_number']),
+            models.Index(fields=['status']),
+            models.Index(fields=['valid_until']),
+            models.Index(fields=['customer_name']),
+        ]
+
+
+class QuotationItem(models.Model):
+    """Individual items in a quotation"""
+    
+    quotation = models.ForeignKey(
+        Quotation,
+        on_delete=models.CASCADE,
+        related_name='quotation_items'
+    )
+    
+    # Link to service or inventory item
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.CASCADE,
+        related_name='quotation_items',
+        null=True,
+        blank=True
+    )
+    inventory_item = models.ForeignKey(
+        'inventory.InventoryItem',
+        on_delete=models.CASCADE,
+        related_name='quotation_items',
+        null=True,
+        blank=True
+    )
+    
+    # Description for custom items or additional details
+    description = models.TextField(blank=True, help_text="Description for custom items or additional details")
+    
+    # Pricing and quantity
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
+    unit_price = models.DecimalField(max_digits=8, decimal_places=2)
+    total_price = models.DecimalField(max_digits=8, decimal_places=2)
+    
+    # Item type for better organization
+    item_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('service', 'Service'),
+            ('inventory', 'Inventory Item'),
+            ('custom', 'Custom Item'),
+        ],
+        default='service'
+    )
+    
+    def save(self, *args, **kwargs):
+        # Calculate total price
+        self.total_price = self.quantity * self.unit_price
+        super().save(*args, **kwargs)
+        
+        # Update quotation totals
+        self.quotation.calculate_totals()
+    
+    def delete(self, *args, **kwargs):
+        quotation = self.quotation
+        super().delete(*args, **kwargs)
+        # Update quotation totals after deletion
+        quotation.calculate_totals()
+    
+    def __str__(self):
+        if self.service:
+            return f"{self.service.name} x{self.quantity}"
+        elif self.inventory_item:
+            return f"{self.inventory_item.name} x{self.quantity}"
+        else:
+            return f"Custom: {self.description[:50]} x{self.quantity}"
+    
+    class Meta:
+        verbose_name = "Quotation Item"
+        verbose_name_plural = "Quotation Items"

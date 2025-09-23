@@ -5,7 +5,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column, Field, HTML, Div
 from crispy_forms.bootstrap import FormActions
 from phonenumber_field.formfields import PhoneNumberField
-from .models import Service, ServiceBay, ServiceCategory, ServicePackage, ServiceOrder, ServiceOrderItem
+from .models import Service, ServiceBay, ServiceCategory, ServicePackage, ServiceOrder, ServiceOrderItem, Quotation, QuotationItem
 
 class ServiceCategoryForm(forms.ModelForm):
     """Service category form - simplified version"""
@@ -321,6 +321,7 @@ class ServiceOrderItemForm(forms.ModelForm):
         model = ServiceOrderItem
         fields = ['service', 'quantity', 'unit_price', 'assigned_to']
         widgets = {
+            'quantity': forms.NumberInput(attrs={'step': '0.01'}),
             'unit_price': forms.NumberInput(attrs={'step': '0.01'}),
         }
     
@@ -1052,3 +1053,253 @@ class NotificationPreferencesForm(forms.Form):
                 Submit('submit', 'Save Preferences', css_class='btn btn-primary')
             )
         )
+
+
+class QuotationForm(forms.ModelForm):
+    """Quotation creation form"""
+    
+    class Meta:
+        model = Quotation
+        fields = [
+            'quotation_type', 'customer_name', 'customer_email', 'customer_phone', 
+            'customer_address', 'vehicle_registration', 'vehicle_make', 'vehicle_model',
+            'vehicle_year', 'vehicle_color', 'description', 'discount_percentage',
+            'tax_percentage', 'valid_from', 'valid_until', 'terms_and_conditions'
+        ]
+        widgets = {
+            'customer_name': forms.TextInput(attrs={'placeholder': 'Enter customer name'}),
+            'customer_email': forms.EmailInput(attrs={'placeholder': 'customer@example.com'}),
+            'customer_phone': forms.TextInput(attrs={'placeholder': '+254 700 000 000'}),
+            'customer_address': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Customer address (optional)'}),
+            'vehicle_registration': forms.TextInput(attrs={'placeholder': 'KXX 000X', 'style': 'text-transform: uppercase;'}),
+            'vehicle_make': forms.TextInput(attrs={'placeholder': 'Toyota'}),
+            'vehicle_model': forms.TextInput(attrs={'placeholder': 'Camry'}),
+            'vehicle_year': forms.NumberInput(attrs={'min': 1980, 'max': 2030, 'placeholder': '2020'}),
+            'vehicle_color': forms.TextInput(attrs={'placeholder': 'White'}),
+            'description': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Brief description of work to be done...'}),
+            'discount_percentage': forms.NumberInput(attrs={'step': '0.01', 'min': 0, 'max': 100}),
+            'tax_percentage': forms.NumberInput(attrs={'step': '0.01', 'min': 0, 'max': 50}),
+            'valid_from': forms.DateInput(attrs={'type': 'date'}),
+            'valid_until': forms.DateInput(attrs={'type': 'date'}),
+            'terms_and_conditions': forms.Textarea(attrs={'rows': 4}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Set default dates and tax
+        if not self.instance.pk:
+            from django.utils import timezone
+            from datetime import timedelta
+            today = timezone.now().date()
+            self.fields['valid_from'].initial = today
+            self.fields['valid_until'].initial = today + timedelta(days=30)
+            self.fields['tax_percentage'].initial = 16
+        
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            HTML('<h5 class="mb-3">Quotation Details</h5>'),
+            Row(
+                Column('quotation_type', css_class='form-group col-md-6'),
+                Column('description', css_class='form-group col-md-6'),
+            ),
+            
+            HTML('<h5 class="mb-3 mt-4">Customer Information</h5>'),
+            Row(
+                Column('customer_name', css_class='form-group col-md-6'),
+                Column('customer_email', css_class='form-group col-md-6'),
+            ),
+            Row(
+                Column('customer_phone', css_class='form-group col-md-6'),
+                Column('customer_address', css_class='form-group col-md-6'),
+            ),
+            
+            HTML('<h5 class="mb-3 mt-4">Vehicle Information (Optional)</h5>'),
+            Row(
+                Column('vehicle_registration', css_class='form-group col-md-4'),
+                Column('vehicle_make', css_class='form-group col-md-4'),
+                Column('vehicle_model', css_class='form-group col-md-4'),
+            ),
+            Row(
+                Column('vehicle_year', css_class='form-group col-md-6'),
+                Column('vehicle_color', css_class='form-group col-md-6'),
+            ),
+            
+            HTML('<h5 class="mb-3 mt-4">Pricing & Validity</h5>'),
+            Row(
+                Column('discount_percentage', css_class='form-group col-md-4'),
+                Column('tax_percentage', css_class='form-group col-md-4'),
+            ),
+            Row(
+                Column('valid_from', css_class='form-group col-md-6'),
+                Column('valid_until', css_class='form-group col-md-6'),
+            ),
+            
+            HTML('<h5 class="mb-3 mt-4">Terms & Conditions</h5>'),
+            'terms_and_conditions',
+            
+            FormActions(
+                Submit('submit', 'Create Quotation', css_class='btn btn-primary'),
+                HTML('<a href="{% url "services:quotation_list" %}" class="btn btn-secondary">Cancel</a>')
+            )
+        )
+    
+    def clean_customer_name(self):
+        name = self.cleaned_data.get('customer_name')
+        if not name or len(name.strip()) < 2:
+            raise ValidationError('Customer name must be at least 2 characters long')
+        return name.strip()
+    
+    def clean_valid_until(self):
+        valid_from = self.cleaned_data.get('valid_from')
+        valid_until = self.cleaned_data.get('valid_until')
+        
+        if valid_from and valid_until and valid_until <= valid_from:
+            raise ValidationError('Valid until date must be after valid from date')
+        
+        return valid_until
+
+
+class QuotationItemForm(forms.ModelForm):
+    """Quotation item form"""
+    
+    class Meta:
+        model = QuotationItem
+        fields = ['service', 'inventory_item', 'description', 'quantity', 'unit_price', 'item_type']
+        widgets = {
+            'quantity': forms.NumberInput(attrs={'step': '0.01', 'min': '0.01'}),
+            'unit_price': forms.NumberInput(attrs={'step': '0.01', 'min': '0.01'}),
+            'description': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Additional description (optional)'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Filter services to active ones
+        self.fields['service'].queryset = Service.objects.filter(is_active=True)
+        self.fields['service'].required = False
+        
+        # Filter inventory items to active ones with stock
+        from apps.inventory.models import InventoryItem
+        self.fields['inventory_item'].queryset = InventoryItem.objects.filter(
+            is_active=True,
+            current_stock__gt=0
+        )
+        self.fields['inventory_item'].required = False
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        service = cleaned_data.get('service')
+        inventory_item = cleaned_data.get('inventory_item')
+        description = cleaned_data.get('description')
+        item_type = cleaned_data.get('item_type')
+        
+        # Ensure at least one item is selected or custom description is provided
+        if not service and not inventory_item and not description:
+            raise ValidationError('Either select a service/inventory item or provide a description for custom items')
+        
+        # Validate item type consistency
+        if item_type == 'service' and not service:
+            raise ValidationError('Service must be selected when item type is "service"')
+        
+        if item_type == 'inventory' and not inventory_item:
+            raise ValidationError('Inventory item must be selected when item type is "inventory"')
+        
+        if item_type == 'custom' and not description:
+            raise ValidationError('Description is required for custom items')
+        
+        # Auto-set unit price based on selected service or inventory item
+        unit_price = cleaned_data.get('unit_price')
+        if not unit_price:
+            if service:
+                cleaned_data['unit_price'] = service.base_price
+            elif inventory_item:
+                cleaned_data['unit_price'] = inventory_item.selling_price or inventory_item.unit_cost
+        
+        return cleaned_data
+
+
+class QuickQuotationForm(forms.Form):
+    """Quick quotation form similar to quick order"""
+    
+    # Customer Selection - Use existing customer from system
+    customer = forms.ModelChoiceField(
+        queryset=None,  # Will be set in __init__
+        required=False,
+        empty_label="Select existing customer",
+        widget=forms.Select(attrs={'class': 'form-control', 'id': 'customer_select'})
+    )
+    
+    # Alternative: Manual customer entry (for new customers)
+    customer_name = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Enter customer name', 'class': 'form-control'})
+    )
+    customer_email = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(attrs={'placeholder': 'customer@example.com', 'class': 'form-control'})
+    )
+    customer_phone = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': '+254 700 000 000', 'class': 'form-control'})
+    )
+    
+    # Vehicle Information (Optional)
+    vehicle_registration = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'KXX 000X', 'style': 'text-transform: uppercase;', 'class': 'form-control'})
+    )
+    vehicle_make = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Toyota', 'class': 'form-control'})
+    )
+    vehicle_model = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Camry', 'class': 'form-control'})
+    )
+    
+    # Quotation Details
+    description = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Brief description of work to be done...', 'class': 'form-control'})
+    )
+    quotation_type = forms.ChoiceField(
+        choices=Quotation.QUOTATION_TYPES,
+        initial='standard',
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    # Services and Items (handled via JavaScript like quick order)
+    selected_services = forms.CharField(required=False, widget=forms.HiddenInput())
+    selected_inventory_items = forms.CharField(required=False, widget=forms.HiddenInput())
+    services_custom_prices = forms.CharField(required=False, widget=forms.HiddenInput())
+    inventory_custom_prices = forms.CharField(required=False, widget=forms.HiddenInput())
+    customer_parts = forms.CharField(required=False, widget=forms.HiddenInput())
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set customer queryset to active customers
+        from apps.customers.models import Customer
+        self.fields['customer'].queryset = Customer.objects.filter(is_active=True).order_by('first_name', 'last_name')
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        customer = cleaned_data.get('customer')
+        customer_name = cleaned_data.get('customer_name')
+        
+        # Either customer must be selected or manual customer name entered
+        if not customer and not customer_name:
+            raise ValidationError('Please select an existing customer or enter customer details manually.')
+        
+        return cleaned_data
+    
+    def clean_customer_name(self):
+        name = self.cleaned_data.get('customer_name')
+        if name and len(name.strip()) < 2:
+            raise ValidationError('Customer name must be at least 2 characters long')
+        return name.strip() if name else name
