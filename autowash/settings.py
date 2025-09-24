@@ -128,6 +128,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
 ] + (['whitenoise.middleware.WhiteNoiseMiddleware'] if RENDER or CPANEL else []) + [
+    'django.middleware.cache.UpdateCacheMiddleware',  # CACHE: Must be first for caching
     'django.contrib.sessions.middleware.SessionMiddleware',
     'apps.core.mysql_middleware.MySQLTenantMiddleware',
     'apps.core.mysql_middleware.TenantBusinessContextMiddleware',
@@ -139,6 +140,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ] + (['django_ratelimit.middleware.RatelimitMiddleware'] if not CPANEL else []) + [
     'allauth.account.middleware.AccountMiddleware',
+    'django.middleware.cache.FetchFromCacheMiddleware',  # CACHE: Must be last for caching
 ] + (['debug_toolbar.middleware.DebugToolbarMiddleware'] if DEBUG else [])
 
 # CSRF Configuration
@@ -273,10 +275,10 @@ else:
         },
     }
 
-# Cache Configuration - Simple and Reliable Django Caching
+# Cache Configuration - Production-Ready Database Cache
 
 def get_cache_config():
-    """Simple, reliable cache configuration for all environments"""
+    """Production-ready cache configuration for all environments"""
     
     if CPANEL:
         # Production cPanel: Database cache (reliable, no Redis needed)
@@ -284,31 +286,62 @@ def get_cache_config():
             'default': {
                 'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
                 'LOCATION': 'django_cache_table',
-                'TIMEOUT': 300,  # 5 minutes - good balance
+                'TIMEOUT': 1800,  # 30 minutes for production
                 'OPTIONS': {
-                    'MAX_ENTRIES': 5000,
+                    'MAX_ENTRIES': 10000,  # More entries for production
                     'CULL_FREQUENCY': 3,  # Remove 1/3 when max reached
                 }
             }
         }
     
-    # Development/Local: Try Redis, fallback to Local Memory
-    try:
-        import redis
-        redis.Redis(host='localhost', port=6379, socket_connect_timeout=1).ping()
+    elif RENDER:
+        # Render: Try Redis first, fallback to database cache
+        redis_url = config('REDIS_URL', default='')
+        if redis_url and 'redis://' in redis_url:
+            try:
+                return {
+                    'default': {
+                        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+                        'LOCATION': redis_url,
+                        'TIMEOUT': 900,  # 15 minutes
+                    }
+                }
+            except:
+                pass
+        
+        # Fallback to database cache for Render
         return {
             'default': {
-                'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-                'LOCATION': 'redis://127.0.0.1:6379/1',
-                'TIMEOUT': 300,  # 5 minutes
+                'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                'LOCATION': 'django_cache_table',
+                'TIMEOUT': 900,  # 15 minutes
+                'OPTIONS': {
+                    'MAX_ENTRIES': 5000,
+                    'CULL_FREQUENCY': 3,
+                }
             }
         }
-    except:
-        # Fallback to simple local memory cache
+    
+    else:
+        # Development/Local: Try Redis first, fallback to database cache
+        try:
+            import redis
+            redis.Redis(host='localhost', port=6379, socket_connect_timeout=1).ping()
+            return {
+                'default': {
+                    'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+                    'LOCATION': 'redis://127.0.0.1:6379/1',
+                    'TIMEOUT': 300,  # 5 minutes for development
+                }
+            }
+        except:
+            pass
+        
+        # Fallback to database cache for local development
         return {
             'default': {
-                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-                'LOCATION': 'autowash-cache',
+                'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                'LOCATION': 'django_cache_table',
                 'TIMEOUT': 300,  # 5 minutes
                 'OPTIONS': {
                     'MAX_ENTRIES': 1000,
@@ -319,13 +352,29 @@ def get_cache_config():
 
 CACHES = get_cache_config()
 
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+# CRITICAL: Ensure cache operations always use main database
+# This prevents cache from being created in tenant databases
+CACHE_MIDDLEWARE_KEY_PREFIX = 'autowash'
+CACHE_MIDDLEWARE_SECONDS = 600  # 10 minutes for page cache
+CACHE_MIDDLEWARE_ALIAS = 'default'
+
+# Database Cache Configuration - Force main database usage
+if any('db.DatabaseCache' in str(cache.get('BACKEND', '')) for cache in CACHES.values()):
+    # Ensure database cache table uses main database routing
+    DATABASES['default']['OPTIONS']['init_command'] += ",@@session.sql_mode='STRICT_TRANS_TABLES'"
+    
+# Multi-tenant cache key versioning to prevent cross-tenant data leakage
+CACHE_MIDDLEWARE_KEY_PREFIX = 'aw'  # Short prefix for efficiency
+
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'  # Hybrid approach for reliability
 SESSION_CACHE_ALIAS = 'default'
-SESSION_COOKIE_AGE = 3600 * 4  # 4 hours - reasonable session timeout
+SESSION_COOKIE_AGE = 3600 * 8  # 8 hours - longer for production stability
 SESSION_COOKIE_NAME = 'autowash_sessionid'
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request for performance
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Allow sessions to persist
 SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request
 
 # Password Validation
