@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.cache import never_cache
 from django.db import transaction, models
 from django.db.models import Q, Count, Sum, Avg, F, Case, When, Value, IntegerField, Prefetch
 from django.utils import timezone
@@ -719,6 +720,20 @@ def quick_order_view(request):
                 
                 # Create vehicle if it's new and assign to customer (only if not skipping vehicle)
                 if not vehicle and not skip_vehicle and not inventory_only and vehicle_registration:
+                    # Get mileage from POST data - check both fields
+                    vehicle_mileage = request.POST.get('vehicle_mileage', '').strip()
+                    existing_vehicle_mileage = request.POST.get('existing_vehicle_mileage', '').strip()
+                    mileage_input = vehicle_mileage or existing_vehicle_mileage
+                    
+                    mileage_value = None
+                    if mileage_input:
+                        try:
+                            mileage_value = int(mileage_input)
+                            if mileage_value < 0:
+                                mileage_value = None
+                        except (ValueError, TypeError):
+                            mileage_value = None
+                    
                     vehicle = Vehicle.objects.create(
                         customer=customer,
                         registration_number=vehicle_registration,
@@ -727,6 +742,7 @@ def quick_order_view(request):
                         color=vehicle_color,
                         vehicle_type=vehicle_type,
                         year=int(vehicle_year),
+                        last_service_mileage=mileage_value,
                         created_by_user_id=request.user.id
                     )
                     logger.info(f"Created new vehicle: {vehicle.registration_number}")
@@ -736,6 +752,27 @@ def quick_order_view(request):
                     vehicle.customer = customer
                     vehicle.save()
                     logger.info(f"Transferred vehicle {vehicle.registration_number} from {old_customer.full_name} to {customer.full_name}")
+                
+                # Update mileage for existing vehicles if provided
+                if vehicle and not skip_vehicle and not inventory_only:
+                    # Check for mileage from both new vehicle form and existing vehicle form
+                    vehicle_mileage = request.POST.get('vehicle_mileage', '').strip()
+                    existing_vehicle_mileage = request.POST.get('existing_vehicle_mileage', '').strip()
+                    mileage_input = vehicle_mileage or existing_vehicle_mileage
+                    
+                    if mileage_input:
+                        try:
+                            mileage_value = int(mileage_input)
+                            if mileage_value >= 0:
+                                # Only update if the new mileage is higher than current (prevents rolling back odometer)
+                                if not vehicle.last_service_mileage or mileage_value >= vehicle.last_service_mileage:
+                                    vehicle.last_service_mileage = mileage_value
+                                    vehicle.save()
+                                    logger.info(f"Updated vehicle {vehicle.registration_number} mileage to {mileage_value} KM")
+                                else:
+                                    logger.warning(f"New mileage {mileage_value} is less than current mileage {vehicle.last_service_mileage} for vehicle {vehicle.registration_number}")
+                        except (ValueError, TypeError):
+                            logger.warning(f"Invalid mileage value provided: {mileage_input}")
                 
                 # Create the service order
                 order = ServiceOrder.objects.create(
@@ -897,9 +934,24 @@ def quick_order_view(request):
                     
                     # Parse inventory custom prices from JSON
                     inventory_custom_prices_data = request.POST.get('inventory_custom_prices', '{}')
+                    logger.info(f"Raw inventory_custom_prices_data: {inventory_custom_prices_data}")
+                    logger.info(f"Type of inventory_custom_prices_data: {type(inventory_custom_prices_data)}")
+                    
                     try:
-                        inventory_custom_prices = json.loads(inventory_custom_prices_data) if inventory_custom_prices_data else {}
-                    except (json.JSONDecodeError, TypeError):
+                        # Handle case where POST data comes as a list (common with forms)
+                        if isinstance(inventory_custom_prices_data, list) and inventory_custom_prices_data:
+                            logger.info(f"inventory_custom_prices_data is a list: {inventory_custom_prices_data}")
+                            inventory_custom_prices_data = inventory_custom_prices_data[0]
+                        
+                        if inventory_custom_prices_data and inventory_custom_prices_data != '{}':
+                            inventory_custom_prices = json.loads(inventory_custom_prices_data)
+                        else:
+                            inventory_custom_prices = {}
+                        logger.info(f"Parsed inventory_custom_prices: {inventory_custom_prices}")
+                        logger.info(f"Number of items with custom prices: {len(inventory_custom_prices)}")
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.error(f"Failed to parse inventory_custom_prices: {e}")
+                        logger.error(f"Problematic data: {repr(inventory_custom_prices_data)}")
                         inventory_custom_prices = {}
                     
                     for item_id in selected_inventory_items:
@@ -932,16 +984,20 @@ def quick_order_view(request):
                             
                             # Get custom price if provided
                             custom_price = inventory_custom_prices.get(str(item_id))
+                            default_price = inventory_item.selling_price or inventory_item.unit_cost or Decimal('0')
+                            logger.info(f"Item {item_id} ({inventory_item.name}): custom_price={custom_price}, default_price={default_price}")
                             
                             # Safely determine unit price
                             try:
-                                if custom_price:
+                                if custom_price is not None and custom_price != "":
                                     unit_price = Decimal(str(custom_price))
+                                    logger.info(f"[CUSTOM] Using custom price {unit_price} for {inventory_item.name}")
                                 else:
-                                    unit_price = inventory_item.selling_price or inventory_item.unit_cost or Decimal('0')
-                            except (ValueError, TypeError, InvalidOperation):
-                                logger.warning(f"Invalid custom price for {inventory_item.name}, using selling price")
-                                unit_price = inventory_item.selling_price or inventory_item.unit_cost or Decimal('0')
+                                    unit_price = default_price
+                                    logger.info(f"[DEFAULT] Using default price {unit_price} for {inventory_item.name} (no custom price provided)")
+                            except (ValueError, TypeError, InvalidOperation) as e:
+                                logger.warning(f"Invalid custom price {custom_price} for {inventory_item.name}: {e}, using selling price")
+                                unit_price = default_price
                             
                             # Validate custom price is not below minimum (unit cost)
                             minimum_price = inventory_item.unit_cost or Decimal('0')
@@ -1001,7 +1057,7 @@ def quick_order_view(request):
                             # Create service order item for customer part
                             ServiceOrderItem.objects.create(
                                 order=order,
-                                description=f"Customer Part: {part_name}",
+                                description=part_name,  # Just the part name without prefix
                                 quantity=part_quantity,
                                 unit_price=Decimal('0'),  # Customer parts are free
                                 total_price=Decimal('0'),  # Explicitly set total price
@@ -1396,11 +1452,21 @@ def add_order_to_queue(order):
     except Exception as e:
         logger.error(f"Error adding order to queue: {str(e)}", exc_info=True)
 
+from django.views.decorators.cache import never_cache
+
 @login_required
 @employee_required()
+@never_cache  # Prevent caching of order details to show real-time updates
 def order_detail_view(request, pk):
     """Service order detail view"""
     order = get_object_or_404(ServiceOrder, pk=pk)
+    
+    # Clear persistent success messages for cancelled orders to prevent repeated display
+    if order.status == 'cancelled' and request.GET.get('refresh'):
+        # Clear all messages to prevent the success message from showing repeatedly
+        storage = messages.get_messages(request)
+        for message in storage:
+            pass  # Consuming all messages clears them
     
     # Get order items
     order_items = order.order_items.all().select_related('service', 'assigned_to')
@@ -1995,7 +2061,12 @@ def cancel_service(request, order_id):
         queue_entry.save()
     
     messages.success(request, f'Order {order.order_number} cancelled successfully.')
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
+    
+    # Force page refresh by adding a timestamp parameter to prevent caching
+    from django.http import HttpResponseRedirect
+    redirect_url = get_business_url(request, 'services:order_detail', pk=order.pk)
+    redirect_url += f"?refresh={timezone.now().timestamp()}"
+    return HttpResponseRedirect(redirect_url)
 
 @login_required
 @employee_required()
@@ -2939,41 +3010,6 @@ def order_print_view(request, pk):
         'title': f'Print Order - {order.order_number}'
     }
     return render(request, 'services/order_print.html', context)
-
-# Service Action Views
-@login_required
-@employee_required()
-@require_POST
-def cancel_service(request, order_id):
-    """Cancel service order and restore inventory if needed"""
-    order = get_object_or_404(ServiceOrder, id=order_id)
-    
-    if not order.can_be_cancelled:
-        messages.error(request, 'This order cannot be cancelled.')
-        return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
-    
-    cancellation_reason = request.POST.get('reason', '')
-    
-    # Restore inventory before cancelling the order
-    _restore_order_inventory(order, request.user, cancellation_reason)
-    
-    order.status = 'cancelled'
-    order.internal_notes += f"\nCancelled by {request.employee.full_name}: {cancellation_reason}"
-    order.save()
-    
-    # Free service bay if assigned
-    if hasattr(order, 'current_bay') and order.current_bay.exists():
-        bay = order.current_bay.first()
-        bay.complete_service()
-    
-    # Update queue entry
-    if hasattr(order, 'queue_entry'):
-        queue_entry = order.queue_entry
-        queue_entry.status = 'cancelled'
-        queue_entry.save()
-    
-    messages.success(request, f'Order {order.order_number} cancelled successfully.')
-    return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
 
 @login_required
 @employee_required()

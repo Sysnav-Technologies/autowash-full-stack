@@ -58,6 +58,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Add event listeners for mileage fields to update review step
+    const vehicleMileageField = document.getElementById('vehicleMileage');
+    const existingVehicleMileageField = document.getElementById('existingVehicleMileage');
+    
+    if (vehicleMileageField) {
+        vehicleMileageField.addEventListener('input', function() {
+            if (currentStep === 4) {
+                updateReviewStep();
+            }
+        });
+    }
+    
+    if (existingVehicleMileageField) {
+        existingVehicleMileageField.addEventListener('input', function() {
+            if (currentStep === 4) {
+                updateReviewStep();
+            }
+        });
+    }
+    
     // Close price edit when clicking outside
     document.addEventListener('click', function(e) {
         if (currentPriceEdit && !e.target.closest('.price-edit-container')) {
@@ -523,6 +543,38 @@ function changeVehicle() {
     document.getElementById('vehicleColor').value = '';
     document.getElementById('vehicleYear').value = '2020';
     document.getElementById('vehicleType').value = '';
+    document.getElementById('vehicleMileage').value = '';
+    
+    // Clear existing vehicle mileage field if it exists
+    const existingMileageField = document.getElementById('existingVehicleMileage');
+    if (existingMileageField) {
+        existingMileageField.value = '';
+    }
+    
+    // Hide mileage section
+    const mileageSection = document.getElementById('mileageUpdateSection');
+    if (mileageSection) {
+        mileageSection.style.display = 'none';
+    }
+}
+
+function toggleMileageUpdate() {
+    const mileageSection = document.getElementById('mileageUpdateSection');
+    const toggleBtn = document.getElementById('mileageToggleBtn');
+    
+    if (mileageSection && toggleBtn) {
+        if (mileageSection.style.display === 'none' || mileageSection.style.display === '') {
+            mileageSection.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="fas fa-tachometer-alt"></i> Hide Mileage';
+            toggleBtn.classList.remove('btn-outline-primary');
+            toggleBtn.classList.add('btn-primary');
+        } else {
+            mileageSection.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="fas fa-tachometer-alt"></i> Update Mileage';
+            toggleBtn.classList.remove('btn-primary');
+            toggleBtn.classList.add('btn-outline-primary');
+        }
+    }
 }
 
 function validateVehicleStep() {
@@ -1725,6 +1777,23 @@ function updateReviewStep() {
             vehicleInfo = `<div class="text-muted">No vehicle information</div>`;
         }
     }
+    
+    // Add mileage information if provided
+    const vehicleMileage = document.getElementById('vehicleMileage') ? document.getElementById('vehicleMileage').value.trim() : '';
+    const existingVehicleMileage = document.getElementById('existingVehicleMileage') ? document.getElementById('existingVehicleMileage').value.trim() : '';
+    const mileageValue = vehicleMileage || existingVehicleMileage;
+    
+    // Update mileage section
+    const mileageSection = document.getElementById('reviewMileageSection');
+    const mileageInfo = document.getElementById('reviewMileageInfo');
+    
+    if (mileageValue && mileageSection && mileageInfo) {
+        mileageInfo.innerHTML = `<strong>${mileageValue} KM</strong><br><small class="text-muted">Current odometer reading</small>`;
+        mileageSection.style.display = 'block';
+    } else if (mileageSection) {
+        mileageSection.style.display = 'none';
+    }
+    
     document.getElementById('reviewVehicleInfo').innerHTML = vehicleInfo;
     
     // Update services and inventory info
@@ -1917,6 +1986,19 @@ function submitOrder() {
                 formData.set('vehicle_color', vehicleColor || 'Unknown');
                 formData.set('vehicle_type', vehicleType || 'car');
                 formData.set('vehicle_year', vehicleYear || '2020');
+            }
+            
+            // Add mileage for both new and existing vehicles (if provided)
+            // Check both new vehicle mileage field and existing vehicle mileage field
+            const vehicleMileage = document.getElementById('vehicleMileage') ? document.getElementById('vehicleMileage').value.trim() : '';
+            const existingVehicleMileage = document.getElementById('existingVehicleMileage') ? document.getElementById('existingVehicleMileage').value.trim() : '';
+            
+            // Send the appropriate mileage field based on which one has a value
+            if (vehicleMileage) {
+                formData.set('vehicle_mileage', vehicleMileage);
+            }
+            if (existingVehicleMileage) {
+                formData.set('existing_vehicle_mileage', existingVehicleMileage);
             }
         }
 
@@ -2819,9 +2901,28 @@ function updateInventoryItemSelection(itemId, quantity) {
         // Add or update inventory item
         itemCard.classList.add('selected');
         
-        // Preserve custom price if it exists, otherwise use current display price
-        const finalPrice = existingItem && existingItem.customPrice ? existingItem.customPrice : itemPrice;
-        const customPrice = existingItem && existingItem.customPrice ? existingItem.customPrice : null;
+        // Check for custom price in multiple sources (priority order):
+        // 1. Existing item's custom price
+        // 2. Pending custom price (set but item not yet selected)
+        // 3. Current display price (default)
+        let finalPrice = itemPrice;
+        let customPrice = null;
+        
+        if (existingItem && existingItem.customPrice) {
+            // Existing custom price takes highest priority
+            finalPrice = existingItem.customPrice;
+            customPrice = existingItem.customPrice;
+            console.log(`Using existing custom price ${customPrice} for inventory item ${itemId}`);
+        } else if (window.pendingCustomPrices && window.pendingCustomPrices.inventory && window.pendingCustomPrices.inventory[itemId]) {
+            // Use pending custom price if available
+            finalPrice = window.pendingCustomPrices.inventory[itemId];
+            customPrice = window.pendingCustomPrices.inventory[itemId];
+            console.log(`Using pending custom price ${customPrice} for inventory item ${itemId}`);
+            // Clear the pending price since it's now being used
+            delete window.pendingCustomPrices.inventory[itemId];
+        } else {
+            console.log(`Using default price ${finalPrice} for inventory item ${itemId}`);
+        }
         
         selectedInventoryItems.push({
             id: itemId,
