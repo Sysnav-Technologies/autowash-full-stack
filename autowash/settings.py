@@ -377,9 +377,11 @@ else:
             'KEY_PREFIX': 'autowash_prod',
             'TIMEOUT': 600,  # 10 minutes for production
             'OPTIONS': {
-                'MAX_ENTRIES': 5000,  # Limit memory usage on shared hosting
-                'CULL_FREQUENCY': 4,
+                'MEMORY_MAX_ENTRIES': 5000,  # Limit memory usage on shared hosting
+                'MEMORY_CULL_FREQUENCY': 4,
+                'DB_TABLE': 'autowash_cache_table',
                 'DATABASE_TIMEOUT': 3600,  # 1 hour for database cache
+                'USE_FILE_CACHE': False,  # Disable file cache for cPanel
             }
         }
     }
