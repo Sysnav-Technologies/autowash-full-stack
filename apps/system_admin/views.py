@@ -1399,6 +1399,15 @@ def setup_tenant_after_approval(business, approving_admin):
         
         print(f"Tenant database created: {business.database_name}")
         
+        # Step 1.5: Ensure cache directories exist for file-based cache
+        print("Ensuring cache directories exist...")
+        try:
+            setup_cache_directories()
+            print("Cache directories verified/created")
+        except Exception as e:
+            print(f"Warning: Cache directory setup failed: {e}")
+            # Continue anyway, cache directories are not critical for tenant setup
+        
         # NOTE: Cache table is global, not per-tenant. Skip creating cache table per tenant.
         print("Skipping cache table creation - cache is global and shared across tenants")
         
@@ -3467,3 +3476,33 @@ def delete_sms_template(request, template_id):
         messages.error(request, f'Error deleting template: {str(e)}')
     
     return redirect('system_admin:sms_templates')
+
+
+def setup_cache_directories():
+    """
+    Ensure cache and session directories exist for file-based cache system
+    Called during business approval and tenant setup
+    """
+    import os
+    from django.conf import settings
+    
+    try:
+        # Get cache location from settings
+        cache_location = settings.CACHES.get('default', {}).get('LOCATION')
+        if cache_location:
+            # Create main cache directory
+            os.makedirs(cache_location, exist_ok=True)
+            print(f"Cache directory ensured: {cache_location}")
+        
+        # Get session directory from settings
+        session_path = getattr(settings, 'SESSION_FILE_PATH', None)
+        if session_path:
+            # Create session directory
+            os.makedirs(session_path, exist_ok=True)
+            print(f"Session directory ensured: {session_path}")
+            
+        return True
+        
+    except Exception as e:
+        print(f"Error setting up cache directories: {e}")
+        return False

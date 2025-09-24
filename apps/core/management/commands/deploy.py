@@ -58,10 +58,10 @@ class Command(BaseCommand):
             self.create_logs_directory()
             self.stdout.write(self.style.SUCCESS('✅ Logs directory created'))
 
-            # Step 3: Create cache table
-            self.stdout.write('💾 Creating cache table...')
-            self.create_cache_table()
-            self.stdout.write(self.style.SUCCESS('✅ Cache table created'))
+            # Step 3: Create cache directories
+            self.stdout.write('� Creating cache directories...')
+            self.create_cache_directories()
+            self.stdout.write(self.style.SUCCESS('✅ Cache directories created'))
 
             # Step 4: Create migrations if needed
             if not options['skip_migrations']:
@@ -178,14 +178,28 @@ class Command(BaseCommand):
         except PermissionError:
             self.stdout.write(self.style.WARNING('Warning: Limited write permissions for logs directory'))
 
-    def create_cache_table(self):
-        """Create cache table for database cache"""
+    def create_cache_directories(self):
+        """Create cache and session directories for file-based cache"""
+        import os
+        from django.conf import settings
+        
         try:
-            call_command('createcachetable', verbosity=0)
+            # Create main cache directory
+            cache_location = settings.CACHES.get('default', {}).get('LOCATION')
+            if cache_location:
+                os.makedirs(cache_location, exist_ok=True)
+                self.stdout.write(f"  📁 Cache directory: {cache_location}")
+            
+            # Create session directory
+            session_path = getattr(settings, 'SESSION_FILE_PATH', None)
+            if session_path:
+                os.makedirs(session_path, exist_ok=True)
+                self.stdout.write(f"  📁 Session directory: {session_path}")
+                
         except Exception as e:
-            # Table might already exist
-            if 'already exists' not in str(e).lower():
-                raise
+            self.stdout.write(
+                self.style.WARNING(f'Warning: Could not create cache directories: {e}')
+            )
 
     def create_migrations(self):
         """Create migrations for all apps if needed"""

@@ -21,48 +21,39 @@ class TenantDatabaseRouter:
         """Set the current tenant for this thread"""
         cls._local.tenant = tenant
         
-        # DISABLED: Cache tenant database config due to tenant database access issues
-        # Caching is not critical for functionality, only performance optimization
-        # The cache was trying to access tenant databases instead of main database
-        # which caused "django_cache_table doesn't exist" errors
-        
-        # if tenant:
-        #     try:
-        #         # Handle both Tenant objects and BusinessContext objects
-        #         database_config = None
-        #         if hasattr(tenant, 'database_config'):
-        #             database_config = tenant.database_config
-        #         elif hasattr(tenant, 'id'):
-        #             # If it's a BusinessContext, get the full Tenant object
-        #             from apps.core.tenant_models import Tenant
-        #             full_tenant = Tenant.objects.using('default').get(id=tenant.id)
-        #             database_config = full_tenant.database_config
-        #         
-        #         if database_config:
-        #             # Explicitly use the main cache backend to avoid tenant database confusion
-        #             from django.core.cache import caches
-        #             # Force use of default cache which should be on main database
-        #             main_cache = caches['default']
-        #             cache_key = f"tenant_db_config_{tenant.id}"
-        #             
-        #             # DEBUG: Check what cache backend we're actually using
-        #             cache_backend = type(main_cache).__name__
-        #             print(f"DEBUG: Using cache backend: {cache_backend}")
-        #             
-        #             # Try to set the cache with error handling
-        #             try:
-        #                 main_cache.set(cache_key, database_config, 300)  # Cache for 5 minutes
-        #                 print(f"DEBUG: Successfully cached tenant config for {tenant.id}")
-        #             except Exception as cache_error:
-        #                 print(f"WARNING Cache set failed for key {cache_key}: {cache_error}")
-        #                 # Continue without caching - not critical
-        #                 pass
-        #                 
-        #     except Exception as e:
-        #         # If cache fails, continue without caching (non-critical feature)
-        #         # This prevents the "django_cache_table doesn't exist" errors
-        #         print(f"Warning: Failed to cache tenant config: {e}")
-        #         pass
+        # Cache tenant database config for performance optimization
+        # Now using file-based cache which avoids database access issues
+        if tenant:
+            try:
+                # Handle both Tenant objects and BusinessContext objects
+                database_config = None
+                if hasattr(tenant, 'database_config'):
+                    database_config = tenant.database_config
+                elif hasattr(tenant, 'id'):
+                    # If it's a BusinessContext, get the full Tenant object
+                    from apps.core.tenant_models import Tenant
+                    full_tenant = Tenant.objects.using('default').get(id=tenant.id)
+                    database_config = full_tenant.database_config
+                
+                if database_config:
+                    # Use file-based cache to store tenant config (no database conflicts)
+                    from django.core.cache import caches
+                    main_cache = caches['default']
+                    cache_key = f"tenant_db_config_{tenant.id}"
+                    
+                    # Cache the database config for better performance
+                    try:
+                        main_cache.set(cache_key, database_config, 300)  # Cache for 5 minutes
+                        print(f"Cached tenant config for {tenant.id} using file-based cache")
+                    except Exception as cache_error:
+                        print(f"Warning: Cache set failed for key {cache_key}: {cache_error}")
+                        # Continue without caching - not critical
+                        pass
+                        
+            except Exception as e:
+                # If cache fails, continue without caching (non-critical feature)
+                print(f"Warning: Failed to cache tenant config: {e}")
+                pass
     
     @classmethod
     def get_tenant(cls):
