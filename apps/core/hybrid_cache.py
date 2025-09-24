@@ -47,14 +47,16 @@ class HybridCacheBackend(BaseCache):
         super().__init__(params)
         
         # Initialize component cache backends
-        self.memory_cache = LocMemCache(
-            location='',  # LocMemCache doesn't use location
-            params={
-                'MAX_ENTRIES': params.get('MEMORY_MAX_ENTRIES', 1000),
-                'CULL_FREQUENCY': params.get('MEMORY_CULL_FREQUENCY', 3),
-                **{k[7:]: v for k, v in params.items() if k.startswith('MEMORY_') and k != 'MEMORY_MAX_ENTRIES' and k != 'MEMORY_CULL_FREQUENCY'}
-            }
-        )
+        memory_params = {
+            'MAX_ENTRIES': params.get('MEMORY_MAX_ENTRIES', 1000),
+            'CULL_FREQUENCY': params.get('MEMORY_CULL_FREQUENCY', 3),
+        }
+        # Add any additional memory-specific parameters
+        for k, v in params.items():
+            if k.startswith('MEMORY_') and k not in ['MEMORY_MAX_ENTRIES', 'MEMORY_CULL_FREQUENCY']:
+                memory_params[k[7:]] = v
+        
+        self.memory_cache = LocMemCache('unique-memory-cache', memory_params)
         
         # Database cache for persistent data
         db_table = params.get('DB_TABLE', 'cache_table')
