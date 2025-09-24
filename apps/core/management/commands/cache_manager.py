@@ -421,15 +421,17 @@ class Command(BaseCommand):
             raise CommandError(f'Failed to update static version: {e}')
 
     def create_cache_table(self):
-        """Create database cache table if needed"""
-        self.stdout.write('Creating database cache table...')
+        """Create database cache table if needed in the default database"""
+        self.stdout.write('Creating database cache table in default database...')
         
         try:
             from django.core.management import call_command
-            call_command('createcachetable')
+            # Ensure cache table is created in the default database (main database)
+            # This is critical for multi-tenant setup - cache is shared across tenants
+            call_command('createcachetable', '--database=default')
             
             self.stdout.write(
-                self.style.SUCCESS('✓ Database cache table created successfully')
+                self.style.SUCCESS('✓ Database cache table created successfully in default database')
             )
             
         except Exception as e:

@@ -58,8 +58,8 @@ class HybridCacheBackend(BaseCache):
         
         self.memory_cache = LocMemCache('unique-memory-cache', memory_params)
         
-        # Database cache for persistent data
-        db_table = params.get('DB_TABLE', 'cache_table')
+        # Database cache for persistent data - use LOCATION as table name for consistency
+        db_table = location if location else params.get('DB_TABLE', 'cache_table')
         db_params = {
             k[3:]: v for k, v in params.items() 
             if k.startswith('DB_') and k != 'DB_TABLE'
