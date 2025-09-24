@@ -101,27 +101,40 @@ class DefaultDatabaseCache(DatabaseCache):
 
     def add(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         """Override add to use default database connection"""
-        import base64, pickle
-        key = self.make_key(key, version=version)
-        db = self._get_db_connection()
-        timeout = self.get_backend_timeout(timeout)
-        value = base64.b64encode(pickle.dumps(value)).decode('latin1')
-        
-        with db.cursor() as cursor:
-            cursor.execute(
-                'SELECT cache_key FROM %s WHERE cache_key = %%s' % self._table,
-                [key]
-            )
-            if cursor.fetchone():
-                return False
-            try:
-                cursor.execute(
-                    'INSERT INTO %s (cache_key, value, expires) VALUES (%%s, %%s, %%s)' % self._table,
-                    [key, value, timeout]
-                )
-                return True
-            except:
-                return False
+        try:
+            key = self.make_key(key, version=version)
+            db = self._get_db_connection()
+            timeout = self.get_backend_timeout(timeout)
+            value = base64.b64encode(pickle.dumps(value)).decode('latin1')
+            
+            with db.cursor() as cursor:
+                # Check if key already exists
+                try:
+                    cursor.execute(
+                        'SELECT cache_key FROM %s WHERE cache_key = %%s' % self._table,
+                        [key]
+                    )
+                    if cursor.fetchone():
+                        return False
+                except Exception as e:
+                    logger.error(f"Error checking cache key existence: {e}")
+                    # If we can't check, assume it doesn't exist and try to insert
+                
+                # Try to insert the new value
+                try:
+                    cursor.execute(
+                        'INSERT INTO %s (cache_key, value, expires) VALUES (%%s, %%s, %%s)' % self._table,
+                        [key, value, timeout]
+                    )
+                    return True
+                except Exception as e:
+                    logger.error(f"Error inserting cache value: {e}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Critical error in cache add operation: {e}")
+            # For session management, we need to indicate failure clearly
+            return False
 
 
 class HybridCacheBackend(BaseCache):
@@ -313,20 +326,31 @@ class HybridCacheBackend(BaseCache):
         
         # Try primary backend first
         try:
-            return primary_backend.add(final_key, value, timeout=timeout, version=version)
+            result = primary_backend.add(final_key, value, timeout=timeout, version=version)
+            if result:
+                return True
+            # If primary returns False, key already exists
+            return False
         except Exception as e:
             logger.error(f"Failed to add to primary cache backend for key {final_key}: {e}")
+            # For session management, if primary fails, we MUST try fallbacks
         
-        # Try fallback backends
+        # Try fallback backends - critical for session management
         for backend in fallback_backends:
             if backend is None:
                 continue
             try:
-                return backend.add(final_key, value, timeout=timeout, version=version)
+                result = backend.add(final_key, value, timeout=timeout, version=version)
+                if result:
+                    logger.info(f"Successfully added to fallback cache backend for key {final_key}")
+                    return True
+                # If fallback returns False, key already exists
+                return False
             except Exception as e:
                 logger.warning(f"Failed to add to fallback cache backend: {e}")
         
-        # If all backends fail, return False (key wasn't added)
+        # If all backends fail, this is critical for sessions
+        logger.critical(f"All cache backends failed for add operation on key {final_key} - session management will fail")
         return False
 
     def delete(self, key, version=None):
