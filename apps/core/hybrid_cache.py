@@ -64,10 +64,7 @@ class HybridCacheBackend(BaseCache):
             k[3:]: v for k, v in params.items() 
             if k.startswith('DB_') and k != 'DB_TABLE'
         }
-        self.database_cache = DatabaseCache(
-            location=db_table,
-            params=db_params
-        )
+        self.database_cache = DatabaseCache(db_table, db_params)
         
         # Optional file cache for static content (when filesystem is suitable)
         self.file_cache = None
@@ -78,10 +75,7 @@ class HybridCacheBackend(BaseCache):
                     k[5:]: v for k, v in params.items() 
                     if k.startswith('FILE_') and k != 'FILE_LOCATION'
                 }
-                self.file_cache = FileBasedCache(
-                    location=file_location,
-                    params=file_params
-                )
+                self.file_cache = FileBasedCache(file_location, file_params)
             except Exception as e:
                 logger.warning(f"File cache initialization failed: {e}")
         
