@@ -14,19 +14,31 @@ Strategy:
 Author: AutoWash Development Team
 """
 
-from django.core.cache.backends.base import BaseCache
+from django.core.cache.backends.base import BaseCache, DEFAULT_TIMEOUT
 from django.core.cache.backends.locmem import LocMemCache
 from django.core.cache.backends.db import DatabaseCache
 from django.core.cache.backends.filebased import FileBasedCache
-from django.core.cache import InvalidCacheBackendError
+from django.db import connections
 from django.utils.encoding import force_str
-from django.utils.module_loading import import_string
-import hashlib
-import time
-import os
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class DefaultDatabaseCache(DatabaseCache):
+    """
+    DatabaseCache that always uses the 'default' database connection
+    for multi-tenant compatibility.
+    """
+    def __init__(self, table, params):
+        super().__init__(table, params)
+        # Override the database connection to always use 'default'
+        self._db = 'default'
+    
+    @property
+    def _cache(self):
+        # Always use the default database connection
+        return connections['default']
 
 
 class HybridCacheBackend(BaseCache):
@@ -59,12 +71,15 @@ class HybridCacheBackend(BaseCache):
         self.memory_cache = LocMemCache('unique-memory-cache', memory_params)
         
         # Database cache for persistent data - use LOCATION as table name for consistency
+        # Force database cache to use default database (main DB) for multi-tenant setup
         db_table = location if location else params.get('DB_TABLE', 'cache_table')
         db_params = {
             k[3:]: v for k, v in params.items() 
             if k.startswith('DB_') and k != 'DB_TABLE'
         }
-        self.database_cache = DatabaseCache(db_table, db_params)
+        # Force database cache to always use 'default' database
+        db_params['_database'] = 'default'
+        self.database_cache = DefaultDatabaseCache(db_table, db_params)
         
         # Optional file cache for static content (when filesystem is suitable)
         self.file_cache = None
@@ -203,6 +218,35 @@ class HybridCacheBackend(BaseCache):
         if not success:
             raise Exception(f"All cache backends failed for key {final_key}")
     
+    def add(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
+        """
+        Add a value to cache only if the key doesn't already exist.
+        Returns True if the value was stored, False otherwise.
+        Required for session management.
+        """
+        tenant_key = self._make_tenant_aware_key(key)
+        final_key = self.make_key(tenant_key, version=version)
+        
+        primary_backend, fallback_backends = self._get_backend_for_key(final_key)
+        
+        # Try primary backend first
+        try:
+            return primary_backend.add(final_key, value, timeout=timeout, version=version)
+        except Exception as e:
+            logger.error(f"Failed to add to primary cache backend for key {final_key}: {e}")
+        
+        # Try fallback backends
+        for backend in fallback_backends:
+            if backend is None:
+                continue
+            try:
+                return backend.add(final_key, value, timeout=timeout, version=version)
+            except Exception as e:
+                logger.warning(f"Failed to add to fallback cache backend: {e}")
+        
+        # If all backends fail, return False (key wasn't added)
+        return False
+
     def delete(self, key, version=None):
         """
         Delete from all backends to ensure consistency.
