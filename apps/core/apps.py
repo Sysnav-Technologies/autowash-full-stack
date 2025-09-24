@@ -8,5 +8,9 @@ class CoreConfig(AppConfig):
     def ready(self):
         import apps.core.signals  # Register signal handlers
         
+        # Simple logging - system ready
+        print("AutoWash Cache System: Using Django built-in cache (Simple & Reliable)")
+        print("AutoWash Core System: READY")
+        
         # Note: Tenant database registration is now handled lazily in middleware
         # to avoid accessing database during app initialization

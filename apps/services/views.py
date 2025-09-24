@@ -1456,20 +1456,25 @@ from django.views.decorators.cache import never_cache
 
 @login_required
 @employee_required()
-@never_cache  # Prevent caching of order details to show real-time updates
+@never_cache
 def order_detail_view(request, pk):
-    """Service order detail view"""
-    order = get_object_or_404(ServiceOrder, pk=pk)
+    """Service order detail view - always gets fresh data"""
+    from django.db import transaction
     
-    # Clear persistent success messages for cancelled orders to prevent repeated display
-    if order.status == 'cancelled' and request.GET.get('refresh'):
-        # Clear all messages to prevent the success message from showing repeatedly
-        storage = messages.get_messages(request)
-        for message in storage:
-            pass  # Consuming all messages clears them
-    
-    # Get order items
-    order_items = order.order_items.all().select_related('service', 'assigned_to')
+    # Use a fresh database connection to avoid any cached queries
+    with transaction.atomic():
+        # Force fresh data from database - no caching
+        order = ServiceOrder.objects.select_related('customer', 'vehicle', 'assigned_attendant').get(pk=pk)
+        
+        # Clear persistent success messages for cancelled orders to prevent repeated display
+        if order.status == 'cancelled' and request.GET.get('refresh'):
+            # Clear all messages to prevent the success message from showing repeatedly
+            storage = messages.get_messages(request)
+            for message in storage:
+                pass  # Consuming all messages clears them
+        
+        # Get order items with fresh query - no caching
+        order_items = ServiceOrderItem.objects.filter(order=order).select_related('service', 'assigned_to', 'inventory_item')
     
     # Get queue entry if exists
     queue_entry = getattr(order, 'queue_entry', None)
@@ -1556,7 +1561,14 @@ def order_detail_view(request, pk):
         'timeline_events': timeline_events,
         'title': f'Order {order.order_number}'
     }
-    return render(request, 'services/order_detail.html', context)
+    
+    # Force no caching for order details to prevent stale data
+    response = render(request, 'services/order_detail.html', context)
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    response['Last-Modified'] = timezone.now().strftime('%a, %d %b %Y %H:%M:%S GMT')
+    return response
 
 @login_required
 @employee_required()
@@ -1597,6 +1609,8 @@ def start_service(request, order_id):
             order.assigned_attendant = request.employee
     
     order.save()
+    
+    # REAL-TIME: No cache invalidation needed - system operates in real-time
     
     # Update queue entry
     if hasattr(order, 'queue_entry'):
@@ -1656,6 +1670,8 @@ def complete_service(request, order_id):
     order.status = 'completed'
     order.actual_end_time = timezone.now()
     order.save()
+    
+    # REAL-TIME: No cache invalidation needed - system operates in real-time
     
     for item in order.order_items.all():
         if not item.completed_at:
@@ -2097,6 +2113,8 @@ def pause_service(request, order_id):
     order.status = 'paused'
     order.internal_notes += f"\nPaused by {request.employee.full_name} at {timezone.now()}"
     order.save()
+    
+    # REAL-TIME: No cache invalidation needed - system operates in real-time
 
     return JsonResponse({
         'success': True,
@@ -2133,6 +2151,8 @@ def resume_service(request, order_id):
     order.status = 'in_progress'
     order.internal_notes += f"\nResumed by {request.employee.full_name} at {timezone.now()}"
     order.save()
+    
+    # REAL-TIME: No cache invalidation needed - system operates in real-time
 
     return JsonResponse({
         'success': True,

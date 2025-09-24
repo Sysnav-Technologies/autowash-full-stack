@@ -43,7 +43,7 @@ class TenantDatabaseRouter:
                     
                     # Cache the database config for better performance
                     try:
-                        main_cache.set(cache_key, database_config, 300)  # Cache for 5 minutes
+                        main_cache.set(cache_key, database_config, 10)  # REAL-TIME: Only 10 seconds
                         print(f"Cached tenant config for {tenant.id} using file-based cache")
                     except Exception as cache_error:
                         print(f"Warning: Cache set failed for key {cache_key}: {cache_error}")

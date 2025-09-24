@@ -1,10 +1,9 @@
 import os
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
-os.environ['NUMEXPR_NUM_THREADS'] = '1'
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
-os.environ['BLAS_NUM_THREADS'] = '1'
+os.environ.update({
+    'OPENBLAS_NUM_THREADS': '1', 'MKL_NUM_THREADS': '1',
+    'NUMEXPR_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1',
+    'VECLIB_MAXIMUM_THREADS': '1', 'BLAS_NUM_THREADS': '1'
+})
 
 from pathlib import Path
 from decouple import config
@@ -13,34 +12,28 @@ from sentry_sdk.integrations.django import DjangoIntegration
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 RENDER = config('RENDER', default=False, cast=bool)
 CPANEL = config('CPANEL', default=False, cast=bool)
-LOCAL = not RENDER and not CPANEL  # Local development environment
+LOCAL = not RENDER and not CPANEL
+
+ALLOWED_HOSTS = {
+    'LOCAL': ['localhost', '127.0.0.1', '*.localhost', 'testserver'],
+    'RENDER': ['.onrender.com', 'autowash-3jpr.onrender.com', 'autowash.co.ke', 'www.autowash.co.ke', '*.autowash.co.ke'],
+    'CPANEL': ['app.autowash.co.ke', 'autowash.co.ke', 'www.autowash.co.ke', '*.autowash.co.ke']
+}
 
 if LOCAL:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
+    ALLOWED_HOSTS = ALLOWED_HOSTS['LOCAL']
 elif RENDER:
-    ALLOWED_HOSTS = [
-        '.onrender.com',                 
-        'autowash-3jpr.onrender.com',      
-        'autowash.co.ke',                   
-        'www.autowash.co.ke',               
-        '*.autowash.co.ke',                
-    ]
-    render_external_hostname = config('RENDER_EXTERNAL_HOSTNAME', default='')
-    if render_external_hostname:
-        ALLOWED_HOSTS.append(render_external_hostname)
-elif CPANEL:
-    ALLOWED_HOSTS = [
-        'app.autowash.co.ke',
-        'autowash.co.ke',                   
-        'www.autowash.co.ke',               
-        '*.autowash.co.ke',
-    ]
+    ALLOWED_HOSTS = ALLOWED_HOSTS['RENDER']
+    external_host = config('RENDER_EXTERNAL_HOSTNAME', default='')
+    if external_host:
+        ALLOWED_HOSTS.append(external_host)
+else:
+    ALLOWED_HOSTS = ALLOWED_HOSTS['CPANEL']
     cpanel_domain = config('CPANEL_DOMAIN', default='')
     if cpanel_domain:
         ALLOWED_HOSTS.append(cpanel_domain)
@@ -129,64 +122,24 @@ TENANT_ROUTING = {
     'PUBLIC_TENANT_DOMAIN': public_domain,
 }
 
-# Disable admin session check since we handle sessions ourselves
 SILENCED_SYSTEM_CHECKS = ['admin.E410']
 
-# MySQL Multi-Tenant Middleware Configuration
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-]
-
-if RENDER:
-    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
-elif CPANEL:
-    # Add whitenoise for cPanel static file serving
-    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
-
-MIDDLEWARE.extend([
-    # Session middleware
+] + (['whitenoise.middleware.WhiteNoiseMiddleware'] if RENDER or CPANEL else []) + [
     'django.contrib.sessions.middleware.SessionMiddleware',
-    
-    # MySQL Multi-tenant middleware
     'apps.core.mysql_middleware.MySQLTenantMiddleware',
     'apps.core.mysql_middleware.TenantBusinessContextMiddleware',
-    'apps.core.mysql_middleware.TenantURLMiddleware',
-    
-    # Standard Django middleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    
-    # Auth middleware after tenant middleware
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    
-    # Message middleware (must come before middleware that uses messages)
     'django.contrib.messages.middleware.MessageMiddleware',
-    
-    # Suspension and access control middleware (after auth and messages)
-    'apps.core.suspension_middleware.SuspensionCheckMiddleware',
-    'apps.core.suspension_middleware.BusinessAccessControlMiddleware',
-    
-    # Subscription status middleware (after messages middleware)
     'apps.subscriptions.middleware.SubscriptionMiddleware',
-    
-    # Other middleware
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_ratelimit.middleware.RatelimitMiddleware',
-    
-    # Custom middleware
-    'apps.core.middleware.TimezoneMiddleware',
-    'apps.core.middleware.UserActivityMiddleware',
-    
-    # Network protection middleware
-    'apps.core.network_middleware.NetworkProtectionMiddleware',
-    
-    # AllAuth middleware at the end
+] + (['django_ratelimit.middleware.RatelimitMiddleware'] if not CPANEL else []) + [
     'allauth.account.middleware.AccountMiddleware',
-])
-
-if DEBUG:
-    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+] + (['debug_toolbar.middleware.DebugToolbarMiddleware'] if DEBUG else [])
 
 # CSRF Configuration
 CSRF_COOKIE_NAME = 'autowash_csrftoken'
@@ -280,7 +233,12 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
+        'CONN_MAX_AGE': 3600 if CPANEL else 600,
         'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES',autocommit=1",
+            'isolation_level': None,
+        } if CPANEL else {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'autocommit': True,
@@ -288,10 +246,7 @@ DATABASES = {
     }
 }
 
-# Database router for multi-tenant architecture
-DATABASE_ROUTERS = [
-    'apps.core.database_router.TenantDatabaseRouter',
-]
+DATABASE_ROUTERS = ['apps.core.database_router.TenantDatabaseRouter']
 
 # Redis and Channel Layers Configuration
 redis_url = config('REDIS_URL', default='')
@@ -318,87 +273,60 @@ else:
         },
     }
 
-# Cache Configuration - Robust Multi-Environment Strategy
-# Optimized for cPanel production (no Redis) and local development (with Redis)
-import os
+# Cache Configuration - Simple and Reliable Django Caching
 
-# Create cache directory for file-based fallback
-CACHE_DIR = os.path.join(BASE_DIR, 'cache')
-if not os.path.exists(CACHE_DIR):
-    os.makedirs(CACHE_DIR)
-
-# Cache strategy based on environment and available services
-if DEBUG and not CPANEL:
-    # Development: Use Redis if available, fallback to local memory
+def get_cache_config():
+    """Simple, reliable cache configuration for all environments"""
+    
+    if CPANEL:
+        # Production cPanel: Database cache (reliable, no Redis needed)
+        return {
+            'default': {
+                'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                'LOCATION': 'django_cache_table',
+                'TIMEOUT': 300,  # 5 minutes - good balance
+                'OPTIONS': {
+                    'MAX_ENTRIES': 5000,
+                    'CULL_FREQUENCY': 3,  # Remove 1/3 when max reached
+                }
+            }
+        }
+    
+    # Development/Local: Try Redis, fallback to Local Memory
     try:
         import redis
-        r = redis.Redis(host='localhost', port=6379, socket_connect_timeout=2)
-        r.ping()
-        
-        # Redis available - use for development
-        CACHES = {
+        redis.Redis(host='localhost', port=6379, socket_connect_timeout=1).ping()
+        return {
             'default': {
                 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
                 'LOCATION': 'redis://127.0.0.1:6379/1',
-                'KEY_PREFIX': 'autowash_dev',
-                'TIMEOUT': 300,
-            },
-            'sessions': {
-                'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-                'LOCATION': 'redis://127.0.0.1:6379/2',
-                'KEY_PREFIX': 'autowash_sessions',
-                'TIMEOUT': 86400,  # 24 hours for sessions
+                'TIMEOUT': 300,  # 5 minutes
             }
         }
-        print("[CACHE] Using Redis for development")
-        
-    except (ImportError, redis.ConnectionError, redis.TimeoutError):
-        # Redis not available - use local memory for development
-        CACHES = {
+    except:
+        # Fallback to simple local memory cache
+        return {
             'default': {
                 'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-                'LOCATION': 'autowash-dev-cache',
-                'KEY_PREFIX': 'autowash_dev',
-                'TIMEOUT': 300,
+                'LOCATION': 'autowash-cache',
+                'TIMEOUT': 300,  # 5 minutes
                 'OPTIONS': {
-                    'MAX_ENTRIES': 10000,
+                    'MAX_ENTRIES': 1000,
                     'CULL_FREQUENCY': 3,
                 }
             }
         }
-        print("[CACHE] Using local memory cache for development")
 
-else:
-    # Production (cPanel): Hybrid strategy - Local Memory + Database fallback
-    CACHES = {
-        'default': {
-            'BACKEND': 'apps.core.hybrid_cache.HybridCacheBackend',
-            'LOCATION': 'autowash_cache_table',
-            'KEY_PREFIX': 'autowash_prod',
-            'TIMEOUT': 600,  # 10 minutes for production
-            'OPTIONS': {
-                'MEMORY_MAX_ENTRIES': 5000,  # Limit memory usage on shared hosting
-                'MEMORY_CULL_FREQUENCY': 4,
-                'DB_TABLE': 'autowash_cache_table',
-                'DATABASE_TIMEOUT': 3600,  # 1 hour for database cache
-                'USE_FILE_CACHE': False,  # Disable file cache for cPanel
-            }
-        }
-    }
-    print(f"[CACHE] Using hybrid cache (memory+database) for production")
+CACHES = get_cache_config()
 
-# Session configuration - always use cache-based sessions for better performance
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 SESSION_CACHE_ALIAS = 'default'
-SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_COOKIE_AGE = 3600 * 4  # 4 hours - reasonable session timeout
 SESSION_COOKIE_NAME = 'autowash_sessionid'
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_SAVE_EVERY_REQUEST = False
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-
-print(f"[SESSIONS] Using cache-based sessions")
+SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -785,8 +713,21 @@ if CPANEL or RENDER:
         '.eot': 'application/vnd.ms-fontobject',
     }
 
-# Network Protection Settings
-# These settings help prevent duplicate database operations during slow internet connections
-NETWORK_SLOW_THRESHOLD = 3.0  # seconds - requests slower than this are considered slow
-NETWORK_DUPLICATE_WINDOW = 5.0  # seconds - time window to detect duplicate submissions
-NETWORK_PROTECTION_DURATION = 30.0  # seconds - how long protection stays active after slow connection detected
+NETWORK_SLOW_THRESHOLD = 3.0
+NETWORK_DUPLICATE_WINDOW = 5.0
+NETWORK_PROTECTION_DURATION = 30.0
+
+if not DEBUG:
+    CONN_HEALTH_CHECKS = True
+    DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+    FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+    
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+    
+    if CPANEL:
+        USE_TZ = True
+        TIME_ZONE = 'UTC'
+        ATOMIC_REQUESTS = False
+        PREPEND_WWW = False

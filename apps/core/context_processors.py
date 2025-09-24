@@ -1,52 +1,25 @@
-"""
-Context processors for MySQL multi-tenant system
-"""
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
-import os
-import hashlib
 import time
 
 
 def static_version_context(request):
-    """
-    Add static file version for browser cache invalidation.
-    This helps ensure users get updated static files after deployments.
-    """
-    # Try to get version from cache first
-    static_version = cache.get('static:version')
-    
-    if not static_version:
-        # Try to read from version file
-        version_file = os.path.join(settings.BASE_DIR, 'static', 'version.txt')
-        if os.path.exists(version_file):
-            try:
-                with open(version_file, 'r') as f:
-                    static_version = f.read().strip()
-            except Exception:
-                pass
-        
-        # Generate new version if not found
-        if not static_version:
-            version_string = f"{time.time()}-{settings.SECRET_KEY[:10]}"
-            static_version = hashlib.md5(version_string.encode()).hexdigest()[:12]
-            
-            # Cache it for future requests
-            cache.set('static:version', static_version, timeout=None)
-    
+    """Simple cache buster context - compatible with cache_buster template tag."""
+    # Simple version based on current time, updated every 10 seconds
+    static_version = str(int(time.time() / 10))
     return {
-        'static_version': static_version,
-        'STATIC_VERSION': static_version,  # Alternative name for templates
+        'static_version': static_version, 
+        'STATIC_VERSION': static_version,
+        'cache_buster': static_version
     }
 
 
 def business_context(request):
-    """Add business context to templates with MySQL multi-tenant routing"""
     context = {
         'tenant': getattr(request, 'tenant', None),
-        'business': getattr(request, 'tenant', None),  # For backward compatibility
+        'business': getattr(request, 'tenant', None),
         'business_slug': getattr(request, 'tenant_slug', None),
         'current_year': timezone.now().year,
         'app_name': 'Autowash',
@@ -54,9 +27,26 @@ def business_context(request):
         'is_tenant_context': hasattr(request, 'tenant') and request.tenant is not None,
     }
     
-    # Add tenant-specific context if we're in a tenant context
     if hasattr(request, 'tenant') and request.tenant:
         tenant = request.tenant
+        # REAL-TIME: No caching - always get fresh business data
+        try:
+            business_context_data = {
+                'business_name': tenant.name,
+                'business_logo': tenant.logo.url if tenant.logo else None,
+                'is_verified': getattr(tenant, 'is_verified', False),
+                'is_approved': getattr(tenant, 'is_approved', False),
+                'is_active': getattr(tenant, 'is_active', True),
+            }
+        except Exception:
+            business_context_data = {
+                'business_name': tenant.name,
+                'is_verified': False,
+                'is_approved': True,
+                'is_active': True,
+            }
+        
+        context.update(business_context_data)
         
         # Check business status
         is_verified = getattr(tenant, 'is_verified', False)
