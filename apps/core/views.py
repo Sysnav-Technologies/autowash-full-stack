@@ -2,6 +2,7 @@ from django.http import HttpResponse, FileResponse, Http404, JsonResponse
 from django.conf import settings
 from django.db import connection
 from django.core.cache import cache
+from apps.core.cache_utils import CoreCache
 from django.contrib.auth import get_user_model
 from django.apps import apps
 from django.views.decorators.cache import cache_control
@@ -92,14 +93,11 @@ def health_check(request):
     try:
         cache_key = f"health_check_{datetime.datetime.now().timestamp()}"
         try:
-            cache.set(cache_key, "test_value", 30)
-            cache_value = cache.get(cache_key)
+            CoreCache.set(cache_key, "test_value", 30)
+            cache_value = CoreCache.get(cache_key)
             if cache_value == "test_value":
                 cache_status = "✅ Working"
-                try:
-                    cache.delete(cache_key)
-                except Exception:
-                    pass  # Ignore delete errors
+                CoreCache.delete(cache_key)  # Cleanup handled by utility
             else:
                 cache_status = "❌ Not working"
                 overall_status = "⚠️ DEGRADED"

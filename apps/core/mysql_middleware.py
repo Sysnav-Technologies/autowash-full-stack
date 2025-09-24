@@ -6,9 +6,9 @@ from django.http import Http404, HttpResponseRedirect
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
-from django.core.cache import cache
 from apps.core.tenant_models import Tenant
 from apps.core.database_router import TenantDatabaseRouter, TenantDatabaseManager
+from apps.core.cache_utils import CoreCache
 import re
 import logging
 
@@ -93,22 +93,13 @@ class MySQLTenantMiddleware(MiddlewareMixin):
             
             # Use cache for performance (with error handling)
             cache_key = f"tenant_subdomain_{subdomain}"
-            tenant = None
-            try:
-                tenant = cache.get(cache_key)
-            except Exception as e:
-                logger.warning(f"Cache get failed for subdomain {subdomain}: {e}")
-                # Continue without cache
+            tenant = CoreCache.get(cache_key)
             
             if tenant is None:
                 try:
                     tenant = Tenant.objects.get_by_subdomain(subdomain)
                     if tenant:
-                        try:
-                            cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
-                        except Exception as e:
-                            logger.warning(f"Cache set failed for subdomain {subdomain}: {e}")
-                            # Continue without caching
+                        CoreCache.set(cache_key, tenant)  # Uses default timeout from settings
                 except Exception:
                     tenant = None
             
@@ -127,21 +118,12 @@ class MySQLTenantMiddleware(MiddlewareMixin):
             
             # Use cache for performance (with error handling)
             cache_key = f"tenant_slug_{tenant_slug}"
-            tenant = None
-            try:
-                tenant = cache.get(cache_key)
-            except Exception as e:
-                logger.warning(f"Cache get failed for slug {tenant_slug}: {e}")
-                # Continue without cache
+            tenant = CoreCache.get(cache_key)
             
             if tenant is None:
                 try:
                     tenant = Tenant.objects.get(slug=tenant_slug, is_active=True)
-                    try:
-                        cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
-                    except Exception as e:
-                        logger.warning(f"Cache set failed for slug {tenant_slug}: {e}")
-                        # Continue without caching
+                    CoreCache.set(cache_key, tenant)  # Uses default timeout from settings
                 except Tenant.DoesNotExist:
                     tenant = None
             
@@ -156,22 +138,13 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         """Resolve tenant from custom domain"""
         # Use cache for performance (with error handling)
         cache_key = f"tenant_domain_{hostname}"
-        tenant = None
-        try:
-            tenant = cache.get(cache_key)
-        except Exception as e:
-            logger.warning(f"Cache get failed for domain {hostname}: {e}")
-            # Continue without cache
+        tenant = CoreCache.get(cache_key)
         
         if tenant is None:
             try:
                 tenant = Tenant.objects.get_by_domain(hostname)
                 if tenant:
-                    try:
-                        cache.set(cache_key, tenant, 300)  # Cache for 5 minutes
-                    except Exception as e:
-                        logger.warning(f"Cache set failed for domain {hostname}: {e}")
-                        # Continue without caching
+                    CoreCache.set(cache_key, tenant)  # Uses default timeout from settings
             except Exception:
                 tenant = None
         

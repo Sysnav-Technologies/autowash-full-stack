@@ -5,12 +5,34 @@ from django.conf.urls.static import static
 from django.views.generic import TemplateView
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect, HttpResponse
+from django.views.static import serve
+import os
 
 from apps.core.views import health_check, serve_legal_document
 
 admin.site.site_header = "Autowash System Administration"
 admin.site.site_title = "System Admin"
 admin.site.index_title = "System Administration Panel"
+
+def serve_service_worker(request):
+    """Serve service worker from static files"""
+    sw_path = os.path.join(settings.BASE_DIR, 'static', 'js', 'sw.js')
+    try:
+        with open(sw_path, 'r') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/javascript')
+    except FileNotFoundError:
+        return HttpResponse('// Service worker not found', content_type='application/javascript', status=404)
+
+def serve_favicon(request):
+    """Serve favicon from static files"""
+    favicon_path = os.path.join(settings.BASE_DIR, 'static', 'img', 'favicon.ico')
+    try:
+        with open(favicon_path, 'rb') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='image/x-icon')
+    except FileNotFoundError:
+        return HttpResponse('', content_type='image/x-icon', status=404)
 
 def root_redirect(request):
     if hasattr(request, 'business') and request.business:
@@ -97,6 +119,10 @@ def _get_employee_redirect_url(tenant_slug, role):
 
 # URL Configuration
 urlpatterns = [
+    # Static file handlers for common requests
+    path('sw.js', serve_service_worker, name='service_worker'),
+    path('favicon.ico', serve_favicon, name='favicon'),
+    
     # Health check and administration
     path('health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),

@@ -19,8 +19,9 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 RENDER = config('RENDER', default=False, cast=bool)
 CPANEL = config('CPANEL', default=False, cast=bool)
+LOCAL = not RENDER and not CPANEL  # Local development environment
 
-if not RENDER and not CPANEL:
+if LOCAL:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*.localhost', 'testserver']
 elif RENDER:
     ALLOWED_HOSTS = [
@@ -297,7 +298,14 @@ DATABASE_ROUTERS = [
 
 # Redis and Channel Layers Configuration
 redis_url = config('REDIS_URL', default='')
-if redis_url and 'redis://' in redis_url:
+# Force in-memory channel layer for cPanel and LOCAL environments, Redis for RENDER
+if CPANEL or LOCAL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+elif RENDER and redis_url and 'redis://' in redis_url:
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -314,15 +322,51 @@ else:
     }
 
 # Cache Configuration
-if redis_url and redis_url != '' and 'redis://' in redis_url:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': redis_url.replace('/1', '/2'),
+# Cache Configuration - Support Redis for better performance
+# Try Redis first, fallback to database cache
+try:
+    # Check if Redis is available (for both cPanel and other environments)
+    import redis
+    
+    # Try to connect to local Redis first
+    redis_connection_options = [
+        'redis://localhost:6379/1',  # Standard local Redis
+        'redis://127.0.0.1:6379/1',  # Alternative local Redis
+    ]
+    
+    # Add render Redis URL if available
+    if RENDER and redis_url and redis_url != '' and 'redis://' in redis_url:
+        redis_connection_options.insert(0, redis_url.replace('/1', '/2'))
+    
+    # Test Redis connection
+    redis_cache_location = None
+    for redis_loc in redis_connection_options:
+        try:
+            r = redis.from_url(redis_loc)
+            r.ping()  # Test connection
+            redis_cache_location = redis_loc
+            print(f"[SUCCESS] Redis connected successfully at {redis_loc}")
+            break
+        except (redis.ConnectionError, redis.TimeoutError, Exception) as e:
+            print(f"[ERROR] Redis connection failed for {redis_loc}: {e}")
+            continue
+    
+    if redis_cache_location:
+        CACHES = {
+            'default': {
+                'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+                'LOCATION': redis_cache_location,
+                'KEY_PREFIX': 'autowash_cache',
+                'TIMEOUT': 300,  # 5 minutes default
+            }
         }
-    }
-else:
-    # Production-ready database cache using main database
+        print("[CACHE] Using Redis cache backend")
+    else:
+        raise Exception("Redis not available, falling back to database cache")
+        
+except (ImportError, Exception) as e:
+    print(f"[WARNING] Redis not available ({e}), using database cache")
+    # Fallback to database cache using main database
     # Custom backend ensures cache table is always accessed from main database
     CACHES = {
         'default': {
@@ -336,6 +380,7 @@ else:
             }
         }
     }
+    print("[CACHE] Using database cache backend")
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -392,9 +437,19 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # Celery Configuration
-if redis_url and 'redis://' in redis_url:
+# Disable Redis for Celery in cPanel and LOCAL environments
+if RENDER and redis_url and 'redis://' in redis_url:
     CELERY_BROKER_URL = redis_url.replace('/1', '/0')
     CELERY_RESULT_BACKEND = redis_url.replace('/1', '/0')
+    CELERY_ACCEPT_CONTENT = ['json']
+    CELERY_TASK_SERIALIZER = 'json'
+    CELERY_RESULT_SERIALIZER = 'json'
+    CELERY_TIMEZONE = TIME_ZONE
+    CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+elif CPANEL or LOCAL:
+    # Use database backend for Celery in cPanel and local development
+    CELERY_BROKER_URL = 'django://'
+    CELERY_RESULT_BACKEND = 'django-cache'
     CELERY_ACCEPT_CONTENT = ['json']
     CELERY_TASK_SERIALIZER = 'json'
     CELERY_RESULT_SERIALIZER = 'json'
@@ -482,7 +537,6 @@ LOGOUT_REDIRECT_URL = '/public/'
 
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
-ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_REDIRECT_URL = '/public/'
@@ -507,7 +561,6 @@ SOCIALACCOUNT_PROVIDERS = {
 SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'  # Since Google emails are pre-verified
-SOCIALACCOUNT_EMAIL_REQUIRED = True
 SOCIALACCOUNT_QUERY_EMAIL = True
 
 # Google OAuth Credentials (to be set in environment variables)
