@@ -48,21 +48,22 @@ class HybridCacheBackend(BaseCache):
         
         # Initialize component cache backends
         self.memory_cache = LocMemCache(
-            location='memory_cache',
+            location='',  # LocMemCache doesn't use location
             params={
                 'MAX_ENTRIES': params.get('MEMORY_MAX_ENTRIES', 1000),
                 'CULL_FREQUENCY': params.get('MEMORY_CULL_FREQUENCY', 3),
-                **{k: v for k, v in params.items() if k.startswith('MEMORY_')}
+                **{k[7:]: v for k, v in params.items() if k.startswith('MEMORY_') and k != 'MEMORY_MAX_ENTRIES' and k != 'MEMORY_CULL_FREQUENCY'}
             }
         )
         
         # Database cache for persistent data
+        db_table = params.get('DB_TABLE', 'cache_table')
         db_params = {
-            'LOCATION': params.get('DB_TABLE', 'cache_table'),
-            **{k: v for k, v in params.items() if k.startswith('DB_')}
+            k[3:]: v for k, v in params.items() 
+            if k.startswith('DB_') and k != 'DB_TABLE'
         }
         self.database_cache = DatabaseCache(
-            location=db_params['LOCATION'],
+            location=db_table,
             params=db_params
         )
         
@@ -71,9 +72,13 @@ class HybridCacheBackend(BaseCache):
         if params.get('USE_FILE_CACHE', False):
             file_location = params.get('FILE_LOCATION', '/tmp/django_cache')
             try:
+                file_params = {
+                    k[5:]: v for k, v in params.items() 
+                    if k.startswith('FILE_') and k != 'FILE_LOCATION'
+                }
                 self.file_cache = FileBasedCache(
                     location=file_location,
-                    params={k: v for k, v in params.items() if k.startswith('FILE_')}
+                    params=file_params
                 )
             except Exception as e:
                 logger.warning(f"File cache initialization failed: {e}")
