@@ -188,20 +188,16 @@ MIDDLEWARE.extend([
 if DEBUG:
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 
-# Session Configuration - Enhanced for multi-tenant
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-SESSION_COOKIE_NAME = 'autowash_sessionid'
-SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_COOKIE_DOMAIN = None
-SESSION_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_PATH = '/'
-SESSION_SAVE_EVERY_REQUEST = False  # CRITICAL: Let our middleware handle saves
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
-
 # CSRF Configuration
+CSRF_COOKIE_NAME = 'autowash_csrftoken'
+CSRF_COOKIE_AGE = 31449600
+CSRF_COOKIE_DOMAIN = None
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_PATH = '/'
+CSRF_USE_SESSIONS = False
+CSRF_FAILURE_VIEW = 'apps.core.views.csrf_failure'
 CSRF_COOKIE_NAME = 'autowash_csrftoken'
 CSRF_COOKIE_AGE = 31449600
 CSRF_COOKIE_DOMAIN = None
@@ -257,6 +253,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.core.context_processors.static_version_context',  # For browser cache invalidation
                 'apps.core.context_processors.business_context',
                 'apps.core.context_processors.user_role_context',
                 'apps.core.context_processors.navigation_context',
@@ -321,66 +318,85 @@ else:
         },
     }
 
-# Cache Configuration
-# Cache Configuration - Support Redis for better performance
-# Try Redis first, fallback to database cache
-try:
-    # Check if Redis is available (for both cPanel and other environments)
-    import redis
-    
-    # Try to connect to local Redis first
-    redis_connection_options = [
-        'redis://localhost:6379/1',  # Standard local Redis
-        'redis://127.0.0.1:6379/1',  # Alternative local Redis
-    ]
-    
-    # Add render Redis URL if available
-    if RENDER and redis_url and redis_url != '' and 'redis://' in redis_url:
-        redis_connection_options.insert(0, redis_url.replace('/1', '/2'))
-    
-    # Test Redis connection
-    redis_cache_location = None
-    for redis_loc in redis_connection_options:
-        try:
-            r = redis.from_url(redis_loc)
-            r.ping()  # Test connection
-            redis_cache_location = redis_loc
-            print(f"[SUCCESS] Redis connected successfully at {redis_loc}")
-            break
-        except (redis.ConnectionError, redis.TimeoutError, Exception) as e:
-            print(f"[ERROR] Redis connection failed for {redis_loc}: {e}")
-            continue
-    
-    if redis_cache_location:
+# Cache Configuration - Robust Multi-Environment Strategy
+# Optimized for cPanel production (no Redis) and local development (with Redis)
+import os
+
+# Create cache directory for file-based fallback
+CACHE_DIR = os.path.join(BASE_DIR, 'cache')
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
+
+# Cache strategy based on environment and available services
+if DEBUG and not CPANEL:
+    # Development: Use Redis if available, fallback to local memory
+    try:
+        import redis
+        r = redis.Redis(host='localhost', port=6379, socket_connect_timeout=2)
+        r.ping()
+        
+        # Redis available - use for development
         CACHES = {
             'default': {
                 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-                'LOCATION': redis_cache_location,
-                'KEY_PREFIX': 'autowash_cache',
-                'TIMEOUT': 300,  # 5 minutes default
+                'LOCATION': 'redis://127.0.0.1:6379/1',
+                'KEY_PREFIX': 'autowash_dev',
+                'TIMEOUT': 300,
+            },
+            'sessions': {
+                'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+                'LOCATION': 'redis://127.0.0.1:6379/2',
+                'KEY_PREFIX': 'autowash_sessions',
+                'TIMEOUT': 86400,  # 24 hours for sessions
             }
         }
-        print("[CACHE] Using Redis cache backend")
-    else:
-        raise Exception("Redis not available, falling back to database cache")
+        print("[CACHE] Using Redis for development")
         
-except (ImportError, Exception) as e:
-    print(f"[WARNING] Redis not available ({e}), using database cache")
-    # Fallback to database cache using main database
-    # Custom backend ensures cache table is always accessed from main database
+    except (ImportError, redis.ConnectionError, redis.TimeoutError):
+        # Redis not available - use local memory for development
+        CACHES = {
+            'default': {
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'LOCATION': 'autowash-dev-cache',
+                'KEY_PREFIX': 'autowash_dev',
+                'TIMEOUT': 300,
+                'OPTIONS': {
+                    'MAX_ENTRIES': 10000,
+                    'CULL_FREQUENCY': 3,
+                }
+            }
+        }
+        print("[CACHE] Using local memory cache for development")
+
+else:
+    # Production (cPanel): Hybrid strategy - Local Memory + Database fallback
     CACHES = {
         'default': {
-            'BACKEND': 'apps.core.production_cache.ProductionDatabaseCache',
-            'LOCATION': 'django_cache_table',
-            'KEY_PREFIX': 'autowash_cache',
-            'TIMEOUT': 300,  # 5 minutes default
+            'BACKEND': 'apps.core.hybrid_cache.HybridCacheBackend',
+            'LOCATION': 'autowash_cache_table',
+            'KEY_PREFIX': 'autowash_prod',
+            'TIMEOUT': 600,  # 10 minutes for production
             'OPTIONS': {
-                'MAX_ENTRIES': 10000,
+                'MAX_ENTRIES': 5000,  # Limit memory usage on shared hosting
                 'CULL_FREQUENCY': 4,
+                'DATABASE_TIMEOUT': 3600,  # 1 hour for database cache
             }
         }
     }
-    print("[CACHE] Using database cache backend")
+    print(f"[CACHE] Using hybrid cache (memory+database) for production")
+
+# Session configuration - always use cache-based sessions for better performance
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_COOKIE_NAME = 'autowash_sessionid'
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_SAVE_EVERY_REQUEST = False
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+print(f"[SESSIONS] Using cache-based sessions")
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [

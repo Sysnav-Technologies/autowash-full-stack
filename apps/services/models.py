@@ -757,6 +757,28 @@ class ServiceOrderItem(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total_price = models.DecimalField(max_digits=12, decimal_places=2)
     
+    # Discount fields
+    discount_percentage = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Discount percentage for this item (0-100%)"
+    )
+    discount_amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Discount amount for this item"
+    )
+    original_price = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Original price before discount (for record keeping)"
+    )
+    
     # Customer-provided parts (no charge for parts, only labor)
     is_customer_provided = models.BooleanField(
         default=False,
@@ -840,6 +862,45 @@ class ServiceOrderItem(models.Model):
             return "inventory"
         return "unknown"
     
+    def calculate_discount(self):
+        """Calculate discount amount based on percentage and update fields"""
+        if self.discount_percentage > 0:
+            original_total = self.quantity * self.unit_price
+            self.discount_amount = (original_total * self.discount_percentage) / Decimal('100')
+            self.original_price = original_total
+            self.total_price = original_total - self.discount_amount
+        else:
+            self.discount_amount = Decimal('0.00')
+            self.original_price = None
+            self.total_price = self.quantity * self.unit_price
+        
+        return self.discount_amount
+    
+    def apply_discount_percentage(self, percentage):
+        """Apply a discount percentage to this item"""
+        if 0 <= percentage <= 100:
+            self.discount_percentage = Decimal(str(percentage))
+            self.calculate_discount()
+            return True
+        return False
+    
+    def apply_discount_amount(self, amount):
+        """Apply a specific discount amount to this item"""
+        original_total = self.quantity * self.unit_price
+        if 0 <= amount <= original_total:
+            self.discount_amount = Decimal(str(amount))
+            self.discount_percentage = (self.discount_amount / original_total) * Decimal('100')
+            self.original_price = original_total
+            self.total_price = original_total - self.discount_amount
+            return True
+        return False
+    
+    def get_effective_unit_price(self):
+        """Get the effective unit price after discount"""
+        if self.discount_amount > 0 and self.quantity > 0:
+            return (self.total_price / self.quantity)
+        return self.unit_price
+    
     def clean(self):
         from django.core.exceptions import ValidationError
         # Allow customer-provided parts without service or inventory item
@@ -855,7 +916,9 @@ class ServiceOrderItem(models.Model):
                 self.unit_price = self.service.base_price
             elif self.inventory_item:
                 self.unit_price = self.inventory_item.selling_price or self.inventory_item.unit_cost
-        self.total_price = self.quantity * self.unit_price
+        
+        # Calculate total price with discount consideration
+        self.calculate_discount()
         
         # Calculate commission if assigned to employee and service is completed
         if self.assigned_to and self.completed_at and not self.commission_paid:
@@ -864,6 +927,7 @@ class ServiceOrderItem(models.Model):
                 self.commission_rate = self.service.commission_rate
             
             if self.commission_rate > 0:
+                # Commission is calculated on the discounted price
                 self.commission_amount = (self.total_price * self.commission_rate) / 100
         
         super().save(*args, **kwargs)

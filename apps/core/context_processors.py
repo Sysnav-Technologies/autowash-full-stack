@@ -4,6 +4,42 @@ Context processors for MySQL multi-tenant system
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
+import os
+import hashlib
+import time
+
+
+def static_version_context(request):
+    """
+    Add static file version for browser cache invalidation.
+    This helps ensure users get updated static files after deployments.
+    """
+    # Try to get version from cache first
+    static_version = cache.get('static:version')
+    
+    if not static_version:
+        # Try to read from version file
+        version_file = os.path.join(settings.BASE_DIR, 'static', 'version.txt')
+        if os.path.exists(version_file):
+            try:
+                with open(version_file, 'r') as f:
+                    static_version = f.read().strip()
+            except Exception:
+                pass
+        
+        # Generate new version if not found
+        if not static_version:
+            version_string = f"{time.time()}-{settings.SECRET_KEY[:10]}"
+            static_version = hashlib.md5(version_string.encode()).hexdigest()[:12]
+            
+            # Cache it for future requests
+            cache.set('static:version', static_version, timeout=None)
+    
+    return {
+        'static_version': static_version,
+        'STATIC_VERSION': static_version,  # Alternative name for templates
+    }
 
 
 def business_context(request):
