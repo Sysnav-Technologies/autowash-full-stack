@@ -24,6 +24,7 @@ import logging
 import time
 import base64
 import pickle
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,15 @@ class DefaultDatabaseCache(DatabaseCache):
         """Always return the default database connection, bypassing routing"""
         return connections['default']
     
+    def _convert_expires(self, expires):
+        """Convert expires timestamp to datetime format for MySQL compatibility"""
+        if expires is None:
+            return None
+        if expires == -1:  # Never expires
+            return datetime(2038, 1, 19, 3, 14, 7)  # Max MySQL datetime
+        # Convert Unix timestamp to datetime
+        return datetime.fromtimestamp(expires)
+    
     def get(self, key, default=None, version=None):
         """Override get to use default database connection"""
         key = self.make_key(key, version=version)
@@ -62,18 +72,19 @@ class DefaultDatabaseCache(DatabaseCache):
             row = cursor.fetchone()
             if row is None:
                 return default
-            now = time.time()
-            if row[2] < now:
+            now = datetime.now()
+            expires_datetime = row[2]  # This is already a datetime from DB
+            if expires_datetime < now:
                 self.delete(key)
                 return default
             return pickle.loads(base64.b64decode(row[1].encode()))
     
     def set(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         """Override set to use default database connection"""
-        import base64, pickle
         key = self.make_key(key, version=version)
         db = self._get_db_connection()
         timeout = self.get_backend_timeout(timeout)
+        expires_datetime = self._convert_expires(timeout)
         value = base64.b64encode(pickle.dumps(value)).decode('latin1')
         
         with db.cursor() as cursor:
@@ -84,12 +95,12 @@ class DefaultDatabaseCache(DatabaseCache):
             if cursor.fetchone():
                 cursor.execute(
                     'UPDATE %s SET value = %%s, expires = %%s WHERE cache_key = %%s' % self._table,
-                    [value, timeout, key]
+                    [value, expires_datetime, key]
                 )
             else:
                 cursor.execute(
                     'INSERT INTO %s (cache_key, value, expires) VALUES (%%s, %%s, %%s)' % self._table,
-                    [key, value, timeout]
+                    [key, value, expires_datetime]
                 )
 
     def delete(self, key, version=None):
@@ -105,6 +116,7 @@ class DefaultDatabaseCache(DatabaseCache):
             key = self.make_key(key, version=version)
             db = self._get_db_connection()
             timeout = self.get_backend_timeout(timeout)
+            expires_datetime = self._convert_expires(timeout)
             value = base64.b64encode(pickle.dumps(value)).decode('latin1')
             
             with db.cursor() as cursor:
@@ -124,7 +136,7 @@ class DefaultDatabaseCache(DatabaseCache):
                 try:
                     cursor.execute(
                         'INSERT INTO %s (cache_key, value, expires) VALUES (%%s, %%s, %%s)' % self._table,
-                        [key, value, timeout]
+                        [key, value, expires_datetime]
                     )
                     return True
                 except Exception as e:
