@@ -1630,15 +1630,25 @@ function toggleService(serviceId) {
         
         const finalPrice = customPrice || servicePrice;
         
-        console.log('Adding service to selectedServices:', serviceId, 'with custom price:', customPrice);
-        selectedServices.push({
+        console.log('Adding service to selectedServices:', serviceId, 'with custom price:', customPrice, 'final price:', finalPrice);
+        
+        // Ensure we store the base price for comparison
+        const serviceData = {
             id: serviceId,
             name: serviceName,
             price: finalPrice,
+            basePrice: servicePrice, // Store original price for validation
             duration: serviceDuration,
             quantity: 1, // Default quantity
             customPrice: customPrice  // This will be sent to backend if set
-        });
+        };
+        
+        selectedServices.push(serviceData);
+        
+        // Validate custom price was properly set
+        if (customPrice && customPrice !== servicePrice) {
+            console.log(`✓ Custom price validated for ${serviceName}: ${customPrice} (base: ${servicePrice})`);
+        }
     }
     
     updateOrderSummary();
@@ -2034,6 +2044,24 @@ function submitOrder() {
         const selectionData = JSON.parse(selectedServicesDataValue || '{}');
         console.log('Parsed selection data:', selectionData);
         console.log('Services custom prices in selectionData:', selectionData.services_custom_prices);
+        
+        // Validate custom pricing consistency
+        if (selectionData.type === 'individual' || selectionData.type === 'mixed') {
+            const customPriceCount = selectionData.services_custom_prices ? Object.keys(selectionData.services_custom_prices).length : 0;
+            const serviceCount = selectionData.service_ids ? selectionData.service_ids.length : 0;
+            
+            console.log(`📊 Custom Pricing Summary: ${customPriceCount} custom prices for ${serviceCount} services`);
+            
+            // Log missing custom prices
+            if (selectionData.service_ids && selectionData.services_custom_prices) {
+                selectionData.service_ids.forEach(serviceId => {
+                    if (!selectionData.services_custom_prices[serviceId]) {
+                        const service = selectedServices.find(s => s.id === serviceId);
+                        console.warn(`⚠ Missing custom price for service: ${service ? service.name : 'Unknown'} (${serviceId}) - will use base price`);
+                    }
+                });
+            }
+        }
         
         if (selectionData.type === 'package' && selectionData.package_id) {
             formData.set('service_type', 'package');
@@ -3155,12 +3183,19 @@ function cancelPriceEdit() {
 }
 
 function updateItemPrice(type, itemId, newPrice) {
+    console.log(`Updating ${type} price for ID: ${itemId} to: ${newPrice}`);
+    
     if (type === 'service') {
         const service = selectedServices.find(s => s.id === itemId || s.id === itemId.toString());
         if (service) {
             service.price = newPrice;
             service.customPrice = newPrice;
-            console.log('Updated existing service in selectedServices:', service);
+            console.log('✓ Updated existing service in selectedServices:', {
+                id: service.id,
+                name: service.name,
+                customPrice: service.customPrice,
+                basePrice: service.basePrice
+            });
         } else {
             // Service not in selectedServices yet, store the custom price for when it gets selected
             console.log('Service not found in selectedServices, storing custom price for later');
@@ -3168,12 +3203,17 @@ function updateItemPrice(type, itemId, newPrice) {
             if (!window.pendingCustomPrices) window.pendingCustomPrices = {};
             if (!window.pendingCustomPrices.services) window.pendingCustomPrices.services = {};
             window.pendingCustomPrices.services[itemId] = newPrice;
-            console.log('Stored pending custom price:', window.pendingCustomPrices.services);
+            console.log('✓ Stored pending custom price:', {
+                serviceId: itemId,
+                customPrice: newPrice,
+                pendingPrices: window.pendingCustomPrices.services
+            });
         }
     } else if (type === 'package') {
         if (selectedPackage && (selectedPackage.id === itemId || selectedPackage.id === itemId.toString())) {
             selectedPackage.price = newPrice;
             selectedPackage.customPrice = newPrice;
+            console.log('✓ Updated package custom price:', selectedPackage);
         }
     } else if (type === 'inventory') {
         const item = selectedInventoryItems.find(i => i.id === itemId || i.id === itemId.toString());
@@ -3347,19 +3387,28 @@ function updateOrderSummary() {
                 custom_price: selectedPackage.customPrice || null
             };
         } else if (selectedServices.length > 0 && (selectedInventoryItems.length > 0 || selectedCustomerParts.length > 0)) {
+            // Build custom prices and quantities for mixed type with enhanced validation
+            const customPrices = {};
+            const quantities = {};
+            
+            selectedServices.forEach(service => {
+                // Always include quantity
+                quantities[service.id] = service.quantity || 1;
+                
+                // Include custom price if it exists and is valid
+                if (service.customPrice && service.customPrice > 0) {
+                    customPrices[service.id] = service.customPrice;
+                    console.log(`✓ Including custom price for service ${service.name} (${service.id}): ${service.customPrice} (mixed mode)`);
+                } else {
+                    console.log(`⚠ No custom price for service ${service.name} (${service.id}) - will use base price (mixed mode)`);
+                }
+            });
+            
             dataToSubmit = {
                 type: 'mixed',
                 service_ids: selectedServices.map(s => s.id),
-                services_custom_prices: selectedServices.reduce((acc, s) => {
-                    console.log('Processing service for custom prices (mixed):', s.id, 'customPrice:', s.customPrice);
-                    if (s.customPrice) acc[s.id] = s.customPrice;
-                    return acc;
-                }, {}),
-                services_quantities: selectedServices.reduce((acc, s) => {
-                    // Always include quantity, even if it's 1, to ensure consistency
-                    acc[s.id] = s.quantity || 1;
-                    return acc;
-                }, {}),
+                services_custom_prices: customPrices,
+                services_quantities: quantities,
                 inventory_items: selectedInventoryItems.map(item => ({
                     id: item.id,
                     quantity: item.quantity,
@@ -3372,22 +3421,36 @@ function updateOrderSummary() {
                     is_custom: part.isCustom || false
                 }))
             };
+            
+            console.log('Mixed services custom prices summary:', Object.keys(customPrices).length, 'services with custom prices');
         } else if (selectedServices.length > 0) {
+            // Build custom prices and quantities with enhanced validation
+            const customPrices = {};
+            const quantities = {};
+            
+            selectedServices.forEach(service => {
+                // Always include quantity
+                quantities[service.id] = service.quantity || 1;
+                
+                // Include custom price if it exists and is valid
+                if (service.customPrice && service.customPrice > 0) {
+                    customPrices[service.id] = service.customPrice;
+                    console.log(`✓ Including custom price for service ${service.name} (${service.id}): ${service.customPrice}`);
+                } else {
+                    console.log(`⚠ No custom price for service ${service.name} (${service.id}) - will use base price`);
+                }
+            });
+            
             dataToSubmit = {
                 type: 'individual',
                 service_ids: selectedServices.map(s => s.id),
-                services_custom_prices: selectedServices.reduce((acc, s) => {
-                    console.log('Processing service for custom prices:', s.id, 'customPrice:', s.customPrice);
-                    if (s.customPrice) acc[s.id] = s.customPrice;
-                    return acc;
-                }, {}),
-                services_quantities: selectedServices.reduce((acc, s) => {
-                    // Always include quantity, even if it's 1, to ensure consistency
-                    acc[s.id] = s.quantity || 1;
-                    return acc;
-                }, {})
+                services_custom_prices: customPrices,
+                services_quantities: quantities
             };
+            
             console.log('Individual services dataToSubmit:', JSON.stringify(dataToSubmit, null, 2));
+            console.log('Custom prices summary:', Object.keys(customPrices).length, 'services with custom prices');
+            console.log('Quantities summary:', Object.keys(quantities).length, 'services with quantities');
         } else if (selectedInventoryItems.length > 0 || selectedCustomerParts.length > 0) {
             dataToSubmit = {
                 type: selectedInventoryItems.length > 0 ? 'inventory' : 'customerParts',
@@ -3405,6 +3468,19 @@ function updateOrderSummary() {
             };
         } else {
             dataToSubmit = { type: null };
+        }
+        
+        // Final validation before serialization
+        if ((dataToSubmit.type === 'individual' || dataToSubmit.type === 'mixed') && dataToSubmit.service_ids) {
+            const customPricesCount = dataToSubmit.services_custom_prices ? Object.keys(dataToSubmit.services_custom_prices).length : 0;
+            const servicesCount = dataToSubmit.service_ids.length;
+            
+            console.log(`🔍 Final validation: ${customPricesCount} custom prices for ${servicesCount} services`);
+            
+            // Ensure data consistency
+            if (customPricesCount > 0 && customPricesCount < servicesCount) {
+                console.warn(`⚠ Potential custom pricing issue: Only ${customPricesCount} of ${servicesCount} services have custom prices`);
+            }
         }
         
         selectedServicesData.value = JSON.stringify(dataToSubmit);
