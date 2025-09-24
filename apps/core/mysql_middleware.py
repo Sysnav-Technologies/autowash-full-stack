@@ -1,6 +1,7 @@
 """
 MySQL Multi-Tenant Middleware
 Replaces django-tenants middleware for MySQL compatibility
+REAL-TIME OPTIMIZED - Minimal caching for immediate updates
 """
 from django.http import Http404, HttpResponseRedirect
 from django.urls import reverse
@@ -8,7 +9,7 @@ from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
 from apps.core.tenant_models import Tenant
 from apps.core.database_router import TenantDatabaseRouter, TenantDatabaseManager
-from apps.core.cache_utils import CoreCache
+from django.core.cache import cache
 import re
 import logging
 
@@ -17,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 class MySQLTenantMiddleware(MiddlewareMixin):
     """
-    MySQL-compatible tenant middleware
-    Resolves tenant from URL path and sets up database routing
+    REAL-TIME MySQL-compatible tenant middleware
+    Resolves tenant from URL path and sets up database routing with minimal caching
     """
     
     def process_request(self, request):
@@ -84,22 +85,23 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         return response
     
     def _resolve_from_subdomain(self, hostname):
-        """Resolve tenant from subdomain"""
+        """Resolve tenant from subdomain - REAL-TIME with minimal caching"""
         # Pattern: business1.autowash.co.ke
         main_domain = getattr(settings, 'MAIN_DOMAIN', 'autowash.co.ke')
         
         if hostname.endswith(f'.{main_domain}'):
             subdomain = hostname.replace(f'.{main_domain}', '')
             
-            # Use cache for performance (with error handling)
-            cache_key = f"tenant_subdomain_{subdomain}"
-            tenant = CoreCache.get(cache_key)
+            # Extremely minimal cache - only 10 seconds for database protection
+            cache_key = f"sub_{subdomain}"
+            tenant = cache.get(cache_key)
             
             if tenant is None:
                 try:
                     tenant = Tenant.objects.get_by_subdomain(subdomain)
                     if tenant:
-                        CoreCache.set(cache_key, tenant)  # Uses default timeout from settings
+                        # REAL-TIME: Only 10-second cache for database protection
+                        cache.set(cache_key, tenant, timeout=10)
                 except Exception:
                     tenant = None
             
@@ -108,7 +110,7 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         return None
     
     def _resolve_from_path(self, path):
-        """Resolve tenant from URL path"""
+        """Resolve tenant from URL path - REAL-TIME with minimal caching"""
         # Pattern: /business/business1/dashboard/
         path_pattern = r'^/business/([a-z0-9-]+)/?'
         match = re.match(path_pattern, path)
@@ -116,14 +118,15 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         if match:
             tenant_slug = match.group(1)
             
-            # Use cache for performance (with error handling)
-            cache_key = f"tenant_slug_{tenant_slug}"
-            tenant = CoreCache.get(cache_key)
+            # Minimal cache for path-based resolution - 10 seconds only
+            cache_key = f"slug_{tenant_slug}"
+            tenant = cache.get(cache_key)
             
             if tenant is None:
                 try:
                     tenant = Tenant.objects.get(slug=tenant_slug, is_active=True)
-                    CoreCache.set(cache_key, tenant)  # Uses default timeout from settings
+                    # REAL-TIME: Only 10-second cache to prevent staleness
+                    cache.set(cache_key, tenant, timeout=10)
                 except Tenant.DoesNotExist:
                     tenant = None
             
@@ -135,16 +138,17 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         return None, path
     
     def _resolve_from_custom_domain(self, hostname):
-        """Resolve tenant from custom domain"""
-        # Use cache for performance (with error handling)
-        cache_key = f"tenant_domain_{hostname}"
-        tenant = CoreCache.get(cache_key)
+        """Resolve tenant from custom domain - REAL-TIME with minimal caching"""
+        # Minimal cache for custom domains - 10 seconds only
+        cache_key = f"domain_{hostname}"
+        tenant = cache.get(cache_key)
         
         if tenant is None:
             try:
                 tenant = Tenant.objects.get_by_domain(hostname)
                 if tenant:
-                    CoreCache.set(cache_key, tenant)  # Uses default timeout from settings
+                    # REAL-TIME: Only 10-second cache to prevent staleness
+                    cache.set(cache_key, tenant, timeout=10)
             except Exception:
                 tenant = None
         
@@ -220,25 +224,44 @@ class TenantBusinessContextMiddleware(MiddlewareMixin):
                 # Get tenant ID safely to avoid database routing issues
                 tenant_id = getattr(tenant, 'id', None) if tenant else None
                 if tenant_id:
-                    # Get subscription from default database - use tenant ID not object
-                    subscription = Subscription.objects.using('default').filter(business_id=tenant_id).first()
+                    # Cache subscription data for performance
+                    sub_cache_key = f"sub_data_{tenant_id}"
+                    subscription_data = cache.get(sub_cache_key)
                     
-                    # Store subscription data for template access without triggering database queries
-                    request.subscription_cache = subscription
-                    request.subscription_is_active = subscription.is_active if subscription else False
-                    request.subscription_is_expired = not subscription.is_active if subscription else True
+                    if subscription_data is None:
+                        # Get subscription from default database - use tenant ID not object
+                        subscription = Subscription.objects.using('default').filter(business_id=tenant_id).first()
+                        subscription_data = {
+                            'is_active': subscription.is_active if subscription else False,
+                            'is_expired': not subscription.is_active if subscription else True,
+                            'subscription': subscription
+                        }
+                        # Cache for 2 minutes to balance freshness and performance
+                        cache.set(sub_cache_key, subscription_data, timeout=10)  # Real-time: 10 seconds
+                    
+                    # Store subscription data for template access
+                    request.subscription_cache = subscription_data['subscription']
+                    request.subscription_is_active = subscription_data['is_active']
+                    request.subscription_is_expired = subscription_data['is_expired']
             
-            # Load tenant settings
+            # Load tenant settings with cache
             try:
-                # Try to get settings from tenant database
-                from apps.core.tenant_models import TenantSettings
-                db_alias = f"tenant_{tenant.id}"
-                TenantDatabaseManager.add_tenant_to_settings(tenant)
-                settings_obj = TenantSettings.objects.using(db_alias).filter(tenant_id=tenant.id).first()
+                settings_cache_key = f"settings_{tenant.id}"
+                settings_obj = cache.get(settings_cache_key)
                 
-                if not settings_obj:
-                    # Create default settings if they don't exist
-                    settings_obj = TenantSettings.objects.using(db_alias).create(tenant_id=tenant.id)
+                if settings_obj is None:
+                    # Try to get settings from tenant database
+                    from apps.core.tenant_models import TenantSettings
+                    db_alias = f"tenant_{tenant.id}"
+                    TenantDatabaseManager.add_tenant_to_settings(tenant)
+                    settings_obj = TenantSettings.objects.using(db_alias).filter(tenant_id=tenant.id).first()
+                    
+                    if not settings_obj:
+                        # Create default settings if they don't exist
+                        settings_obj = TenantSettings.objects.using(db_alias).create(tenant_id=tenant.id)
+                    
+                    # Cache settings for 10 minutes
+                    cache.set(settings_cache_key, settings_obj, timeout=10)  # Real-time: 10 seconds
             except Exception as e:
                 print(f"Warning: Could not load tenant settings: {e}")
                 settings_obj = None

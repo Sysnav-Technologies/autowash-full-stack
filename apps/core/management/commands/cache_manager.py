@@ -143,19 +143,15 @@ class Command(BaseCommand):
             if hasattr(cache, 'clear_tenant_cache'):
                 cache.clear_tenant_cache(tenant_schema)
                 self.stdout.write(
-                    self.style.SUCCESS(f'✓ Cache cleared for tenant: {tenant_schema}')
+                    self.style.SUCCESS(f'Cache cleared for tenant: {tenant_schema}')
                 )
             else:
-                # Fallback: clear keys with tenant prefix
-                from apps.core.cache_utils import TenantCache
-                tenant_cache = TenantCache()
+                # Fallback: clear all cache since we can't target specific tenant
+                cache.clear()
                 
-                # This is a simplified approach - in production you might want
-                # more sophisticated pattern-based clearing
                 self.stdout.write(
                     self.style.WARNING(
-                        f'Cache backend does not support tenant-specific clearing. '
-                        f'Consider upgrading to HybridCacheBackend.'
+                        f'Cleared all cache (cannot target specific tenant with current backend)'
                     )
                 )
                 
@@ -167,7 +163,7 @@ class Command(BaseCommand):
         self.stdout.write('Warming cache with frequently accessed data...')
         
         try:
-            from apps.core.cache_utils import TenantCache
+            from django.core.cache import cache
             
             warmed_items = 0
             
@@ -185,7 +181,7 @@ class Command(BaseCommand):
                             'timezone': getattr(business, 'timezone', 'UTC'),
                             'currency': getattr(business, 'currency', 'USD'),
                         }
-                        cache.set(cache_key, settings_data, timeout=3600)  # 1 hour
+                        cache.set(cache_key, settings_data, timeout=10)  # REAL-TIME: 10 seconds
                         warmed_items += 1
                         
             except Exception as e:
@@ -201,7 +197,7 @@ class Command(BaseCommand):
                 cache_key = "services:categories:all"
                 if not cache.get(cache_key):
                     categories_data = list(categories.values('id', 'name', 'description'))
-                    cache.set(cache_key, categories_data, timeout=7200)  # 2 hours
+                    cache.set(cache_key, categories_data, timeout=10)  # REAL-TIME: 10 seconds
                     warmed_items += 1
                     
             except Exception as e:
@@ -215,7 +211,7 @@ class Command(BaseCommand):
                 'debug': settings.DEBUG,
                 'static_url': settings.STATIC_URL,
             }
-            cache.set('system:settings', system_settings, timeout=86400)  # 24 hours
+            cache.set('system:settings', system_settings, timeout=10)  # REAL-TIME: 10 seconds
             warmed_items += 1
             
             self.stdout.write(
@@ -314,20 +310,23 @@ class Command(BaseCommand):
                 )
                 issues_found += 1
         
-        # Test tenant isolation (if available)
+        # Test basic cache functionality
         try:
-            from apps.core.cache_utils import TenantCache
-            tenant_cache = TenantCache()
+            # Test basic cache operations
+            test_key = 'health_test_key'
+            test_value = 'health_test_value'
             
-            # Test tenant key generation
-            test_key = tenant_cache.get_key('test_key')
-            if ':tenant:' in test_key or test_key.startswith('tenant:'):
+            cache.set(test_key, test_value, 30)
+            retrieved_value = cache.get(test_key)
+            
+            if retrieved_value == test_value:
                 self.stdout.write(
-                    self.style.SUCCESS('✓ Tenant isolation: OK')
+                    self.style.SUCCESS('Cache operations: OK')
                 )
+                cache.delete(test_key)  # Cleanup
             else:
                 self.stdout.write(
-                    self.style.WARNING('? Tenant isolation: May not be working properly')
+                    self.style.ERROR('Cache operations: FAILED')
                 )
                 issues_found += 1
                 
