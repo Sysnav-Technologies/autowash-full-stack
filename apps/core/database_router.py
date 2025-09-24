@@ -67,6 +67,10 @@ class TenantDatabaseRouter:
     
     def db_for_read(self, model, **hints):
         """Suggest the database to read from"""
+        # CRITICAL: Cache table must ALWAYS use default database
+        if hasattr(model._meta, 'db_table') and model._meta.db_table == 'django_cache_table':
+            return 'default'
+        
         # CRITICAL: Always use default database for sessions, auth, and accounts
         # This ensures users stay logged in when switching between main and tenant areas
         if model._meta.app_label in ['sessions', 'auth', 'accounts']:
@@ -86,6 +90,10 @@ class TenantDatabaseRouter:
     
     def db_for_write(self, model, **hints):
         """Suggest the database to write to"""
+        # CRITICAL: Cache table must ALWAYS use default database
+        if hasattr(model._meta, 'db_table') and model._meta.db_table == 'django_cache_table':
+            return 'default'
+        
         # CRITICAL: Always use default database for sessions, auth, and accounts
         # This ensures users stay logged in when switching between main and tenant areas
         if model._meta.app_label in ['sessions', 'auth', 'accounts']:
