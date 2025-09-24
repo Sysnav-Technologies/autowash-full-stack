@@ -218,6 +218,10 @@ TEMPLATES = [
                 'apps.core.context_processors.subscription_flow_context',
                 'apps.core.context_processors.sidebar_context',
                 'apps.core.context_processors.network_status',
+                # Multi-tenant cache context processors
+                'apps.core.cache_context_processors.tenant_cache_context',
+                'apps.core.cache_context_processors.cache_performance_context',
+                'apps.core.cache_context_processors.cache_health_context',
             ],
         },
     },
@@ -281,21 +285,21 @@ def get_cache_config():
     """Production-ready cache configuration for all environments"""
     
     if CPANEL:
-        # Production cPanel: Database cache (reliable, no Redis needed)
+        # Production cPanel: Multi-tenant database cache (reliable, no Redis needed)
         return {
             'default': {
-                'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                'BACKEND': 'apps.core.cache_backends.MultiTenantDatabaseCache',
                 'LOCATION': 'django_cache_table',
-                'TIMEOUT': 1800,  # 30 minutes for production
+                'TIMEOUT': 300,  # 5 minutes for real-time updates
                 'OPTIONS': {
-                    'MAX_ENTRIES': 10000,  # More entries for production
-                    'CULL_FREQUENCY': 3,  # Remove 1/3 when max reached
+                    'MAX_ENTRIES': 20000,  # More entries for multi-tenant
+                    'CULL_FREQUENCY': 4,  # Remove 1/4 when max reached
                 }
             }
         }
     
     elif RENDER:
-        # Render: Try Redis first, fallback to database cache
+        # Render: Try Redis first, fallback to multi-tenant database cache
         redis_url = config('REDIS_URL', default='')
         if redis_url and 'redis://' in redis_url:
             try:
@@ -309,21 +313,21 @@ def get_cache_config():
             except:
                 pass
         
-        # Fallback to database cache for Render
+        # Fallback to multi-tenant database cache for Render
         return {
             'default': {
-                'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                'BACKEND': 'apps.core.cache_backends.MultiTenantDatabaseCache',
                 'LOCATION': 'django_cache_table',
-                'TIMEOUT': 900,  # 15 minutes
+                'TIMEOUT': 300,  # 5 minutes for real-time updates
                 'OPTIONS': {
-                    'MAX_ENTRIES': 5000,
-                    'CULL_FREQUENCY': 3,
+                    'MAX_ENTRIES': 10000,
+                    'CULL_FREQUENCY': 4,
                 }
             }
         }
     
     else:
-        # Development/Local: Try Redis first, fallback to database cache
+        # Development/Local: Try Redis first, fallback to multi-tenant database cache
         try:
             import redis
             redis.Redis(host='localhost', port=6379, socket_connect_timeout=1).ping()
@@ -337,34 +341,32 @@ def get_cache_config():
         except:
             pass
         
-        # Fallback to database cache for local development
+        # Fallback to multi-tenant database cache for local development
         return {
             'default': {
-                'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                'BACKEND': 'apps.core.cache_backends.MultiTenantDatabaseCache',
                 'LOCATION': 'django_cache_table',
                 'TIMEOUT': 300,  # 5 minutes
                 'OPTIONS': {
-                    'MAX_ENTRIES': 1000,
-                    'CULL_FREQUENCY': 3,
+                    'MAX_ENTRIES': 5000,
+                    'CULL_FREQUENCY': 4,
                 }
             }
         }
+
 
 CACHES = get_cache_config()
 
 # CRITICAL: Ensure cache operations always use main database
 # This prevents cache from being created in tenant databases
-CACHE_MIDDLEWARE_KEY_PREFIX = 'autowash'
-CACHE_MIDDLEWARE_SECONDS = 600  # 10 minutes for page cache
+CACHE_MIDDLEWARE_KEY_PREFIX = 'aw'  # Short prefix for efficiency
+CACHE_MIDDLEWARE_SECONDS = 300  # 5 minutes for real-time updates (reduced from 10 minutes)
 CACHE_MIDDLEWARE_ALIAS = 'default'
 
 # Database Cache Configuration - Force main database usage
-if any('db.DatabaseCache' in str(cache.get('BACKEND', '')) for cache in CACHES.values()):
+if any('MultiTenantDatabaseCache' in str(cache.get('BACKEND', '')) for cache in CACHES.values()):
     # Ensure database cache table uses main database routing
     DATABASES['default']['OPTIONS']['init_command'] += ",@@session.sql_mode='STRICT_TRANS_TABLES'"
-    
-# Multi-tenant cache key versioning to prevent cross-tenant data leakage
-CACHE_MIDDLEWARE_KEY_PREFIX = 'aw'  # Short prefix for efficiency
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'  # Hybrid approach for reliability
 SESSION_CACHE_ALIAS = 'default'
