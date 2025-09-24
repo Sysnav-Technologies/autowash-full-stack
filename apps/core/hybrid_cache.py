@@ -21,6 +21,9 @@ from django.core.cache.backends.filebased import FileBasedCache
 from django.db import connections
 from django.utils.encoding import force_str
 import logging
+import time
+import base64
+import pickle
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +31,97 @@ logger = logging.getLogger(__name__)
 class DefaultDatabaseCache(DatabaseCache):
     """
     DatabaseCache that always uses the 'default' database connection
-    for multi-tenant compatibility.
+    for multi-tenant compatibility. Bypasses database routing.
     """
     def __init__(self, table, params):
         super().__init__(table, params)
-        # Override the database connection to always use 'default'
-        self._db = 'default'
+        self._table = table
+        
+    def get_backend_timeout(self, timeout=DEFAULT_TIMEOUT):
+        """Get backend timeout, using default if not specified"""
+        if timeout is DEFAULT_TIMEOUT:
+            timeout = self.default_timeout
+        elif timeout == 0:
+            # avoid time.time() related precision issues
+            timeout = -1
+        return None if timeout is None else time.time() + timeout
     
-    @property
-    def _cache(self):
-        # Always use the default database connection
+    def _get_db_connection(self):
+        """Always return the default database connection, bypassing routing"""
         return connections['default']
+    
+    def get(self, key, default=None, version=None):
+        """Override get to use default database connection"""
+        key = self.make_key(key, version=version)
+        db = self._get_db_connection()
+        with db.cursor() as cursor:
+            cursor.execute(
+                'SELECT cache_key, value, expires FROM %s WHERE cache_key = %%s' % self._table,
+                [key]
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return default
+            now = time.time()
+            if row[2] < now:
+                self.delete(key)
+                return default
+            return pickle.loads(base64.b64decode(row[1].encode()))
+    
+    def set(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
+        """Override set to use default database connection"""
+        import base64, pickle
+        key = self.make_key(key, version=version)
+        db = self._get_db_connection()
+        timeout = self.get_backend_timeout(timeout)
+        value = base64.b64encode(pickle.dumps(value)).decode('latin1')
+        
+        with db.cursor() as cursor:
+            cursor.execute(
+                'SELECT cache_key FROM %s WHERE cache_key = %%s' % self._table,
+                [key]
+            )
+            if cursor.fetchone():
+                cursor.execute(
+                    'UPDATE %s SET value = %%s, expires = %%s WHERE cache_key = %%s' % self._table,
+                    [value, timeout, key]
+                )
+            else:
+                cursor.execute(
+                    'INSERT INTO %s (cache_key, value, expires) VALUES (%%s, %%s, %%s)' % self._table,
+                    [key, value, timeout]
+                )
+
+    def delete(self, key, version=None):
+        """Override delete to use default database connection"""
+        key = self.make_key(key, version=version)
+        db = self._get_db_connection()
+        with db.cursor() as cursor:
+            cursor.execute('DELETE FROM %s WHERE cache_key = %%s' % self._table, [key])
+
+    def add(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
+        """Override add to use default database connection"""
+        import base64, pickle
+        key = self.make_key(key, version=version)
+        db = self._get_db_connection()
+        timeout = self.get_backend_timeout(timeout)
+        value = base64.b64encode(pickle.dumps(value)).decode('latin1')
+        
+        with db.cursor() as cursor:
+            cursor.execute(
+                'SELECT cache_key FROM %s WHERE cache_key = %%s' % self._table,
+                [key]
+            )
+            if cursor.fetchone():
+                return False
+            try:
+                cursor.execute(
+                    'INSERT INTO %s (cache_key, value, expires) VALUES (%%s, %%s, %%s)' % self._table,
+                    [key, value, timeout]
+                )
+                return True
+            except:
+                return False
 
 
 class HybridCacheBackend(BaseCache):
@@ -77,8 +160,7 @@ class HybridCacheBackend(BaseCache):
             k[3:]: v for k, v in params.items() 
             if k.startswith('DB_') and k != 'DB_TABLE'
         }
-        # Force database cache to always use 'default' database
-        db_params['_database'] = 'default'
+        # Use our custom DefaultDatabaseCache that forces default database
         self.database_cache = DefaultDatabaseCache(db_table, db_params)
         
         # Optional file cache for static content (when filesystem is suitable)
