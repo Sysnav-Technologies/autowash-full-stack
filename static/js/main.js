@@ -23,6 +23,7 @@ function initializeApp() {
     initializeSidebar();
     initializeDebugPanel();
     initializeSmoothNavigation();
+    initializeMessages(); // Add message handling
 }
 
 // ===============================
@@ -503,3 +504,143 @@ window.addEventListener('error', function(e) {
 window.toggleTheme = toggleTheme;
 window.initializeTheme = initializeTheme;
 window.toggleDropdown = toggleDropdown;
+
+// ===============================
+// MESSAGE HANDLING SYSTEM
+// ===============================
+function initializeMessages() {
+    // Auto-dismiss success messages after 4 seconds
+    $('.message-alert.alert-success').each(function() {
+        const $alert = $(this);
+        setTimeout(() => {
+            $alert.fadeOut(300, function() {
+                $(this).remove();
+            });
+        }, 4000);
+    });
+
+    // Auto-dismiss info messages after 5 seconds
+    $('.message-alert.alert-info').each(function() {
+        const $alert = $(this);
+        setTimeout(() => {
+            $alert.fadeOut(300, function() {
+                $(this).remove();
+            });
+        }, 5000);
+    });
+
+    // Auto-dismiss warning messages after 6 seconds
+    $('.message-alert.alert-warning').each(function() {
+        const $alert = $(this);
+        setTimeout(() => {
+            $alert.fadeOut(300, function() {
+                $(this).remove();
+            });
+        }, 6000);
+    });
+
+    // Error messages stay until manually closed (no auto-dismiss)
+    // but add enhanced close functionality
+    $('.message-alert .btn-close').on('click', function() {
+        const $alert = $(this).closest('.message-alert');
+        $alert.fadeOut(300, function() {
+            $(this).remove();
+        });
+    });
+
+    // Add click to dismiss functionality (except for errors)
+    $('.message-alert:not(.alert-danger):not(.alert-error)').on('click', function() {
+        const $alert = $(this);
+        $alert.fadeOut(300, function() {
+            $(this).remove();
+        });
+    });
+
+    // Progressive enhancement: Add hover pause for auto-dismiss
+    let autodismissTimeouts = new Map();
+    
+    $('.message-alert:not(.alert-danger):not(.alert-error)').hover(
+        function() {
+            // Mouse enter - pause auto dismiss
+            const $alert = $(this);
+            const timeout = autodismissTimeouts.get(this);
+            if (timeout) {
+                clearTimeout(timeout);
+                $alert.addClass('paused');
+            }
+        },
+        function() {
+            // Mouse leave - resume auto dismiss
+            const $alert = $(this);
+            if ($alert.hasClass('paused')) {
+                $alert.removeClass('paused');
+                const delay = $alert.hasClass('alert-success') ? 2000 : 
+                             $alert.hasClass('alert-info') ? 3000 : 4000;
+                
+                const newTimeout = setTimeout(() => {
+                    $alert.fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                }, delay);
+                
+                autodismissTimeouts.set(this, newTimeout);
+            }
+        }
+    );
+}
+
+// Function to show dynamic messages (for AJAX responses)
+function showMessage(message, type = 'info', autoDismiss = true) {
+    const iconMap = {
+        success: 'fas fa-check-circle',
+        error: 'fas fa-exclamation-triangle',
+        danger: 'fas fa-exclamation-triangle',
+        warning: 'fas fa-exclamation-circle',
+        info: 'fas fa-info-circle'
+    };
+
+    const messageHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show message-alert" role="alert">
+            <div class="d-flex align-items-start">
+                <div class="message-icon">
+                    <i class="${iconMap[type] || 'fas fa-bell'}"></i>
+                </div>
+                <div class="message-content">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+
+    // Find or create messages container
+    let $container = $('.messages-container');
+    if ($container.length === 0) {
+        $container = $('<div class="messages-container"></div>');
+        $('main .container-fluid, main .container, .main-content').first().prepend($container);
+    }
+
+    const $newMessage = $(messageHtml);
+    $container.append($newMessage);
+
+    // Apply same auto-dismiss logic
+    if (autoDismiss && type !== 'error' && type !== 'danger') {
+        const delay = type === 'success' ? 4000 : 
+                     type === 'info' ? 5000 : 6000;
+        
+        setTimeout(() => {
+            $newMessage.fadeOut(300, function() {
+                $(this).remove();
+                if ($container.children().length === 0) {
+                    $container.remove();
+                }
+            });
+        }, delay);
+    }
+
+    return $newMessage;
+}
+
+// Make message functions globally available
+window.showMessage = showMessage;
+window.initializeMessages = initializeMessages;

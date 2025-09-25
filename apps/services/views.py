@@ -22,6 +22,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from apps.core.decorators import employee_required, ajax_required, owner_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
+from apps.core.cache_manager import MultiTenantCacheManager
 from apps.employees.models import Employee
 from apps.payments.models import Payment
 from django.views.decorators.http import require_GET
@@ -1671,7 +1672,40 @@ def complete_service(request, order_id):
     order.actual_end_time = timezone.now()
     order.save()
     
-    # REAL-TIME: No cache invalidation needed - system operates in real-time
+    # Direct cache invalidation for order completion
+    try:
+        from django.core.cache import cache
+        
+        # Get tenant ID directly
+        tenant_id = str(request.tenant.id) if hasattr(request, 'tenant') and request.tenant else None
+        
+        if tenant_id:
+            # Clear cache keys directly
+            cache_keys_to_clear = [
+                f"tenant_{tenant_id}:orders_list",
+                f"tenant_{tenant_id}:service_orders_list", 
+                f"tenant_{tenant_id}:pending_orders",
+                f"tenant_{tenant_id}:in_progress_orders",
+                f"tenant_{tenant_id}:completed_orders",
+                f"tenant_{tenant_id}:recent_orders",
+                f"tenant_{tenant_id}:dashboard_orders",
+                f"tenant_{tenant_id}:order_stats",
+                f"tenant_{tenant_id}:order_{order.id}",
+                f"tenant_{tenant_id}:service_order_{order.id}",
+                f"tenant_{tenant_id}:orders_{order.status}",
+                f"tenant_{tenant_id}:views.decorators.cache",
+                f"tenant_{tenant_id}:middleware.cache",
+                f"tenant_{tenant_id}:template.cache"
+            ]
+            
+            # Delete each cache key directly
+            for key in cache_keys_to_clear:
+                cache.delete(key)
+                
+    except Exception as cache_error:
+        logger.error(f"Cache clearing failed for order completion: {cache_error}")
+    
+    # REAL-TIME: Cache invalidation added for immediate UI updates
     
     for item in order.order_items.all():
         if not item.completed_at:
@@ -2951,6 +2985,21 @@ def order_edit_view(request, pk):
                 order.total_amount = Decimal('0')
             
             order.save()
+            
+            # Use comprehensive cache manager for multi-tenant cache invalidation
+            try:
+                # Invalidate all order-related cache immediately
+                order_invalidated = MultiTenantCacheManager.invalidate_order_cache(order, request=request)
+                dashboard_invalidated = MultiTenantCacheManager.invalidate_dashboard_cache(request=request)
+                template_invalidated = MultiTenantCacheManager.invalidate_template_cache(request=request, 
+                    template_names=['orders_list', 'order_detail', 'dashboard_stats'])
+                
+                logger.info(f"Cache invalidated for order {order.id} edit: "
+                          f"order_keys={order_invalidated}, dashboard_keys={dashboard_invalidated}, "
+                          f"template_keys={template_invalidated}")
+                          
+            except Exception as cache_error:
+                logger.error(f"Cache invalidation failed for order edit: {cache_error}")
             
             messages.success(request, f'Order {order.order_number} updated successfully!')
             return redirect('/business/{}/services/orders/{}/'.format(request.tenant.slug, order.pk))

@@ -21,8 +21,8 @@ class TenantDatabaseRouter:
         """Set the current tenant for this thread"""
         cls._local.tenant = tenant
         
-        # Cache tenant database config for performance optimization
-        # Now using file-based cache which avoids database access issues
+        # Lightweight tenant config caching for performance
+        # Uses the new optimized cache system that prevents template staleness
         if tenant:
             try:
                 # Handle both Tenant objects and BusinessContext objects
@@ -36,23 +36,21 @@ class TenantDatabaseRouter:
                     database_config = full_tenant.database_config
                 
                 if database_config:
-                    # Use file-based cache to store tenant config (no database conflicts)
+                    # Use optimized cache system with very short timeout to prevent staleness
                     from django.core.cache import caches
                     main_cache = caches['default']
-                    cache_key = f"tenant_db_config_{tenant.id}"
+                    cache_key = f"tenant_db_{tenant.id}"
                     
-                    # Cache the database config for better performance
+                    # Cache for only 30 seconds to ensure fresh data
                     try:
-                        main_cache.set(cache_key, database_config, 10)  # REAL-TIME: Only 10 seconds
-                        print(f"Cached tenant config for {tenant.id} using file-based cache")
-                    except Exception as cache_error:
-                        print(f"Warning: Cache set failed for key {cache_key}: {cache_error}")
-                        # Continue without caching - not critical
+                        main_cache.set(cache_key, database_config, 30)
+                        # Removed debug print to reduce log noise
+                    except Exception:
+                        # Silent fail - caching is not critical for functionality
                         pass
                         
-            except Exception as e:
-                # If cache fails, continue without caching (non-critical feature)
-                print(f"Warning: Failed to cache tenant config: {e}")
+            except Exception:
+                # Silent fail - tenant setup should work without caching
                 pass
     
     @classmethod
@@ -67,7 +65,7 @@ class TenantDatabaseRouter:
     
     def db_for_read(self, model, **hints):
         """Suggest the database to read from"""
-        # CRITICAL: Cache table must ALWAYS use default database
+        # Legacy: Cache table routing (not currently used but kept for compatibility)
         if hasattr(model._meta, 'db_table') and model._meta.db_table == 'django_cache_table':
             return 'default'
         
@@ -90,7 +88,7 @@ class TenantDatabaseRouter:
     
     def db_for_write(self, model, **hints):
         """Suggest the database to write to"""
-        # CRITICAL: Cache table must ALWAYS use default database
+        # Legacy: Cache table routing (not currently used but kept for compatibility)
         if hasattr(model._meta, 'db_table') and model._meta.db_table == 'django_cache_table':
             return 'default'
         
