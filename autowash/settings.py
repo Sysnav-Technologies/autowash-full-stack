@@ -131,6 +131,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'apps.core.mysql_middleware.MySQLTenantMiddleware',
     'apps.core.mysql_middleware.TenantBusinessContextMiddleware',
+    'apps.core.logging_utils.LoggingMiddleware',  # Add logging middleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -626,7 +627,18 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 log_dir = BASE_DIR / 'logs'
 log_dir.mkdir(exist_ok=True)
 
-# Session logging configuration - Minimal to prevent noise
+# Reports directory for comprehensive logging
+reports_dir = BASE_DIR / 'reports'
+reports_dir.mkdir(exist_ok=True)
+(reports_dir / 'tenant_activity').mkdir(exist_ok=True)
+(reports_dir / 'user_logins').mkdir(exist_ok=True)
+(reports_dir / 'performance_metrics').mkdir(exist_ok=True)
+(reports_dir / 'business_analytics').mkdir(exist_ok=True)
+(reports_dir / 'system_health').mkdir(exist_ok=True)
+(reports_dir / 'security_logs').mkdir(exist_ok=True)
+(reports_dir / 'error_tracking').mkdir(exist_ok=True)
+
+# Enhanced logging configuration with comprehensive reporting
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -637,6 +649,14 @@ LOGGING = {
         },
         'simple': {
             'format': '{levelname} {message}',
+            'style': '{',
+        },
+        'detailed': {
+            'format': '{asctime} | {levelname} | {name} | {funcName} | {message}',
+            'style': '{',
+        },
+        'json_format': {
+            'format': '{asctime} | {levelname} | {name} | {funcName} | {message}',
             'style': '{',
         },
     },
@@ -652,9 +672,57 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        'tenant_activity': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': reports_dir / 'tenant_activity' / 'tenant_actions.log',
+            'formatter': 'detailed',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+        },
+        'user_logins': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': reports_dir / 'user_logins' / 'login_attempts.log',
+            'formatter': 'json_format',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 10,
+        },
+        'performance_metrics': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': reports_dir / 'performance_metrics' / 'performance.log',
+            'formatter': 'detailed',
+            'maxBytes': 20971520,  # 20MB
+            'backupCount': 7,
+        },
+        'security_logs': {
+            'level': 'WARNING',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': reports_dir / 'security_logs' / 'security_events.log',
+            'formatter': 'json_format',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 20,  # Keep more security logs
+        },
+        'error_tracking': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': reports_dir / 'error_tracking' / 'application_errors.log',
+            'formatter': 'verbose',
+            'maxBytes': 20971520,  # 20MB
+            'backupCount': 10,
+        },
+        'business_analytics': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': reports_dir / 'business_analytics' / 'business_events.log',
+            'formatter': 'json_format',
+            'maxBytes': 15728640,  # 15MB
+            'backupCount': 12,
+        },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console', 'file', 'error_tracking'],
         'level': 'INFO',
     },
     'loggers': {
@@ -669,7 +737,32 @@ LOGGING = {
             'propagate': False,
         },
         'django_tenants': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'file', 'tenant_activity'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'autowash.tenant_activity': {
+            'handlers': ['tenant_activity'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'autowash.user_logins': {
+            'handlers': ['user_logins'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'autowash.performance': {
+            'handlers': ['performance_metrics'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'autowash.security': {
+            'handlers': ['security_logs'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'autowash.business': {
+            'handlers': ['business_analytics'],
             'level': 'INFO',
             'propagate': False,
         },

@@ -23,6 +23,7 @@ from django.urls import reverse
 from apps.core.decorators import employee_required, ajax_required, owner_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
 from apps.core.cache_manager import MultiTenantCacheManager
+from apps.core.logging_utils import AutoWashLogger
 from apps.employees.models import Employee
 from apps.payments.models import Payment
 from django.views.decorators.http import require_GET
@@ -786,6 +787,33 @@ def quick_order_view(request):
                     created_by_id=request.user.id
                 )
                 logger.info(f"Created order: {order.order_number}")
+                
+                # Log business event for order creation
+                AutoWashLogger.log_business_event(
+                    event_type='service_order_created',
+                    customer=customer,
+                    details={
+                        'order_number': order.order_number,
+                        'vehicle_registration': vehicle.registration_number if vehicle else None,
+                        'priority': order.priority,
+                        'created_by': request.user.username,
+                        'employee_id': getattr(request, 'employee', None).employee_id if getattr(request, 'employee', None) else None,
+                        'service_type': service_type
+                    },
+                    request=request
+                )
+                
+                # Log tenant activity
+                AutoWashLogger.log_tenant_action(
+                    action='service_order_created',
+                    user=request.user,
+                    details={
+                        'order_number': order.order_number,
+                        'customer_name': customer.full_name,
+                        'vehicle_reg': vehicle.registration_number if vehicle else 'N/A'
+                    },
+                    request=request
+                )
                 
                 # Handle service selection
                 service_type = request.POST.get('service_type', 'individual')
@@ -1671,6 +1699,34 @@ def complete_service(request, order_id):
     order.status = 'completed'
     order.actual_end_time = timezone.now()
     order.save()
+    
+    # Log business event for service completion
+    AutoWashLogger.log_business_event(
+        event_type='service_order_completed',
+        amount=order.total_amount,
+        customer=order.customer,
+        details={
+            'order_number': order.order_number,
+            'vehicle_registration': order.vehicle.registration_number if order.vehicle else None,
+            'completion_time': order.actual_end_time.isoformat(),
+            'completed_by': request.user.username,
+            'employee_id': getattr(request, 'employee', None).employee_id if getattr(request, 'employee', None) else None,
+            'duration_minutes': ((order.actual_end_time - order.actual_start_time).total_seconds() / 60) if order.actual_start_time else None
+        },
+        request=request
+    )
+    
+    # Log tenant activity
+    AutoWashLogger.log_tenant_action(
+        action='service_order_completed',
+        user=request.user,
+        details={
+            'order_number': order.order_number,
+            'customer_name': order.customer.full_name,
+            'total_amount': str(order.total_amount)
+        },
+        request=request
+    )
     
     # Direct cache invalidation for order completion
     try:

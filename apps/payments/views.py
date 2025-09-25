@@ -14,6 +14,7 @@ from django.urls import reverse
 from django.conf import settings
 from apps.core.decorators import employee_required, ajax_required
 from apps.core.utils import send_sms_notification, send_email_notification, generate_unique_code
+from apps.core.logging_utils import AutoWashLogger
 from .models import (
     Payment, PaymentMethod, PaymentRefund, MPesaTransaction,
     CardTransaction, CashTransaction, PaymentGateway
@@ -39,6 +40,22 @@ def process_manual_mpesa_payment(request, payment, phone_number, payment_code):
         payment.processed_by = getattr(request.user, 'employee_profile', None) if request.user.is_authenticated else None
         payment.notes = f"Manual M-Pesa payment processed with code: {payment_code or 'No code provided'}"
         payment.save()
+        
+        # Log payment completion
+        AutoWashLogger.log_business_event(
+            event_type='payment_completed',
+            amount=payment.amount,
+            customer=payment.order.customer if hasattr(payment, 'order') and payment.order else None,
+            details={
+                'payment_id': payment.payment_id,
+                'method': 'mpesa_manual',
+                'transaction_code': payment_code,
+                'phone_number': phone_number,
+                'processed_by': request.user.username,
+                'order_number': payment.order.order_number if hasattr(payment, 'order') and payment.order else None
+            },
+            request=request
+        )
         
         # Create M-Pesa transaction record for tracking
         try:

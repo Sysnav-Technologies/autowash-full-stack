@@ -13,6 +13,7 @@ from django.urls import reverse
 
 from apps.core.decorators import employee_required, ajax_required
 from apps.core.utils import generate_unique_code, send_sms_notification, send_email_notification
+from apps.core.logging_utils import AutoWashLogger
 from .models import (
     Customer, Vehicle, CustomerNote, CustomerDocument, 
     CustomerFeedback, LoyaltyProgram
@@ -165,6 +166,31 @@ def customer_create_view(request):
                     customer.customer_id = generate_unique_code('CUST', 6)
                     customer.created_by = request.user  # Use user object directly
                     customer.save()
+                    
+                    # Log customer creation
+                    AutoWashLogger.log_business_event(
+                        event_type='customer_created',
+                        customer=customer,
+                        details={
+                            'customer_id': customer.customer_id,
+                            'customer_name': customer.display_name,
+                            'created_by': request.user.username,
+                            'employee_id': getattr(request, 'employee', None).employee_id if getattr(request, 'employee', None) else None,
+                            'has_vehicle': bool(vehicle_form and vehicle_form.is_valid())
+                        },
+                        request=request
+                    )
+                    
+                    # Log tenant activity
+                    AutoWashLogger.log_tenant_action(
+                        action='customer_created',
+                        user=request.user,
+                        details={
+                            'customer_id': customer.customer_id,
+                            'customer_name': customer.display_name
+                        },
+                        request=request
+                    )
                     
                     # Create vehicle if provided
                     if vehicle_form and vehicle_form.is_valid():
