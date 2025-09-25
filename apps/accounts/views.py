@@ -23,6 +23,7 @@ from datetime import timedelta
 import uuid
 from django.conf import settings
 from apps.core.decorators import ajax_required
+from apps.core.logging_utils import AutoWashLogger
 from apps.core.management.environment import get_current_environment, get_domain_for_environment, get_environment_context, get_error_message, get_success_message
 from .models import UserProfile, Business, BusinessSettings, BusinessVerification, Domain, EmailOTP
 from .forms import (
@@ -84,6 +85,19 @@ def register_view(request):
                     UserProfile.objects.create(
                         user=user,
                         phone=form.cleaned_data.get('phone'),
+                    )
+                    
+                    # Log user registration
+                    AutoWashLogger.log_tenant_action(
+                        action='user_registration',
+                        user=user,
+                        details={
+                            'email': user.email,
+                            'ip_address': get_client_ip(request),
+                            'user_agent': request.META.get('HTTP_USER_AGENT', '')[:100],
+                            'registration_method': 'web_form'
+                        },
+                        request=request
                     )
                     
                     success = send_otp_email(request, user)
@@ -523,6 +537,27 @@ def login_view(request):
         if user:
             if user.is_active:
                 login(request, user)
+                
+                # Log successful login
+                AutoWashLogger.log_user_login(
+                    user=user,
+                    success=True,
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:200],
+                    request=request
+                )
+                
+                # Log tenant activity
+                AutoWashLogger.log_tenant_action(
+                    action='user_login',
+                    user=user,
+                    details={
+                        'ip_address': get_client_ip(request),
+                        'user_agent': request.META.get('HTTP_USER_AGENT', '')[:100]
+                    },
+                    request=request
+                )
+                
                 messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
                 
                 # Send login notification email (async to not slow down login)
@@ -541,6 +576,15 @@ def login_view(request):
                 next_url = request.GET.get('next', 'accounts:dashboard_redirect')
                 return redirect(next_url)
             else:
+                # Log failed login attempt (inactive user)
+                AutoWashLogger.log_user_login(
+                    user=user,
+                    success=False,
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:200],
+                    request=request
+                )
+                
                 # User exists but email is not verified - redirect to OTP verification
                 messages.warning(request, 'Your email address is not verified. Please check your email for the verification code.')
                 
@@ -555,6 +599,27 @@ def login_view(request):
                 # Redirect to OTP verification with email parameter
                 return redirect(f"{reverse('accounts:verify_otp')}?email={user.email}")
         else:
+            # Log failed login attempt
+            AutoWashLogger.log_user_login(
+                user=None,
+                success=False,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')[:200],
+                request=request
+            )
+            
+            # Log security event for failed login
+            AutoWashLogger.log_security_event(
+                event_type='failed_login_attempt',
+                severity='WARNING',
+                details={
+                    'attempted_username': username,
+                    'ip_address': get_client_ip(request),
+                    'user_agent': request.META.get('HTTP_USER_AGENT', '')[:100]
+                },
+                request=request
+            )
+            
             messages.error(request, 'Invalid credentials. Please try again.')
     
     return render(request, 'auth/login.html')
