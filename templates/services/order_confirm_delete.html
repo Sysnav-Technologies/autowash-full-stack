@@ -1,0 +1,251 @@
+<!-- templates/services/order_confirm_delete.html -->
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Delete Order {{ order.order_number }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.alert-delete {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+}
+
+.alert-warning {
+    background-color: #fffbeb;
+    border: 1px solid #fef3c7;
+    color: #d97706;
+}
+
+.order-summary {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.summary-item:last-child {
+    border-bottom: none;
+}
+
+.summary-label {
+    font-weight: 500;
+    color: #64748b;
+}
+
+.summary-value {
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.delete-reasons {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.reason-item {
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0;
+}
+
+.reason-icon {
+    margin-right: 0.5rem;
+    width: 16px;
+}
+
+.btn-delete {
+    background-color: #dc2626;
+    border-color: #dc2626;
+    color: white;
+}
+
+.btn-delete:hover {
+    background-color: #b91c1c;
+    border-color: #b91c1c;
+}
+
+.inline-form {
+    display: inline;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="page-title">
+                <i class="fas fa-trash"></i>
+                Delete Order {{ order.order_number }}
+            </h1>
+            <p class="page-subtitle">
+                Confirm order deletion
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                    Confirm Order Deletion
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if can_delete %}
+                    <div class="alert alert-delete">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-exclamation-circle"></i>
+                            This action cannot be undone!
+                        </h6>
+                        <p class="mb-0">
+                            Are you sure you want to delete order <strong>{{ order.order_number }}</strong>?
+                            This will permanently remove the order and all associated data.
+                        </p>
+                    </div>
+                    
+                    <div class="delete-reasons">
+                        <h6 class="mb-2"><i class="fas fa-check-circle text-success"></i> Deletion Allowed</h6>
+                        <div class="reason-item">
+                            <i class="fas fa-info-circle text-success reason-icon"></i>
+                            <span>{{ delete_reason }}</span>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-ban"></i>
+                            Cannot Delete This Order
+                        </h6>
+                        <p class="mb-0">{{ delete_reason }}</p>
+                    </div>
+                    
+                    <div class="delete-reasons">
+                        <h6 class="mb-2"><i class="fas fa-times-circle text-danger"></i> Deletion Not Allowed</h6>
+                        {% if not is_empty and not is_confirmed_only %}
+                            <div class="reason-item">
+                                <i class="fas fa-cog text-warning reason-icon"></i>
+                                <span>Order has active services or is in progress</span>
+                            </div>
+                        {% endif %}
+                        
+                        {% if order.has_payments %}
+                            <div class="reason-item">
+                                <i class="fas fa-credit-card text-warning reason-icon"></i>
+                                <span>Order has associated payments</span>
+                            </div>
+                        {% endif %}
+                        
+                        {% if order.actual_start_time %}
+                            <div class="reason-item">
+                                <i class="fas fa-play text-warning reason-icon"></i>
+                                <span>Service has already started</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <!-- Order Summary -->
+                <div class="order-summary">
+                    <h6 class="mb-3"><i class="fas fa-file-invoice"></i> Order Details</h6>
+                    
+                    <div class="summary-item">
+                        <span class="summary-label">Order Number:</span>
+                        <span class="summary-value">{{ order.order_number }}</span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <span class="summary-label">Customer:</span>
+                        <span class="summary-value">{{ order.customer.full_name }}</span>
+                    </div>
+                    
+                    {% if order.vehicle %}
+                    <div class="summary-item">
+                        <span class="summary-label">Vehicle:</span>
+                        <span class="summary-value">{{ order.vehicle.registration_number }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="summary-item">
+                        <span class="summary-label">Status:</span>
+                        <span class="summary-value">
+                            <span class="badge badge-{{ order.status }}">{{ order.get_status_display }}</span>
+                        </span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <span class="summary-label">Total Amount:</span>
+                        <span class="summary-value">KES {{ order.total_amount }}</span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <span class="summary-label">Order Items:</span>
+                        <span class="summary-value">{{ order_items_count }} item{{ order_items_count|pluralize }}</span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <span class="summary-label">Has Payments:</span>
+                        <span class="summary-value">
+                            {% if has_payments %}
+                                <i class="fas fa-check text-success"></i> Yes
+                            {% else %}
+                                <i class="fas fa-times text-muted"></i> No
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <span class="summary-label">Created:</span>
+                        <span class="summary-value">{{ order.created_at|date:"M d, Y g:i A" }}</span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'services:order_detail' order.pk %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancel
+                    </a>
+                    
+                    {% if can_delete %}
+                        <form method="post" class="inline-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-delete" onclick="return confirmDelete()">
+                                <i class="fas fa-trash"></i> Delete Order
+                            </button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'services:order_detail' order.pk %}" class="btn btn-primary">
+                            <i class="fas fa-eye"></i> View Order
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete() {
+    return confirm('Are you absolutely sure you want to delete this order? This action cannot be undone.');
+}
+</script>
+{% endblock %}
