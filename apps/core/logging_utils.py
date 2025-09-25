@@ -7,8 +7,22 @@ Compatible with custom MySQL tenant system
 import logging
 import json
 from datetime import datetime
+from uuid import UUID
+from decimal import Decimal
 from django.utils import timezone
 from django.db import connection
+
+class AutoWashJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for AutoWash logging that handles UUID, Decimal, and datetime objects"""
+    
+    def default(self, obj):
+        if isinstance(obj, UUID):
+            return str(obj)
+        elif isinstance(obj, Decimal):
+            return float(obj)
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 # Initialize loggers
 tenant_logger = logging.getLogger('autowash.tenant_activity')
@@ -63,7 +77,7 @@ class AutoWashLogger:
             'details': details or {},
         }
         
-        tenant_logger.info(f"TENANT_ACTION: {json.dumps(log_data)}")
+        tenant_logger.info(f"TENANT_ACTION: {json.dumps(log_data, cls=AutoWashJSONEncoder)}")
     
     @staticmethod
     def log_user_login(user, success=True, ip_address=None, user_agent=None, tenant=None, request=None):
@@ -81,7 +95,7 @@ class AutoWashLogger:
             'user_agent': user_agent,
         }
         
-        login_logger.info(f"LOGIN_ATTEMPT: {json.dumps(log_data)}")
+        login_logger.info(f"LOGIN_ATTEMPT: {json.dumps(log_data, cls=AutoWashJSONEncoder)}")
     
     @staticmethod
     def log_performance(operation, duration_ms, details=None, tenant=None, request=None):
@@ -97,7 +111,7 @@ class AutoWashLogger:
             'details': details or {},
         }
         
-        performance_logger.info(f"PERFORMANCE: {json.dumps(log_data)}")
+        performance_logger.info(f"PERFORMANCE: {json.dumps(log_data, cls=AutoWashJSONEncoder)}")
     
     @staticmethod
     def log_security_event(event_type, severity='WARNING', user=None, details=None, tenant=None, request=None):
@@ -115,7 +129,7 @@ class AutoWashLogger:
             'details': details or {},
         }
         
-        security_logger.warning(f"SECURITY_EVENT: {json.dumps(log_data)}")
+        security_logger.warning(f"SECURITY_EVENT: {json.dumps(log_data, cls=AutoWashJSONEncoder)}")
     
     @staticmethod
     def log_business_event(event_type, amount=None, customer=None, service=None, details=None, tenant=None, request=None):
@@ -133,7 +147,7 @@ class AutoWashLogger:
             'details': details or {},
         }
         
-        business_logger.info(f"BUSINESS_EVENT: {json.dumps(log_data)}")
+        business_logger.info(f"BUSINESS_EVENT: {json.dumps(log_data, cls=AutoWashJSONEncoder)}")
 
 
 class LoggingMiddleware:
