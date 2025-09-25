@@ -189,4 +189,8 @@ if settings.DEBUG:
 
 # Static and media files
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Only serve media files through Django in development
+# On cPanel, Apache serves media files directly from public_html/media/
+if not settings.CPANEL:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
