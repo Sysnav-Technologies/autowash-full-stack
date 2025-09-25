@@ -42,7 +42,8 @@ urlpatterns = [
     path('<str:payment_id>/', views.payment_detail_view, name='detail'),
     path('<str:payment_id>/cash/', views.process_cash_payment_view, name='process_cash'),
     path('<str:payment_id>/mpesa/', views.process_mpesa_payment_view, name='process_mpesa'),
-    # path('<str:payment_id>/card/', views.process_card_payment_view, name='process_card'),
+    path('<str:payment_id>/card/', views.process_card_payment_view, name='process_card'),
+    path('<str:payment_id>/bank/', views.process_bank_payment_view, name='process_bank'),
     
     # Payment Status & Actions - specific payment ID patterns
     path('<str:payment_id>/status/', views.mpesa_payment_status_view, name='mpesa_status'),

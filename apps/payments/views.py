@@ -17,7 +17,7 @@ from apps.core.utils import send_sms_notification, send_email_notification, gene
 from apps.core.logging_utils import AutoWashLogger
 from .models import (
     Payment, PaymentMethod, PaymentRefund, MPesaTransaction,
-    CardTransaction, CashTransaction, PaymentGateway
+    CardTransaction, CashTransaction, BankTransaction, PaymentGateway
 )
 from .forms import (
     PaymentForm, CashPaymentForm, CardPaymentForm, MPesaPaymentForm,
@@ -1092,6 +1092,106 @@ def process_cash_payment_view(request, payment_id):
     }
     
     return render(request, 'payments/process_cash.html', context)
+
+@login_required
+@employee_required()
+def process_card_payment_view(request, payment_id):
+    """Process card payment with direct processing like cash"""
+    payment = get_object_or_404(Payment, payment_id=payment_id)
+    
+    if request.method == 'POST':
+        try:
+            # Get basic details for record keeping
+            reference_number = request.POST.get('reference_number', '').strip()
+            card_type = request.POST.get('card_type', 'Card')
+            
+            with transaction.atomic():
+                # Create card transaction details with minimal info
+                card_details = CardTransaction.objects.create(
+                    payment=payment,
+                    card_type=card_type,
+                    masked_pan="****-****-****-CARD",
+                    card_holder_name="Card Payment",
+                    authorization_code=reference_number if reference_number else f"AUTH{generate_unique_code(6)}",
+                    processor_response="Approved",
+                    gateway_transaction_id=f"TXN{generate_unique_code(10)}",
+                    cvv_response="M",  # Match
+                    avs_response="Y"   # Yes
+                )
+                
+                # Complete payment
+                payment.complete_payment(user=request.user)
+                
+                messages.success(request, f'Card payment {payment.payment_id} completed successfully!')
+                
+                # Check if this is a service order and if it's fully paid
+                if payment.service_order:
+                    # Calculate total paid for the order
+                    total_paid = Payment.objects.filter(
+                        service_order=payment.service_order,
+                        status='completed'
+                    ).aggregate(total=Sum('amount'))['total'] or 0
+                    
+                    # If order is fully paid, redirect to order receipt
+                    if total_paid >= payment.service_order.total_amount:
+                        return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/receipt/')
+                
+                # Otherwise redirect to payment receipt
+                return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/receipt/?print=true')
+                
+        except Exception as e:
+            messages.error(request, f'Error processing card payment: {str(e)}')
+    
+    context = {
+        'payment': payment,
+        'title': f'Card Payment - {payment.payment_id}'
+    }
+    
+    return render(request, 'payments/process_card.html', context)
+
+@login_required
+@employee_required()
+def process_bank_payment_view(request, payment_id):
+    """Process bank transfer payment directly without showing template"""
+    payment = get_object_or_404(Payment, payment_id=payment_id)
+    
+    try:
+        with transaction.atomic():
+            # Create bank transaction details with default values
+            bank_details = BankTransaction.objects.create(
+                payment=payment,
+                bank_name='Bank Transfer',
+                account_number='',
+                account_name='Bank Transfer',
+                reference_number=f'BT-{payment.payment_id}-{timezone.now().strftime("%Y%m%d%H%M%S")}',
+                confirmation_code='',
+                transaction_date=timezone.now(),
+                processed_by=request.employee if hasattr(request, 'employee') else None
+            )
+            
+            # Complete payment immediately
+            payment.complete_payment(user=request.user)
+            
+            messages.success(request, f'Bank transfer payment {payment.payment_id} completed successfully!')
+            
+            # Check if this is a service order and if it's fully paid
+            if payment.service_order:
+                # Calculate total paid for the order
+                total_paid = Payment.objects.filter(
+                    service_order=payment.service_order,
+                    status='completed'
+                ).aggregate(total=Sum('amount'))['total'] or 0
+                
+                # If order is fully paid, redirect to order receipt
+                if total_paid >= payment.service_order.total_amount:
+                    return redirect(f'/business/{request.tenant.slug}/services/orders/{payment.service_order.pk}/receipt/')
+            
+            # Otherwise redirect to payment receipt
+            return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/receipt/?print=true')
+            
+    except Exception as e:
+        messages.error(request, f'Error processing bank transfer: {str(e)}')
+        return redirect(f'/business/{request.tenant.slug}/payments/{payment.payment_id}/')
 
 @login_required
 @employee_required()
