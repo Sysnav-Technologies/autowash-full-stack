@@ -2,19 +2,19 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Card Payment - {{ block.super }}{% endblock %}
+{% block title %}Bank Transfer - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <style>
-    .card-payment-card {
+    .bank-payment-card {
         background: white;
         border-radius: 12px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         border: none;
     }
     
-    .card-header {
-        background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    .bank-header {
+        background: linear-gradient(135deg, #0984e3, #74b9ff);
         color: white;
         border-radius: 12px 12px 0 0;
         padding: 1.5rem;
@@ -33,10 +33,10 @@
 <div class="container-fluid px-4">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <div class="card-payment-card">
-                <div class="card-header">
+            <div class="bank-payment-card">
+                <div class="bank-header">
                     <h3 class="mb-1 fw-bold">
-                        <i class="fas fa-credit-card me-2"></i>Card Payment
+                        <i class="fas fa-university me-2"></i>Bank Transfer Payment
                     </h3>
                     <p class="mb-0 opacity-75">Payment ID: {{ payment.payment_id }}</p>
                 </div>
@@ -60,32 +60,61 @@
                         </div>
                     </div>
                     
-                    <form method="post" id="cardPaymentForm">
+                    <form method="post" id="bankPaymentForm">
                         {% csrf_token %}
                         
-                        <!-- Card Details -->
+                        <!-- Bank Transfer Details -->
                         <div class="mb-4">
                             <h5 class="fw-bold mb-3">
-                                <i class="fas fa-credit-card text-primary me-2"></i>Card Payment Details
+                                <i class="fas fa-university text-primary me-2"></i>Bank Transfer Details
                             </h5>
                             
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label for="cardType" class="form-label">Card Type</label>
-                                    <select class="form-select" id="cardType" name="card_type">
-                                        <option value="Visa">Visa</option>
-                                        <option value="MasterCard">MasterCard</option>
-                                        <option value="Amex">American Express</option>
+                                    <label for="bankName" class="form-label">Bank Name</label>
+                                    <select class="form-select" id="bankName" name="bank_name">
+                                        <option value="">Select Bank</option>
+                                        <option value="KCB">KCB Bank</option>
+                                        <option value="Equity">Equity Bank</option>
+                                        <option value="Cooperative">Cooperative Bank</option>
+                                        <option value="ABSA">ABSA Bank</option>
+                                        <option value="Standard Chartered">Standard Chartered</option>
+                                        <option value="I&M">I&M Bank</option>
+                                        <option value="NIC">NIC Bank</option>
+                                        <option value="DTB">Diamond Trust Bank</option>
                                         <option value="Other">Other</option>
                                     </select>
                                 </div>
                                 
                                 <div class="col-md-6 mb-3">
-                                    <label for="referenceNumber" class="form-label">Reference Number (Optional)</label>
+                                    <label for="accountNumber" class="form-label">Account Number</label>
+                                    <input type="text" class="form-control" 
+                                           id="accountNumber" name="account_number" 
+                                           placeholder="Enter account number">
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="accountName" class="form-label">Account Name</label>
+                                    <input type="text" class="form-control" 
+                                           id="accountName" name="account_name" 
+                                           placeholder="Account holder name">
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="referenceNumber" class="form-label">Reference Number <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" 
                                            id="referenceNumber" name="reference_number" 
-                                           placeholder="Transaction reference">
+                                           placeholder="Transfer reference/confirmation" required>
                                 </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="confirmationCode" class="form-label">Confirmation Code</label>
+                                <input type="text" class="form-control" 
+                                       id="confirmationCode" name="confirmation_code" 
+                                       placeholder="Bank confirmation code (if available)">
                             </div>
                         </div>
                         
@@ -94,7 +123,7 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h5 class="mb-1">Total to Process</h5>
-                                    <small class="text-muted">Payment will be processed immediately</small>
+                                    <small class="text-muted">Payment will be marked as completed</small>
                                 </div>
                                 <div class="text-end">
                                     <h3 class="mb-0 text-success fw-bold">KES {{ payment.amount|floatformat:2|intcomma }}</h3>
@@ -106,11 +135,11 @@
                         <div class="alert alert-warning border-0 mb-4">
                             <div class="d-flex align-items-center">
                                 <div class="me-3">
-                                    <i class="fas fa-shield-alt text-warning fs-4"></i>
+                                    <i class="fas fa-info-circle text-warning fs-4"></i>
                                 </div>
                                 <div>
-                                    <strong>Secure Processing</strong><br>
-                                    <small>This payment will be processed securely. Ensure the customer has completed the card transaction.</small>
+                                    <strong>Bank Transfer Verification</strong><br>
+                                    <small>Ensure the bank transfer has been completed before processing this payment. The reference number is required for tracking.</small>
                                 </div>
                             </div>
                         </div>
@@ -123,7 +152,7 @@
                             </a>
                             
                             <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-check-circle me-2"></i>Process Card Payment
+                                <i class="fas fa-check-circle me-2"></i>Process Bank Transfer
                             </button>
                         </div>
                     </form>
@@ -136,24 +165,24 @@
                     <div class="row">
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <i class="fas fa-credit-card text-primary fs-2"></i>
+                                <i class="fas fa-university text-primary fs-2"></i>
                             </div>
-                            <h6 class="fw-bold">Process Payment</h6>
-                            <small class="text-muted">Customer swipes/inserts card on terminal</small>
+                            <h6 class="fw-bold">Customer Transfers</h6>
+                            <small class="text-muted">Customer completes bank transfer to your account</small>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <i class="fas fa-check-circle text-success fs-2"></i>
+                                <i class="fas fa-receipt text-success fs-2"></i>
                             </div>
-                            <h6 class="fw-bold">Confirm Transaction</h6>
-                            <small class="text-muted">Verify transaction is successful</small>
+                            <h6 class="fw-bold">Get Reference</h6>
+                            <small class="text-muted">Obtain transfer reference number from customer</small>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <i class="fas fa-receipt text-info fs-2"></i>
+                                <i class="fas fa-check-double text-info fs-2"></i>
                             </div>
-                            <h6 class="fw-bold">Complete Payment</h6>
-                            <small class="text-muted">Click process to finalize payment</small>
+                            <h6 class="fw-bold">Confirm & Process</h6>
+                            <small class="text-muted">Enter details and process the payment</small>
                         </div>
                     </div>
                 </div>

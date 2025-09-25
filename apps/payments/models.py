@@ -753,6 +753,34 @@ class CashTransaction(TenantTimeStampedModel):
         verbose_name = "Cash Transaction"
         verbose_name_plural = "Cash Transactions"
 
+class BankTransaction(TenantTimeStampedModel):
+    """Bank transfer payment transaction details"""
+    payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name='bank_details')
+    
+    # Bank transfer details
+    bank_name = models.CharField(max_length=100, blank=True)
+    account_number = models.CharField(max_length=50, blank=True)
+    account_name = models.CharField(max_length=100, blank=True)
+    reference_number = models.CharField(max_length=100, blank=True)
+    
+    # Transaction details
+    transaction_date = models.DateTimeField(null=True, blank=True)
+    confirmation_code = models.CharField(max_length=100, blank=True)
+    processed_by = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bank_transactions'
+    )
+    
+    def __str__(self):
+        return f"Bank Transfer {self.reference_number} - {self.bank_name}"
+    
+    class Meta:
+        verbose_name = "Bank Transaction"
+        verbose_name_plural = "Bank Transactions"
+
 class PaymentGateway(TenantTimeStampedModel):
     """Payment gateway configurations"""
     
