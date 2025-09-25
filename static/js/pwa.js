@@ -53,30 +53,12 @@ class PWAManager {
         }
     }
 
-    // Service Worker Registration
+    // Service Worker Registration (Disabled for better cache control)
     async registerServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            try {
-                this.swRegistration = await navigator.serviceWorker.register('/static/js/sw.js', {
-                    scope: '/'
-                });
-                
-                console.log('Service Worker registered successfully:', this.swRegistration);
-                
-                // Handle service worker updates
-                this.swRegistration.addEventListener('updatefound', () => {
-                    const newWorker = this.swRegistration.installing;
-                    newWorker.addEventListener('statechange', () => {
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            this.showUpdateNotification();
-                        }
-                    });
-                });
-
-            } catch (error) {
-                console.log('Service Worker registration failed:', error);
-            }
-        }
+        // Service worker disabled to prevent cache conflicts
+        // PWA functionality maintained through manifest and install prompts
+        console.log('Service Worker registration disabled for better cache control');
+        return null;
     }
 
     // Install Prompt Setup

@@ -51,10 +51,32 @@ class SubscriptionMiddleware:
             response = self.get_response(request)
             return response
         
+        # Prevent redirect loops by tracking attempts
+        redirect_key = f'subscription_redirects_{request.user.id}'
+        if not hasattr(request, 'session'):
+            # If no session, continue without subscription checks to prevent errors
+            response = self.get_response(request)
+            return response
+            
+        redirect_count = request.session.get(redirect_key, 0)
+        
+        # If we've already redirected too many times, skip to prevent infinite loops
+        if redirect_count >= 5:
+            logger.warning(f"Subscription redirect loop detected for user {request.user.id} on path {request.path}, skipping checks")
+            # Reset counter after skipping
+            request.session[redirect_key] = 0
+            response = self.get_response(request)
+            return response
+        
         # Check subscription status
         redirect_url = self.check_subscription_status(request)
-        if redirect_url and request.path != redirect_url:
+        if redirect_url and request.path != redirect_url and not request.path.startswith(redirect_url):
+            # Increment redirect counter
+            request.session[redirect_key] = redirect_count + 1
             return redirect(redirect_url)
+        else:
+            # Reset counter on successful page load
+            request.session[redirect_key] = 0
         
         response = self.get_response(request)
         return response

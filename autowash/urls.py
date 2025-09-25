@@ -14,15 +14,24 @@ admin.site.site_header = "Autowash System Administration"
 admin.site.site_title = "System Admin"
 admin.site.index_title = "System Administration Panel"
 
-def serve_service_worker(request):
-    """Serve service worker from static files"""
-    sw_path = os.path.join(settings.BASE_DIR, 'static', 'js', 'sw.js')
-    try:
-        with open(sw_path, 'r') as f:
-            content = f.read()
-        return HttpResponse(content, content_type='application/javascript')
-    except FileNotFoundError:
-        return HttpResponse('// Service worker not found', content_type='application/javascript', status=404)
+def serve_empty_service_worker(request):
+    """Serve empty service worker to clean up browser cache"""
+    content = '''
+    // Service worker cleanup
+    self.addEventListener('install', function(e) {
+        self.skipWaiting();
+    });
+    self.addEventListener('activate', function(e) {
+        self.registration.unregister()
+            .then(function() {
+                return self.clients.matchAll();
+            })
+            .then(function(clients) {
+                clients.forEach(client => client.navigate(client.url));
+            });
+    });
+    '''
+    return HttpResponse(content, content_type='application/javascript')
 
 def serve_favicon(request):
     """Serve favicon from static files"""
@@ -120,7 +129,7 @@ def _get_employee_redirect_url(tenant_slug, role):
 # URL Configuration
 urlpatterns = [
     # Static file handlers for common requests
-    path('sw.js', serve_service_worker, name='service_worker'),
+    path('sw.js', serve_empty_service_worker, name='service_worker_cleanup'),
     path('favicon.ico', serve_favicon, name='favicon'),
     
     # Health check and administration

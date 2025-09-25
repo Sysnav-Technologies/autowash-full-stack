@@ -1,12 +1,11 @@
 """
-Multi-Tenant Cache Context Processor
-Provides tenant-aware cache operations and utilities to templates and views
-Updated with actual functionalities from all apps
+Optimized Cache Context Processor
+Provides fast, responsive cache operations for templates and views
+Uses the new optimized cache system that prevents template staleness
 """
 from django.core.cache import cache
 from django.conf import settings
 from apps.core.database_router import get_current_tenant
-from apps.core.cache_backends import TenantAwareCacheHandler
 import time
 import hashlib
 
@@ -292,7 +291,9 @@ def tenant_cache_context(request):
     def clear_tenant_cache():
         """Clear all cache for current tenant"""
         if tenant_id:
-            TenantAwareCacheHandler.clear_tenant_cache(tenant_id)
+            # Use the optimized cache system
+            from apps.core.cache_manager import MultiTenantCacheManager
+            MultiTenantCacheManager.force_cache_refresh(tenant_id=tenant_id, request=request)
     
     def get_cache_stats():
         """Get cache statistics for current tenant"""

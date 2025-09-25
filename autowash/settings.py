@@ -128,7 +128,6 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
 ] + (['whitenoise.middleware.WhiteNoiseMiddleware'] if RENDER or CPANEL else []) + [
-    'django.middleware.cache.UpdateCacheMiddleware',  # CACHE: Must be first for caching
     'django.contrib.sessions.middleware.SessionMiddleware',
     'apps.core.mysql_middleware.MySQLTenantMiddleware',
     'apps.core.mysql_middleware.TenantBusinessContextMiddleware',
@@ -140,7 +139,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ] + (['django_ratelimit.middleware.RatelimitMiddleware'] if not CPANEL else []) + [
     'allauth.account.middleware.AccountMiddleware',
-    'django.middleware.cache.FetchFromCacheMiddleware',  # CACHE: Must be last for caching
 ] + (['debug_toolbar.middleware.DebugToolbarMiddleware'] if DEBUG else [])
 
 # CSRF Configuration
@@ -217,7 +215,6 @@ TEMPLATES = [
                 'apps.core.context_processors.verification_context',
                 'apps.core.context_processors.subscription_flow_context',
                 'apps.core.context_processors.sidebar_context',
-                'apps.core.context_processors.network_status',
                 # Multi-tenant cache context processors
                 'apps.core.cache_context_processors.tenant_cache_context',
                 'apps.core.cache_context_processors.cache_performance_context',
@@ -239,7 +236,7 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
-        'CONN_MAX_AGE': 3600 if CPANEL else 600,
+        'CONN_MAX_AGE': 7200 if CPANEL else 1200,  # Increased: 2 hours for cPanel, 20 minutes for local
         'OPTIONS': {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES',autocommit=1",
@@ -282,24 +279,53 @@ else:
 # Cache Configuration - Production-Ready Database Cache
 
 def get_cache_config():
-    """Production-ready cache configuration for all environments"""
+    """
+    Production-ready cache configuration optimized for immediate template updates
+    Designed to prevent template staleness and system unresponsiveness
+    """
     
     if CPANEL:
-        # Production cPanel: Multi-tenant database cache (reliable, no Redis needed)
+        # cPanel Production: Use locmem cache for speed, file-based for persistence
+        # This configuration prevents template staleness while maintaining performance
+        cache_dir = BASE_DIR / 'cache'
+        cache_dir.mkdir(exist_ok=True)
+        
         return {
             'default': {
-                'BACKEND': 'apps.core.cache_backends.MultiTenantDatabaseCache',
-                'LOCATION': 'django_cache_table',
-                'TIMEOUT': 300,  # 5 minutes for real-time updates
+                # Fast in-memory cache with optimized timeout for better performance
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'TIMEOUT': 60,  # Increased from 30s to 60s for better performance
                 'OPTIONS': {
-                    'MAX_ENTRIES': 20000,  # More entries for multi-tenant
-                    'CULL_FREQUENCY': 4,  # Remove 1/4 when max reached
+                    'MAX_ENTRIES': 5000,  # Increased from 1000 for higher capacity
+                    'CULL_FREQUENCY': 3,  # Less aggressive culling (from 2 to 3)
+                },
+                'KEY_PREFIX': 'aw_fast_',
+                'VERSION': 4,  # Bump version to clear old cache
+            },
+            'persistent': {
+                # File-based cache for data that needs persistence
+                'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+                'LOCATION': str(cache_dir / 'persistent'),
+                'TIMEOUT': 600,  # Increased from 5 to 10 minutes for persistent data
+                'OPTIONS': {
+                    'MAX_ENTRIES': 2000,  # Increased from 500 for more capacity
+                    'CULL_FREQUENCY': 4,  # Less aggressive culling
+                }
+            },
+            'sessions': {
+                # Separate cache for sessions with optimizations
+                'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+                'LOCATION': str(cache_dir / 'sessions'),
+                'TIMEOUT': 3600 * 12,  # Increased from 8 to 12 hours for sessions
+                'OPTIONS': {
+                    'MAX_ENTRIES': 1000,  # Add max entries for session cache
+                    'CULL_FREQUENCY': 5,   # Very light culling for sessions
                 }
             }
         }
     
     elif RENDER:
-        # Render: Try Redis first, fallback to multi-tenant database cache
+        # Render: Use Redis if available, otherwise locmem for speed
         redis_url = config('REDIS_URL', default='')
         if redis_url and 'redis://' in redis_url:
             try:
@@ -307,77 +333,72 @@ def get_cache_config():
                     'default': {
                         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
                         'LOCATION': redis_url,
-                        'TIMEOUT': 900,  # 15 minutes
+                        'TIMEOUT': 60,  # Short timeout for immediate updates
+                        'OPTIONS': {
+                            'CONNECTION_POOL_KWARGS': {
+                                'max_connections': 20,
+                                'socket_connect_timeout': 5,
+                                'socket_timeout': 5,
+                            }
+                        },
+                        'KEY_PREFIX': 'aw_prod_',
+                        'VERSION': 3,
                     }
                 }
             except:
                 pass
         
-        # Fallback to multi-tenant database cache for Render
+        # Fallback to fast locmem cache
         return {
             'default': {
-                'BACKEND': 'apps.core.cache_backends.MultiTenantDatabaseCache',
-                'LOCATION': 'django_cache_table',
-                'TIMEOUT': 300,  # 5 minutes for real-time updates
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'TIMEOUT': 60,  # Short timeout for immediate updates
                 'OPTIONS': {
-                    'MAX_ENTRIES': 10000,
-                    'CULL_FREQUENCY': 4,
+                    'MAX_ENTRIES': 2000,
+                    'CULL_FREQUENCY': 2,
                 }
             }
         }
     
     else:
-        # Development/Local: Try Redis first, fallback to multi-tenant database cache
-        try:
-            import redis
-            redis.Redis(host='localhost', port=6379, socket_connect_timeout=1).ping()
-            return {
-                'default': {
-                    'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-                    'LOCATION': 'redis://127.0.0.1:6379/1',
-                    'TIMEOUT': 300,  # 5 minutes for development
-                }
-            }
-        except:
-            pass
-        
-        # Fallback to multi-tenant database cache for local development
+        # Development: Use dummy cache to ensure immediate template updates
+        # This completely eliminates caching issues during development
         return {
             'default': {
-                'BACKEND': 'apps.core.cache_backends.MultiTenantDatabaseCache',
-                'LOCATION': 'django_cache_table',
-                'TIMEOUT': 300,  # 5 minutes
-                'OPTIONS': {
-                    'MAX_ENTRIES': 5000,
-                    'CULL_FREQUENCY': 4,
-                }
+                'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+            },
+            'redis': {
+                'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+                'LOCATION': 'redis://127.0.0.1:6379/1',
+                'TIMEOUT': 60,
+            } if LOCAL else {
+                'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
             }
         }
 
 
 CACHES = get_cache_config()
 
-# CRITICAL: Ensure cache operations always use main database
-# This prevents cache from being created in tenant databases
-CACHE_MIDDLEWARE_KEY_PREFIX = 'aw'  # Short prefix for efficiency
-CACHE_MIDDLEWARE_SECONDS = 300  # 5 minutes for real-time updates (reduced from 10 minutes)
+# Cache Configuration - Optimized for immediate template updates
+CACHE_VERSION = '4'  # Increment to invalidate all caches - UPDATED for performance optimizations
+CACHE_MIDDLEWARE_KEY_PREFIX = 'aw_fast'  # Updated prefix for new cache system
+CACHE_MIDDLEWARE_SECONDS = 0  # COMPLETELY DISABLE middleware caching to prevent staleness
 CACHE_MIDDLEWARE_ALIAS = 'default'
 
-# Database Cache Configuration - Force main database usage
-if any('MultiTenantDatabaseCache' in str(cache.get('BACKEND', '')) for cache in CACHES.values()):
-    # Ensure database cache table uses main database routing
-    DATABASES['default']['OPTIONS']['init_command'] += ",@@session.sql_mode='STRICT_TRANS_TABLES'"
+# Template caching - COMPLETELY DISABLED to ensure immediate updates
+USE_TEMPLATE_CACHE = False  # Never cache templates to prevent staleness
+TEMPLATE_CACHE_TIMEOUT = 0  # Disable any template caching
 
-SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'  # Hybrid approach for reliability
+# Session configuration - optimized for responsiveness
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Use database sessions for reliability
 SESSION_CACHE_ALIAS = 'default'
-SESSION_COOKIE_AGE = 3600 * 8  # 8 hours - longer for production stability
+SESSION_COOKIE_AGE = 3600 * 4  # Shorter sessions - 4 hours for better security
 SESSION_COOKIE_NAME = 'autowash_sessionid'
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request for performance
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Allow sessions to persist
 SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -569,14 +590,16 @@ SITE_ID = 1
 
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
 
+# Browser compatibility: Use SAMEORIGIN for local dev, DENY for production
 if not RENDER and not CPANEL:
+    X_FRAME_OPTIONS = 'SAMEORIGIN'  # Less restrictive for local development
     SECURE_HSTS_SECONDS = 0
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
 else:
+    X_FRAME_OPTIONS = 'DENY'  # Strict security for production
     if DEBUG:
         SECURE_HSTS_SECONDS = 0
         SECURE_SSL_REDIRECT = False
@@ -763,10 +786,6 @@ if CPANEL or RENDER:
         '.ttf': 'font/ttf',
         '.eot': 'application/vnd.ms-fontobject',
     }
-
-NETWORK_SLOW_THRESHOLD = 3.0
-NETWORK_DUPLICATE_WINDOW = 5.0
-NETWORK_PROTECTION_DURATION = 30.0
 
 if not DEBUG:
     CONN_HEALTH_CHECKS = True
