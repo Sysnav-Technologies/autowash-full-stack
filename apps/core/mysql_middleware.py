@@ -9,9 +9,11 @@ from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
 from apps.core.tenant_models import Tenant
 from apps.core.database_router import TenantDatabaseRouter, TenantDatabaseManager
+from apps.core.uuid_utils import is_valid_uuid, safe_uuid_convert, fix_corrupted_uuid_field
 from django.core.cache import cache
 import re
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -100,9 +102,24 @@ class MySQLTenantMiddleware(MiddlewareMixin):
                 try:
                     tenant = Tenant.objects.get_by_subdomain(subdomain)
                     if tenant:
-                        # REAL-TIME: Only 10-second cache for database protection
-                        cache.set(cache_key, tenant, timeout=10)
-                except Exception:
+                        # Validate tenant UUID fields
+                        try:
+                            if not is_valid_uuid(tenant.id):
+                                logger.error(f"Tenant {subdomain} has invalid UUID: {tenant.id}")
+                                fixed_uuid = fix_corrupted_uuid_field(tenant.id)
+                                if fixed_uuid:
+                                    tenant.id = safe_uuid_convert(fixed_uuid)
+                                else:
+                                    tenant = None
+                        except Exception as uuid_error:
+                            logger.error(f"UUID validation error for subdomain {subdomain}: {uuid_error}")
+                            tenant = None
+                        
+                        if tenant:
+                            # REAL-TIME: Only 10-second cache for database protection
+                            cache.set(cache_key, tenant, timeout=10)
+                except Exception as e:
+                    logger.error(f"Database error resolving subdomain {subdomain}: {e}")
                     tenant = None
             
             return tenant
@@ -125,9 +142,32 @@ class MySQLTenantMiddleware(MiddlewareMixin):
             if tenant is None:
                 try:
                     tenant = Tenant.objects.get(slug=tenant_slug, is_active=True)
-                    # REAL-TIME: Only 10-second cache to prevent staleness
-                    cache.set(cache_key, tenant, timeout=10)
+                    # Validate tenant UUID fields before caching
+                    if tenant and hasattr(tenant, 'id'):
+                        try:
+                            # Validate the tenant ID is a proper UUID
+                            if not is_valid_uuid(tenant.id):
+                                logger.error(f"Tenant {tenant_slug} has invalid UUID: {tenant.id}")
+                                # Try to fix the UUID
+                                fixed_uuid = fix_corrupted_uuid_field(tenant.id)
+                                if fixed_uuid:
+                                    logger.info(f"Fixed tenant UUID from {tenant.id} to {fixed_uuid}")
+                                    # Note: This won't persist to DB, just for this request
+                                    tenant.id = safe_uuid_convert(fixed_uuid)
+                                else:
+                                    logger.error(f"Could not fix UUID for tenant {tenant_slug}, skipping")
+                                    tenant = None
+                        except Exception as uuid_error:
+                            logger.error(f"UUID validation error for tenant {tenant_slug}: {uuid_error}")
+                            tenant = None
+                    
+                    if tenant:
+                        # REAL-TIME: Only 10-second cache to prevent staleness
+                        cache.set(cache_key, tenant, timeout=10)
                 except Tenant.DoesNotExist:
+                    tenant = None
+                except Exception as e:
+                    logger.error(f"Database error resolving tenant {tenant_slug}: {e}")
                     tenant = None
             
             if tenant:
@@ -147,9 +187,24 @@ class MySQLTenantMiddleware(MiddlewareMixin):
             try:
                 tenant = Tenant.objects.get_by_domain(hostname)
                 if tenant:
-                    # REAL-TIME: Only 10-second cache to prevent staleness
-                    cache.set(cache_key, tenant, timeout=10)
-            except Exception:
+                    # Validate tenant UUID fields
+                    try:
+                        if not is_valid_uuid(tenant.id):
+                            logger.error(f"Tenant {hostname} has invalid UUID: {tenant.id}")
+                            fixed_uuid = fix_corrupted_uuid_field(tenant.id)
+                            if fixed_uuid:
+                                tenant.id = safe_uuid_convert(fixed_uuid)
+                            else:
+                                tenant = None
+                    except Exception as uuid_error:
+                        logger.error(f"UUID validation error for domain {hostname}: {uuid_error}")
+                        tenant = None
+                    
+                    if tenant:
+                        # REAL-TIME: Only 10-second cache to prevent staleness
+                        cache.set(cache_key, tenant, timeout=10)
+            except Exception as e:
+                logger.error(f"Database error resolving custom domain {hostname}: {e}")
                 tenant = None
         
         return tenant

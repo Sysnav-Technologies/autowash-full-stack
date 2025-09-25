@@ -24,6 +24,7 @@ urlpatterns = [
     path('orders/quick/', views.quick_order_view, name='quick_order'),
     path('orders/<uuid:pk>/', views.order_detail_view, name='order_detail'),
     path('orders/<uuid:pk>/edit/', views.order_edit_view, name='order_edit'),
+    path('orders/<uuid:pk>/delete/', views.order_delete_view, name='order_delete'),
     path('orders/<uuid:pk>/print/', views.order_print_view, name='order_print'),
     path('orders/<uuid:pk>/receipt/', views.order_receipt_view, name='order_receipt'),
     path('orders/<uuid:pk>/receipt/print/', views.order_receipt_print_view, name='order_receipt_print'),

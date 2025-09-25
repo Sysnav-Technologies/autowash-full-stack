@@ -1622,6 +1622,110 @@ def order_detail_view(request, pk):
     return response
 
 @login_required
+@employee_required(['owner', 'manager'])
+@require_http_methods(["GET", "POST"])
+def order_delete_view(request, pk):
+    """Delete empty orders or orders in confirmed state"""
+    order = get_object_or_404(ServiceOrder, pk=pk)
+    
+    # Check if order can be deleted
+    can_delete = False
+    delete_reason = ""
+    
+    # Check if order is empty (no items)
+    order_items = order.order_items.all()
+    is_empty = not order_items.exists()
+    
+    # Check if order is in confirmed state without payments or progress
+    is_confirmed_only = (
+        order.status == 'confirmed' and
+        not order.actual_start_time and
+        not order.has_payments
+    )
+    
+    if is_empty:
+        can_delete = True
+        delete_reason = "Empty order (no services or items)"
+    elif is_confirmed_only:
+        can_delete = True
+        delete_reason = "Confirmed order without progress or payments"
+    else:
+        # Order cannot be deleted - has items, payments, or is in progress
+        delete_reason = "Cannot delete: Order has progress, payments, or active services"
+    
+    if request.method == 'POST' and can_delete:
+        try:
+            with transaction.atomic():
+                order_number = order.order_number
+                customer_name = order.customer.full_name
+                
+                # Log the deletion
+                AutoWashLogger.log_tenant_action(
+                    action='order_deleted',
+                    user=request.user,
+                    details={
+                        'order_number': order_number,
+                        'customer_name': customer_name,
+                        'delete_reason': delete_reason,
+                        'order_status': order.status,
+                        'total_amount': str(order.total_amount)
+                    },
+                    request=request
+                )
+                
+                # Delete the order
+                order.delete()
+                
+                messages.success(request, f'Order {order_number} has been deleted successfully.')
+                
+                # Handle AJAX requests
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'message': f'Order {order_number} deleted successfully',
+                        'redirect_url': get_business_url(request, 'services:order_list')
+                    })
+                    
+                return redirect(get_business_url(request, 'services:order_list'))
+                
+        except Exception as e:
+            error_msg = f'Error deleting order: {str(e)}'
+            
+            # Log the error
+            AutoWashLogger.log_security_event(
+                event_type='order_deletion_error',
+                severity='ERROR',
+                user=request.user,
+                details={
+                    'order_number': order.order_number,
+                    'error_message': str(e)
+                },
+                request=request
+            )
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': error_msg
+                })
+            else:
+                messages.error(request, error_msg)
+    
+    # GET request or cannot delete - show confirmation page
+    context = {
+        'order': order,
+        'can_delete': can_delete,
+        'delete_reason': delete_reason,
+        'is_empty': is_empty,
+        'is_confirmed_only': is_confirmed_only,
+        'order_items_count': order_items.count(),
+        'has_payments': order.has_payments,
+        'title': f'Delete Order - {order.order_number}'
+    }
+    
+    return render(request, 'services/order_confirm_delete.html', context)
+
+@login_required
 @employee_required()
 @require_POST
 def start_service(request, order_id):

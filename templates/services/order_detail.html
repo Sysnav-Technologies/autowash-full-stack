@@ -1100,6 +1100,16 @@
                         </button>
                     {% endif %}
                     
+                    <!-- Delete Order Option (for managers/owners only) -->
+                    {% if user_role in 'owner,manager' %}
+                        {% if order.status == 'confirmed' and not order.actual_start_time and not order.has_payments or not order.order_items.exists %}
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/delete/" class="btn btn-outline-danger">
+                                <i class="fas fa-trash"></i>
+                                Delete Order
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                    
                     {% if order.status == 'pending' or order.status == 'confirmed' %}
                         <a href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/edit/" class="btn btn-outline-primary">
                             <i class="fas fa-edit"></i>

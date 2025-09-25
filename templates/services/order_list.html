@@ -451,6 +451,15 @@
                                         </a></li>
                                         {% endif %}
                                         
+                                        <!-- Delete Order Option (for empty orders or confirmed orders without progress) -->
+                                        {% if user_role in 'owner,manager' %}
+                                            {% if order.status == 'confirmed' and not order.actual_start_time and not order.has_payments or not order.order_items.exists %}
+                                            <li><a class="dropdown-item text-danger" href="/business/{{ request.tenant.slug }}/services/orders/{{ order.pk }}/delete/">
+                                                <i class="fas fa-trash"></i> Delete Order
+                                            </a></li>
+                                            {% endif %}
+                                        {% endif %}
+                                        
                                         {% if order.payment_status != 'paid' %}
                                         <li><hr class="dropdown-divider"></li>
                                         <li><a class="dropdown-item text-warning" href="/business/{{ request.tenant.slug }}/payments/process/{{ order.id }}/">
