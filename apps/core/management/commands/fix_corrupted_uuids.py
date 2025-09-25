@@ -77,6 +77,10 @@ class Command(BaseCommand):
             
             if not self.model_name or self.model_name.lower() == 'user':
                 total_fixed += self.fix_user_related_uuids()
+            
+            # Always run MySQL connection cleanup unless specific model is targeted
+            if not self.model_name:
+                total_fixed += self.fix_mysql_connection_issues()
 
             if total_fixed > 0:
                 self.stdout.write(
@@ -432,3 +436,87 @@ class Command(BaseCommand):
             pass
         
         return None
+
+    def fix_mysql_connection_issues(self):
+        """Fix MySQL connection and session issues that cause Command Out of Sync errors"""
+        self.stdout.write('Checking for MySQL connection and session issues...')
+        
+        fixed_count = 0
+        
+        try:
+            with connection.cursor() as cursor:
+                # Check for long-running or stuck connections
+                cursor.execute("SHOW PROCESSLIST")
+                processes = cursor.fetchall()
+                
+                long_running_count = 0
+                for process in processes:
+                    # process format: (Id, User, Host, db, Command, Time, State, Info)
+                    if len(process) >= 6 and process[5]:  # Check Time column
+                        if process[5] > 300:  # More than 5 minutes
+                            long_running_count += 1
+                
+                if long_running_count > 0:
+                    self.stdout.write(
+                        self.style.WARNING(f'Found {long_running_count} long-running connections')
+                    )
+                
+                # Clean up expired sessions more aggressively
+                cursor.execute("""
+                    SELECT COUNT(*) FROM django_session 
+                    WHERE expire_date < DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                """)
+                old_sessions = cursor.fetchone()[0]
+                
+                if old_sessions > 0:
+                    self.stdout.write(
+                        self.style.WARNING(f'Found {old_sessions} old sessions (> 1 hour expired)')
+                    )
+                    
+                    if not self.dry_run:
+                        cursor.execute("""
+                            DELETE FROM django_session 
+                            WHERE expire_date < DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                        """)
+                        fixed_count += old_sessions
+                        self.stdout.write(
+                            self.style.SUCCESS(f'Cleaned up {old_sessions} old sessions')
+                        )
+                    else:
+                        fixed_count += old_sessions
+                
+                # Check for corrupted session data that might cause MySQL sync issues
+                cursor.execute("""
+                    SELECT session_key, session_data FROM django_session 
+                    WHERE LENGTH(session_data) > 10000
+                    LIMIT 10
+                """)
+                large_sessions = cursor.fetchall()
+                
+                if large_sessions:
+                    self.stdout.write(
+                        self.style.WARNING(f'Found {len(large_sessions)} unusually large sessions')
+                    )
+                    
+                    for session_key, session_data in large_sessions:
+                        # Check if session data is corrupted (contains binary or invalid data)
+                        try:
+                            session_data.encode('utf-8')
+                        except UnicodeError:
+                            if not self.dry_run:
+                                cursor.execute("""
+                                    DELETE FROM django_session WHERE session_key = %s
+                                """, [session_key])
+                                fixed_count += 1
+                                self.stdout.write(
+                                    self.style.SUCCESS(f'Removed corrupted session: {session_key}')
+                                )
+                            else:
+                                fixed_count += 1
+                
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'Error checking MySQL connection issues: {e}')
+            )
+        
+        return fixed_count
