@@ -134,9 +134,10 @@ MIDDLEWARE = [
     'apps.core.logging_utils.LoggingMiddleware',  # Add logging middleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'apps.core.auth_protection_middleware.AuthProtectionMiddleware',  # Handle auth corruption BEFORE auth middleware
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'apps.subscriptions.middleware.SubscriptionMiddleware',
+    'apps.subscriptions.middleware.SubscriptionMiddleware',  # Must come AFTER authentication
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ] + (['django_ratelimit.middleware.RatelimitMiddleware'] if not CPANEL else []) + [
     'allauth.account.middleware.AccountMiddleware',

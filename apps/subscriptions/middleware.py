@@ -42,12 +42,22 @@ class SubscriptionMiddleware:
     
     def __call__(self, request):
         # Skip if not authenticated or on exempt paths
-        if not request.user.is_authenticated or self.is_exempt_path(request.path):
-            response = self.get_response(request)
-            return response
+        # Add defensive check to handle authentication corruption
+        try:
+            user_authenticated = hasattr(request, 'user') and request.user.is_authenticated
+            if not user_authenticated or self.is_exempt_path(request.path):
+                response = self.get_response(request)
+                return response
+            
+            # Skip for superusers (defensive check)
+            if hasattr(request.user, 'is_superuser') and request.user.is_superuser:
+                response = self.get_response(request)
+                return response
         
-        # Skip for superusers
-        if request.user.is_superuser:
+        except (AttributeError, IndexError, ValueError) as e:
+            # Handle authentication corruption gracefully
+            logger.error(f"Authentication error in subscription middleware: {e}")
+            logger.error(f"Request path: {request.path}")
             response = self.get_response(request)
             return response
         
