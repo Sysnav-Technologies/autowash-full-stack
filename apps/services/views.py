@@ -1643,12 +1643,18 @@ def order_delete_view(request, pk):
         not order.has_payments
     )
     
+    # Check if order is cancelled
+    is_cancelled = order.status == 'cancelled'
+    
     if is_empty:
         can_delete = True
         delete_reason = "Empty order (no services or items)"
     elif is_confirmed_only:
         can_delete = True
         delete_reason = "Confirmed order without progress or payments"
+    elif is_cancelled:
+        can_delete = True
+        delete_reason = "Cancelled order"
     else:
         # Order cannot be deleted - has items, payments, or is in progress
         delete_reason = "Cannot delete: Order has progress, payments, or active services"
