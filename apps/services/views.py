@@ -791,33 +791,6 @@ def quick_order_view(request):
                 )
                 logger.info(f"Created order: {order.order_number}")
                 
-                # Log business event for order creation
-                AutoWashLogger.log_business_event(
-                    event_type='service_order_created',
-                    customer=customer,
-                    details={
-                        'order_number': order.order_number,
-                        'vehicle_registration': vehicle.registration_number if vehicle else None,
-                        'priority': order.priority,
-                        'created_by': request.user.username,
-                        'employee_id': getattr(request, 'employee', None).employee_id if getattr(request, 'employee', None) else None,
-                        'service_type': service_type
-                    },
-                    request=request
-                )
-                
-                # Log tenant activity
-                AutoWashLogger.log_tenant_action(
-                    action='service_order_created',
-                    user=request.user,
-                    details={
-                        'order_number': order.order_number,
-                        'customer_name': customer.full_name,
-                        'vehicle_reg': vehicle.registration_number if vehicle else 'N/A'
-                    },
-                    request=request
-                )
-                
                 # Handle service selection
                 total_amount = Decimal('0')
                 
@@ -1143,6 +1116,39 @@ def quick_order_view(request):
                 )
                 
                 logger.info(f"Order {order.order_number} created successfully")
+                
+                # Log business event for order creation (after successful completion)
+                try:
+                    AutoWashLogger.log_business_event(
+                        event_type='service_order_created',
+                        customer=customer,
+                        details={
+                            'order_number': order.order_number,
+                            'vehicle_registration': vehicle.registration_number if vehicle else None,
+                            'priority': order.priority,
+                            'created_by': request.user.username,
+                            'employee_id': getattr(request, 'employee', None).employee_id if getattr(request, 'employee', None) else None,
+                            'service_type': service_type
+                        },
+                        request=request
+                    )
+                except Exception as log_error:
+                    logger.warning(f"Failed to log business event for order {order.order_number}: {log_error}")
+                
+                # Log tenant activity (after successful completion) 
+                try:
+                    AutoWashLogger.log_tenant_action(
+                        action='service_order_created',
+                        user=request.user,
+                        details={
+                            'order_number': order.order_number,
+                            'customer_name': customer.full_name,
+                            'vehicle_reg': vehicle.registration_number if vehicle else 'N/A'
+                        },
+                        request=request
+                    )
+                except Exception as log_error:
+                    logger.warning(f"Failed to log tenant action for order {order.order_number}: {log_error}")
                 
                 # Return appropriate response
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
