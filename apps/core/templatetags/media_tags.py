@@ -12,22 +12,32 @@ def media_url(file_field):
     """
     Generate the correct media URL based on the deployment environment.
     
-    For cPanel deployments, media files are stored in public_html/media/ 
-    Since public_html is the document root, they are accessible at /media/
+    This works exactly like Django's {% static %} tag but for media files.
+    It uses Django's MEDIA_URL setting to construct URLs, ensuring
+    consistency across all environments.
     """
     if not file_field:
         return ''
     
     # Get the file path relative to MEDIA_ROOT
-    file_path = str(file_field)
-    
-    if settings.CPANEL:
-        # On cPanel, files are stored in public_html/media/ 
-        # Since public_html is the document root, they're accessible at /media/
-        return f'/media/{file_path}'
+    if hasattr(file_field, 'name'):
+        file_path = file_field.name
     else:
-        # For local development and other environments, use the standard approach
-        return file_field.url
+        file_path = str(file_field)
+    
+    # Clean the file path - remove leading slashes
+    clean_path = file_path.lstrip('/')
+    
+    # Use Django's MEDIA_URL setting directly (just like {% static %} uses STATIC_URL)
+    # This ensures consistency with how Django handles static files
+    media_url_setting = getattr(settings, 'MEDIA_URL', '/media/')
+    
+    # Ensure media_url ends with /
+    if not media_url_setting.endswith('/'):
+        media_url_setting += '/'
+    
+    # Construct the full URL - this works for all environments
+    return f"{media_url_setting}{clean_path}"
 
 @register.simple_tag
 def business_logo_url(tenant_settings):
@@ -40,6 +50,7 @@ def business_logo_url(tenant_settings):
     if hasattr(tenant_settings, 'business_logo') and tenant_settings.business_logo:
         return media_url(tenant_settings.business_logo)
     elif hasattr(tenant_settings, 'logo_url') and tenant_settings.logo_url:
+        # If there's a custom logo_url, use it as-is
         return tenant_settings.logo_url
     else:
         return ''
@@ -48,5 +59,6 @@ def business_logo_url(tenant_settings):
 def cpanel_media_url(file_field):
     """
     Filter version of media_url for use in templates like {{ image|cpanel_media_url }}
+    Works exactly like Django's static filter for media files.
     """
     return media_url(file_field)
