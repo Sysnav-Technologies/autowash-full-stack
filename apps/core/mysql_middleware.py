@@ -100,7 +100,24 @@ class MySQLTenantMiddleware(MiddlewareMixin):
             
             if tenant is None:
                 try:
-                    tenant = Tenant.objects.get_by_subdomain(subdomain)
+                    # Add explicit error handling for database query issues
+                    try:
+                        tenant = Tenant.objects.get_by_subdomain(subdomain)
+                    except IndexError as idx_error:
+                        logger.error(f"List index error querying subdomain {subdomain}: {idx_error}")
+                        # Try a safer query approach
+                        try:
+                            tenant = Tenant.objects.using('default').filter(
+                                subdomain=subdomain, 
+                                is_active=True
+                            ).first()
+                        except Exception as safe_error:
+                            logger.error(f"Safe query also failed for subdomain {subdomain}: {safe_error}")
+                            tenant = None
+                    except Exception as query_error:
+                        logger.error(f"Database query error for subdomain {subdomain}: {query_error}")
+                        tenant = None
+                        
                     if tenant:
                         # Validate tenant UUID fields
                         try:
@@ -284,8 +301,26 @@ class TenantBusinessContextMiddleware(MiddlewareMixin):
                     subscription_data = cache.get(sub_cache_key)
                     
                     if subscription_data is None:
-                        # Get subscription from default database - use tenant ID not object
-                        subscription = Subscription.objects.using('default').filter(business_id=tenant_id).first()
+                        # Get subscription from default database with proper error handling
+                        subscription = None
+                        try:
+                            # Validate tenant_id before using it in queries
+                            if tenant_id and is_valid_uuid(tenant_id):
+                                # Use business_id (Django auto-created field for ForeignKey)
+                                subscription = Subscription.objects.using('default').filter(business_id=tenant_id).first()
+                            else:
+                                logger.warning(f"Invalid tenant_id for subscription lookup: {tenant_id}")
+                        except Exception as e:
+                            logger.warning(f"Error querying subscription for tenant {tenant_id}: {e}")
+                            # Try alternative approach if UUID field is corrupted
+                            try:
+                                from apps.core.tenant_models import Tenant
+                                tenant_obj = Tenant.objects.using('default').get(id=tenant_id)
+                                subscription = Subscription.objects.using('default').filter(business=tenant_obj).first()
+                            except Exception as fallback_error:
+                                logger.error(f"Fallback subscription query also failed: {fallback_error}")
+                                subscription = None
+                        
                         subscription_data = {
                             'is_active': subscription.is_active if subscription else False,
                             'is_expired': not subscription.is_active if subscription else True,
