@@ -106,9 +106,21 @@ class SubscriptionMiddleware:
         try:
             # Import here to avoid circular imports
             from apps.core.tenant_models import Tenant
+            from apps.core.uuid_utils import is_valid_uuid, safe_uuid_convert
             
-            # Get user's business using explicit database routing
-            business = Tenant.objects.using('default').filter(owner=request.user).first()
+            # Get user's business using explicit database routing with UUID validation
+            try:
+                business = Tenant.objects.using('default').filter(owner=request.user).first()
+                
+                # Validate business UUID if found
+                if business and hasattr(business, 'id'):
+                    if not is_valid_uuid(business.id):
+                        logger.error(f"Business owner {request.user.id} has business with invalid UUID: {business.id}")
+                        business = None
+                        
+            except Exception as db_error:
+                logger.error(f"Database error getting business for user {request.user.id}: {db_error}")
+                business = None
             
             if not business:
                 # User doesn't own a business - check if they're an employee
@@ -166,12 +178,35 @@ class SubscriptionMiddleware:
             # Check subscription using explicit database routing
             from apps.subscriptions.models import Subscription
             subscription = None
-            if hasattr(business, 'subscription_id') and business.subscription_id:
-                # Get subscription from default database explicitly
-                subscription = Subscription.objects.using('default').filter(id=business.subscription_id).first()
-            elif business.subscription:
-                # If already loaded, use it
-                subscription = business.subscription
+            
+            try:
+                # Import UUID utilities
+                from apps.core.uuid_utils import is_valid_uuid
+                
+                # Force subscription queries to use default database explicitly
+                # We need to refetch the business from default database to access subscription
+                business_from_default = Tenant.objects.using('default').get(id=business.id)
+                
+                # Get subscription_id directly to avoid cross-database FK access
+                subscription_id = getattr(business_from_default, 'subscription_id', None)
+                
+                if subscription_id:
+                    # Validate subscription UUID before querying
+                    if is_valid_uuid(subscription_id):
+                        subscription = Subscription.objects.using('default').filter(
+                            id=subscription_id
+                        ).first()
+                    else:
+                        logger.warning(f"Invalid subscription UUID for business {business.id}: {subscription_id}")
+                        subscription = None
+                else:
+                    # Try to find any active subscription for this business
+                    subscription = Subscription.objects.using('default').filter(
+                        business=business_from_default
+                    ).first()
+            except Exception as e:
+                logger.warning(f"Error accessing subscription for business {business.id}: {e}")
+                subscription = None
             
             if not subscription:
                 # No subscription - only redirect business owners, not employees
