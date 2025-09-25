@@ -1,8 +1,7 @@
-"""
-Template tags for handling media URLs correctly across different environments (local, cPanel, etc.)
-"""
 from django import template
 from django.conf import settings
+from django.templatetags.static import static
+from django.utils.safestring import mark_safe
 import os
 
 register = template.Library()
@@ -12,9 +11,9 @@ def media_url(file_field):
     """
     Generate the correct media URL based on the deployment environment.
     
-    This works exactly like Django's {% static %} tag but for media files.
-    It uses Django's MEDIA_URL setting to construct URLs, ensuring
-    consistency across all environments.
+    For cPanel deployment, explicitly includes public_html prefix in URL
+    since Apache serves from the public_html directory structure.
+    For local development, uses standard /media/ URL.
     """
     if not file_field:
         return ''
@@ -28,16 +27,15 @@ def media_url(file_field):
     # Clean the file path - remove leading slashes
     clean_path = file_path.lstrip('/')
     
-    # Use Django's MEDIA_URL setting directly (just like {% static %} uses STATIC_URL)
-    # This ensures consistency with how Django handles static files
-    media_url_setting = getattr(settings, 'MEDIA_URL', '/media/')
-    
-    # Ensure media_url ends with /
-    if not media_url_setting.endswith('/'):
-        media_url_setting += '/'
-    
-    # Construct the full URL - this works for all environments
-    return f"{media_url_setting}{clean_path}"
+    # For cPanel, explicitly add public_html prefix to URL
+    if getattr(settings, 'CPANEL', False):
+        return mark_safe(f"/public_html/media/{clean_path}")
+    else:
+        # For local development and other environments
+        media_url_setting = getattr(settings, 'MEDIA_URL', '/media/')
+        if not media_url_setting.endswith('/'):
+            media_url_setting += '/'
+        return mark_safe(f"{media_url_setting}{clean_path}")
 
 @register.simple_tag
 def business_logo_url(tenant_settings):
