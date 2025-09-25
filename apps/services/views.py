@@ -777,6 +777,9 @@ def quick_order_view(request):
                             logger.warning(f"Invalid mileage value provided: {mileage_input}")
                 
                 # Create the service order
+                # Handle service selection first to get service_type
+                service_type = request.POST.get('service_type', 'individual')
+                
                 order = ServiceOrder.objects.create(
                     customer=customer,
                     vehicle=vehicle,
@@ -816,7 +819,6 @@ def quick_order_view(request):
                 )
                 
                 # Handle service selection
-                service_type = request.POST.get('service_type', 'individual')
                 total_amount = Decimal('0')
                 
                 if service_type == 'package':
@@ -1180,6 +1182,20 @@ def quick_order_view(request):
         except Exception as e:
             error_msg = f'Error creating quick order: {str(e)}'
             logger.error(f"Exception in quick order creation: {error_msg}", exc_info=True)
+            
+            # Log error to error tracking
+            AutoWashLogger.log_security_event(
+                event_type='quick_order_creation_error',
+                severity='ERROR',
+                user=request.user,
+                details={
+                    'error_message': str(e),
+                    'post_data': dict(request.POST),
+                    'user_agent': request.META.get('HTTP_USER_AGENT', '')[:100]
+                },
+                request=request
+            )
+            
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': False,
