@@ -22,7 +22,7 @@ LOCAL = not RENDER and not CPANEL
 ALLOWED_HOSTS = {
     'LOCAL': ['localhost', '127.0.0.1', '*.localhost', 'testserver'],
     'RENDER': ['.onrender.com', 'autowash-3jpr.onrender.com', 'autowash.co.ke', 'www.autowash.co.ke', '*.autowash.co.ke'],
-    'CPANEL': ['app.autowash.co.ke', 'autowash.co.ke', 'www.autowash.co.ke', '*.autowash.co.ke']
+    'CPANEL': ['app.autowash.co.ke', 'autowash.co.ke', 'www.autowash.co.ke', '*.autowash.co.ke', 'www.app.autowash.co.ke']
 }
 
 if LOCAL:
@@ -667,6 +667,7 @@ LOGGING = {
             'class': 'logging.FileHandler',
             'filename': log_dir / 'django.log',
             'formatter': 'verbose',
+            'encoding': 'utf-8',
         },
         'console': {
             'level': 'INFO',
@@ -678,6 +679,7 @@ LOGGING = {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': reports_dir / 'tenant_activity' / 'tenant_actions.log',
             'formatter': 'detailed',
+            'encoding': 'utf-8',
             'maxBytes': 10485760,  # 10MB
             'backupCount': 5,
         },
@@ -686,6 +688,7 @@ LOGGING = {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': reports_dir / 'user_logins' / 'login_attempts.log',
             'formatter': 'json_format',
+            'encoding': 'utf-8',
             'maxBytes': 10485760,  # 10MB
             'backupCount': 10,
         },
@@ -694,6 +697,7 @@ LOGGING = {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': reports_dir / 'performance_metrics' / 'performance.log',
             'formatter': 'detailed',
+            'encoding': 'utf-8',
             'maxBytes': 20971520,  # 20MB
             'backupCount': 7,
         },
@@ -702,6 +706,7 @@ LOGGING = {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': reports_dir / 'security_logs' / 'security_events.log',
             'formatter': 'json_format',
+            'encoding': 'utf-8',
             'maxBytes': 10485760,  # 10MB
             'backupCount': 20,  # Keep more security logs
         },
@@ -710,6 +715,7 @@ LOGGING = {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': reports_dir / 'error_tracking' / 'application_errors.log',
             'formatter': 'verbose',
+            'encoding': 'utf-8',
             'maxBytes': 20971520,  # 20MB
             'backupCount': 10,
         },
@@ -718,6 +724,7 @@ LOGGING = {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': reports_dir / 'business_analytics' / 'business_events.log',
             'formatter': 'json_format',
+            'encoding': 'utf-8',
             'maxBytes': 15728640,  # 15MB
             'backupCount': 12,
         },
