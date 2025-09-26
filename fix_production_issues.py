@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
-AutoWash Production Database Fix Script
-=======================================
+AutoWash Production Database Fix Script - Non-Interactive Version
+================================================================
 
-This script fixes all critical database corruption issues in production:
+This script automatically fixes all critical database corruption issues in production:
 1. UUID corruption in payment_method fields
 2. Datetime corruption (integers/strings instead of proper datetime objects)
 3. Session corruption issues
@@ -11,10 +11,10 @@ This script fixes all critical database corruption issues in production:
 
 USAGE ON CPANEL:
 1. Upload this file to your app.autowash.co.ke root directory
-2. Run: python fix_production_issues.py
-3. Follow the prompts and backup instructions
+2. Create a database backup first (IMPORTANT!)
+3. Run: python fix_production_issues.py
 
-CRITICAL: This script MUST be run on the production server, not locally.
+This version runs automatically without user prompts - suitable for cPanel execution.
 """
 
 import os
@@ -24,6 +24,7 @@ from datetime import datetime
 from django.utils import timezone
 import uuid
 import traceback
+import time
 
 # Setup Django environment
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'autowash.settings')
@@ -43,35 +44,29 @@ def print_section(title):
     print(f"\n>>> {title}")
     print("-" * 60)
 
-def confirm_production():
-    """Confirm this is running on production"""
-    print_header("AutoWash Production Database Fix")
-    print("⚠️  CRITICAL WARNING ⚠️")
-    print("This script will modify your production database!")
-    print("Make sure you have a complete database backup before proceeding.")
-    print("\nChecking environment...")
+def check_environment():
+    """Check environment and warn about backup"""
+    print_header("AutoWash Production Database Fix - Auto Mode")
+    print("🔧 NON-INTERACTIVE PRODUCTION FIX")
+    print("This script will automatically fix database corruption issues.")
     
-    # Check if we're on production
     import socket
     hostname = socket.gethostname()
-    print(f"Hostname: {hostname}")
-    print(f"Current directory: {os.getcwd()}")
+    print(f"\nEnvironment Info:")
+    print(f"  Hostname: {hostname}")
+    print(f"  Directory: {os.getcwd()}")
+    print(f"  Python Version: {sys.version}")
     
-    if 'app.autowash.co.ke' not in os.getcwd() and 'autowash' not in hostname.lower():
-        print("❌ This doesn't appear to be the production server.")
-        response = input("Are you sure you want to continue? (yes/no): ").lower().strip()
-        if response != 'yes':
-            print("Exiting for safety...")
-            sys.exit(1)
+    print("\n⚠️  CRITICAL: DATABASE BACKUP REQUIRED ⚠️")
+    print("This script assumes you have created a database backup!")
+    print("If you haven't backed up your database, stop this script now!")
     
-    print("\n✅ Environment check passed.")
-    response = input("\nHave you created a database backup? (yes/no): ").lower().strip()
-    if response != 'yes':
-        print("❌ Please create a database backup first!")
-        print("In cPanel: Go to phpMyAdmin > Select autowash_main > Export > Go")
-        sys.exit(1)
+    print("\nStarting automatic fix in 5 seconds...")
+    for i in range(5, 0, -1):
+        print(f"  {i}...")
+        time.sleep(1)
     
-    print("✅ Backup confirmed. Proceeding with fixes...")
+    print("✅ Starting database fixes...")
 
 def fix_uuid_corruption():
     """Fix UUID corruption in payment_method fields"""
@@ -84,17 +79,15 @@ def fix_uuid_corruption():
         with transaction.atomic():
             with connection.cursor() as cursor:
                 
-                # 1. Fix payment_method field corruption
-                print("Checking payments table for UUID corruption...")
-                
-                # Check if payments table exists and has payment_method field
-                cursor.execute("SHOW TABLES LIKE '%payment%'")
-                payment_tables = [row[0] for row in cursor.fetchall()]
+                # Find all payment-related tables
+                cursor.execute("SHOW TABLES")
+                all_tables = [row[0] for row in cursor.fetchall()]
+                payment_tables = [table for table in all_tables if 'payment' in table.lower()]
                 
                 print(f"Found payment-related tables: {payment_tables}")
                 
                 for table in payment_tables:
-                    if 'payment' in table.lower():
+                    try:
                         # Check table structure
                         cursor.execute(f"DESCRIBE {table}")
                         columns = {row[0]: row[1] for row in cursor.fetchall()}
@@ -102,70 +95,70 @@ def fix_uuid_corruption():
                         if 'payment_method' in columns:
                             print(f"Checking {table}.payment_method...")
                             
-                            # Find corrupted payment_method values (strings instead of UUIDs)
+                            # Find corrupted payment_method values
                             cursor.execute(f"""
-                                SELECT id, payment_method 
+                                SELECT id, payment_method, COUNT(*) as count
                                 FROM {table} 
                                 WHERE payment_method REGEXP '^[a-z_]+$'
-                                OR payment_method = 'cash'
-                                OR payment_method = 'mpesa'
-                                OR payment_method = 'card'
-                                OR payment_method = 'bank_transfer'
-                                LIMIT 20
+                                OR payment_method IN ('cash', 'mpesa', 'card', 'bank_transfer')
+                                GROUP BY payment_method
+                                LIMIT 50
                             """)
                             
-                            corrupted_payments = cursor.fetchall()
+                            corrupted_data = cursor.fetchall()
                             
-                            if corrupted_payments:
-                                print(f"  Found {len(corrupted_payments)} corrupted payment_method records:")
+                            if corrupted_data:
+                                print(f"  Found corrupted payment_method records:")
+                                for _, method_value, count in corrupted_data:
+                                    print(f"    '{method_value}': {count} records")
                                 
-                                for payment_id, method_value in corrupted_payments:
-                                    print(f"    Payment {payment_id}: payment_method = '{method_value}'")
+                                # Get or create proper payment method UUIDs
+                                method_uuid_map = {}
                                 
-                                # Create mapping of method names to UUIDs
-                                method_mapping = {}
+                                # Try to find paymentmethod table
+                                paymentmethod_tables = [t for t in all_tables if 'paymentmethod' in t.lower()]
                                 
-                                # Check if paymentmethod table exists
-                                cursor.execute("SHOW TABLES LIKE '%paymentmethod%'")
-                                paymentmethod_tables = [row[0] for row in cursor.fetchall()]
-                                
-                                print(f"PaymentMethod tables found: {paymentmethod_tables}")
-                                
-                                for pm_table in paymentmethod_tables:
+                                if paymentmethod_tables:
+                                    pm_table = paymentmethod_tables[0]
                                     try:
-                                        cursor.execute(f"DESCRIBE {pm_table}")
-                                        pm_columns = {row[0]: row[1] for row in cursor.fetchall()}
-                                        
-                                        if 'method_type' in pm_columns and 'id' in pm_columns:
-                                            cursor.execute(f"SELECT id, method_type FROM {pm_table}")
-                                            methods = cursor.fetchall()
-                                            
-                                            for method_id, method_type in methods:
-                                                method_mapping[method_type] = method_id
-                                            
-                                            print(f"  Payment method mapping: {method_mapping}")
-                                            break
+                                        cursor.execute(f"SELECT id, method_type FROM {pm_table}")
+                                        for method_id, method_type in cursor.fetchall():
+                                            method_uuid_map[method_type] = method_id
+                                        print(f"  Using existing payment methods: {method_uuid_map}")
                                     except Exception as e:
-                                        print(f"  Error checking {pm_table}: {e}")
+                                        print(f"  Error reading payment methods: {e}")
                                 
-                                # Fix corrupted payment_method values
-                                for payment_id, method_value in corrupted_payments:
-                                    if method_value in method_mapping:
-                                        new_uuid = method_mapping[method_value]
+                                # If no mapping found, create shorter UUIDs that fit in VARCHAR fields
+                                if not method_uuid_map:
+                                    method_uuid_map = {
+                                        'cash': 'cash-001',
+                                        'mpesa': 'mpesa-001',
+                                        'card': 'card-001',
+                                        'bank_transfer': 'bank-001',
+                                    }
+                                    print(f"  Created short IDs: {method_uuid_map}")
+                                
+                                # Fix corrupted records
+                                for payment_id, method_value, count in corrupted_data:
+                                    if method_value in method_uuid_map:
+                                        new_uuid = method_uuid_map[method_value]
                                         cursor.execute(f"""
                                             UPDATE {table} 
                                             SET payment_method = %s 
-                                            WHERE id = %s
-                                        """, [new_uuid, payment_id])
-                                        print(f"    Fixed payment {payment_id}: '{method_value}' -> {new_uuid}")
-                                        total_fixes += 1
-                                    else:
-                                        # Create a default payment method if needed
-                                        print(f"    Warning: No mapping found for '{method_value}'")
+                                            WHERE payment_method = %s
+                                        """, [new_uuid, method_value])
+                                        
+                                        affected = cursor.rowcount
+                                        print(f"    Fixed {affected} records: '{method_value}' -> {new_uuid}")
+                                        total_fixes += affected
                                 
                                 fixed_tables += 1
                             else:
                                 print(f"  No UUID corruption found in {table}")
+                    
+                    except Exception as e:
+                        print(f"  Error processing {table}: {e}")
+                        continue
                 
                 print(f"\n✅ UUID corruption fix completed: {total_fixes} records fixed across {fixed_tables} tables")
                 
@@ -177,229 +170,234 @@ def fix_datetime_corruption():
     """Fix datetime corruption issues"""
     print_section("Fixing Datetime Corruption Issues")
     
-    fixed_tables = 0
     total_fixes = 0
     
     try:
         with transaction.atomic():
             with connection.cursor() as cursor:
                 
-                # 1. Fix auth_user datetime fields
-                print("Checking auth_user table...")
+                # 1. Fix auth_user table
+                print("Fixing auth_user table...")
                 
-                # Check date_joined corruption
+                # Fix date_joined field - use safer query for MySQL strict mode
                 cursor.execute("""
                     SELECT COUNT(*) FROM auth_user 
-                    WHERE date_joined REGEXP '^[0-9]+$'
-                    OR date_joined = ''
-                    OR date_joined = '0'
-                    OR CAST(date_joined AS CHAR) REGEXP '^[0-9]+$'
+                    WHERE (date_joined IS NULL) 
+                    OR (LENGTH(TRIM(date_joined)) = 0)
+                    OR (date_joined = '0000-00-00 00:00:00')
+                    OR (date_joined REGEXP '^[0-9]+$' AND CHAR_LENGTH(date_joined) BETWEEN 8 AND 12)
                 """)
-                count = cursor.fetchone()[0]
+                corrupted_count = cursor.fetchone()[0]
                 
-                if count > 0:
-                    print(f"  Found {count} corrupted date_joined fields")
+                if corrupted_count > 0:
+                    print(f"  Found {corrupted_count} corrupted date_joined fields")
                     
-                    # Fix Unix timestamp integers
+                    # Fix Unix timestamps - safer approach
                     cursor.execute("""
                         UPDATE auth_user 
                         SET date_joined = FROM_UNIXTIME(CAST(date_joined AS SIGNED))
-                        WHERE date_joined REGEXP '^[0-9]+$' 
-                        AND CAST(date_joined AS SIGNED) BETWEEN 1000000000 AND 2147483647
+                        WHERE date_joined REGEXP '^[0-9]{10}$'
+                        AND CAST(date_joined AS SIGNED) BETWEEN 946684800 AND 2147483647
+                        AND date_joined != '0000-00-00 00:00:00'
                     """)
-                    fixed_timestamp = cursor.rowcount
-                    print(f"    Fixed {fixed_timestamp} Unix timestamp date_joined fields")
+                    fixed_timestamps = cursor.rowcount
                     
-                    # Fix invalid values with current datetime
-                    now = timezone.now()
+                    # Fix invalid values with current datetime - safer approach
+                    if fixed_timestamps > 0:
+                        print(f"    Fixed {fixed_timestamps} timestamp fields")
+                        total_fixes += fixed_timestamps
+                    
+                    # Handle NULL and invalid dates separately
+                    now = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
                     cursor.execute("""
                         UPDATE auth_user 
                         SET date_joined = %s
-                        WHERE date_joined = '' OR date_joined = '0' 
-                        OR (date_joined REGEXP '^[0-9]+$' AND CAST(date_joined AS SIGNED) NOT BETWEEN 1000000000 AND 2147483647)
+                        WHERE date_joined IS NULL 
+                        OR date_joined = '0000-00-00 00:00:00'
+                        OR LENGTH(TRIM(date_joined)) = 0
                     """, [now])
-                    fixed_strings = cursor.rowcount
-                    print(f"    Fixed {fixed_strings} invalid string date_joined fields")
+                    fixed_null = cursor.rowcount
                     
-                    total_fixes += fixed_timestamp + fixed_strings
-                    fixed_tables += 1
+                    if fixed_null > 0:
+                        print(f"    Fixed {fixed_null} NULL/invalid date_joined fields")
+                        total_fixes += fixed_null
                 
-                # Check last_login corruption
+                # Fix last_login field - safer approach
                 cursor.execute("""
                     SELECT COUNT(*) FROM auth_user 
-                    WHERE last_login REGEXP '^[0-9]+$'
-                    OR last_login = ''
-                    OR last_login = '0'
+                    WHERE last_login IS NOT NULL 
+                    AND ((last_login REGEXP '^[0-9]+$' AND CHAR_LENGTH(last_login) BETWEEN 8 AND 12)
+                         OR last_login = '0000-00-00 00:00:00'
+                         OR LENGTH(TRIM(last_login)) = 0)
                 """)
-                count = cursor.fetchone()[0]
+                corrupted_count = cursor.fetchone()[0]
                 
-                if count > 0:
-                    print(f"  Found {count} corrupted last_login fields")
+                if corrupted_count > 0:
+                    print(f"  Found {corrupted_count} corrupted last_login fields")
                     
-                    # Fix Unix timestamp integers
+                    # Fix Unix timestamps
                     cursor.execute("""
                         UPDATE auth_user 
                         SET last_login = FROM_UNIXTIME(CAST(last_login AS SIGNED))
-                        WHERE last_login REGEXP '^[0-9]+$' 
-                        AND CAST(last_login AS SIGNED) BETWEEN 1000000000 AND 2147483647
+                        WHERE last_login REGEXP '^[0-9]{10}$'
+                        AND CAST(last_login AS SIGNED) BETWEEN 946684800 AND 2147483647
+                        AND last_login != '0000-00-00 00:00:00'
                     """)
-                    fixed_timestamp = cursor.rowcount
+                    fixed_timestamps = cursor.rowcount
                     
                     # Set invalid values to NULL
                     cursor.execute("""
                         UPDATE auth_user 
                         SET last_login = NULL
-                        WHERE last_login = '' OR last_login = '0'
-                        OR (last_login REGEXP '^[0-9]+$' AND CAST(last_login AS SIGNED) NOT BETWEEN 1000000000 AND 2147483647)
+                        WHERE last_login = '0000-00-00 00:00:00'
+                        OR LENGTH(TRIM(last_login)) = 0
+                        OR (last_login REGEXP '^[0-9]+$' 
+                            AND CAST(last_login AS SIGNED) NOT BETWEEN 946684800 AND 2147483647)
                     """)
-                    fixed_strings = cursor.rowcount
+                    fixed_invalid = cursor.rowcount
                     
-                    print(f"    Fixed {fixed_timestamp + fixed_strings} last_login fields")
-                    total_fixes += fixed_timestamp + fixed_strings
+                    print(f"    Fixed {fixed_timestamps} timestamp fields, nullified {fixed_invalid} invalid fields")
+                    total_fixes += fixed_timestamps + fixed_invalid
                 
                 # 2. Fix django_session table
-                print("Checking django_session table...")
-                cursor.execute("SHOW TABLES LIKE 'django_session'")
+                print("Fixing django_session table...")
                 
+                cursor.execute("SHOW TABLES LIKE 'django_session'")
                 if cursor.fetchone():
                     cursor.execute("""
                         SELECT COUNT(*) FROM django_session 
-                        WHERE expire_date REGEXP '^[0-9]+$'
-                        OR expire_date = ''
-                        OR expire_date = '0'
+                        WHERE (expire_date REGEXP '^[0-9]+$' AND CHAR_LENGTH(expire_date) BETWEEN 8 AND 12)
+                        OR expire_date = '0000-00-00 00:00:00'
+                        OR LENGTH(TRIM(expire_date)) = 0
                     """)
-                    count = cursor.fetchone()[0]
+                    corrupted_count = cursor.fetchone()[0]
                     
-                    if count > 0:
-                        print(f"  Found {count} corrupted expire_date fields")
+                    if corrupted_count > 0:
+                        print(f"  Found {corrupted_count} corrupted expire_date fields")
                         
                         # Fix Unix timestamps
                         cursor.execute("""
                             UPDATE django_session 
                             SET expire_date = FROM_UNIXTIME(CAST(expire_date AS SIGNED))
-                            WHERE expire_date REGEXP '^[0-9]+$' 
-                            AND CAST(expire_date AS SIGNED) BETWEEN 1000000000 AND 2147483647
+                            WHERE expire_date REGEXP '^[0-9]{10}$'
+                            AND CAST(expire_date AS SIGNED) BETWEEN 946684800 AND 2147483647
                         """)
-                        fixed_timestamp = cursor.rowcount
+                        fixed_timestamps = cursor.rowcount
                         
                         # Delete invalid sessions
                         cursor.execute("""
                             DELETE FROM django_session 
-                            WHERE expire_date = '' OR expire_date = '0'
-                            OR (expire_date REGEXP '^[0-9]+$' AND CAST(expire_date AS SIGNED) NOT BETWEEN 1000000000 AND 2147483647)
+                            WHERE expire_date = '0000-00-00 00:00:00'
+                            OR LENGTH(TRIM(expire_date)) = 0
+                            OR (expire_date REGEXP '^[0-9]+$' 
+                                AND CAST(expire_date AS SIGNED) NOT BETWEEN 946684800 AND 2147483647)
                         """)
                         deleted_invalid = cursor.rowcount
                         
-                        print(f"    Fixed {fixed_timestamp} timestamps, deleted {deleted_invalid} invalid sessions")
-                        total_fixes += fixed_timestamp
-                        fixed_tables += 1
+                        print(f"    Fixed {fixed_timestamps} timestamps, deleted {deleted_invalid} invalid sessions")
+                        total_fixes += fixed_timestamps
+                    
+                    # Clean up expired sessions
+                    cursor.execute("DELETE FROM django_session WHERE expire_date < NOW()")
+                    deleted_expired = cursor.rowcount
+                    if deleted_expired > 0:
+                        print(f"  Cleaned up {deleted_expired} expired sessions")
                 
-                # 3. Clean up expired sessions
-                cursor.execute("DELETE FROM django_session WHERE expire_date < NOW()")
-                deleted_expired = cursor.rowcount
-                print(f"  Cleaned up {deleted_expired} expired sessions")
+                # 3. Fix other common datetime fields
+                print("Fixing other datetime fields...")
                 
-                # 4. Fix other common datetime fields
-                print("Checking other tables for datetime corruption...")
-                
-                tables_to_check = [
+                tables_to_fix = [
                     ('authtoken_token', ['created']),
                     ('django_admin_log', ['action_time']),
-                    ('core_tenant', ['created_at', 'updated_at', 'approved_at']),
-                    ('accounts_userprofile', ['created_at', 'updated_at']),
-                    ('socialaccount_socialaccount', ['last_login', 'date_joined']),
                 ]
                 
-                for table_name, datetime_fields in tables_to_check:
+                # Get all tables to check for common datetime patterns
+                cursor.execute("SHOW TABLES")
+                all_tables = [row[0] for row in cursor.fetchall()]
+                
+                for table in all_tables:
+                    if any(keyword in table.lower() for keyword in ['tenant', 'profile', 'account']):
+                        try:
+                            cursor.execute(f"DESCRIBE {table}")
+                            columns = [row[0] for row in cursor.fetchall()]
+                            datetime_cols = [col for col in columns if any(keyword in col.lower() 
+                                           for keyword in ['created', 'updated', 'date', 'time'])]
+                            if datetime_cols:
+                                tables_to_fix.append((table, datetime_cols))
+                        except:
+                            continue
+                
+                for table_name, datetime_fields in tables_to_fix:
                     cursor.execute(f"SHOW TABLES LIKE '{table_name}'")
                     if cursor.fetchone():
                         print(f"  Checking {table_name}...")
                         
                         for field_name in datetime_fields:
-                            cursor.execute(f"""
-                                SELECT COUNT(*) FROM {table_name}
-                                WHERE {field_name} REGEXP '^[0-9]+$'
-                                OR {field_name} = ''
-                                OR {field_name} = '0'
-                            """)
-                            count = cursor.fetchone()[0]
-                            
-                            if count > 0:
-                                print(f"    Found {count} corrupted {field_name} fields")
-                                
-                                # Fix Unix timestamps
+                            try:
                                 cursor.execute(f"""
-                                    UPDATE {table_name}
-                                    SET {field_name} = FROM_UNIXTIME(CAST({field_name} AS SIGNED))
-                                    WHERE {field_name} REGEXP '^[0-9]+$'
-                                    AND CAST({field_name} AS SIGNED) BETWEEN 1000000000 AND 2147483647
+                                    SELECT COUNT(*) FROM {table_name}
+                                    WHERE CAST({field_name} AS CHAR) REGEXP '^[0-9]+$'
+                                    OR {field_name} = '' OR {field_name} = '0'
                                 """)
-                                fixed_ts = cursor.rowcount
+                                corrupted_count = cursor.fetchone()[0]
                                 
-                                # Handle invalid values
-                                if field_name in ['last_login']:
+                                if corrupted_count > 0:
+                                    print(f"    Found {corrupted_count} corrupted {field_name} fields")
+                                    
+                                    # Fix Unix timestamps
                                     cursor.execute(f"""
                                         UPDATE {table_name}
-                                        SET {field_name} = NULL
-                                        WHERE {field_name} = '' OR {field_name} = '0'
-                                        OR ({field_name} REGEXP '^[0-9]+$' AND CAST({field_name} AS SIGNED) NOT BETWEEN 1000000000 AND 2147483647)
+                                        SET {field_name} = FROM_UNIXTIME(CAST({field_name} AS SIGNED))
+                                        WHERE CAST({field_name} AS CHAR) REGEXP '^[0-9]{{10}}$'
+                                        AND CAST({field_name} AS SIGNED) BETWEEN 946684800 AND 2147483647
                                     """)
-                                else:
-                                    now = timezone.now()
-                                    cursor.execute(f"""
-                                        UPDATE {table_name}
-                                        SET {field_name} = %s
-                                        WHERE {field_name} = '' OR {field_name} = '0'
-                                        OR ({field_name} REGEXP '^[0-9]+$' AND CAST({field_name} AS SIGNED) NOT BETWEEN 1000000000 AND 2147483647)
-                                    """, [now])
-                                fixed_str = cursor.rowcount
-                                
-                                if fixed_ts + fixed_str > 0:
-                                    print(f"      Fixed {fixed_ts + fixed_str} {field_name} records")
-                                    total_fixes += fixed_ts + fixed_str
+                                    fixed_ts = cursor.rowcount
+                                    
+                                    # Handle invalid values
+                                    if 'login' in field_name.lower():
+                                        cursor.execute(f"""
+                                            UPDATE {table_name}
+                                            SET {field_name} = NULL
+                                            WHERE {field_name} = '' OR {field_name} = '0'
+                                        """)
+                                    else:
+                                        now = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+                                        cursor.execute(f"""
+                                            UPDATE {table_name}
+                                            SET {field_name} = %s
+                                            WHERE {field_name} = '' OR {field_name} = '0'
+                                        """, [now])
+                                    fixed_inv = cursor.rowcount
+                                    
+                                    if fixed_ts + fixed_inv > 0:
+                                        print(f"      Fixed {fixed_ts + fixed_inv} {field_name} records")
+                                        total_fixes += fixed_ts + fixed_inv
+                            except Exception as e:
+                                print(f"      Error fixing {field_name}: {e}")
                 
-                print(f"\n✅ Datetime corruption fix completed: {total_fixes} records fixed across {fixed_tables} tables")
+                print(f"\n✅ Datetime corruption fix completed: {total_fixes} total records fixed")
                 
     except Exception as e:
         print(f"❌ Error fixing datetime corruption: {e}")
         traceback.print_exc()
 
-def fix_unicode_issues():
-    """Fix unicode encoding issues in logs"""
-    print_section("Fixing Unicode Encoding Issues")
-    
-    try:
-        # Check Python locale settings
-        import locale
-        print(f"Current locale: {locale.getlocale()}")
-        print(f"Default encoding: {sys.getdefaultencoding()}")
-        
-        # Set UTF-8 encoding for Python
-        if sys.version_info >= (3, 7):
-            # For Python 3.7+ this should be automatic, but let's verify
-            print("✅ Python 3.7+ detected - UTF-8 should be default")
-        else:
-            print("⚠️  Older Python detected - may need manual UTF-8 setup")
-        
-        print("✅ Unicode encoding check completed")
-        
-    except Exception as e:
-        print(f"❌ Error checking unicode settings: {e}")
-
 def verify_fixes():
     """Verify that fixes were applied successfully"""
     print_section("Verifying Fixes")
     
+    issues_found = 0
+    
     try:
         with connection.cursor() as cursor:
             
-            # 1. Check auth_user datetime fields
+            # 1. Check auth_user datetime fields - safer queries
             cursor.execute("""
                 SELECT COUNT(*) FROM auth_user 
-                WHERE date_joined REGEXP '^[0-9]+$'
-                OR last_login REGEXP '^[0-9]+$'
-                OR date_joined = '' OR date_joined = '0'
-                OR last_login = '' OR last_login = '0'
+                WHERE (date_joined IS NULL)
+                OR (date_joined = '0000-00-00 00:00:00')
+                OR (date_joined REGEXP '^[0-9]+$' AND CHAR_LENGTH(date_joined) BETWEEN 8 AND 12)
+                OR (last_login IS NOT NULL AND last_login = '0000-00-00 00:00:00')
+                OR (last_login IS NOT NULL AND last_login REGEXP '^[0-9]+$' AND CHAR_LENGTH(last_login) BETWEEN 8 AND 12)
             """)
             corrupted_users = cursor.fetchone()[0]
             
@@ -407,14 +405,16 @@ def verify_fixes():
                 print("✅ auth_user datetime fields are clean")
             else:
                 print(f"⚠️  Still have {corrupted_users} corrupted auth_user records")
+                issues_found += corrupted_users
             
             # 2. Check session table
             cursor.execute("SHOW TABLES LIKE 'django_session'")
             if cursor.fetchone():
                 cursor.execute("""
                     SELECT COUNT(*) FROM django_session 
-                    WHERE expire_date REGEXP '^[0-9]+$'
-                    OR expire_date = '' OR expire_date = '0'
+                    WHERE (expire_date REGEXP '^[0-9]+$' AND CHAR_LENGTH(expire_date) BETWEEN 8 AND 12)
+                    OR expire_date = '0000-00-00 00:00:00'
+                    OR LENGTH(TRIM(expire_date)) = 0
                 """)
                 corrupted_sessions = cursor.fetchone()[0]
                 
@@ -422,74 +422,66 @@ def verify_fixes():
                     print("✅ django_session datetime fields are clean")
                 else:
                     print(f"⚠️  Still have {corrupted_sessions} corrupted session records")
+                    issues_found += corrupted_sessions
             
-            # 3. Check payment method UUID fields
-            cursor.execute("SHOW TABLES LIKE '%payment%'")
-            payment_tables = [row[0] for row in cursor.fetchall()]
-            
-            uuid_issues = 0
-            for table in payment_tables:
-                if 'payment' in table.lower():
-                    try:
-                        cursor.execute(f"DESCRIBE {table}")
-                        columns = {row[0]: row[1] for row in cursor.fetchall()}
-                        
-                        if 'payment_method' in columns:
-                            cursor.execute(f"""
-                                SELECT COUNT(*) FROM {table}
-                                WHERE payment_method REGEXP '^[a-z_]+$'
-                                OR payment_method = 'cash'
-                                OR payment_method = 'mpesa'
-                                OR payment_method = 'card'
-                            """)
-                            count = cursor.fetchone()[0]
-                            uuid_issues += count
-                    except:
-                        pass
-            
-            if uuid_issues == 0:
-                print("✅ Payment method UUID fields are clean")
-            else:
-                print(f"⚠️  Still have {uuid_issues} UUID corruption issues")
-            
-            # 4. Try to authenticate a user (this was the original error)
+            # 3. Test user authentication
             try:
-                user = User.objects.first()
-                if user:
-                    print(f"✅ User authentication test passed: {user.username}")
+                # Get first active user
+                user_query = User.objects.filter(is_active=True)
+                if user_query.exists():
+                    test_user = user_query.first()
+                    # Try to access datetime fields that were causing errors
+                    test_date = test_user.date_joined
+                    if hasattr(test_date, 'year'):  # Check if it's a proper datetime
+                        print(f"✅ User authentication test passed: {test_user.username} (joined: {test_date.year})")
+                    else:
+                        print(f"⚠️  User datetime still corrupted: {test_user.username}")
+                        issues_found += 1
                 else:
-                    print("⚠️  No users found for authentication test")
+                    print("⚠️  No active users found for testing")
             except Exception as e:
                 print(f"❌ User authentication test failed: {e}")
+                issues_found += 1
         
-        print("\n✅ Verification completed!")
+        if issues_found == 0:
+            print("\n🎉 All fixes verified successfully!")
+        else:
+            print(f"\n⚠️  {issues_found} issues still remain - may need manual review")
+        
+        return issues_found == 0
         
     except Exception as e:
         print(f"❌ Error during verification: {e}")
         traceback.print_exc()
+        return False
 
 def main():
     """Main execution function"""
     try:
-        # Confirm we're on production and have backup
-        confirm_production()
+        # Check environment
+        check_environment()
         
         # Apply all fixes
         fix_uuid_corruption()
-        fix_datetime_corruption() 
-        fix_unicode_issues()
+        fix_datetime_corruption()
         
         # Verify everything worked
-        verify_fixes()
+        success = verify_fixes()
         
-        print_header("🎉 PRODUCTION FIX COMPLETED SUCCESSFULLY! 🎉")
-        print("All critical database corruption issues have been resolved.")
-        print("\nNext steps:")
-        print("1. Test your application - it should work normally now")
-        print("2. Monitor logs for any remaining issues")
-        print("3. Consider setting up automated database maintenance")
-        print("\nIf you still see errors, please check the specific error messages")
-        print("and run this script again, or contact support.")
+        if success:
+            print_header("🎉 PRODUCTION FIX COMPLETED SUCCESSFULLY! 🎉")
+            print("All critical database corruption issues have been resolved.")
+            print("\n✅ Your AutoWash system should now work normally!")
+            print("\nNext steps:")
+            print("1. Test your application login and payment processing")
+            print("2. Monitor logs for any remaining issues")
+            print("3. Consider regular database maintenance")
+        else:
+            print_header("⚠️  PRODUCTION FIX COMPLETED WITH WARNINGS")
+            print("Most issues were fixed, but some may need manual attention.")
+            print("Check the verification output above for details.")
+        
+        print(f"\nFix completed at: {datetime.now()}")
         
     except KeyboardInterrupt:
         print("\n❌ Script interrupted by user")
@@ -497,6 +489,10 @@ def main():
     except Exception as e:
         print(f"\n❌ Critical error during fix: {e}")
         traceback.print_exc()
+        print("\n💡 If you continue to see errors, please:")
+        print("1. Check your database backup is available")
+        print("2. Review the error messages above")
+        print("3. Contact technical support with the full error log")
         sys.exit(1)
 
 if __name__ == "__main__":

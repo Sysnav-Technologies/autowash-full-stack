@@ -651,6 +651,8 @@ def update_daily_metrics(metrics, user=None):
         # Payment method breakdown from all payments today (excluding refunds)
         try:
             Payment = apps.get_model('payments', 'Payment')
+            PaymentMethod = apps.get_model('payments', 'PaymentMethod')
+            
             payments_today = Payment.objects.filter(
                 created_at__date=today,
                 status__in=['completed', 'verified', 'paid', 'success']
@@ -659,34 +661,48 @@ def update_daily_metrics(metrics, user=None):
             if payments_today.exists():
                 logger.info(f"DEBUG: Found {payments_today.count()} payments for breakdown")
                 
-                # Payment method breakdown
-                cash_payments = payments_today.filter(payment_method='cash').aggregate(
-                    total=Sum('amount')
-                )['total'] or Decimal('0.00')
-                
-                card_payments = payments_today.filter(payment_method='card').aggregate(
-                    total=Sum('amount')
-                )['total'] or Decimal('0.00')
-                
-                mpesa_payments = payments_today.filter(payment_method='mpesa').aggregate(
-                    total=Sum('amount')
-                )['total'] or Decimal('0.00')
-                
-                # If no specific breakdown, try with different possible values
-                if cash_payments == 0 and card_payments == 0 and mpesa_payments == 0:
-                    # Try case-insensitive matching for common variations
+                # Get payment methods by their method_type (safer approach)
+                try:
+                    cash_method = PaymentMethod.objects.filter(method_type='cash').first()
+                    card_method = PaymentMethod.objects.filter(method_type='card').first()
+                    mpesa_method = PaymentMethod.objects.filter(method_type='mpesa').first()
+                    
+                    # Payment method breakdown using proper PaymentMethod objects
+                    cash_payments = payments_today.filter(payment_method=cash_method).aggregate(
+                        total=Sum('amount')
+                    )['total'] or Decimal('0.00') if cash_method else Decimal('0.00')
+                    
+                    card_payments = payments_today.filter(payment_method=card_method).aggregate(
+                        total=Sum('amount')
+                    )['total'] or Decimal('0.00') if card_method else Decimal('0.00')
+                    
+                    mpesa_payments = payments_today.filter(payment_method=mpesa_method).aggregate(
+                        total=Sum('amount')
+                    )['total'] or Decimal('0.00') if mpesa_method else Decimal('0.00')
+                    
+                except Exception as method_error:
+                    logger.warning(f"DEBUG: Could not get PaymentMethod objects: {method_error}")
+                    # Fallback: try to get breakdown by examining each payment's payment_method
+                    cash_payments = card_payments = mpesa_payments = Decimal('0.00')
+                    
                     for payment in payments_today:
-                        method = str(payment.payment_method).lower() if payment.payment_method else ''
-                        amount = payment.amount or Decimal('0.00')
-                        if 'cash' in method:
-                            cash_payments += amount
-                        elif 'card' in method or 'visa' in method or 'mastercard' in method:
-                            card_payments += amount
-                        elif 'mpesa' in method or 'mobile' in method:
-                            mpesa_payments += amount
-                        else:
-                            # Default unknown payments to mpesa
-                            mpesa_payments += amount
+                        try:
+                            if payment.payment_method:
+                                method_type = payment.payment_method.method_type if hasattr(payment.payment_method, 'method_type') else str(payment.payment_method).lower()
+                                amount = payment.amount or Decimal('0.00')
+                                
+                                if 'cash' in method_type:
+                                    cash_payments += amount
+                                elif 'card' in method_type or 'visa' in method_type or 'mastercard' in method_type:
+                                    card_payments += amount
+                                elif 'mpesa' in method_type or 'mobile' in method_type:
+                                    mpesa_payments += amount
+                                else:
+                                    # Default unknown payments to cash
+                                    cash_payments += amount
+                        except Exception as payment_error:
+                            logger.warning(f"DEBUG: Error processing payment {payment.id}: {payment_error}")
+                            continue
                 
                 metrics.cash_payments = cash_payments
                 metrics.card_payments = card_payments
