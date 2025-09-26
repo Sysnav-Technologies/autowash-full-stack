@@ -520,17 +520,11 @@ else:
     MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
     MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
     MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
-    MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
-    
-    if RENDER:
-        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://autowash-3jpr.onrender.com/subscriptions/mpesa-callback/')
-        MPESA_TIMEOUT_URL = config('MPESA_TIMEOUT_URL', default='https://autowash-3jpr.onrender.com/subscriptions/mpesa-timeout/')
-    elif CPANEL:
-        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://app.autowash.co.ke/subscriptions/mpesa-callback/')
-        MPESA_TIMEOUT_URL = config('MPESA_TIMEOUT_URL', default='https://app.autowash.co.ke/subscriptions/mpesa-timeout/')
-    else:
-        MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://your-domain.com/subscriptions/mpesa-callback/')
-        MPESA_TIMEOUT_URL = config('MPESA_TIMEOUT_URL', default='https://your-domain.com/subscriptions/mpesa-timeout/')
+    MPESA_PASSKEY = config('MPESA_PASSKEY', default='') 
+    MPESA_BASE_URL = config('MPESA_BASE_URL', default='https://sandbox.safaricom.co.ke')
+    MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://app.autowash.co.ke/subscriptions/mpesa-callback/')
+    MPESA_TIMEOUT_URL = config('MPESA_TIMEOUT_URL', default='https://app.autowash.co.ke/subscriptions/mpesa-timeout/')
+   
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
