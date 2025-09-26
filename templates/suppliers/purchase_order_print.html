@@ -1,30 +1,13 @@
+{% load static %}
+{% load media_tags %}
+{% load humanize %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Purchase Order - PO-{{ order.po_number }}</title>
+    <title>Purchase Order PO-{{ order.po_number }} - {{ business.name }}</title>
     <style>
-        @page {
-            size: A4;
-            margin: 20mm;
-        }
-        
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-            
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .page-break {
-                page-break-before: always;
-            }
-        }
-        
         * {
             margin: 0;
             padding: 0;
@@ -32,243 +15,393 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, sans-serif;
             font-size: 12px;
             line-height: 1.4;
-            color: #333;
+            color: #000;
             background: white;
         }
         
-        .header {
-            border-bottom: 3px solid #2563eb;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+        @page {
+            size: A4;
+            margin: 0;
         }
         
-        .company-info {
+        @media print {
+            @page { 
+                margin: 0; 
+                size: A4;
+            }
+            
+            body {
+                margin: 0;
+                padding: 10mm;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .po-container {
+                page-break-inside: avoid;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+                border: none;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+        }
+        
+        .po-container {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 10mm;
+            background: white;
+        }
+        
+        /* Header Section */
+        .po-header {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #000;
+        }
+        
+        .company-name-row {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .main-company-name {
+            font-size: 28px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 0;
+            color: #000;
+        }
+        
+        .header-content {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 20px;
+        }
+        
+        .logo-section {
+            flex: 0 0 auto;
+            margin-right: 20px;
+        }
+        
+        .business-info-center {
+            flex: 1;
+            text-align: center;
         }
         
         .company-logo {
-            flex: 0 0 auto;
-        }
-        
-        .company-logo img {
-            max-height: 80px;
-            max-width: 200px;
+            max-height: 100px;
+            max-width: 250px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            margin-bottom: 10px;
         }
         
         .company-details {
+            font-size: 11px;
+            line-height: 1.4;
+            margin-bottom: 3px;
+        }
+        
+        .po-title {
             text-align: right;
-            flex: 1;
-            margin-left: 20px;
+            flex: 0 0 auto;
         }
         
-        .company-name {
-            font-size: 24px;
-            font-weight: bold;
-            color: #1e293b;
+        .credit-po {
+            font-size: 20px;
+            font-weight: 900;
+            text-transform: uppercase;
             margin-bottom: 5px;
-        }
-        
-        .company-address {
-            color: #64748b;
-            line-height: 1.5;
-        }
-        
-        .document-title {
+            color: #000;
+            line-height: 1.2;
             text-align: center;
-            margin: 30px 0;
+            width: 120px;
+            margin-left: auto;
+            margin-right: auto;
         }
         
-        .document-title h1 {
-            font-size: 28px;
-            color: #2563eb;
-            margin-bottom: 10px;
-        }
-        
-        .po-details {
+        /* Supplier and PO Info */
+        .info-section {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            border: 2px solid #000;
+            background-color: #f8f8f8;
         }
         
-        .po-left, .po-right {
-            width: 48%;
+        .supplier-info {
+            flex: 1;
+            margin-right: 20px;
         }
         
-        .info-section {
+        .po-meta {
+            flex: 0 0 250px;
+        }
+        
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .info-table td {
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+        
+        .info-table .label {
+            font-weight: 900;
+            background: #f9f9f9;
+            width: 35%;
+        }
+        
+        .info-table .value {
+            font-weight: 900;
+        }
+        
+        /* Items Section */
+        .items-section {
             margin-bottom: 20px;
         }
-        
-        .info-section h3 {
-            background: #f1f5f9;
-            padding: 8px 12px;
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: #1e293b;
-            border-left: 4px solid #2563eb;
-        }
-        
-        .info-row {
-            display: flex;
-            margin-bottom: 5px;
-            align-items: baseline;
-        }
-        
-        .info-label {
-            font-weight: 600;
-            color: #64748b;
-            min-width: 120px;
-            flex-shrink: 0;
-        }
-        
-        .info-value {
-            color: #1e293b;
-            flex: 1;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .status-draft { background: #f3f4f6; color: #6b7280; }
-        .status-pending { background: #fef3c7; color: #d97706; }
-        .status-approved { background: #dcfce7; color: #16a34a; }
-        .status-sent { background: #dbeafe; color: #2563eb; }
-        .status-completed { background: #dcfce7; color: #16a34a; }
-        .status-cancelled { background: #fee2e2; color: #dc2626; }
-        
-        .priority-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .priority-low { background: #f0f9ff; color: #0369a1; }
-        .priority-normal { background: #f9fafb; color: #374151; }
-        .priority-high { background: #fef3c7; color: #d97706; }
-        .priority-urgent { background: #fee2e2; color: #dc2626; }
         
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
-            border: 1px solid #e5e7eb;
+            font-size: 11px;
         }
         
         .items-table th {
             background: #9966CC;
             color: white;
-            padding: 12px 8px;
+            font-weight: 900;
+            text-align: center;
+            border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
+            padding: 8px 4px;
+            font-size: 11px;
+            border-left: 1px solid #000;
+            border-right: 1px solid #000;
+        }
+        
+        .items-table {
+            border: 2px solid #000;
+        }
+        
+        .items-table .item-col {
+            text-align: center;
+            width: 6%;
+        }
+        
+        .items-table .code-col {
+            width: 14%;
             text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
         }
         
-        .items-table td {
-            padding: 6px;
-            border-bottom: none;
-            border-right: 1px solid #e5e7eb;
-            vertical-align: top;
+        .items-table .description-col {
+            width: 35%;
+            text-align: left;
         }
         
-        .items-table tr:last-child td {
-            border-bottom: 1px solid #e5e7eb;
+        .items-table .qty-col,
+        .items-table .unit-col {
+            text-align: center;
+            width: 10%;
         }
         
-        .items-table tr:nth-child(even) {
-            background: #f9fafb;
-        }
-        
-        .text-right {
+        .items-table .price-col,
+        .items-table .total-col {
             text-align: right;
+            width: 12%;
         }
         
-        .text-center {
+        /* Specific header alignments to match content */
+        .items-table th.item-col {
             text-align: center;
         }
         
+        .items-table th.code-col,
+        .items-table th.description-col {
+            text-align: left;
+        }
+        
+        .items-table th.qty-col,
+        .items-table th.unit-col {
+            text-align: center;
+        }
+        
+        .items-table th.price-col,
+        .items-table th.total-col {
+            text-align: right;
+        }
+        
+        /* Table body cells */
+        .items-table td {
+            border-left: 1px solid #000;
+            border-right: 1px solid #000;
+            border-top: none;
+            border-bottom: none;
+            padding: 8px 4px;
+            vertical-align: top;
+            font-size: 11px;
+        }
+        
+        .items-table td:first-child {
+            border-left: 1px solid #000;
+        }
+        
+        .items-table td:last-child {
+            border-right: 1px solid #000;
+        }
+        
+        /* Totals Section */
         .totals-section {
-            margin-top: 30px;
-            display: flex;
-            justify-content: flex-end;
+            margin-left: auto;
+            width: 300px;
         }
         
         .totals-table {
-            width: 300px;
+            width: 100%;
             border-collapse: collapse;
         }
         
         .totals-table td {
-            padding: 8px 12px;
-            border-bottom: 1px solid #e5e7eb;
+            padding: 4px 8px;
+            border: 1px solid #000;
+            font-size: 12px;
         }
         
         .totals-table .label {
-            font-weight: 600;
-            color: #4B0082;
-            background: #DDA0DD;
+            font-weight: 900;
+            background: white;
+            color: black;
             text-align: right;
         }
         
         .totals-table .amount {
             text-align: right;
-            color: #1e293b;
-            font-weight: 500;
+            font-weight: 900;
+            background: white;
+            color: black;
         }
         
-        .total-row {
+        .total-amount-row {
             background: #9966CC;
-            color: white;
-            font-weight: 700;
-            font-size: 14px;
+            color: black;
+            font-weight: 900;
+            font-size: 13px;
         }
         
-        .terms-section {
-            margin-top: 40px;
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        
+        .status-draft {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-pending {
+            background: #ddd6fe;
+            color: #5b21b6;
+        }
+        
+        .status-approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-sent {
+            background: #bfdbfe;
+            color: #1e40af;
+        }
+        
+        .status-received {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-cancelled {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .priority-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        
+        .priority-low {
+            background: #f0f9ff;
+            color: #0369a1;
+        }
+        
+        .priority-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .priority-high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .priority-urgent {
+            background: #991b1b;
+            color: white;
+        }
+        
+        /* Footer Section */
+        .footer-section {
+            margin-top: 20px;
             page-break-inside: avoid;
         }
         
-        .terms-section h3 {
-            background: #f1f5f9;
-            padding: 8px 12px;
+        .signature-section {
+            margin-top: 25px;
             margin-bottom: 15px;
+        }
+        
+        .signature-line {
+            border-bottom: 1px solid #000;
+            width: 200px;
+            margin-bottom: 5px;
+        }
+        
+        .terms-section {
             font-size: 14px;
-            color: #1e293b;
-            border-left: 4px solid #2563eb;
+            line-height: 1.3;
+            margin-top: 15px;
+            padding: 8px;
+            border: 1px solid #000;
         }
         
-        .terms-content {
-            padding: 15px;
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            line-height: 1.6;
+        .terms-title {
+            font-weight: 900;
+            margin-bottom: 8px;
+            text-decoration: underline;
         }
         
-        .footer {
-            margin-top: 50px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            font-size: 11px;
-            color: #64748b;
-            text-align: center;
-        }
-        
+        /* Print Controls */
         .print-controls {
             position: fixed;
             top: 20px;
@@ -306,6 +439,7 @@
             background: #4b5563;
         }
         
+        /* Watermark */
         .watermark {
             position: absolute;
             top: 50%;
@@ -318,33 +452,34 @@
             pointer-events: none;
         }
         
+        /* Responsive adjustments */
         @media screen and (max-width: 768px) {
-            .po-details {
+            .po-container {
+                width: 100%;
+                padding: 10px;
+            }
+            
+            .info-section {
                 flex-direction: column;
             }
             
-            .po-left, .po-right {
-                width: 100%;
+            .supplier-info {
+                margin-right: 0;
                 margin-bottom: 20px;
             }
             
-            .company-info {
-                flex-direction: column;
-                text-align: center;
+            .po-meta {
+                flex: none;
             }
             
-            .company-details {
-                text-align: center;
-                margin-left: 0;
-                margin-top: 20px;
-            }
-            
-            .totals-section {
-                justify-content: center;
+            .print-controls {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin-bottom: 20px;
             }
         }
     </style>
-    {% include 'includes/business_styles.html' %}
 </head>
 <body>
     <!-- Print Controls -->
@@ -355,290 +490,285 @@
         <button onclick="downloadPDF()" class="btn">
             <i class="fas fa-file-pdf"></i> Download PDF
         </button>
+        {% if request.tenant %}
         <a href="/business/{{ request.tenant.slug }}/suppliers/orders/{{ order.pk }}/" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back
         </a>
+        {% endif %}
     </div>
 
-    <!-- Watermark for draft orders -->
+    <!-- Watermark for draft/cancelled orders -->
     {% if order.status == 'draft' %}
     <div class="watermark">DRAFT</div>
     {% elif order.status == 'cancelled' %}
     <div class="watermark">CANCELLED</div>
     {% endif %}
 
-    <!-- Header -->
-    <div class="header">
-        <div class="company-info">
-            {% include 'includes/business_header.html' %}
-        </div>
-    </div>
-
-    <!-- Document Title -->
-    <div class="document-title">
-        <h1>PURCHASE ORDER</h1>
-        <div style="font-size: 16px; color: #64748b;">PO-{{ order.po_number }}</div>
-    </div>
-
-    <!-- Purchase Order Details -->
-    <div class="po-details">
-        <div class="po-left">
-            <!-- Supplier Information -->
-            <div class="info-section">
-                <h3>Supplier Information</h3>
-                <div class="info-row">
-                    <span class="info-label">Supplier:</span>
-                    <span class="info-value">{{ order.supplier.name }}</span>
-                </div>
-                {% if order.supplier.business_name and order.supplier.business_name != order.supplier.name %}
-                <div class="info-row">
-                    <span class="info-label">Business Name:</span>
-                    <span class="info-value">{{ order.supplier.business_name }}</span>
-                </div>
-                {% endif %}
-                <div class="info-row">
-                    <span class="info-label">Supplier Code:</span>
-                    <span class="info-value">{{ order.supplier.supplier_code }}</span>
-                </div>
-                {% if order.supplier.email %}
-                <div class="info-row">
-                    <span class="info-label">Email:</span>
-                    <span class="info-value">{{ order.supplier.email }}</span>
-                </div>
-                {% endif %}
-                {% if order.supplier.phone %}
-                <div class="info-row">
-                    <span class="info-label">Phone:</span>
-                    <span class="info-value">{{ order.supplier.phone }}</span>
-                </div>
-                {% endif %}
-                {% if order.supplier.street_address or order.supplier.city or order.supplier.country %}
-                <div class="info-row">
-                    <span class="info-label">Address:</span>
-                    <span class="info-value">
-                        {% if order.supplier.street_address %}{{ order.supplier.street_address }}<br>{% endif %}
-                        {% if order.supplier.city %}{{ order.supplier.city }}{% endif %}
-                        {% if order.supplier.state %}, {{ order.supplier.state }}{% endif %}
-                        {% if order.supplier.postal_code %} {{ order.supplier.postal_code }}{% endif %}
-                        {% if order.supplier.country %}<br>{{ order.supplier.country }}{% endif %}
-                    </span>
-                </div>
-                {% endif %}
-                {% if order.supplier.tax_number %}
-                <div class="info-row">
-                    <span class="info-label">Tax Number:</span>
-                    <span class="info-value">{{ order.supplier.tax_number }}</span>
-                </div>
-                {% endif %}
+    <div class="po-container">
+        <!-- Header -->
+        <div class="po-header">
+            <!-- Company Name - Top Row Alone -->
+            <div class="company-name-row">
+                <div class="main-company-name">{{ business.name|upper }}</div>
             </div>
-
-            <!-- Delivery Information -->
-            {% if order.delivery_address or order.contact_person %}
-            <div class="info-section">
-                <h3>Delivery Information</h3>
-                {% if order.delivery_address %}
-                <div class="info-row">
-                    <span class="info-label">Delivery Address:</span>
-                    <span class="info-value">{{ order.delivery_address|linebreaks }}</span>
-                </div>
-                {% endif %}
-                {% if order.contact_person %}
-                <div class="info-row">
-                    <span class="info-label">Contact Person:</span>
-                    <span class="info-value">{{ order.contact_person }}</span>
-                </div>
-                {% endif %}
-                {% if order.contact_phone %}
-                <div class="info-row">
-                    <span class="info-label">Contact Phone:</span>
-                    <span class="info-value">{{ order.contact_phone }}</span>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-
-        <div class="po-right">
-            <!-- Order Information -->
-            <div class="info-section">
-                <h3>Order Information</h3>
-                <div class="info-row">
-                    <span class="info-label">Order Date:</span>
-                    <span class="info-value">{{ order.order_date|date:"F d, Y" }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Expected Delivery:</span>
-                    <span class="info-value">{{ order.expected_delivery_date|date:"F d, Y" }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Status:</span>
-                    <span class="info-value">
-                        <span class="status-badge status-{{ order.status }}">{{ order.get_status_display }}</span>
-                    </span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Priority:</span>
-                    <span class="info-value">
-                        <span class="priority-badge priority-{{ order.priority }}">{{ order.get_priority_display }}</span>
-                    </span>
-                </div>
-                {% if order.payment_terms %}
-                <div class="info-row">
-                    <span class="info-label">Payment Terms:</span>
-                    <span class="info-value">{{ order.get_payment_terms_display }}</span>
-                </div>
-                {% endif %}
-                {% if order.delivery_terms %}
-                <div class="info-row">
-                    <span class="info-label">Delivery Terms:</span>
-                    <span class="info-value">{{ order.delivery_terms }}</span>
-                </div>
-                {% endif %}
-                {% if order.requested_by %}
-                <div class="info-row">
-                    <span class="info-label">Requested By:</span>
-                    <span class="info-value">{{ order.requested_by.user.get_full_name|default:order.requested_by.user.username }}</span>
-                </div>
-                {% endif %}
-                {% if order.approved_by %}
-                <div class="info-row">
-                    <span class="info-label">Approved By:</span>
-                    <span class="info-value">{{ order.approved_by.user.get_full_name|default:order.approved_by.user.username }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Approved Date:</span>
-                    <span class="info-value">{{ order.approved_at|date:"F d, Y" }}</span>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Items Table -->
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th style="width: 5%;">#</th>
-                <th style="width: 15%;">Item Code</th>
-                <th style="width: 35%;">Description</th>
-                <th style="width: 10%;" class="text-center">Qty</th>
-                <th style="width: 10%;" class="text-center">Unit</th>
-                <th style="width: 12%;" class="text-right">Unit Price</th>
-                <th style="width: 13%;" class="text-right">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in order.items.all %}
-            <tr>
-                <td class="text-center">{{ forloop.counter }}</td>
-                <td>{{ item.item.sku|default:"-" }}</td>
-                <td>
-                    <div style="font-weight: 600;">{{ item.item.name }}</div>
-                    {% if item.item.description %}
-                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
-                        {{ item.item.description|truncatewords:15 }}
-                    </div>
+            
+            <!-- Logo, Business Details, and PO Type - Second Row -->
+            <div class="header-content">
+                <!-- Logo section on left -->
+                <div class="logo-section">
+                    {% if tenant_settings.business_logo %}
+                    <img src="{% media_url tenant_settings.business_logo %}" alt="{{ business.name }} Logo" class="company-logo">
+                    {% elif tenant_settings.logo_url %}
+                    <img src="{{ tenant_settings.logo_url }}" alt="{{ business.name }} Logo" class="company-logo">
                     {% endif %}
-                    {% if item.notes %}
-                    <div style="font-size: 11px; color: #059669; margin-top: 2px; font-style: italic;">
-                        Note: {{ item.notes }}
-                    </div>
+                </div>
+
+                <!-- Business Information centered -->
+                <div class="business-info-center">
+                    <!-- Contact Information -->
+                    {% if tenant_settings.contact_address %}
+                    <div class="company-details">{{ tenant_settings.contact_address }}</div>
+                    {% elif business.city %}
+                    <div class="company-details">{{ business.city }}{% if business.state %}, {{ business.state }}{% endif %}</div>
                     {% endif %}
-                </td>
-                <td class="text-center">{{ item.quantity|floatformat:2 }}</td>
-                <td class="text-center">{{ item.item.unit|default:"PCS" }}</td>
-                <td class="text-right">{{ order.supplier.currency|default:"KES" }} {{ item.unit_price|floatformat:2 }}</td>
-                <td class="text-right">{{ order.supplier.currency|default:"KES" }} {{ item.total_amount|floatformat:2 }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" class="text-center" style="padding: 20px; color: #64748b;">
-                    No items found
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    
+                    {% if tenant_settings.contact_phone %}
+                    <div class="company-details">TEL NO: {{ tenant_settings.contact_phone }}</div>
+                    {% elif business.phone %}
+                    <div class="company-details">TEL NO: {{ business.phone }}</div>
+                    {% endif %}
+                    
+                    {% if tenant_settings.contact_email %}
+                    <div class="company-details">E-MAIL: {{ tenant_settings.contact_email }}</div>
+                    {% elif business.email %}
+                    <div class="company-details">E-MAIL: {{ business.email }}</div>
+                    {% endif %}
 
-    <!-- Totals Section -->
-    <div class="totals-section">
-        <table class="totals-table">
-            <tr>
-                <td class="label">Subtotal:</td>
-                <td class="amount">{{ order.supplier.currency|default:"KES" }} {{ order.subtotal|floatformat:2 }}</td>
-            </tr>
-            {% if order.shipping_cost > 0 %}
-            <tr>
-                <td class="label">Shipping:</td>
-                <td class="amount">{{ order.supplier.currency|default:"KES" }} {{ order.shipping_cost|floatformat:2 }}</td>
-            </tr>
+                    <!-- PIN Number -->
+                    {% if tenant_settings.tax_number %}
+                    <div class="company-details">VAT No. PIN No: {{ tenant_settings.tax_number }}</div>
+                    {% endif %}
+                    
+                    <!-- VAT Number -->
+                    {% if tenant_settings.vat_number %}
+                    <div class="company-details">VAT No: {{ tenant_settings.vat_number }}</div>
+                    {% endif %}
+                </div>
+                
+                <!-- PO title on right -->
+                <div class="po-title">
+                    <div class="credit-po">
+                        PURCHASE<br>ORDER
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supplier and PO Information -->
+        <div class="info-section">
+            <div class="supplier-info">
+                <table class="info-table">
+                    <tr>
+                        <td class="label">SUPPLIER:</td>
+                        <td class="value">{{ order.supplier.name|upper }}</td>
+                    </tr>
+                    {% if order.supplier.business_name and order.supplier.business_name != order.supplier.name %}
+                    <tr>
+                        <td class="label">BUSINESS:</td>
+                        <td class="value">{{ order.supplier.business_name|upper }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td class="label">SUPPLIER CODE:</td>
+                        <td class="value">{{ order.supplier.supplier_code|upper }}</td>
+                    </tr>
+                    {% if order.supplier.email %}
+                    <tr>
+                        <td class="label">EMAIL:</td>
+                        <td class="value">{{ order.supplier.email }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if order.supplier.phone %}
+                    <tr>
+                        <td class="label">PHONE:</td>
+                        <td class="value">{{ order.supplier.phone }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if order.delivery_address %}
+                    <tr>
+                        <td class="label">DELIVERY:</td>
+                        <td class="value">{{ order.delivery_address|truncatewords:5 }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+            
+            <div class="po-meta">
+                <table class="info-table">
+                    <tr>
+                        <td class="label">PO NUMBER</td>
+                        <td class="value">PO-{{ order.po_number }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">ORDER DATE</td>
+                        <td class="value">{{ order.order_date|date:"d M Y" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">DELIVERY DATE</td>
+                        <td class="value">{{ order.expected_delivery_date|date:"d M Y" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">STATUS</td>
+                        <td class="value">
+                            <span class="status-badge status-{{ order.status }}">{{ order.get_status_display|upper }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label">PRIORITY</td>
+                        <td class="value">
+                            <span class="priority-badge priority-{{ order.priority }}">{{ order.get_priority_display|upper }}</span>
+                        </td>
+                    </tr>
+                    {% if order.requested_by %}
+                    <tr>
+                        <td class="label">REQUESTED BY</td>
+                        <td class="value">{{ order.requested_by.user.get_full_name|default:order.requested_by.user.username|upper }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="items-section">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th class="item-col">#</th>
+                        <th class="code-col">ITEM CODE</th>
+                        <th class="description-col">DESCRIPTION</th>
+                        <th class="qty-col">QTY</th>
+                        <th class="unit-col">UNIT</th>
+                        <th class="price-col">UNIT PRICE</th>
+                        <th class="total-col">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items.all %}
+                    <tr>
+                        <td class="item-col">{{ forloop.counter }}</td>
+                        <td class="code-col">{{ item.item.sku|default:"-" }}</td>
+                        <td class="description-col">
+                            {{ item.item.name|upper }}
+                            {% if item.notes %}
+                            <br><small style="font-style: italic; color: #666;">Note: {{ item.notes }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="qty-col">{{ item.quantity|floatformat:-2 }}</td>
+                        <td class="unit-col">{{ item.item.unit|default:"PCS" }}</td>
+                        <td class="price-col">{{ item.unit_price|floatformat:2|intcomma }}</td>
+                        <td class="total-col">{{ item.total_amount|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; font-style: italic;">No items found</td>
+                    </tr>
+                    {% endfor %}
+                    
+                    <!-- Empty rows to maintain table structure -->
+                    {% for i in "12345" %}
+                    <tr>
+                        <td class="item-col">&nbsp;</td>
+                        <td class="code-col">&nbsp;</td>
+                        <td class="description-col">&nbsp;</td>
+                        <td class="qty-col">&nbsp;</td>
+                        <td class="unit-col">&nbsp;</td>
+                        <td class="price-col">&nbsp;</td>
+                        <td class="total-col">&nbsp;</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Totals -->
+        <div class="totals-section">
+            <table class="totals-table">
+                <tr>
+                    <td class="label">SUBTOTAL ({{ order.supplier.currency|default:"KSh" }})</td>
+                    <td class="amount">{{ order.subtotal|floatformat:2|intcomma }}</td>
+                </tr>
+                {% if order.shipping_cost > 0 %}
+                <tr>
+                    <td class="label">SHIPPING</td>
+                    <td class="amount">{{ order.shipping_cost|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endif %}
+                {% if order.tax_amount > 0 %}
+                <tr>
+                    <td class="label">VAT 16%</td>
+                    <td class="amount">{{ order.tax_amount|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endif %}
+                {% if order.discount_amount > 0 %}
+                <tr>
+                    <td class="label">DISCOUNT</td>
+                    <td class="amount">-{{ order.discount_amount|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endif %}
+                <tr class="total-amount-row">
+                    <td class="label">TOTAL AMOUNT ({{ order.supplier.currency|default:"KSh" }})</td>
+                    <td class="amount">{{ order.total_amount|floatformat:2|intcomma }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Footer Section -->
+        <div class="footer-section">
+            {% if order.approved_by %}
+            <div class="signature-section">
+                <p><strong>APPROVED BY</strong></p>
+                <br>
+                <div class="signature-line"></div>
+                <p>{{ order.approved_by.user.get_full_name|default:order.approved_by.user.username|upper }}</p>
+                <p><strong>SIGNATURE & DATE</strong></p>
+            </div>
+            {% else %}
+            <div class="signature-section">
+                <p><strong>AUTHORIZED SIGNATURE</strong></p>
+                <br>
+                <div class="signature-line"></div>
+                <p>PROCUREMENT MANAGER</p>
+                <p><strong>SIGNATURE & DATE</strong></p>
+            </div>
             {% endif %}
-            {% if order.tax_amount > 0 %}
-            <tr>
-                <td class="label">Tax:</td>
-                <td class="amount">{{ order.supplier.currency|default:"KES" }} {{ order.tax_amount|floatformat:2 }}</td>
-            </tr>
-            {% endif %}
-            {% if order.discount_amount > 0 %}
-            <tr>
-                <td class="label">Discount:</td>
-                <td class="amount">-{{ order.supplier.currency|default:"KES" }} {{ order.discount_amount|floatformat:2 }}</td>
-            </tr>
-            {% endif %}
-            <tr class="total-row">
-                <td class="label">Total Amount:</td>
-                <td class="amount">{{ order.supplier.currency|default:"KES" }} {{ order.total_amount|floatformat:2 }}</td>
-            </tr>
-        </table>
-    </div>
 
-    <!-- Terms and Conditions -->
-    {% if order.special_instructions or order.terms_and_conditions or order.notes %}
-    <div class="terms-section">
-        {% if order.special_instructions %}
-        <h3>Special Instructions</h3>
-        <div class="terms-content">
-            {{ order.special_instructions|linebreaks }}
+            <div class="terms-section">
+                <div class="terms-title">TERMS AND CONDITIONS:</div>
+                {% if order.terms_and_conditions %}
+                    <p>{{ order.terms_and_conditions|linebreaks }}</p>
+                {% else %}
+                    <ol style="padding-left: 20px; margin: 0;">
+                        <li>This purchase order is subject to our standard terms and conditions.</li>
+                        <li>Delivery must be made on or before {{ order.expected_delivery_date|date:"F d, Y" }}.</li>
+                        <li>All items must conform to specifications and be in good condition.</li>
+                        <li>Invoice should reference this purchase order number: PO-{{ order.po_number }}</li>
+                        {% if order.payment_terms %}
+                        <li>Payment terms: {{ order.get_payment_terms_display }}</li>
+                        {% else %}
+                        <li>Payment will be made according to agreed payment terms.</li>
+                        {% endif %}
+                        <li>Supplier must notify us immediately of any delays or issues.</li>
+                    </ol>
+                {% endif %}
+                {% if order.special_instructions %}
+                <p><strong>Special Instructions:</strong> {{ order.special_instructions }}</p>
+                {% endif %}
+                {% if order.notes %}
+                <p><strong>Internal Notes:</strong> {{ order.notes }}</p>
+                {% endif %}
+            </div>
         </div>
-        {% endif %}
-
-        {% if order.terms_and_conditions %}
-        <h3>Terms and Conditions</h3>
-        <div class="terms-content">
-            {{ order.terms_and_conditions|linebreaks }}
-        </div>
-        {% endif %}
-
-        {% if order.notes %}
-        <h3>Internal Notes</h3>
-        <div class="terms-content">
-            {{ order.notes|linebreaks }}
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    <!-- Default Terms if none specified -->
-    {% if not order.terms_and_conditions %}
-    <div class="terms-section">
-        <h3>Terms and Conditions</h3>
-        <div class="terms-content">
-            <ol style="padding-left: 20px;">
-                <li>This purchase order is subject to our standard terms and conditions.</li>
-                <li>Delivery must be made on or before the specified delivery date.</li>
-                <li>All items must conform to specifications and be in good condition.</li>
-                <li>Invoice should reference this purchase order number: PO-{{ order.po_number }}</li>
-                <li>Payment will be made according to agreed payment terms.</li>
-                <li>Supplier must notify us immediately of any delays or issues.</li>
-            </ol>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Footer -->
-    <div class="footer">
-        <p>This is a computer-generated document. No signature is required.</p>
-        <p>Generated on {{ "now"|date:"F d, Y g:i A" }} | PO-{{ order.po_number }}</p>
     </div>
 
     <script>
@@ -663,6 +793,12 @@
         window.addEventListener('afterprint', () => {
             document.querySelector('.print-controls').style.display = 'block';
         });
+
+        // Auto-print when opened (optional)
+        // window.onload = function() {
+        //     window.print();
+        // };
     </script>
 </body>
 </html>
+   
