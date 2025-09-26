@@ -1,0 +1,68 @@
+{% extends "emails/base.html" %}
+
+{% block email_title %}Subscription Cancelled - {{ subscription.business.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header warning">
+        <h1>Subscription Cancelled</h1>
+        <p>Your AutoWash subscription has been cancelled</p>
+    </div>
+    
+    <div class="content">
+        <p>Dear {{ subscription.business.name }} Team,</p>
+        
+        <p>We're sorry to see you go! This email confirms that your AutoWash subscription has been successfully cancelled.</p>
+        
+        <div class="details-box">
+            <h3>Cancellation Details</h3>
+            <p><strong>Business:</strong> {{ subscription.business.name }}</p>
+            <p><strong>Subscription Plan:</strong> {{ subscription.plan.name|default:"Premium Plan" }}</p>
+            <p><strong>Cancellation Date:</strong> {{ subscription.cancelled_at|date:"F d, Y g:i A"|default:"Just now" }}</p>
+            <p><strong>Original Start Date:</strong> {{ subscription.start_date|date:"F d, Y"|default:"Not specified" }}</p>
+            <p><strong>Status:</strong> <span class="status-cancelled">✗ Cancelled</span></p>
+        </div>
+        
+        {% if subscription.end_date and subscription.end_date > subscription.cancelled_at %}
+        <div class="info-box">
+            <h3>Service Access</h3>
+            <p>Your subscription was cancelled on {{ subscription.cancelled_at|date:"F d, Y" }}, but you still have access to AutoWash services until {{ subscription.end_date|date:"F d, Y" }} (the end of your current billing period).</p>
+        </div>
+        {% else %}
+        <div class="warning-box">
+            <h3>Service Access</h3>
+            <p>Your access to AutoWash premium features has been immediately suspended as of {{ subscription.cancelled_at|date:"F d, Y g:i A"|default:"now" }}.</p>
+        </div>
+        {% endif %}
+        
+        <div class="details-box">
+            <h3>What Happens Next?</h3>
+            <ul>{% if subscription.end_date and subscription.end_date > subscription.cancelled_at %}
+                <li>Continue using premium features until {{ subscription.end_date|date:"F d, Y" }}</li>
+                <li>No further charges will be made to your account</li>
+                <li>Your account will automatically switch to free plan after {{ subscription.end_date|date:"F d, Y" }}</li>{% else %}
+                <li>Immediate switch to free plan with limited features</li>
+                <li>Your data and account remain safe and accessible</li>
+                <li>No further charges will be made to your account</li>{% endif %}
+                <li>You can reactivate your subscription anytime</li>
+            </ul>
+        </div>
+        
+        <div class="feedback-box">
+            <h3>We Value Your Feedback</h3>
+            <p>We'd love to know why you're cancelling your subscription. Your feedback helps us improve our service for everyone.</p>
+            <a href="{{ domain|default:'https://app.autowash.co.ke' }}/feedback/" class="feedback-button">Share Feedback</a>
+        </div>
+        
+        <div class="cta-section">
+            <a href="{{ domain|default:'https://app.autowash.co.ke' }}/subscriptions/plans/" class="cta-button secondary">Reactivate Subscription</a>
+        </div>
+        
+        <p>If you cancelled by mistake or changed your mind, you can easily reactivate your subscription by visiting our pricing page.</p>
+        
+        <p>Thank you for being part of the AutoWash community. We hope to serve you again in the future!</p>
+        
+        <p>If you have any questions, please don't hesitate to contact our support team.</p>
+    </div>
+</div>
+{% endblock %}
