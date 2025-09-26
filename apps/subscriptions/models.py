@@ -244,7 +244,7 @@ class Subscription(TimeStampedModel):
         """Extend subscription by specified days"""
         from datetime import timedelta
         self.end_date += timedelta(days=days)
-        self.save()
+        self.save(using='default')
     
     def cancel_subscription(self, reason=""):
         """Cancel subscription"""
@@ -252,7 +252,7 @@ class Subscription(TimeStampedModel):
         self.cancelled_at = timezone.now()
         self.cancellation_reason = reason
         self.is_auto_renew = False
-        self.save()
+        self.save(using='default')
     
     def reactivate_subscription(self):
         """Reactivate cancelled subscription if within grace period"""
@@ -261,7 +261,7 @@ class Subscription(TimeStampedModel):
             self.cancelled_at = None
             self.cancellation_reason = ""
             self.is_auto_renew = True
-            self.save()
+            self.save(using='default')
             return True
         return False
 
@@ -329,19 +329,19 @@ class Payment(TimeStampedModel):
         self.transaction_id = transaction_id
         if notes:
             self.notes = notes
-        self.save()
+        self.save(using='default')
         
         # Update subscription status if it was pending
         if self.subscription.status == 'pending':
             self.subscription.status = 'active'
-            self.subscription.save()
+            self.subscription.save(using='default')
     
     def mark_as_failed(self, reason=""):
         """Mark payment as failed"""
         self.status = 'failed'
         self.failed_at = timezone.now()
         self.failure_reason = reason
-        self.save()
+        self.save(using='default')
 
 class SubscriptionUsage(TimeStampedModel):
     """Track subscription usage and limits"""
@@ -462,7 +462,7 @@ class SubscriptionDiscount(TimeStampedModel):
     def use_discount(self):
         """Mark discount as used"""
         self.current_uses += 1
-        self.save()
+        self.save(using='default')
 
 class SubscriptionInvoice(TimeStampedModel):
     """Invoices for subscription payments"""
