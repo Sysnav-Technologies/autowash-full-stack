@@ -558,6 +558,70 @@ def fix_subscription_datetime_corruption():
         traceback.print_exc()
 
 
+def fix_site_id_corruption():
+    """Fix site ID corruption in django_site and related tables"""
+    print_section("Fixing Site ID Corruption")
+    
+    try:
+        with connection.cursor() as cursor:
+            # Check if django_site table exists and has valid data
+            cursor.execute("SHOW TABLES LIKE 'django_site'")
+            if not cursor.fetchone():
+                print("  django_site table not found, creating...")
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS django_site (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        domain VARCHAR(100) NOT NULL,
+                        name VARCHAR(50) NOT NULL
+                    )
+                """)
+                cursor.execute("""
+                    INSERT INTO django_site (id, domain, name) 
+                    VALUES (1, 'app.autowash.co.ke', 'AutoWash')
+                """)
+                print("  Created django_site table with default site")
+                return
+            
+            # Check for corrupted site IDs (non-numeric values)
+            cursor.execute("SELECT COUNT(*) FROM django_site WHERE id REGEXP '[^0-9]'")
+            corrupted_sites = cursor.fetchone()[0]
+            
+            if corrupted_sites > 0:
+                print(f"  Found {corrupted_sites} corrupted site IDs")
+                
+                # Fix corrupted site IDs by replacing with proper integer IDs
+                cursor.execute("DELETE FROM django_site WHERE id REGEXP '[^0-9]'")
+                print(f"    Removed {cursor.rowcount} corrupted site records")
+                
+                # Ensure we have a default site with ID 1
+                cursor.execute("SELECT COUNT(*) FROM django_site WHERE id = 1")
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("""
+                        INSERT INTO django_site (id, domain, name) 
+                        VALUES (1, 'app.autowash.co.ke', 'AutoWash')
+                        ON DUPLICATE KEY UPDATE domain='app.autowash.co.ke', name='AutoWash'
+                    """)
+                    print("    Created default site record with ID 1")
+            
+            # Fix any socialaccount_socialapp_sites with corrupted site_id
+            cursor.execute("SHOW TABLES LIKE 'socialaccount_socialapp_sites'")
+            if cursor.fetchone():
+                cursor.execute("SELECT COUNT(*) FROM socialaccount_socialapp_sites WHERE site_id REGEXP '[^0-9]'")
+                corrupted_social_sites = cursor.fetchone()[0]
+                
+                if corrupted_social_sites > 0:
+                    print(f"  Found {corrupted_social_sites} corrupted social app site references")
+                    # Remove corrupted social app site references
+                    cursor.execute("DELETE FROM socialaccount_socialapp_sites WHERE site_id REGEXP '[^0-9]'")
+                    print(f"    Removed {cursor.rowcount} corrupted social app site references")
+        
+        print("✅ Site ID corruption fix completed")
+        
+    except Exception as e:
+        print(f"❌ Error fixing site ID corruption: {e}")
+        traceback.print_exc()
+
+
 def main():
     """Main execution function"""
     try:
@@ -568,6 +632,7 @@ def main():
         fix_uuid_corruption()
         fix_datetime_corruption()
         fix_subscription_datetime_corruption()
+        fix_site_id_corruption()
         
         # Verify everything worked
         success = verify_fixes()
