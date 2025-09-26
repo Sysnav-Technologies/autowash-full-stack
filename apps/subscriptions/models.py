@@ -1,10 +1,58 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.core.validators import MinValueValidator, MaxValueValidator
 from apps.core.models import TimeStampedModel  # Changed to use global models for system-wide subscriptions
 from decimal import Decimal
+from datetime import datetime
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def safe_datetime_parse(datetime_value):
+    """
+    Safely parse a datetime field that might be corrupted as a string
+    Returns None if parsing fails
+    """
+    if datetime_value is None:
+        return None
+    
+    # If it's already a datetime object, return it
+    if hasattr(datetime_value, 'utcoffset'):
+        return datetime_value
+    
+    # If it's a string, try to parse it
+    if isinstance(datetime_value, str):
+        try:
+            # Try Django's dateparse first
+            parsed = parse_datetime(datetime_value)
+            if parsed:
+                return parsed
+            
+            # Try common formats
+            for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f']:
+                try:
+                    parsed = datetime.strptime(datetime_value, fmt)
+                    # Make it timezone aware if it isn't
+                    if parsed.tzinfo is None:
+                        parsed = timezone.make_aware(parsed)
+                    return parsed
+                except ValueError:
+                    continue
+            
+            logger.warning(f"Could not parse datetime string: {datetime_value}")
+            return None
+            
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error parsing datetime value {datetime_value}: {e}")
+            return None
+    
+    # If it's some other type, log and return None
+    logger.warning(f"Unexpected datetime field type: {type(datetime_value)} with value: {datetime_value}")
+    return None
 
 class SubscriptionPlan(TimeStampedModel):
     """Global subscription plans available for all businesses"""
@@ -152,12 +200,15 @@ class Subscription(TimeStampedModel):
         
         if self.status == 'active':
             # For active subscriptions, only check end_date
-            return self.end_date > now
+            end_date = safe_datetime_parse(self.end_date)
+            return end_date and end_date > now
         elif self.status == 'trial':
             # For trial subscriptions, check both end_date and trial_end_date
+            end_date = safe_datetime_parse(self.end_date)
+            trial_end_date = safe_datetime_parse(self.trial_end_date)
             return (
-                self.end_date > now and 
-                (not self.trial_end_date or self.trial_end_date > now)
+                end_date and end_date > now and 
+                (not trial_end_date or trial_end_date > now)
             )
         else:
             # For other statuses (expired, cancelled, etc.), not active
@@ -166,23 +217,28 @@ class Subscription(TimeStampedModel):
     @property
     def is_trial(self):
         """Check if subscription is in trial period"""
-        if not self.trial_end_date:
+        trial_end_date = safe_datetime_parse(self.trial_end_date)
+        if not trial_end_date:
             return False
-        return timezone.now() < self.trial_end_date and self.status == 'trial'
+        return timezone.now() < trial_end_date and self.status == 'trial'
     
     @property
     def days_remaining(self):
         """Get days remaining in subscription"""
         if not self.is_active:
             return 0
-        return (self.end_date - timezone.now()).days
+        end_date = safe_datetime_parse(self.end_date)
+        if not end_date:
+            return 0
+        return (end_date - timezone.now()).days
     
     @property
     def trial_days_remaining(self):
         """Get trial days remaining"""
-        if not self.trial_end_date or not self.is_trial:
+        trial_end_date = safe_datetime_parse(self.trial_end_date)
+        if not trial_end_date or not self.is_trial:
             return 0
-        return max(0, (self.trial_end_date - timezone.now()).days)
+        return max(0, (trial_end_date - timezone.now()).days)
     
     def extend_subscription(self, days):
         """Extend subscription by specified days"""
