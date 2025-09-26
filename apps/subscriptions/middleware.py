@@ -5,9 +5,54 @@ from django.shortcuts import redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.conf import settings
+from django.utils.dateparse import parse_datetime
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def safe_datetime_parse(datetime_value):
+    """
+    Safely parse a datetime field that might be corrupted as a string
+    Returns None if parsing fails
+    """
+    if datetime_value is None:
+        return None
+    
+    # If it's already a datetime object, return it
+    if hasattr(datetime_value, 'utcoffset'):
+        return datetime_value
+    
+    # If it's a string, try to parse it
+    if isinstance(datetime_value, str):
+        try:
+            # Try Django's dateparse first
+            parsed = parse_datetime(datetime_value)
+            if parsed:
+                return parsed
+            
+            # Try common formats
+            for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f']:
+                try:
+                    parsed = datetime.strptime(datetime_value, fmt)
+                    # Make it timezone aware if it isn't
+                    if parsed.tzinfo is None:
+                        parsed = timezone.make_aware(parsed)
+                    return parsed
+                except ValueError:
+                    continue
+            
+            logger.warning(f"Could not parse datetime string: {datetime_value}")
+            return None
+            
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error parsing datetime value {datetime_value}: {e}")
+            return None
+    
+    # If it's some other type, log and return None
+    logger.warning(f"Unexpected datetime field type: {type(datetime_value)} with value: {datetime_value}")
+    return None
 
 
 class SubscriptionMiddleware:
@@ -238,8 +283,9 @@ class SubscriptionMiddleware:
                 
                 # Handle different subscription statuses
                 if subscription.status == 'trial':
-                    # Check if trial has expired
-                    if subscription.trial_end_date and timezone.now() > subscription.trial_end_date:
+                    # Check if trial has expired - safely parse datetime field
+                    trial_end_date = safe_datetime_parse(subscription.trial_end_date)
+                    if trial_end_date and timezone.now() > trial_end_date:
                         # Update status and redirect
                         subscription.status = 'expired'
                         subscription.save(using='default')
@@ -322,40 +368,42 @@ class SubscriptionMiddleware:
                         return '/subscriptions/manage/'
             
             # Check for upcoming expiry (7 days)
-            if subscription.is_active and subscription.end_date:
-                days_until_expiry = (subscription.end_date - timezone.now()).days
-                
-                if days_until_expiry <= 7 and days_until_expiry > 0:
-                    # Show warning but don't redirect
-                    if not hasattr(request, '_expiry_warning_shown'):
+            if subscription.is_active:
+                end_date = safe_datetime_parse(subscription.end_date)
+                if end_date:
+                    days_until_expiry = (end_date - timezone.now()).days
+                    
+                    if days_until_expiry <= 7 and days_until_expiry > 0:
+                        # Show warning but don't redirect
+                        if not hasattr(request, '_expiry_warning_shown'):
+                            try:
+                                messages.warning(
+                                    request, 
+                                    f"Your subscription expires in {days_until_expiry} day{'s' if days_until_expiry != 1 else ''}. "
+                                    f"<a href='/subscriptions/manage/'>Manage subscription</a>"
+                                )
+                            except Exception:
+                                pass  # Messages framework may not be available
+                            request._expiry_warning_shown = True
+                    
+                    elif days_until_expiry <= 0:
+                        # Subscription has expired
+                        subscription.status = 'expired'
+                        subscription.save(using='default')
+                        
+                        # Allow access to subscription management paths even after expiry
+                        if self.is_subscription_management_path(request.path):
+                            return None
+                        
                         try:
-                            messages.warning(
-                                request, 
-                                f"Your subscription expires in {days_until_expiry} day{'s' if days_until_expiry != 1 else ''}. "
-                                f"<a href='/subscriptions/manage/'>Manage subscription</a>"
-                            )
+                            messages.error(request, "Your subscription has expired. Please renew to continue using the service.")
                         except Exception:
                             pass  # Messages framework may not be available
-                        request._expiry_warning_shown = True
-                
-                elif days_until_expiry <= 0:
-                    # Subscription has expired
-                    subscription.status = 'expired'
-                    subscription.save(using='default')
-                    
-                    # Allow access to subscription management paths even after expiry
-                    if self.is_subscription_management_path(request.path):
-                        return None
-                    
-                    try:
-                        messages.error(request, "Your subscription has expired. Please renew to continue using the service.")
-                    except Exception:
-                        pass  # Messages framework may not be available
-                    # Redirect to upgrade page in business context if verified
-                    if business.is_verified and business.is_approved:
-                        return f'/business/{business.slug}/subscriptions/upgrade/'
-                    else:
-                        return '/subscriptions/upgrade/'
+                        # Redirect to upgrade page in business context if verified
+                        if business.is_verified and business.is_approved:
+                            return f'/business/{business.slug}/subscriptions/upgrade/'
+                        else:
+                            return '/subscriptions/upgrade/'
             
             # All checks passed
             return None

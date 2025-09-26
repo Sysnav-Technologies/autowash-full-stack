@@ -455,6 +455,109 @@ def verify_fixes():
         traceback.print_exc()
         return False
 
+
+def fix_subscription_datetime_corruption():
+    """Fix datetime corruption in subscription models"""
+    print_section("Fixing Subscription Datetime Corruption")
+    
+    try:
+        from apps.subscriptions.models import Subscription
+        
+        with connection.cursor() as cursor:
+            # Check for corrupted end_date fields in subscriptions
+            cursor.execute("""
+                SELECT COUNT(*) FROM subscriptions_subscription 
+                WHERE end_date REGEXP '^[0-9]+$'
+                AND CHAR_LENGTH(end_date) BETWEEN 8 AND 12
+            """)
+            corrupted_end_date = cursor.fetchone()[0]
+            
+            if corrupted_end_date > 0:
+                print(f"  Found {corrupted_end_date} corrupted end_date fields")
+                cursor.execute("""
+                    UPDATE subscriptions_subscription 
+                    SET end_date = FROM_UNIXTIME(CAST(end_date AS SIGNED))
+                    WHERE end_date REGEXP '^[0-9]{10}$'
+                    AND CAST(end_date AS SIGNED) BETWEEN 946684800 AND 2147483647
+                """)
+                print(f"    Fixed {cursor.rowcount} end_date Unix timestamps")
+            
+            # Check for corrupted trial_end_date fields
+            cursor.execute("""
+                SELECT COUNT(*) FROM subscriptions_subscription 
+                WHERE trial_end_date IS NOT NULL
+                AND trial_end_date REGEXP '^[0-9]+$'
+                AND CHAR_LENGTH(trial_end_date) BETWEEN 8 AND 12
+            """)
+            corrupted_trial_end = cursor.fetchone()[0]
+            
+            if corrupted_trial_end > 0:
+                print(f"  Found {corrupted_trial_end} corrupted trial_end_date fields")
+                cursor.execute("""
+                    UPDATE subscriptions_subscription 
+                    SET trial_end_date = FROM_UNIXTIME(CAST(trial_end_date AS SIGNED))
+                    WHERE trial_end_date REGEXP '^[0-9]{10}$'
+                    AND CAST(trial_end_date AS SIGNED) BETWEEN 946684800 AND 2147483647
+                """)
+                print(f"    Fixed {cursor.rowcount} trial_end_date Unix timestamps")
+            
+            # Check for string datetime values that need parsing
+            cursor.execute("""
+                SELECT id, end_date, trial_end_date 
+                FROM subscriptions_subscription 
+                WHERE (end_date NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND end_date NOT REGEXP '^[0-9]+$')
+                OR (trial_end_date IS NOT NULL AND trial_end_date NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND trial_end_date NOT REGEXP '^[0-9]+$')
+                LIMIT 100
+            """)
+            
+            string_corrupted = cursor.fetchall()
+            if string_corrupted:
+                print(f"  Found {len(string_corrupted)} subscriptions with string datetime corruption")
+                from django.utils.dateparse import parse_datetime
+                
+                for sub_id, end_date, trial_end_date in string_corrupted:
+                    # Fix end_date if corrupted
+                    if end_date and not end_date.startswith(('19', '20', '21')):
+                        try:
+                            # Try to parse as datetime string
+                            parsed_end = parse_datetime(str(end_date))
+                            if not parsed_end:
+                                # Use current time + 1 month as fallback
+                                parsed_end = timezone.now() + timezone.timedelta(days=30)
+                            
+                            cursor.execute("""
+                                UPDATE subscriptions_subscription 
+                                SET end_date = %s 
+                                WHERE id = %s
+                            """, [parsed_end.strftime('%Y-%m-%d %H:%M:%S'), sub_id])
+                        except Exception as e:
+                            print(f"    Warning: Could not fix end_date for subscription {sub_id}: {e}")
+                    
+                    # Fix trial_end_date if corrupted
+                    if trial_end_date and not trial_end_date.startswith(('19', '20', '21')):
+                        try:
+                            parsed_trial = parse_datetime(str(trial_end_date))
+                            if not parsed_trial:
+                                # Use current time + 7 days as fallback
+                                parsed_trial = timezone.now() + timezone.timedelta(days=7)
+                            
+                            cursor.execute("""
+                                UPDATE subscriptions_subscription 
+                                SET trial_end_date = %s 
+                                WHERE id = %s
+                            """, [parsed_trial.strftime('%Y-%m-%d %H:%M:%S'), sub_id])
+                        except Exception as e:
+                            print(f"    Warning: Could not fix trial_end_date for subscription {sub_id}: {e}")
+                
+                print(f"    Processed {len(string_corrupted)} subscription datetime fixes")
+        
+        print("✅ Subscription datetime corruption fix completed")
+        
+    except Exception as e:
+        print(f"❌ Error fixing subscription datetime corruption: {e}")
+        traceback.print_exc()
+
+
 def main():
     """Main execution function"""
     try:
@@ -464,6 +567,7 @@ def main():
         # Apply all fixes
         fix_uuid_corruption()
         fix_datetime_corruption()
+        fix_subscription_datetime_corruption()
         
         # Verify everything worked
         success = verify_fixes()
