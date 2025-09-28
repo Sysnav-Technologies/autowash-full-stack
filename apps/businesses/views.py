@@ -362,14 +362,23 @@ def get_business_insights():
         
         insights['monthly_revenue'] = monthly_stats['monthly_revenue'] or Decimal('0.00')
         
-        # Top services with single query
+        # Top services with single query - use package name since ServiceOrder has package relationship
         top_services = ServiceOrder.objects.filter(
-            created_at__date__gte=current_month_start
-        ).values('service__name').annotate(
+            created_at__date__gte=current_month_start,
+            package__isnull=False
+        ).values('package__name').annotate(
             count=Count('id')
         ).order_by('-count')[:5]
         
-        insights['top_services'] = list(top_services)
+        # Format the results for template usage
+        formatted_top_services = []
+        for service in top_services:
+            formatted_top_services.append({
+                'name': service['package__name'],
+                'count': service['count']
+            })
+        
+        insights['top_services'] = formatted_top_services
         
     except Exception as e:
         logger.error(f"Error in business insights: {e}")
@@ -393,14 +402,18 @@ def get_recent_activities(employee, limit=10):
     try:
         from django.apps import apps
         
-        # Optimized recent orders query with select_related
+        # Optimized recent orders query with proper select_related
         ServiceOrder = apps.get_model('services', 'ServiceOrder')
-        recent_orders = ServiceOrder.objects.select_related('service', 'customer').filter(
+        recent_orders = ServiceOrder.objects.select_related('customer', 'vehicle', 'package').filter(
             created_at__gte=cutoff_time
         ).order_by('-created_at')[:5]
         
         for order in recent_orders:
-            service_name = order.service.name if hasattr(order, 'service') and order.service else "Unknown"
+            # Get service info from package or order items
+            service_name = "Car Wash Service"
+            if order.package:
+                service_name = order.package.name
+            
             activities.append({
                 'title': f'New service order #{str(order.id)[:8]}',
                 'description': f'Service: {service_name}',
@@ -558,8 +571,10 @@ def update_daily_metrics(metrics, user=None):
         except:
             metrics.low_stock_items = 0
         
-        # Set employee attendance to default
-        metrics.employee_attendance_rate = 100.0
+        # Employee attendance is calculated as a property, not set directly
+        # Default employee counts (could be enhanced with actual attendance tracking)
+        metrics.total_employees_present = 1  # Default to at least the current user
+        metrics.total_employees_absent = 0
         
     except Exception as e:
         logger.error(f"Error in optimized daily metrics update: {e}")
