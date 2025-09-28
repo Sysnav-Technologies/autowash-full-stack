@@ -100,34 +100,19 @@ class MySQLTenantMiddleware(MiddlewareMixin):
             
             if tenant is None:
                 try:
-                    # Add explicit error handling for database query issues
-                    try:
-                        tenant = Tenant.objects.get_by_subdomain(subdomain)
-                    except IndexError as idx_error:
-                        logger.error(f"List index error querying subdomain {subdomain}: {idx_error}")
-                        # Try a safer query approach
-                        try:
-                            tenant = Tenant.objects.using('default').filter(
-                                subdomain=subdomain, 
-                                is_active=True
-                            ).first()
-                        except Exception as safe_error:
-                            logger.error(f"Safe query also failed for subdomain {subdomain}: {safe_error}")
-                            tenant = None
-                    except Exception as query_error:
-                        logger.error(f"Database query error for subdomain {subdomain}: {query_error}")
-                        tenant = None
-                        
+                    # Use safer query approach immediately
+                    tenant = Tenant.objects.using('default').filter(
+                        subdomain=subdomain, 
+                        is_active=True
+                    ).first()
+                    
                     if tenant:
-                        # Validate tenant UUID fields
+                        # Validate tenant UUID fields before caching
                         try:
                             if not is_valid_uuid(tenant.id):
                                 logger.error(f"Tenant {subdomain} has invalid UUID: {tenant.id}")
-                                fixed_uuid = fix_corrupted_uuid_field(tenant.id)
-                                if fixed_uuid:
-                                    tenant.id = safe_uuid_convert(fixed_uuid)
-                                else:
-                                    tenant = None
+                                # Don't try to fix UUIDs in middleware, just reject the tenant
+                                tenant = None
                         except Exception as uuid_error:
                             logger.error(f"UUID validation error for subdomain {subdomain}: {uuid_error}")
                             tenant = None
@@ -135,6 +120,7 @@ class MySQLTenantMiddleware(MiddlewareMixin):
                         if tenant:
                             # REAL-TIME: Only 10-second cache for database protection
                             cache.set(cache_key, tenant, timeout=10)
+                            
                 except Exception as e:
                     logger.error(f"Database error resolving subdomain {subdomain}: {e}")
                     tenant = None
@@ -158,22 +144,18 @@ class MySQLTenantMiddleware(MiddlewareMixin):
             
             if tenant is None:
                 try:
-                    tenant = Tenant.objects.get(slug=tenant_slug, is_active=True)
+                    tenant = Tenant.objects.using('default').filter(
+                        slug=tenant_slug, 
+                        is_active=True
+                    ).first()
+                    
                     # Validate tenant UUID fields before caching
                     if tenant and hasattr(tenant, 'id'):
                         try:
                             # Validate the tenant ID is a proper UUID
                             if not is_valid_uuid(tenant.id):
                                 logger.error(f"Tenant {tenant_slug} has invalid UUID: {tenant.id}")
-                                # Try to fix the UUID
-                                fixed_uuid = fix_corrupted_uuid_field(tenant.id)
-                                if fixed_uuid:
-                                    logger.info(f"Fixed tenant UUID from {tenant.id} to {fixed_uuid}")
-                                    # Note: This won't persist to DB, just for this request
-                                    tenant.id = safe_uuid_convert(fixed_uuid)
-                                else:
-                                    logger.error(f"Could not fix UUID for tenant {tenant_slug}, skipping")
-                                    tenant = None
+                                tenant = None
                         except Exception as uuid_error:
                             logger.error(f"UUID validation error for tenant {tenant_slug}: {uuid_error}")
                             tenant = None
@@ -181,8 +163,7 @@ class MySQLTenantMiddleware(MiddlewareMixin):
                     if tenant:
                         # REAL-TIME: Only 10-second cache to prevent staleness
                         cache.set(cache_key, tenant, timeout=10)
-                except Tenant.DoesNotExist:
-                    tenant = None
+                        
                 except Exception as e:
                     logger.error(f"Database error resolving tenant {tenant_slug}: {e}")
                     tenant = None
@@ -202,17 +183,17 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         
         if tenant is None:
             try:
-                tenant = Tenant.objects.get_by_domain(hostname)
+                tenant = Tenant.objects.using('default').filter(
+                    custom_domain=hostname, 
+                    is_active=True
+                ).first()
+                
                 if tenant:
                     # Validate tenant UUID fields
                     try:
                         if not is_valid_uuid(tenant.id):
                             logger.error(f"Tenant {hostname} has invalid UUID: {tenant.id}")
-                            fixed_uuid = fix_corrupted_uuid_field(tenant.id)
-                            if fixed_uuid:
-                                tenant.id = safe_uuid_convert(fixed_uuid)
-                            else:
-                                tenant = None
+                            tenant = None
                     except Exception as uuid_error:
                         logger.error(f"UUID validation error for domain {hostname}: {uuid_error}")
                         tenant = None
@@ -220,6 +201,7 @@ class MySQLTenantMiddleware(MiddlewareMixin):
                     if tenant:
                         # REAL-TIME: Only 10-second cache to prevent staleness
                         cache.set(cache_key, tenant, timeout=10)
+                        
             except Exception as e:
                 logger.error(f"Database error resolving custom domain {hostname}: {e}")
                 tenant = None
@@ -307,19 +289,14 @@ class TenantBusinessContextMiddleware(MiddlewareMixin):
                             # Validate tenant_id before using it in queries
                             if tenant_id and is_valid_uuid(tenant_id):
                                 # Use business_id (Django auto-created field for ForeignKey)
-                                subscription = Subscription.objects.using('default').filter(business_id=tenant_id).first()
+                                subscription = Subscription.objects.using('default').filter(
+                                    business_id=tenant_id
+                                ).order_by('-created_at').first()
                             else:
                                 logger.warning(f"Invalid tenant_id for subscription lookup: {tenant_id}")
                         except Exception as e:
                             logger.warning(f"Error querying subscription for tenant {tenant_id}: {e}")
-                            # Try alternative approach if UUID field is corrupted
-                            try:
-                                from apps.core.tenant_models import Tenant
-                                tenant_obj = Tenant.objects.using('default').get(id=tenant_id)
-                                subscription = Subscription.objects.using('default').filter(business=tenant_obj).first()
-                            except Exception as fallback_error:
-                                logger.error(f"Fallback subscription query also failed: {fallback_error}")
-                                subscription = None
+                            subscription = None
                         
                         subscription_data = {
                             'is_active': subscription.is_active if subscription else False,
@@ -399,11 +376,13 @@ class TenantBusinessContextMiddleware(MiddlewareMixin):
             
             # Get tenant ID safely to avoid database routing issues
             tenant_id = getattr(tenant, 'id', None) if tenant else None
-            if not tenant_id:
+            if not tenant_id or not is_valid_uuid(tenant_id):
                 return f'/business/{getattr(tenant, "slug", "unknown")}/subscriptions/upgrade/'
             
             # Get subscription from default database - use tenant ID not object
-            subscription = Subscription.objects.using('default').filter(business_id=tenant_id).first()
+            subscription = Subscription.objects.using('default').filter(
+                business_id=tenant_id
+            ).order_by('-created_at').first()
             
             # Store subscription data for template access without triggering database queries
             request.subscription_cache = subscription
@@ -432,7 +411,7 @@ class TenantBusinessContextMiddleware(MiddlewareMixin):
             return None
             
         except Exception as e:
-            print(f"ERROR Error in subscription middleware: {e}")
+            logger.error(f"ERROR Error in subscription middleware: {e}")
             # In case of error, redirect to upgrade to be safe
             return f'/business/{tenant.slug}/subscriptions/upgrade/'
 

@@ -128,6 +128,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
 ] + (['whitenoise.middleware.WhiteNoiseMiddleware'] if RENDER or CPANEL else []) + [
+    'apps.core.db_protection_middleware.DatabaseConnectionProtectionMiddleware',  # Handle DB connection issues first
     'django.contrib.sessions.middleware.SessionMiddleware',
     'apps.core.mysql_middleware.MySQLTenantMiddleware',
     'apps.core.mysql_middleware.TenantBusinessContextMiddleware',
@@ -238,16 +239,16 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
-        'CONN_MAX_AGE': 7200 if CPANEL else 1200,  # Increased: 2 hours for cPanel, 20 minutes for local
+        'CONN_MAX_AGE': 0 if CPANEL else 300,  # No persistent connections for cPanel, 5 minutes for local
         'OPTIONS': {
-            'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES',autocommit=1",
-            'isolation_level': None,
-        } if CPANEL else {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'autocommit': True,
         },
+        'TEST': {
+            'CHARSET': 'utf8mb4',
+            'COLLATION': 'utf8mb4_unicode_ci',
+        }
     }
 }
 
@@ -391,16 +392,17 @@ CACHE_MIDDLEWARE_ALIAS = 'default'
 USE_TEMPLATE_CACHE = False  # Never cache templates to prevent staleness
 TEMPLATE_CACHE_TIMEOUT = 0  # Disable any template caching
 
-# Session configuration - optimized for responsiveness
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Use database sessions for reliability
+# Session configuration - optimized for reliability and preventing corruption
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'  # Use cached database sessions for reliability
 SESSION_CACHE_ALIAS = 'default'
-SESSION_COOKIE_AGE = 3600 * 4  # Shorter sessions - 4 hours for better security
+SESSION_COOKIE_AGE = 3600 * 8  # 8 hours for better stability
 SESSION_COOKIE_NAME = 'autowash_sessionid'
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'  # Use JSON serializer for better compatibility
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -893,6 +895,6 @@ if not DEBUG:
     
     if CPANEL:
         USE_TZ = True
-        TIME_ZONE = 'UTC'
+        TIME_ZONE = 'Africa/Nairobi'  # Keep Kenya timezone for cPanel
         ATOMIC_REQUESTS = False
         PREPEND_WWW = False

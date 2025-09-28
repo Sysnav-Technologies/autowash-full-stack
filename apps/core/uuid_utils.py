@@ -24,9 +24,21 @@ def is_valid_uuid(uuid_str, allow_none=True):
     
     if isinstance(uuid_str, uuid.UUID):
         return True
+    
+    # Convert to string and check if it looks like a session key (not a UUID)
+    str_val = str(uuid_str)
+    
+    # Django session keys are typically 32 characters of base64-like characters
+    # If it's a session key, it's not a valid UUID
+    if len(str_val) == 32 and not any(c in str_val for c in '-'):
+        # Check if it contains characters that wouldn't be in a UUID
+        uuid_chars = set('0123456789abcdefABCDEF-')
+        if not all(c in uuid_chars for c in str_val.lower()):
+            logger.debug(f"Rejecting session key as UUID: {str_val}")
+            return False
         
     try:
-        uuid.UUID(str(uuid_str))
+        uuid.UUID(str_val)
         return True
     except (ValueError, TypeError, AttributeError):
         return False

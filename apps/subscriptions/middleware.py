@@ -165,7 +165,7 @@ class SubscriptionMiddleware:
             
             # Get user's business using explicit database routing with UUID validation
             try:
-                business = Tenant.objects.using('default').filter(owner=request.user).first()
+                business = Tenant.objects.using('default').filter(owner=request.user, is_active=True).first()
                 
                 # Validate business UUID if found
                 if business and hasattr(business, 'id'):
@@ -238,27 +238,22 @@ class SubscriptionMiddleware:
                 # Import UUID utilities
                 from apps.core.uuid_utils import is_valid_uuid
                 
-                # Force subscription queries to use default database explicitly
-                # We need to refetch the business from default database to access subscription
-                business_from_default = Tenant.objects.using('default').get(id=business.id)
-                
-                # Get subscription_id directly to avoid cross-database FK access
-                subscription_id = getattr(business_from_default, 'subscription_id', None)
-                
-                if subscription_id:
-                    # Validate subscription UUID before querying
-                    if is_valid_uuid(subscription_id):
-                        subscription = Subscription.objects.using('default').filter(
-                            id=subscription_id
-                        ).first()
-                    else:
-                        logger.warning(f"Invalid subscription UUID for business {business.id}: {subscription_id}")
-                        subscription = None
-                else:
-                    # Try to find any active subscription for this business
+                # Get subscription directly using business_id to avoid cross-database FK issues
+                if is_valid_uuid(business.id):
                     subscription = Subscription.objects.using('default').filter(
-                        business=business_from_default
+                        business_id=business.id,
+                        is_active=True
                     ).first()
+                    
+                    # If no active subscription, try any subscription for status checking
+                    if not subscription:
+                        subscription = Subscription.objects.using('default').filter(
+                            business_id=business.id
+                        ).order_by('-created_at').first()
+                else:
+                    logger.warning(f"Invalid business UUID for subscription lookup: {business.id}")
+                    subscription = None
+                    
             except Exception as e:
                 logger.warning(f"Error accessing subscription for business {business.id}: {e}")
                 subscription = None

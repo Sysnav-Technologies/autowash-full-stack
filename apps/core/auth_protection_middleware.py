@@ -55,7 +55,7 @@ class AuthProtectionMiddleware(MiddlewareMixin):
                 # Force evaluation of lazy user object
                 is_authenticated = user.is_authenticated
                 
-        except (IndexError, ValueError, TypeError, SessionInterrupted, OperationalError) as e:
+        except (IndexError, ValueError, TypeError, SessionInterrupted, OperationalError, pymysql.err.OperationalError) as e:
             # Handle authentication corruption, session interruption, and database errors
             error_type = type(e).__name__
             logger.warning(f"Authentication/Session error detected ({error_type}): {e}")
@@ -66,7 +66,10 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             try:
                 # Clear session data - handle different corruption types
                 if hasattr(request, 'session'):
+                    # Force flush the session to clear corruption
                     request.session.flush()
+                    # Create new session
+                    request.session.create()
                 
                 # Set user to anonymous
                 request.user = AnonymousUser()
@@ -75,18 +78,18 @@ class AuthProtectionMiddleware(MiddlewareMixin):
                 
             except Exception as cleanup_error:
                 logger.error(f"Error clearing corrupted session: {cleanup_error}")
-                # Force create new session
+                # Force create new anonymous user
                 try:
                     request.user = AnonymousUser()
                 except Exception:
                     pass
             
             # For AJAX requests, return JSON error
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
                 return JsonResponse({
                     'error': f'Session corruption detected ({error_type})',
                     'message': 'Please refresh the page and log in again',
-                    'redirect': reverse('account_login') if hasattr(reverse, 'account_login') else '/accounts/login/'
+                    'redirect': '/accounts/login/'
                 }, status=401)
             
             # For regular requests, redirect to login
