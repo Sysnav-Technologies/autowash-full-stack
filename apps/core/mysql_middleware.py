@@ -299,8 +299,8 @@ class TenantBusinessContextMiddleware(MiddlewareMixin):
                             subscription = None
                         
                         subscription_data = {
-                            'is_active': subscription.is_active if subscription else False,
-                            'is_expired': not subscription.is_active if subscription else True,
+                            'is_active': subscription.is_active if subscription else False,  # Use property method
+                            'is_expired': not subscription.is_active if subscription else True,  # Use property method
                             'subscription': subscription
                         }
                         # Cache for 2 minutes to balance freshness and performance
@@ -386,8 +386,8 @@ class TenantBusinessContextMiddleware(MiddlewareMixin):
             
             # Store subscription data for template access without triggering database queries
             request.subscription_cache = subscription
-            request.subscription_is_active = subscription.is_active if subscription else False
-            request.subscription_is_expired = not subscription.is_active if subscription else True
+            request.subscription_is_active = subscription.is_active if subscription else False  # Use property method
+            request.subscription_is_expired = not subscription.is_active if subscription else True  # Use property method
             
             if not subscription:
                 # No subscription found

@@ -240,12 +240,13 @@ class SubscriptionMiddleware:
                 
                 # Get subscription directly using business_id to avoid cross-database FK issues
                 if is_valid_uuid(business.id):
+                    # First try to get an active subscription
                     subscription = Subscription.objects.using('default').filter(
                         business_id=business.id,
-                        is_active=True
-                    ).first()
+                        status__in=['active', 'trial']  # Use status field instead of is_active
+                    ).order_by('-created_at').first()
                     
-                    # If no active subscription, try any subscription for status checking
+                    # If no active subscription, get the most recent one for status checking
                     if not subscription:
                         subscription = Subscription.objects.using('default').filter(
                             business_id=business.id
@@ -270,97 +271,106 @@ class SubscriptionMiddleware:
                 # Employees can continue working even without business subscription
                 return None
             
-            # Check subscription status (only enforce for business owners, not employees)
-            if not subscription.is_active and not getattr(request, 'is_employee_access', False):
-                # Allow access to subscription management paths
-                if self.is_subscription_management_path(request.path):
-                    return None
-                
-                # Handle different subscription statuses
-                if subscription.status == 'trial':
-                    # Check if trial has expired - safely parse datetime field
-                    trial_end_date = safe_datetime_parse(subscription.trial_end_date)
-                    if trial_end_date and timezone.now() > trial_end_date:
-                        # Update status and redirect
-                        subscription.status = 'expired'
-                        subscription.save(using='default')
-                        
-                        # Allow access to subscription management paths even after expiry
+            # Check if subscription is active
+            if not subscription or not subscription.is_active:
+                # Only enforce for business owners, not employees
+                if not getattr(request, 'is_employee_access', False):
+                    # Allow access to subscription management paths
+                    if self.is_subscription_management_path(request.path):
+                        return None
+                    
+                    # Handle different subscription statuses
+                    if subscription and subscription.status == 'trial':
+                        # Check if trial has expired - safely parse datetime field
+                        trial_end_date = safe_datetime_parse(subscription.trial_end_date)
+                        if trial_end_date and timezone.now() > trial_end_date:
+                            # Update status and redirect
+                            subscription.status = 'expired'
+                            subscription.save(using='default')
+                            
+                            # Allow access to subscription management paths even after expiry
+                            if self.is_subscription_management_path(request.path):
+                                return None
+                                
+                            try:
+                                messages.warning(request, "Your trial period has expired. Please upgrade to continue using the service.")
+                            except Exception:
+                                pass  # Messages framework may not be available
+                            # Redirect to upgrade page in business context if verified
+                            if business.is_verified and business.is_approved:
+                                return f'/business/{business.slug}/subscriptions/upgrade/'
+                            else:
+                                return '/subscriptions/upgrade/'
+                        else:
+                            # Trial is still active but waiting for verification
+                            return None
+                    
+                    elif subscription and subscription.status == 'expired':
+                        # Allow access to subscription management paths
                         if self.is_subscription_management_path(request.path):
                             return None
-                            
+                        
                         try:
-                            messages.warning(request, "Your trial period has expired. Please upgrade to continue using the service.")
+                            messages.warning(request, "Your subscription has expired. Please renew to continue using the service.")
                         except Exception:
                             pass  # Messages framework may not be available
-                        # Redirect to upgrade page in business context if verified
+                        # Redirect to upgrade instead of select to avoid verification loop
                         if business.is_verified and business.is_approved:
                             return f'/business/{business.slug}/subscriptions/upgrade/'
                         else:
                             return '/subscriptions/upgrade/'
-                    else:
-                        # Trial is still active but waiting for verification
-                        return None
-                
-                elif subscription.status == 'expired':
-                    # Allow access to subscription management paths
-                    if self.is_subscription_management_path(request.path):
-                        return None
                     
-                    try:
-                        messages.warning(request, "Your subscription has expired. Please renew to continue using the service.")
-                    except Exception:
-                        pass  # Messages framework may not be available
-                    # Redirect to upgrade instead of select to avoid verification loop
-                    if business.is_verified and business.is_approved:
-                        return f'/business/{business.slug}/subscriptions/upgrade/'
-                    else:
-                        return '/subscriptions/upgrade/'
-                
-                elif subscription.status == 'cancelled':
-                    # Allow access to subscription management paths
-                    if self.is_subscription_management_path(request.path):
-                        return None
+                    elif subscription and subscription.status == 'cancelled':
+                        # Allow access to subscription management paths
+                        if self.is_subscription_management_path(request.path):
+                            return None
+                        
+                        try:
+                            messages.info(request, "Your subscription has been cancelled. You can reactivate it anytime.")
+                        except Exception:
+                            pass  # Messages framework may not be available
+                        # Redirect to manage page in business context if verified
+                        if business.is_verified and business.is_approved:
+                            return f'/business/{business.slug}/subscriptions/manage/'
+                        else:
+                            return '/subscriptions/manage/'
                     
-                    try:
-                        messages.info(request, "Your subscription has been cancelled. You can reactivate it anytime.")
-                    except Exception:
-                        pass  # Messages framework may not be available
-                    # Redirect to manage page in business context if verified
-                    if business.is_verified and business.is_approved:
-                        return f'/business/{business.slug}/subscriptions/manage/'
-                    else:
-                        return '/subscriptions/manage/'
-                
-                elif subscription.status == 'suspended':
-                    # Allow access to subscription management paths
-                    if self.is_subscription_management_path(request.path):
-                        return None
+                    elif subscription and subscription.status == 'suspended':
+                        # Allow access to subscription management paths
+                        if self.is_subscription_management_path(request.path):
+                            return None
+                        
+                        try:
+                            messages.warning(request, "Your subscription has been suspended. Please contact support.")
+                        except Exception:
+                            pass  # Messages framework may not be available
+                        # Redirect to manage page in business context if verified
+                        if business.is_verified and business.is_approved:
+                            return f'/business/{business.slug}/subscriptions/manage/'
+                        else:
+                            return '/subscriptions/manage/'
                     
-                    try:
-                        messages.warning(request, "Your subscription has been suspended. Please contact support.")
-                    except Exception:
-                        pass  # Messages framework may not be available
-                    # Redirect to manage page in business context if verified
-                    if business.is_verified and business.is_approved:
-                        return f'/business/{business.slug}/subscriptions/manage/'
-                    else:
-                        return '/subscriptions/manage/'
-                
-                elif subscription.status == 'pending':
-                    # Allow access to subscription management paths
-                    if self.is_subscription_management_path(request.path):
-                        return None
+                    elif subscription and subscription.status == 'pending':
+                        # Allow access to subscription management paths
+                        if self.is_subscription_management_path(request.path):
+                            return None
+                        
+                        try:
+                            messages.info(request, "Your subscription is pending payment. Please complete payment to activate.")
+                        except Exception:
+                            pass  # Messages framework may not be available
+                        # Redirect to manage/payment page in business context if verified
+                        if business.is_verified and business.is_approved:
+                            return f'/business/{business.slug}/subscriptions/manage/'
+                        else:
+                            return '/subscriptions/manage/'
                     
-                    try:
-                        messages.info(request, "Your subscription is pending payment. Please complete payment to activate.")
-                    except Exception:
-                        pass  # Messages framework may not be available
-                    # Redirect to manage/payment page in business context if verified
-                    if business.is_verified and business.is_approved:
-                        return f'/business/{business.slug}/subscriptions/manage/'
-                    else:
-                        return '/subscriptions/manage/'
+                    elif not subscription:
+                        # No subscription found - redirect to upgrade
+                        if business.is_verified and business.is_approved:
+                            return f'/business/{business.slug}/subscriptions/upgrade/'
+                        else:
+                            return '/subscriptions/select/'
             
             # Check for upcoming expiry (7 days)
             if subscription.is_active:
