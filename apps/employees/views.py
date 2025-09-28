@@ -137,25 +137,27 @@ def employee_list_view(request):
     if status:
         employees = employees.filter(status=status)
     if search:
-        employees = employees.filter(
-            Q(employee_id__icontains=search) |
+        # Search in user data first (from main database)
+        matching_users = User.objects.using('default').filter(
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
             Q(email__icontains=search) |
-            Q(phone__icontains=search)
-        )
-        if search:
-            matching_users = User.objects.using('default').filter(
-                Q(first_name__icontains=search) |
-                Q(last_name__icontains=search) |
-                Q(email__icontains=search) |
-                    Q(username__icontains=search)
-                ).values_list('id', flat=True)
-            if matching_users:
-                employees = employees.filter(
-                    Q(user_id__in=matching_users) |
-                    Q(employee_id__icontains=search) |
-                    Q(email__icontains=search) |
-                    Q(phone__icontains=search)
-                ).distinct()
+            Q(username__icontains=search)
+        ).values_list('id', flat=True)
+        
+        # Filter employees by user_id matches or employee-specific fields
+        if matching_users:
+            employees = employees.filter(
+                Q(user_id__in=matching_users) |
+                Q(employee_id__icontains=search) |
+                Q(phone__icontains=search)  # phone is a real field on Employee
+            ).distinct()
+        else:
+            # If no matching users, search only employee-specific fields
+            employees = employees.filter(
+                Q(employee_id__icontains=search) |
+                Q(phone__icontains=search)
+            )
     paginator = Paginator(employees, 20)
     page = request.GET.get('page')
     employees_page = paginator.get_page(page)

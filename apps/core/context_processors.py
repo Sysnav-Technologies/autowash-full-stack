@@ -59,6 +59,7 @@ def business_context(request):
             'business_phone': tenant.phone,
             'business_email': tenant.email,
             'business_timezone': getattr(tenant, 'timezone', 'Africa/Nairobi'),
+            'timezone_name': getattr(tenant, 'timezone', 'Africa/Nairobi'),  # Add this for template compatibility
             'business_verified': is_verified,
             'business_approved': is_approved,
             'business_active': is_active,

@@ -125,26 +125,66 @@ TENANT_ROUTING = {
 SILENCED_SYSTEM_CHECKS = ['admin.E410']
 
 MIDDLEWARE = [
+    # 1. Security and CORS first (before any processing)
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-] + (['whitenoise.middleware.WhiteNoiseMiddleware'] if RENDER or CPANEL else []) + [
-    'apps.core.db_protection_middleware.DatabaseConnectionProtectionMiddleware',  # Handle DB connection issues first
-    'django.middleware.cache.UpdateCacheMiddleware',  # Cache middleware for performance
+] + (
+    # 2. Static files (if needed)
+    ['whitenoise.middleware.WhiteNoiseMiddleware'] if RENDER or CPANEL else []
+) + [
+    # 3. Database protection (before any DB operations)
+    'apps.core.db_protection_middleware.DatabaseConnectionProtectionMiddleware',
+    
+    # 4. Performance monitoring (early for accurate timing)
+    'apps.core.performance_middleware.PerformanceMonitoringMiddleware',
+    
+    # 5. Cache middleware (before sessions/tenant resolution)
+    'django.middleware.cache.UpdateCacheMiddleware',
+    
+    # 6. Sessions (needed for tenant resolution)
     'django.contrib.sessions.middleware.SessionMiddleware',
+    
+    # 7. Tenant resolution (critical for multi-tenant system)
     'apps.core.mysql_middleware.MySQLTenantMiddleware',
     'apps.core.mysql_middleware.TenantBusinessContextMiddleware',
-    'apps.core.logging_utils.LoggingMiddleware',  # Add logging middleware
+    
+    # 8. Common middleware (URL processing, ETags)
     'django.middleware.common.CommonMiddleware',
+    
+    # 9. CSRF protection (after common middleware)
     'django.middleware.csrf.CsrfViewMiddleware',
-    'apps.core.auth_protection_middleware.AuthProtectionMiddleware',  # Handle auth corruption BEFORE auth middleware
+    
+    # 10. Authentication protection (before auth middleware)
+    'apps.core.auth_protection_middleware.AuthProtectionMiddleware',
+    
+    # 11. Authentication middleware
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    
+    # 12. Messages (after authentication)
     'django.contrib.messages.middleware.MessageMiddleware',
-    'apps.subscriptions.middleware.SubscriptionMiddleware',  # Must come AFTER authentication
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-] + (['django_ratelimit.middleware.RatelimitMiddleware'] if not CPANEL else []) + [
+    
+    # 13. Business logic middleware (after auth)
+    'apps.subscriptions.middleware.SubscriptionMiddleware',
+    
+    # 14. Rate limiting (if not cPanel)
+] + (
+    ['django_ratelimit.middleware.RatelimitMiddleware'] if not CPANEL else []
+) + [
+    # 15. Third-party account middleware
     'allauth.account.middleware.AccountMiddleware',
-    'django.middleware.cache.FetchFromCacheMiddleware',  # Cache middleware at the end
-] + (['debug_toolbar.middleware.DebugToolbarMiddleware'] if DEBUG else [])
+    
+    # 16. Logging (near the end for complete request context)
+    'apps.core.logging_utils.LoggingMiddleware',
+    
+    # 17. Security headers (near the end)
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    
+    # 18. Cache fetch middleware (last for caching)
+    'django.middleware.cache.FetchFromCacheMiddleware',
+] + (
+    # 19. Debug toolbar (only in debug mode, absolute last)
+    ['debug_toolbar.middleware.DebugToolbarMiddleware'] if DEBUG else []
+)
 
 # CSRF Configuration
 CSRF_COOKIE_NAME = 'autowash_csrftoken'
@@ -372,6 +412,15 @@ def get_cache_config():
                     'MAX_ENTRIES': 2000,
                     'CULL_FREQUENCY': 2,
                 }
+            },
+            'sessions': {
+                # Add sessions cache for Render fallback
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'TIMEOUT': 3600,  # 1 hour for sessions
+                'OPTIONS': {
+                    'MAX_ENTRIES': 1000,
+                    'CULL_FREQUENCY': 3,
+                }
             }
         }
     
@@ -381,6 +430,15 @@ def get_cache_config():
         return {
             'default': {
                 'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+            },
+            'sessions': {
+                # Add sessions cache for local development
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'TIMEOUT': 3600,  # 1 hour for sessions
+                'OPTIONS': {
+                    'MAX_ENTRIES': 1000,
+                    'CULL_FREQUENCY': 3,
+                }
             },
             'redis': {
                 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
@@ -405,8 +463,14 @@ USE_TEMPLATE_CACHE = False  # Never cache templates to prevent staleness
 TEMPLATE_CACHE_TIMEOUT = 0  # Disable any template caching
 
 # Session configuration - optimized for reliability and high concurrency
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'  # Cache-only sessions for better performance
-SESSION_CACHE_ALIAS = 'sessions'  # Use dedicated session cache
+if CPANEL or RENDER:
+    # Production: Use cache-based sessions for better performance
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+    SESSION_CACHE_ALIAS = 'sessions'  # Use dedicated session cache in production
+else:
+    # Development: Use database sessions for reliability
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
 SESSION_COOKIE_AGE = 3600 * 8  # 8 hours for better stability
 SESSION_COOKIE_NAME = 'autowash_sessionid'
 SESSION_COOKIE_SECURE = not DEBUG
