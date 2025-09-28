@@ -40,7 +40,7 @@ class PerformanceMonitoringMiddleware(MiddlewareMixin):
         
         # Log performance data
         performance_data = {
-            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S.%fZ', time.gmtime(end_time)),
+            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(end_time)),
             'tenant': tenant_name,
             'operation': f"{request.method} {request.path}",
             'duration_ms': round(duration_ms, 2),
