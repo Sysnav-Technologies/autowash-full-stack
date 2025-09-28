@@ -129,6 +129,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ] + (['whitenoise.middleware.WhiteNoiseMiddleware'] if RENDER or CPANEL else []) + [
     'apps.core.db_protection_middleware.DatabaseConnectionProtectionMiddleware',  # Handle DB connection issues first
+    'apps.core.performance_middleware.PerformanceMonitoringMiddleware',  # Monitor performance
     'django.middleware.cache.UpdateCacheMiddleware',  # Cache middleware for performance
     'django.contrib.sessions.middleware.SessionMiddleware',
     'apps.core.mysql_middleware.MySQLTenantMiddleware',
@@ -372,6 +373,15 @@ def get_cache_config():
                     'MAX_ENTRIES': 2000,
                     'CULL_FREQUENCY': 2,
                 }
+            },
+            'sessions': {
+                # Add sessions cache for Render fallback
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'TIMEOUT': 3600,  # 1 hour for sessions
+                'OPTIONS': {
+                    'MAX_ENTRIES': 1000,
+                    'CULL_FREQUENCY': 3,
+                }
             }
         }
     
@@ -381,6 +391,15 @@ def get_cache_config():
         return {
             'default': {
                 'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+            },
+            'sessions': {
+                # Add sessions cache for local development
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'TIMEOUT': 3600,  # 1 hour for sessions
+                'OPTIONS': {
+                    'MAX_ENTRIES': 1000,
+                    'CULL_FREQUENCY': 3,
+                }
             },
             'redis': {
                 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
