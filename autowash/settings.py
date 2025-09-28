@@ -129,6 +129,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ] + (['whitenoise.middleware.WhiteNoiseMiddleware'] if RENDER or CPANEL else []) + [
     'apps.core.db_protection_middleware.DatabaseConnectionProtectionMiddleware',  # Handle DB connection issues first
+    'django.middleware.cache.UpdateCacheMiddleware',  # Cache middleware for performance
     'django.contrib.sessions.middleware.SessionMiddleware',
     'apps.core.mysql_middleware.MySQLTenantMiddleware',
     'apps.core.mysql_middleware.TenantBusinessContextMiddleware',
@@ -142,6 +143,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ] + (['django_ratelimit.middleware.RatelimitMiddleware'] if not CPANEL else []) + [
     'allauth.account.middleware.AccountMiddleware',
+    'django.middleware.cache.FetchFromCacheMiddleware',  # Cache middleware at the end
 ] + (['debug_toolbar.middleware.DebugToolbarMiddleware'] if DEBUG else [])
 
 # CSRF Configuration
@@ -239,10 +241,10 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
-        'CONN_MAX_AGE': 0 if CPANEL else 300,  # No persistent connections for cPanel, 5 minutes for local
+        'CONN_MAX_AGE': 300 if CPANEL else 600,  # Enable connection pooling: 5-10 minutes
         'OPTIONS': {
             'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES',autocommit=1,wait_timeout=28800,interactive_timeout=28800",
             'autocommit': True,
         },
         'TEST': {
@@ -299,8 +301,8 @@ def get_cache_config():
                 'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
                 'TIMEOUT': 60,  # Increased from 30s to 60s for better performance
                 'OPTIONS': {
-                    'MAX_ENTRIES': 5000,  # Increased from 1000 for higher capacity
-                    'CULL_FREQUENCY': 3,  # Less aggressive culling (from 2 to 3)
+                    'MAX_ENTRIES': 10000,  # Increased for higher concurrency
+                    'CULL_FREQUENCY': 4,   # Less aggressive culling for better performance
                 },
                 'KEY_PREFIX': 'aw_fast_',
                 'VERSION': 4,  # Bump version to clear old cache
@@ -316,14 +318,24 @@ def get_cache_config():
                 }
             },
             'sessions': {
-                # Separate cache for sessions with optimizations
+                # Separate cache for sessions with high-concurrency optimizations
                 'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
                 'LOCATION': str(cache_dir / 'sessions'),
-                'TIMEOUT': 3600 * 12,  # Increased from 8 to 12 hours for sessions
+                'TIMEOUT': 3600 * 8,  # 8 hours for sessions (optimized)
                 'OPTIONS': {
-                    'MAX_ENTRIES': 1000,  # Add max entries for session cache
-                    'CULL_FREQUENCY': 5,   # Very light culling for sessions
+                    'MAX_ENTRIES': 5000,   # Support more concurrent sessions
+                    'CULL_FREQUENCY': 6,   # Very light culling for better performance
                 }
+            },
+            'tenant_cache': {
+                # Dedicated cache for tenant data to improve multi-tenant performance
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'TIMEOUT': 300,  # 5 minutes for tenant data
+                'OPTIONS': {
+                    'MAX_ENTRIES': 2000,  # Support more tenants
+                    'CULL_FREQUENCY': 4,
+                },
+                'KEY_PREFIX': 'aw_tenant_',
             }
         }
     
@@ -382,25 +394,25 @@ def get_cache_config():
 
 CACHES = get_cache_config()
 
-# Cache Configuration - Optimized for immediate template updates
-CACHE_VERSION = '4'  # Increment to invalidate all caches - UPDATED for performance optimizations
-CACHE_MIDDLEWARE_KEY_PREFIX = 'aw_fast'  # Updated prefix for new cache system
-CACHE_MIDDLEWARE_SECONDS = 0  # COMPLETELY DISABLE middleware caching to prevent staleness
+# Cache Configuration - Optimized for high concurrency performance
+CACHE_VERSION = '5'  # Increment to invalidate all caches - HIGH CONCURRENCY OPTIMIZATIONS
+CACHE_MIDDLEWARE_KEY_PREFIX = 'aw_hc'  # high-concurrency prefix
+CACHE_MIDDLEWARE_SECONDS = 60 if CPANEL else 0  # Enable page caching for cPanel production only
 CACHE_MIDDLEWARE_ALIAS = 'default'
 
 # Template caching - COMPLETELY DISABLED to ensure immediate updates
 USE_TEMPLATE_CACHE = False  # Never cache templates to prevent staleness
 TEMPLATE_CACHE_TIMEOUT = 0  # Disable any template caching
 
-# Session configuration - optimized for reliability and preventing corruption
-SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'  # Use cached database sessions for reliability
-SESSION_CACHE_ALIAS = 'default'
+# Session configuration - optimized for reliability and high concurrency
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'  # Cache-only sessions for better performance
+SESSION_CACHE_ALIAS = 'sessions'  # Use dedicated session cache
 SESSION_COOKIE_AGE = 3600 * 8  # 8 hours for better stability
 SESSION_COOKIE_NAME = 'autowash_sessionid'
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request
+SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request - performance boost
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'  # Use JSON serializer for better compatibility
 
@@ -898,3 +910,14 @@ if not DEBUG:
         TIME_ZONE = 'Africa/Nairobi'  # Keep Kenya timezone for cPanel
         ATOMIC_REQUESTS = False
         PREPEND_WWW = False
+        
+        # Additional cPanel optimizations for high concurrency
+        DATA_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5MB
+        FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5MB
+        
+        # Connection and performance optimizations
+        CONN_HEALTH_CHECKS = True
+        
+        # Enable optimizations
+        USE_L10N = False  # Disable localization for better performance
+        USE_I18N = False  # Disable internationalization for better performance
