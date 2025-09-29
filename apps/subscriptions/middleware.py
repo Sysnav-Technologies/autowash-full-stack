@@ -163,22 +163,58 @@ class SubscriptionMiddleware:
             from apps.core.tenant_models import Tenant
             from apps.core.uuid_utils import is_valid_uuid, safe_uuid_convert
             
-            # Get user's business using explicit database routing with UUID validation
-            try:
-                business = Tenant.objects.using('default').filter(owner=request.user, is_active=True).first()
+            business = None
+            
+            # FIRST: Check if we already have business context from URL (set by tenant middleware)
+            if hasattr(request, 'tenant') and request.tenant:
+                # We have business context from URL - now verify user has access to this business
+                business = request.tenant
                 
-                # Validate business UUID if found
-                if business and hasattr(business, 'id'):
-                    if not is_valid_uuid(business.id):
-                        logger.error(f"Business owner {request.user.id} has business with invalid UUID: {business.id}")
-                        business = None
+                # Check if user is the business owner
+                if business.owner_id == request.user.id:
+                    request.is_employee_access = False
+                else:
+                    # Check if user is an employee of this business
+                    try:
+                        from apps.employees.models import Employee
+                        from apps.core.database_router import TenantDatabaseManager
                         
-            except Exception as db_error:
-                logger.error(f"Database error getting business for user {request.user.id}: {db_error}")
-                business = None
+                        # Ensure tenant database is registered
+                        TenantDatabaseManager.add_tenant_to_settings(business)
+                        db_alias = f"tenant_{business.id}"
+                        
+                        employee = Employee.objects.using(db_alias).filter(
+                            user_id=request.user.id, 
+                            is_active=True
+                        ).first()
+                        
+                        if employee:
+                            request.is_employee_access = True
+                        else:
+                            # User has no access to this business
+                            return '/auth/business/register/'
+                            
+                    except Exception:
+                        # If there's an error checking employee status, deny access
+                        return '/auth/business/register/'
+            else:
+                # FALLBACK: No business context from URL, try to find user's owned business
+                try:
+                    business = Tenant.objects.using('default').filter(owner=request.user, is_active=True).first()
+                    
+                    # Validate business UUID if found
+                    if business and hasattr(business, 'id'):
+                        if not is_valid_uuid(business.id):
+                            logger.error(f"Business owner {request.user.id} has business with invalid UUID: {business.id}")
+                            business = None
+                            
+                except Exception as db_error:
+                    logger.error(f"Database error getting business for user {request.user.id}: {db_error}")
+                    business = None
             
             if not business:
-                # User doesn't own a business - check if they're an employee
+                # FALLBACK: If no business context and user doesn't own business, 
+                # check if they're an employee of any verified business
                 try:
                     # Check if user is an employee of any verified business
                     verified_businesses = Tenant.objects.using('default').filter(
@@ -221,9 +257,6 @@ class SubscriptionMiddleware:
                 except Exception:
                     # If there's an error checking employee status, redirect to registration
                     return '/auth/business/register/'
-            else:
-                # User owns a business - mark as owner access
-                request.is_employee_access = False
             
             # Check if business is properly set up (only for business owners, not employees)
             if not getattr(request, 'is_employee_access', False):
