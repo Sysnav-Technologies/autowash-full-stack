@@ -3,180 +3,553 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - Autowash System Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>{{ title }} - AutoWash System Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
     <style>
-        .sidebar {
-            min-height: 100vh;
-            background-color: #1e293b;
+        /* Responsive Admin Sidebar Styles */
+        :root {
+            --sidebar-width: 280px;
+            --sidebar-collapsed-width: 70px;
+            --primary-color: #1e293b;
+            --secondary-color: #334155;
+            --accent-color: #0ea5e9;
+            --text-light: #cbd5e1;
+            --text-white: #ffffff;
+            --bg-light: #f8fafc;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .sidebar .nav-link {
-            color: #cbd5e1;
-            padding: 12px 20px;
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--bg-light);
+            overflow-x: hidden;
         }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active {
-            background-color: #334155;
-            color: white;
+
+        /* Mobile-first Sidebar */
+        .admin-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            transform: translateX(-100%);
+            transition: var(--transition);
+            z-index: 1050;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
         }
+
+        .admin-sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .sidebar-brand {
+            color: var(--text-white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .sidebar-brand i {
+            background: var(--accent-color);
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+        }
+
+        .sidebar-nav {
+            padding: 20px 0 100px 0;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 30px;
+        }
+
+        .nav-section-title {
+            color: var(--text-light);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 0 20px 10px;
+            opacity: 0.7;
+        }
+
+        .nav-item {
+            margin: 2px 15px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 15px;
+            color: var(--text-light);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-white);
+            transform: translateX(5px);
+        }
+
+        .nav-link.active {
+            background: var(--accent-color);
+            color: var(--text-white);
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+        }
+
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: var(--text-white);
+        }
+
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .nav-text {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.2);
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        .user-name {
+            color: var(--text-white);
+            font-weight: 600;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--text-white);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            transition: var(--transition);
+            width: 100%;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: var(--text-white);
+        }
+
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1060;
+            background: var(--primary-color);
+            color: var(--text-white);
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: var(--transition);
+        }
+
+        .mobile-menu-toggle:hover {
+            background: var(--secondary-color);
+            transform: scale(1.05);
+        }
+
+        /* Sidebar Overlay for Mobile */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+            z-index: 1040;
+        }
+
+        .sidebar-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Main Content */
         .main-content {
-            background-color: #f8fafc;
+            margin-left: 0;
             min-height: 100vh;
+            background: var(--bg-light);
+            transition: var(--transition);
+            padding: 70px 15px 20px;
         }
-        .stats-card {
-            border-left: 4px solid #3b82f6;
+
+        .content-header {
+            background: white;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(226, 232, 240, 0.5);
         }
+
+        .content-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 0;
+        }
+        
+        @media (min-width: 768px) {
+            .content-title {
+                font-size: 1.75rem;
+            }
+        }
+
+        /* Status Badges */
         .status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .status-active { background-color: #dcfce7; color: #166534; }
-        .status-pending { background-color: #fef3c7; color: #92400e; }
-        .status-rejected { background-color: #fecaca; color: #991b1b; }
-        .status-suspended { background-color: #fed7aa; color: #c2410c; }
-        .status-trial { background-color: #dbeafe; color: #1e40af; }
-        .status-expired { background-color: #fee2e2; color: #dc2626; }
+
+        .status-active { background: #dcfce7; color: #166534; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-rejected { background: #fecaca; color: #991b1b; }
+        .status-suspended { background: #fed7aa; color: #c2410c; }
+        .status-trial { background: #dbeafe; color: #1e40af; }
+        .status-expired { background: #fee2e2; color: #dc2626; }
+
+        /* Responsive Design */
+        @media (min-width: 768px) {
+            .mobile-menu-toggle {
+                display: none;
+            }
+
+            .admin-sidebar {
+                transform: translateX(0);
+                position: fixed;
+                top: 0;
+            }
+
+            .main-content {
+                margin-left: var(--sidebar-width);
+                padding: 20px;
+            }
+
+            .sidebar-overlay {
+                display: none;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .main-content {
+                margin-left: var(--sidebar-width);
+                padding: 25px;
+            }
+            
+            .content-header {
+                padding: 20px 25px;
+                margin-bottom: 25px;
+            }
+        }
+
+        /* Scrollbar Styling */
+        .admin-sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .admin-sidebar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .admin-sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .admin-sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar">
-                <div class="position-sticky pt-3">
-                    <h5 class="text-white px-3 mb-4">
-                        <i class="fas fa-cogs me-2"></i>System Admin
-                    </h5>
-                    
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
-                               href="{% url 'system_admin:dashboard' %}">
-                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'business_management' %}active{% endif %}" 
-                               href="{% url 'system_admin:business_management' %}">
-                                <i class="fas fa-building me-2"></i>Business Management
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'subscription_management' %}active{% endif %}" 
-                               href="{% url 'system_admin:subscription_management' %}">
-                                <i class="fas fa-credit-card me-2"></i>Subscriptions
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'subscription_plans' %}active{% endif %}" 
-                               href="{% url 'system_admin:subscription_plans' %}">
-                                <i class="fas fa-list me-2"></i>Subscription Plans
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'payment_management' %}active{% endif %}" 
-                               href="{% url 'system_admin:payment_management' %}">
-                                <i class="fas fa-money-bill-wave me-2"></i>Payments
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'invoice_management' %}active{% endif %}" 
-                               href="{% url 'system_admin:invoice_management' %}">
-                                <i class="fas fa-file-invoice me-2"></i>Invoices
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'user_management' %}active{% endif %}" 
-                               href="{% url 'system_admin:user_management' %}">
-                                <i class="fas fa-users me-2"></i>Users
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'suspension_management' %}active{% endif %}" 
-                               href="{% url 'system_admin:suspension_management' %}">
-                                <i class="fas fa-ban me-2"></i>Suspensions
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if 'gateway' in request.resolver_match.url_name %}active{% endif %}" 
-                               href="{% url 'system_admin:gateway_management' %}">
-                                <i class="fas fa-credit-card me-2"></i>Payment Gateways
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if 'sms' in request.resolver_match.url_name %}active{% endif %}" 
-                               href="{% url 'system_admin:sms_management' %}">
-                                <i class="fas fa-sms me-2"></i>SMS Management
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" 
-                               href="{% url 'system_admin:analytics' %}">
-                                <i class="fas fa-chart-bar me-2"></i>Analytics
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'system_settings' %}active{% endif %}" 
-                               href="{% url 'system_admin:system_settings' %}">
-                                <i class="fas fa-cog me-2"></i>Settings
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'export_data' %}active{% endif %}" 
-                               href="{% url 'system_admin:export_data' %}">
-                                <i class="fas fa-download me-2"></i>Export Data
-                            </a>
-                        </li>
-                    </ul>
-                    
-                    <hr class="text-secondary">
-                    
-                    <div class="px-3">
-                        <small class="text-muted">Logged in as:</small><br>
-                        <strong class="text-white">{{ user.get_full_name|default:user.username }}</strong>
-                        <div class="mt-2">
-                            <form method="post" action="{% url 'admin:logout' %}" style="display: inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-outline-light btn-sm">
-                                    <i class="fas fa-sign-out-alt me-1"></i>Logout
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </nav>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle d-md-none" id="mobile-menu-toggle" type="button" 
+            title="Toggle Navigation Menu" aria-label="Toggle Navigation Menu">
+        <i class="fas fa-bars"></i>
+    </button>
 
-            <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">{{ title }}</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-download"></i> Export
-                            </button>
-                        </div>
-                    </div>
-                </div>
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-
-                {% block content %}
-                {% endblock %}
-            </main>
+    <!-- Responsive Admin Sidebar -->
+    <nav class="admin-sidebar" id="admin-sidebar">
+        <div class="sidebar-header">
+            <a href="{% url 'system_admin:dashboard' %}" class="sidebar-brand">
+                <i class="fas fa-satellite"></i>
+                <span>AutoWash Admin</span>
+            </a>
         </div>
-    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        <div class="sidebar-nav">
+            <!-- Core Management -->
+            <div class="nav-section">
+                <div class="nav-section-title">Core Management</div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+                       href="{% url 'system_admin:dashboard' %}">
+                        <i class="fas fa-tachometer-alt nav-icon"></i>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'performance_monitoring' %}active{% endif %}" 
+                       href="{% url 'system_admin:performance_monitoring' %}">
+                        <i class="fas fa-satellite nav-icon"></i>
+                        <span class="nav-text">Performance Monitor</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" 
+                       href="{% url 'system_admin:analytics' %}">
+                        <i class="fas fa-chart-line nav-icon"></i>
+                        <span class="nav-text">Analytics</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Business Management -->
+            <div class="nav-section">
+                <div class="nav-section-title">Business Management</div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'business_management' %}active{% endif %}" 
+                       href="{% url 'system_admin:business_management' %}">
+                        <i class="fas fa-building nav-icon"></i>
+                        <span class="nav-text">Businesses</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'user_management' %}active{% endif %}" 
+                       href="{% url 'system_admin:user_management' %}">
+                        <i class="fas fa-users nav-icon"></i>
+                        <span class="nav-text">Users</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'suspension_management' %}active{% endif %}" 
+                       href="{% url 'system_admin:suspension_management' %}">
+                        <i class="fas fa-user-slash nav-icon"></i>
+                        <span class="nav-text">Suspensions</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Financial Management -->
+            <div class="nav-section">
+                <div class="nav-section-title">Financial Management</div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'subscription_management' %}active{% endif %}" 
+                       href="{% url 'system_admin:subscription_management' %}">
+                        <i class="fas fa-credit-card nav-icon"></i>
+                        <span class="nav-text">Subscriptions</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'subscription_plans' %}active{% endif %}" 
+                       href="{% url 'system_admin:subscription_plans' %}">
+                        <i class="fas fa-list nav-icon"></i>
+                        <span class="nav-text">Plans</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'payment_management' %}active{% endif %}" 
+                       href="{% url 'system_admin:payment_management' %}">
+                        <i class="fas fa-money-bill-wave nav-icon"></i>
+                        <span class="nav-text">Payments</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'invoice_management' %}active{% endif %}" 
+                       href="{% url 'system_admin:invoice_management' %}">
+                        <i class="fas fa-file-invoice nav-icon"></i>
+                        <span class="nav-text">Invoices</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if 'gateway' in request.resolver_match.url_name %}active{% endif %}" 
+                       href="{% url 'system_admin:gateway_management' %}">
+                        <i class="fas fa-credit-card nav-icon"></i>
+                        <span class="nav-text">Payment Gateways</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- System Management -->
+            <div class="nav-section">
+                <div class="nav-section-title">System Management</div>
+                <div class="nav-item">
+                    <a class="nav-link {% if 'sms' in request.resolver_match.url_name %}active{% endif %}" 
+                       href="{% url 'system_admin:sms_management' %}">
+                        <i class="fas fa-sms nav-icon"></i>
+                        <span class="nav-text">SMS Management</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'system_settings' %}active{% endif %}" 
+                       href="{% url 'system_admin:system_settings' %}">
+                        <i class="fas fa-cogs nav-icon"></i>
+                        <span class="nav-text">Settings</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'export_data' %}active{% endif %}" 
+                       href="{% url 'system_admin:export_data' %}">
+                        <i class="fas fa-download nav-icon"></i>
+                        <span class="nav-text">Export Data</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                <form method="post" action="{% url 'admin:logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="logout-btn">
+                        <i class="fas fa-sign-out-alt me-2"></i>Logout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-header">
+            <h1 class="content-title">{{ title }}</h1>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Responsive Admin Sidebar JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileToggle = document.getElementById('mobile-menu-toggle');
+            const sidebar = document.getElementById('admin-sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            // Toggle sidebar on mobile
+            function toggleSidebar() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('show');
+                document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+            }
+            
+            // Close sidebar
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('show');
+                document.body.style.overflow = '';
+            }
+            
+            // Event listeners
+            if (mobileToggle) {
+                mobileToggle.addEventListener('click', toggleSidebar);
+            }
+            
+            if (overlay) {
+                overlay.addEventListener('click', closeSidebar);
+            }
+            
+            // Close sidebar when clicking nav links on mobile
+            const navLinks = sidebar.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth < 768) {
+                        setTimeout(closeSidebar, 100);
+                    }
+                });
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                if (window.innerWidth >= 768) {
+                    closeSidebar();
+                }
+            });
+            
+            // Keyboard navigation
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+                    closeSidebar();
+                }
+            });
+        });
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>
