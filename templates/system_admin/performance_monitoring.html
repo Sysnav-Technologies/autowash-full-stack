@@ -1,0 +1,942 @@
+{% extends 'system_admin/base.html' %}
+{% load static %}
+{% load system_admin_tags %}
+
+{% block title %}AutoWash Control Panel - Advanced System Monitoring{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/performance_monitoring.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js for real-time charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Performance monitoring JavaScript -->
+<script src="{% static 'js/performance_monitoring.js' %}"></script>
+
+<!-- Initialize the dashboard when DOM is ready -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initializePerformanceMonitoring();
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<!-- Hidden data for JavaScript -->
+<script id="performance-data" type="application/json">
+    {{ performance_data|safe }}
+</script>
+
+<div class="space-station-container">
+    <!-- Mission Control Header -->
+    <div class="mission-control-header">
+        <div class="header-left">
+            <h1 class="mission-title">
+                <span class="mission-icon">🎛️</span>
+                AutoWash Control Panel
+                <span class="mission-status status-{{ overall_status }}">{{ overall_status|upper }}</span>
+            </h1>
+            <div class="mission-time">
+                System Time: <span id="current-time">{{ current_time|date:"Y-m-d H:i:s" }}</span> UTC
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="connection-status">
+                <div class="status-indicator active" id="connection-status"></div>
+                <span>CONNECTED</span>
+            </div>
+            <div class="auto-refresh-control">
+                <label class="switch">
+                    <input type="checkbox" id="auto-refresh-toggle" checked>
+                    <span class="slider round"></span>
+                </label>
+                <span>Auto-Refresh</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert System -->
+    <div id="alert-system" class="alert-system hidden">
+        <div class="alert-content">
+            <span class="alert-icon">⚠️</span>
+            <span class="alert-message" id="alert-message"></span>
+            <button class="alert-close" onclick="hideAlert()">&times;</button>
+        </div>
+    </div>
+
+    <!-- Main Control Grid -->
+    <div class="control-grid">
+        <!-- System Overview Panel -->
+        <div class="control-panel system-overview">
+            <div class="panel-header">
+                <h3>🖥️ System Overview</h3>
+                <div class="panel-status status-{{ overall_status }}"></div>
+            </div>
+            <div class="panel-content">
+                <div class="overview-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="cpu-percent">{{ cpu_info.usage_percent }}%</div>
+                        <div class="stat-label">CPU Usage</div>
+                        <div class="stat-bar">
+                            <div class="stat-fill" style="width: {{ cpu_info.usage_percent }}%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="memory-percent">{{ memory_info.usage_percent }}%</div>
+                        <div class="stat-label">Memory Usage</div>
+                        <div class="stat-bar">
+                            <div class="stat-fill" style="width: {{ memory_info.usage_percent }}%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="active-tenants">{{ tenant_stats.active_tenants }}</div>
+                        <div class="stat-label">Active Businesses</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="db-connections">{{ database_stats.active_connections }}</div>
+                        <div class="stat-label">DB Connections</div>
+                    </div>
+                </div>
+                <div class="system-info">
+                    <p><strong>Hostname:</strong> {{ system_info.hostname }}</p>
+                    <p><strong>Platform:</strong> {{ system_info.platform }}</p>
+                    <p><strong>Uptime:</strong> {{ system_info.uptime }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Performance Chart -->
+        <div class="control-panel performance-chart">
+            <div class="panel-header">
+                <h3>📊 Real-time Performance</h3>
+                <div class="chart-controls">
+                    <select id="chart-metric" onchange="updateChart()">
+                        <option value="cpu">CPU Usage</option>
+                        <option value="memory">Memory Usage</option>
+                        <option value="response_time">Response Time</option>
+                        <option value="active_users">Active Users</option>
+                    </select>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="chart-container">
+                    <canvas id="performance-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Health Matrix -->
+        <div class="control-panel health-matrix">
+            <div class="panel-header">
+                <h3>🩺 Health Matrix</h3>
+            </div>
+            <div class="panel-content">
+                <div class="health-grid">
+                    <div class="health-item status-{{ health_indicators.cpu }}">
+                        <div class="health-icon">🖥️</div>
+                        <div class="health-label">CPU</div>
+                        <div class="health-value">{{ cpu_info.usage_percent }}%</div>
+                    </div>
+                    <div class="health-item status-{{ health_indicators.memory }}">
+                        <div class="health-icon">💾</div>
+                        <div class="health-label">Memory</div>
+                        <div class="health-value">{{ memory_info.usage_percent }}%</div>
+                    </div>
+                    <div class="health-item status-{{ health_indicators.disk }}">
+                        <div class="health-icon">💿</div>
+                        <div class="health-label">Disk</div>
+                        <div class="health-value">{{ disk_info.0.usage_percent|default:"0" }}%</div>
+                    </div>
+                    <div class="health-item status-{{ health_indicators.database }}">
+                        <div class="health-icon">🗄️</div>
+                        <div class="health-label">Database</div>
+                        <div class="health-value">{{ database_stats.queries_per_second }}/s</div>
+                    </div>
+                    <div class="health-item status-{{ health_indicators.cache }}">
+                        <div class="health-icon">⚡</div>
+                        <div class="health-label">Cache</div>
+                        <div class="health-value">{{ cache_stats.status|upper }}</div>
+                    </div>
+                    <div class="health-item status-{{ health_indicators.network }}">
+                        <div class="health-icon">🌐</div>
+                        <div class="health-label">Network</div>
+                        <div class="health-value">{{ network_info.status|upper }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Performance -->
+        <div class="control-panel database-panel">
+            <div class="panel-header">
+                <h3>🗄️ Database Performance</h3>
+            </div>
+            <div class="panel-content">
+                <div class="db-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Active Connections:</span>
+                        <span class="metric-value" id="db-active-connections">{{ database_stats.active_connections }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Queries/Second:</span>
+                        <span class="metric-value" id="db-qps">{{ database_stats.queries_per_second }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Slow Queries:</span>
+                        <span class="metric-value warning" id="db-slow-queries">{{ database_stats.slow_queries }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Total Queries:</span>
+                        <span class="metric-value" id="db-total-queries">{{ database_stats.total_queries|floatformat:0 }}</span>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="db-performance-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Default Database & Authentication -->
+        <div class="control-panel auth-db-panel">
+            <div class="panel-header">
+                <h3>🔐 Main DB & Authentication</h3>
+                <div class="panel-status status-{{ main_db_auth_metrics.authentication_stats.active_sessions|yesno:'optimal,warning,critical' }}"></div>
+            </div>
+            <div class="panel-content">
+                <div class="auth-stats-grid">
+                    <div class="auth-section">
+                        <h4><i class="fas fa-users"></i> Active Users</h4>
+                        <div class="auth-metrics">
+                            <div class="auth-metric">
+                                <span class="auth-label">Live Sessions:</span>
+                                <span class="auth-value highlight" id="active-sessions-count" data-metric="active-sessions">{{ main_db_auth_metrics.authentication_stats.active_sessions }}</span>
+                            </div>
+                            <div class="auth-metric">
+                                <span class="auth-label">Total Users:</span>
+                                <span class="auth-value" data-metric="total-users">{{ main_db_auth_metrics.authentication_stats.total_users }}</span>
+                            </div>
+                            <div class="auth-metric">
+                                <span class="auth-label">Active Today:</span>
+                                <span class="auth-value">{{ main_db_auth_metrics.authentication_stats.active_users_24h }}</span>
+                            </div>
+                            <div class="auth-metric">
+                                <span class="auth-label">New This Week:</span>
+                                <span class="auth-value">{{ main_db_auth_metrics.authentication_stats.recent_signups_7d }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="auth-section">
+                        <h4><i class="fas fa-database"></i> Default Database</h4>
+                        <div class="db-info">
+                            <div class="db-metric">
+                                <span class="db-label">Database:</span>
+                                <span class="db-value">{{ main_db_auth_metrics.main_db_stats.database_name|default:"AutoWash Main" }}</span>
+                            </div>
+                            <div class="db-metric">
+                                <span class="db-label">Total Tables:</span>
+                                <span class="db-value">{{ main_db_auth_metrics.main_db_stats.total_tables|default:0 }}</span>
+                            </div>
+                            <div class="db-metric">
+                                <span class="db-label">Size:</span>
+                                <span class="db-value" data-metric="db-size">{{ main_db_auth_metrics.main_db_stats.total_size_mb|default:0 }} MB</span>
+                            </div>
+                            <div class="db-metric">
+                                <span class="db-label">Total Records:</span>
+                                <span class="db-value">{{ main_db_auth_metrics.main_db_stats.total_rows|default:0|floatformat:0 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="auth-tables-section">
+                    <h4><i class="fas fa-table"></i> Authentication Tables</h4>
+                    <div class="auth-tables-grid">
+                        {% for table in main_db_auth_metrics.auth_tables|slice:":6" %}
+                        <div class="table-item">
+                            <div class="table-name">{{ table.table_name|truncatechars:20 }}</div>
+                            <div class="table-stats">
+                                <span class="table-rows">{{ table.row_count|floatformat:0 }} rows</span>
+                                <span class="table-size">{{ table.size_mb }} MB</span>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="table-item">
+                            <div class="table-name">No auth tables found</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="login-patterns">
+                    <h4><i class="fas fa-chart-line"></i> Login Patterns (24h)</h4>
+                    <div class="login-stats">
+                        <div class="login-stat">
+                            <span class="login-label">Recent Logins:</span>
+                            <span class="login-value" data-metric="recent-logins">{{ main_db_auth_metrics.login_patterns.recent_logins_24h|default:0 }}</span>
+                        </div>
+                        <div class="login-stat">
+                            <span class="login-label">Peak Hour:</span>
+                            <span class="login-value">{{ main_db_auth_metrics.login_patterns.peak_hour|default:0 }}:00</span>
+                        </div>
+                        <div class="login-stat">
+                            <span class="login-label">Session Ratio:</span>
+                            <span class="login-value">{{ main_db_auth_metrics.authentication_stats.session_to_user_ratio|default:0 }}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Traffic Monitor -->
+        <div class="control-panel network-panel">
+            <div class="panel-header">
+                <h3>🌐 Network Traffic</h3>
+            </div>
+            <div class="panel-content">
+                <div class="network-stats">
+                    <div class="traffic-item">
+                        <div class="traffic-direction">⬇️ IN</div>
+                        <div class="traffic-value" id="bytes-received">{{ network_info.total_bytes_recv|filesizeformat }}</div>
+                    </div>
+                    <div class="traffic-item">
+                        <div class="traffic-direction">⬆️ OUT</div>
+                        <div class="traffic-value" id="bytes-sent">{{ network_info.total_bytes_sent|filesizeformat }}</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="network-chart"></canvas>
+                </div>
+                <div class="network-interfaces">
+                    {% for interface in network_info.interfaces|slice:":3" %}
+                    <div class="interface-item">
+                        <strong>{{ interface.name }}:</strong>
+                        <span class="interface-stats">{{ interface.bytes_recv|filesizeformat }} / {{ interface.bytes_sent|filesizeformat }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Users & Tenant Monitor -->
+        <div class="control-panel users-panel">
+            <div class="panel-header">
+                <h3>👥 Business & User Activity</h3>
+            </div>
+            <div class="panel-content">
+                <div class="activity-stats">
+                    <div class="activity-item">
+                        <div class="activity-number" id="total-businesses">{{ tenant_stats.total_tenants }}</div>
+                        <div class="activity-label">Total Businesses</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-number active" id="active-businesses">{{ tenant_stats.active_tenants }}</div>
+                        <div class="activity-label">Active Now</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-number" id="new-signups-24h">{{ tenant_stats.recent_signups_24h }}</div>
+                        <div class="activity-label">New (24h)</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-number" id="new-signups-7d">{{ tenant_stats.recent_signups_7d }}</div>
+                        <div class="activity-label">New (7d)</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="user-activity-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Actions Control -->
+        <div class="control-panel actions-panel">
+            <div class="panel-header">
+                <h3>🚀 Server Actions</h3>
+                <div class="panel-status status-operational"></div>
+            </div>
+            <div class="panel-content">
+                <div class="action-buttons">
+                    <button class="action-btn primary" onclick="performServerAction('clear_cache')">
+                        <span class="btn-icon">🧹</span>
+                        Clear Cache
+                    </button>
+                    <button class="action-btn warning" onclick="performServerAction('optimize_database')">
+                        <span class="btn-icon">⚡</span>
+                        Optimize DB
+                    </button>
+                    <button class="action-btn secondary" onclick="performServerAction('collect_garbage')">
+                        <span class="btn-icon">🗑️</span>
+                        Collect GC
+                    </button>
+                    <button class="action-btn danger" onclick="performServerAction('flush_sessions')">
+                        <span class="btn-icon">🚪</span>
+                        Flush Sessions
+                    </button>
+                </div>
+                <div class="action-log" id="action-log">
+                    <div class="log-entry">System ready for commands...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comprehensive Detailed Monitoring Section -->
+        <div class="control-panel detailed-monitoring full-width">
+            <div class="panel-header">
+                <h3>📊 Comprehensive System Analytics</h3>
+                <div class="panel-status status-{{ overall_status }}"></div>
+            </div>
+            <div class="panel-content">
+                <div class="detailed-grid">
+                    <!-- CPU Detailed Analysis -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-microchip"></i> CPU Analysis</h4>
+                        <div class="detail-stats">
+                            <div class="detail-stat">
+                                <span class="label">Current Usage:</span>
+                                <span class="value status-{{ cpu_info.status }}">{{ cpu_info.usage_percent|default:0|floatformat:1 }}%</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Physical Cores:</span>
+                                <span class="value">{{ cpu_info.core_count|default:0 }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Logical Cores:</span>
+                                <span class="value">{{ cpu_info.logical_cores|default:0 }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Frequency:</span>
+                                <span class="value">{{ cpu_info.frequency_mhz|default:0|floatformat:0 }} MHz</span>
+                            </div>
+                            {% if cpu_info.load_average %}
+                            <div class="detail-stat">
+                                <span class="label">Load Average:</span>
+                                <span class="value">{{ cpu_info.load_average.0|floatformat:2 }}, {{ cpu_info.load_average.1|floatformat:2 }}, {{ cpu_info.load_average.2|floatformat:2 }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <!-- Per-Core Usage -->
+                        <div class="core-usage-grid">
+                            <h5>Per-Core Usage</h5>
+                            {% for core_usage in cpu_info.per_core_usage %}
+                            <div class="core-item">
+                                <span class="core-label">Core {{ forloop.counter0 }}</span>
+                                <div class="core-bar">
+                                    <div class="core-fill" style="width: {{ core_usage }}%"></div>
+                                </div>
+                                <span class="core-value">{{ core_usage|floatformat:1 }}%</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Memory Detailed Analysis -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-memory"></i> Memory Analysis</h4>
+                        <div class="detail-stats">
+                            <div class="detail-stat">
+                                <span class="label">Total Memory:</span>
+                                <span class="value">{{ memory_info.total_gb|default:0|floatformat:2 }} GB</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Used Memory:</span>
+                                <span class="value status-{{ memory_info.status }}">{{ memory_info.used_gb|default:0|floatformat:2 }} GB</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Available:</span>
+                                <span class="value">{{ memory_info.available_gb|default:0|floatformat:2 }} GB</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Usage Percent:</span>
+                                <span class="value status-{{ memory_info.status }}">{{ memory_info.usage_percent|default:0|floatformat:1 }}%</span>
+                            </div>
+                            {% if memory_info.cached_gb > 0 %}
+                            <div class="detail-stat">
+                                <span class="label">Cached:</span>
+                                <span class="value">{{ memory_info.cached_gb|floatformat:2 }} GB</span>
+                            </div>
+                            {% endif %}
+                            {% if memory_info.swap_total_gb > 0 %}
+                            <div class="detail-stat">
+                                <span class="label">Swap Used:</span>
+                                <span class="value">{{ memory_info.swap_used_gb|floatformat:2 }} / {{ memory_info.swap_total_gb|floatformat:2 }} GB</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <!-- Memory Usage Visualization -->
+                        <div class="memory-visualization">
+                            <div class="memory-bar">
+                                <div class="memory-used" style="width: {{ memory_info.usage_percent }}%"></div>
+                            </div>
+                            <div class="memory-legend">
+                                <span class="legend-item"><span class="color-box used"></span> Used ({{ memory_info.usage_percent|floatformat:1 }}%)</span>
+                                <span class="legend-item"><span class="color-box free"></span> Free ({% calculate_free_percentage memory_info.usage_percent %}%)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Disk Detailed Analysis -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-hdd"></i> Storage Analysis</h4>
+                        <div class="disk-list">
+                            {% for disk in disk_info %}
+                            <div class="disk-item">
+                                <div class="disk-header">
+                                    <h5>{{ disk.device }}</h5>
+                                    <span class="disk-status status-{{ disk.status }}">{{ disk.status|upper }}</span>
+                                </div>
+                                <div class="disk-details">
+                                    <div class="disk-stat">
+                                        <span class="label">Mount Point:</span>
+                                        <span class="value">{{ disk.mountpoint }}</span>
+                                    </div>
+                                    <div class="disk-stat">
+                                        <span class="label">Filesystem:</span>
+                                        <span class="value">{{ disk.filesystem }}</span>
+                                    </div>
+                                    <div class="disk-stat">
+                                        <span class="label">Total Space:</span>
+                                        <span class="value">{{ disk.total_gb|floatformat:2 }} GB</span>
+                                    </div>
+                                    <div class="disk-stat">
+                                        <span class="label">Used Space:</span>
+                                        <span class="value">{{ disk.used_gb|floatformat:2 }} GB</span>
+                                    </div>
+                                    <div class="disk-stat">
+                                        <span class="label">Free Space:</span>
+                                        <span class="value">{{ disk.free_gb|floatformat:2 }} GB</span>
+                                    </div>
+                                </div>
+                                <div class="disk-usage-bar">
+                                    <div class="disk-fill status-{{ disk.status }}" style="width: {{ disk.usage_percent }}%"></div>
+                                </div>
+                                <div class="disk-percentage">{{ disk.usage_percent|floatformat:1 }}% Used</div>
+                            </div>
+                            {% empty %}
+                            <div class="no-data">No disk information available</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Network Detailed Analysis -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-network-wired"></i> Network Analysis</h4>
+                        <div class="detail-stats">
+                            <div class="detail-stat">
+                                <span class="label">Total Bytes Sent:</span>
+                                <span class="value">{{ network_info.total_bytes_sent|filesizeformat }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Total Bytes Received:</span>
+                                <span class="value">{{ network_info.total_bytes_recv|filesizeformat }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Network Errors:</span>
+                                <span class="value status-{% if network_info.errors_in|add:network_info.errors_out > 0 %}warning{% else %}optimal{% endif %}">{{ network_info.errors_in|add:network_info.errors_out }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Network Status:</span>
+                                <span class="value status-{{ network_info.status }}">{{ network_info.status|upper }}</span>
+                            </div>
+                        </div>
+                        
+                        <!-- IP Geolocation Data -->
+                        <div class="ip-geolocation">
+                            <h5>Network Interfaces & Locations</h5>
+                            {% for interface in ip_location_data %}
+                            <div class="interface-item">
+                                <div class="interface-header">
+                                    <span class="interface-name">{{ interface.interface }}</span>
+                                    <span class="ip-address">{{ interface.ip }}</span>
+                                </div>
+                                <div class="interface-details">
+                                    {% if interface.netmask %}
+                                    <span class="detail-item">Netmask: {{ interface.netmask }}</span>
+                                    {% endif %}
+                                    {% if interface.city and interface.city != 'Unknown' %}
+                                    <span class="detail-item">Location: {{ interface.city }}, {{ interface.country }}</span>
+                                    {% endif %}
+                                    <span class="detail-item type-{{ interface.family|lower }}">{{ interface.family }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Database Detailed Analysis -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-database"></i> Database Analysis</h4>
+                        <div class="detail-stats">
+                            <div class="detail-stat">
+                                <span class="label">Active Connections:</span>
+                                <span class="value">{{ database_stats.active_connections|default:0 }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Max Connections:</span>
+                                <span class="value">{{ database_stats.max_connections|default:0 }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Total Queries:</span>
+                                <span class="value">{{ database_stats.total_queries|default:0 }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Queries/Second:</span>
+                                <span class="value">{{ database_stats.queries_per_second|default:0|floatformat:2 }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">Slow Queries:</span>
+                                <span class="value status-{% if database_stats.slow_queries > 10 %}warning{% else %}optimal{% endif %}">{{ database_stats.slow_queries|default:0 }}</span>
+                            </div>
+                            <div class="detail-stat">
+                                <span class="label">DB Uptime:</span>
+                                <span class="value">{{ database_stats.uptime_seconds|default:0|floatformat:0 }} seconds</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Schema Statistics -->
+                        {% if database_stats.schema_stats %}
+                        <div class="schema-stats">
+                            <h5>Database Schema Statistics</h5>
+                            {% for schema in database_stats.schema_stats %}
+                            <div class="schema-item">
+                                <span class="schema-name">{{ schema.schema_name }}</span>
+                                <span class="schema-tables">{{ schema.table_count }} tables</span>
+                                <span class="schema-size">{{ schema.size_mb|floatformat:2 }} MB</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Tenant & User Detailed Analysis -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-users-cog"></i> Tenant & User Analysis</h4>
+                        <div class="tenant-user-grid">
+                            <!-- Tenant Stats -->
+                            <div class="subsection">
+                                <h5>Tenant Statistics</h5>
+                                <div class="detail-stats">
+                                    <div class="detail-stat">
+                                        <span class="label">Total Tenants:</span>
+                                        <span class="value">{{ tenant_stats.total_tenants|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">Active Tenants:</span>
+                                        <span class="value status-optimal">{{ tenant_stats.active_tenants|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">Inactive Tenants:</span>
+                                        <span class="value">{{ tenant_stats.inactive_tenants|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">Recent Activity (24h):</span>
+                                        <span class="value">{{ tenant_stats.recent_activity_24h|default:0 }}</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Tenant Details -->
+                                {% if tenant_stats.tenant_details %}
+                                <div class="tenant-details">
+                                    <div class="detail-stat">
+                                        <span class="label">New Signups (24h):</span>
+                                        <span class="value">{{ tenant_stats.tenant_details.recent_signups_24h|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">New Signups (7d):</span>
+                                        <span class="value">{{ tenant_stats.tenant_details.recent_signups_7d|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">New Signups (30d):</span>
+                                        <span class="value">{{ tenant_stats.tenant_details.recent_signups_30d|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">Activity Rate:</span>
+                                        <span class="value">{{ tenant_stats.tenant_details.activity_rate|default:0|floatformat:1 }}%</span>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- User Session Stats -->
+                            <div class="subsection">
+                                <h5>User Session Statistics</h5>
+                                <div class="detail-stats">
+                                    <div class="detail-stat">
+                                        <span class="label">Active Sessions:</span>
+                                        <span class="value">{{ session_stats.active_sessions|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">Total Users:</span>
+                                        <span class="value">{{ session_stats.total_users|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">Recent Activity:</span>
+                                        <span class="value">{{ session_stats.recent_user_activity|default:0 }}</span>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <span class="label">Last Updated:</span>
+                                        <span class="value">{{ session_stats.last_updated|default:'Unknown' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Application Errors & Logs Analysis -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-exclamation-triangle"></i> Error & Log Analysis</h4>
+                        <div class="error-summary">
+                            <div class="error-stat">
+                                <span class="label">Recent Application Errors:</span>
+                                <span class="value status-{% if application_errors|length > 10 %}warning{% else %}optimal{% endif %}">{{ application_errors|length|default:0 }}</span>
+                            </div>
+                            <div class="error-stat">
+                                <span class="label">Django Log Entries:</span>
+                                <span class="value">{{ django_logs|length|default:0 }}</span>
+                            </div>
+                            <div class="error-stat">
+                                <span class="label">Cache Status:</span>
+                                <span class="value status-{% if cache_stats.status == 'operational' %}optimal{% else %}critical{% endif %}">{{ cache_stats.status|upper|default:'UNKNOWN' }}</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent Errors Display -->
+                        <div class="recent-errors">
+                            <h5>Recent Application Errors</h5>
+                            <div class="error-list">
+                                {% for error in application_errors|slice:":5" %}
+                                <div class="error-item level-{{ error.level|lower }}">
+                                    <div class="error-header">
+                                        <span class="error-level">{{ error.level }}</span>
+                                        <span class="error-time">{{ error.timestamp|date:"H:i:s" }}</span>
+                                        <span class="error-source">{{ error.source }}</span>
+                                    </div>
+                                    <div class="error-message">{{ error.message|truncatechars:150 }}</div>
+                                </div>
+                                {% empty %}
+                                <div class="no-errors">No recent errors detected</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Logs Monitor -->
+        <div class="control-panel logs-panel full-width">
+            <div class="panel-header">
+                <h3>📋 Live System Logs & Django Activity</h3>
+                <div class="log-controls">
+                    <select id="log-level-filter">
+                        <option value="all">All Levels</option>
+                        <option value="error">Errors Only</option>
+                        <option value="warning">Warnings</option>
+                        <option value="info">Info</option>
+                    </select>
+                    <button class="btn-small" onclick="clearLogs()">Clear</button>
+                    <button class="btn-small" onclick="pauseLogs()" id="pause-logs-btn">Pause</button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="logs-container" id="logs-container">
+                    <!-- Display Django System Logs -->
+                    {% for log in django_logs %}
+                    <div class="log-entry {{ log.level|lower }}">
+                        <span class="log-time">{{ log.timestamp|date:"H:i:s" }}</span>
+                        <span class="log-level {{ log.level|lower }}">{{ log.level|upper }}</span>
+                        <span class="log-message">{{ log.message|truncatechars:200 }}</span>
+                        {% if log.source %}
+                        <span class="log-source">{{ log.source }}</span>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <!-- Display Performance Logs if no Django logs -->
+                    {% for log in performance_logs %}
+                    <div class="log-entry {{ log.level|lower }}">
+                        <span class="log-time">{{ log.timestamp|date:"H:i:s" }}</span>
+                        <span class="log-level {{ log.level|lower }}">{{ log.level|upper }}</span>
+                        <span class="log-message">{{ log.message|truncatechars:200 }}</span>
+                    </div>
+                    {% empty %}
+                    <!-- Fallback if no logs available -->
+                    <div class="log-entry info">
+                        <span class="log-time">{{ current_time|date:"H:i:s" }}</span>
+                        <span class="log-level info">INFO</span>
+                        <span class="log-message">Performance monitoring system initialized - No recent logs available</span>
+                    </div>
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advanced Reports & Analytics Sidebar -->
+    <div class="analytics-sidebar" id="analyticsSidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-chart-line icon-neon"></i>Advanced Analytics</h3>
+            <button class="toggle-sidebar" id="toggleSidebar">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="sidebar-panel">
+            <h4><i class="fas fa-bolt"></i>Quick Actions</h4>
+            <div class="action-buttons">
+                <button class="action-btn" onclick="refreshAllData()">
+                    <i class="fas fa-sync-alt"></i> Refresh All Data
+                </button>
+                <button class="action-btn" onclick="exportSystemReport()">
+                    <i class="fas fa-download"></i> Export Report
+                </button>
+                <button class="action-btn" onclick="clearCache()">
+                    <i class="fas fa-trash-alt"></i> Clear Cache
+                </button>
+            </div>
+        </div>
+
+        <!-- Real-Time Log Stream -->
+        <div class="sidebar-panel">
+            <h4><i class="fas fa-stream"></i>Live Log Stream</h4>
+            <div class="log-stream" id="liveLogStream">
+                {% for log in performance_logs|slice:":25" %}
+                <div class="log-entry" data-level="{{ log.level|lower }}">
+                    <span class="log-time">{{ log.timestamp|date:"H:i:s" }}</span>
+                    <span class="log-level">{{ log.level }}</span>
+                    <span class="log-message">{{ log.message|truncatechars:80 }}</span>
+                </div>
+                {% empty %}
+                <div class="log-entry">
+                    <span class="log-message">No recent logs available</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Django System Logs -->
+        <div class="sidebar-panel">
+            <h4><i class="fas fa-cogs"></i>Django System Logs</h4>
+            <div class="log-stream" id="djangoLogStream">
+                {% for log in django_logs|slice:":15" %}
+                <div class="log-entry" data-level="{{ log.level|lower }}">
+                    <span class="log-time">{{ log.timestamp|date:"H:i:s" }}</span>
+                    <span class="log-level">{{ log.level }}</span>
+                    <span class="log-message">{{ log.message|truncatechars:70 }}</span>
+                </div>
+                {% empty %}
+                <div class="log-entry">
+                    <span class="log-message">No Django logs available</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- IP Geolocation Data -->
+        <div class="sidebar-panel">
+            <h4><i class="fas fa-map-marker-alt"></i>IP Geolocation</h4>
+            <div class="ip-location-list">
+                {% for interface in ip_location_data %}
+                <div class="ip-item">
+                    <div class="ip-name">{{ interface.interface }}</div>
+                    <div class="ip-address">{{ interface.ip }}</div>
+                    <div class="ip-location">
+                        <small>{{ interface.city|default:'Unknown' }}, {{ interface.country|default:'Unknown' }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- System Health Indicators -->
+        <div class="sidebar-panel">
+            <h4><i class="fas fa-heartbeat"></i>Health Indicators</h4>
+            <div class="health-indicators">
+                <div class="health-item" data-status="{{ overall_status }}">
+                    <i class="fas fa-circle"></i>
+                    <span>Overall System</span>
+                    <span class="status-text">{{ overall_status|capfirst }}</span>
+                </div>
+                <div class="health-item" data-status="{{ database_stats.status }}">
+                    <i class="fas fa-database"></i>
+                    <span>Database</span>
+                    <span class="status-text">{{ database_stats.status|capfirst }}</span>
+                </div>
+                <div class="health-item" data-status="{{ cache_stats.status }}">
+                    <i class="fas fa-memory"></i>
+                    <span>Cache</span>
+                    <span class="status-text">{{ cache_stats.status|capfirst }}</span>
+                </div>
+                <div class="health-item" data-status="{{ network_info.status }}">
+                    <i class="fas fa-wifi"></i>
+                    <span>Network</span>
+                    <span class="status-text">{{ network_info.status|capfirst }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Statistics -->
+        <div class="sidebar-panel">
+            <h4><i class="fas fa-chart-bar"></i>Detailed Stats</h4>
+            <div class="detailed-stats">
+                <div class="stat-row">
+                    <span>System Uptime:</span>
+                    <span>{{ system_info.uptime|default:'Unknown' }}</span>
+                </div>
+                <div class="stat-row">
+                    <span>Platform:</span>
+                    <span>{{ system_info.platform|default:'Unknown' }}</span>
+                </div>
+                <div class="stat-row">
+                    <span>Timezone:</span>
+                    <span>{{ system_info.timezone|default:'Unknown' }}</span>
+                </div>
+                <div class="stat-row">
+                    <span>DB Uptime:</span>
+                    <span>{{ database_stats.uptime_seconds|default:0|floatformat:0 }}s</span>
+                </div>
+                <div class="stat-row">
+                    <span>Total Queries:</span>
+                    <span>{{ database_stats.total_queries|default:0 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sidebar Toggle Button -->
+<button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleAnalyticsSidebar()">
+    <i class="fas fa-chart-bar"></i>
+</button>
+
+<!-- Modal for Action Confirmations -->
+    <div id="confirmation-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Confirm Action</h3>
+                <span class="modal-close" onclick="hideModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="modal-message">Are you sure you want to perform this action?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary" onclick="hideModal()">Cancel</button>
+                <button class="btn danger" id="confirm-action-btn" onclick="confirmAction()">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Data for JavaScript -->
+<script type="application/json" id="performance-data">
+{
+    "cpu_info": {{ cpu_info|safe }},
+    "memory_info": {{ memory_info|safe }},
+    "database_stats": {{ database_stats|safe }},
+    "network_info": {{ network_info|safe }},
+    "tenant_stats": {{ tenant_stats|safe }},
+    "performance_logs": {{ performance_logs|safe }}
+}
+</script>
+{% endblock %}

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .performance_views import performance_monitoring_view, server_action_view, performance_api_view
 
 app_name = 'system_admin'
 
@@ -90,4 +91,9 @@ urlpatterns = [
     # Settings & Tools
     path('settings/', views.system_settings, name='system_settings'),
     path('export/', views.export_data, name='export_data'),
+    
+    # Performance Monitoring
+    path('performance/', performance_monitoring_view, name='performance_monitoring'),
+    path('server-action/', server_action_view, name='server_action'),
+    path('performance-api/', performance_api_view, name='performance_api'),
 ]
