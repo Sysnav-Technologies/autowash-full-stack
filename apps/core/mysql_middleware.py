@@ -88,46 +88,78 @@ class MySQLTenantMiddleware(MiddlewareMixin):
     
     def _resolve_from_subdomain(self, hostname):
         """Resolve tenant from subdomain - REAL-TIME with minimal caching"""
-        # Pattern: business1.autowash.co.ke
-        main_domain = getattr(settings, 'MAIN_DOMAIN', 'autowash.co.ke')
-        
-        if hostname.endswith(f'.{main_domain}'):
-            subdomain = hostname.replace(f'.{main_domain}', '')
+        try:
+            # Pattern: business1.autowash.co.ke
+            main_domain = getattr(settings, 'MAIN_DOMAIN', 'autowash.co.ke')
             
-            # Extremely minimal cache - only 10 seconds for database protection
-            cache_key = f"sub_{subdomain}"
-            tenant = cache.get(cache_key)
+            # Defensive hostname validation
+            if not hostname or not isinstance(hostname, str) or len(hostname.strip()) == 0:
+                logger.debug(f"Invalid hostname provided: {hostname}")
+                return None
+                
+            hostname = hostname.strip().lower()
             
-            if tenant is None:
-                try:
-                    # Use safer query approach immediately
-                    tenant = Tenant.objects.using('default').filter(
-                        subdomain=subdomain, 
-                        is_active=True
-                    ).first()
-                    
-                    if tenant:
-                        # Validate tenant UUID fields before caching
-                        try:
-                            if not is_valid_uuid(tenant.id):
-                                logger.error(f"Tenant {subdomain} has invalid UUID: {tenant.id}")
-                                # Don't try to fix UUIDs in middleware, just reject the tenant
-                                tenant = None
-                        except Exception as uuid_error:
-                            logger.error(f"UUID validation error for subdomain {subdomain}: {uuid_error}")
-                            tenant = None
+            if hostname.endswith(f'.{main_domain}'):
+                subdomain = hostname.replace(f'.{main_domain}', '')
+                
+                # Validate subdomain is not empty and contains valid characters
+                if not subdomain or len(subdomain.strip()) == 0:
+                    logger.debug(f"Empty subdomain extracted from hostname: {hostname}")
+                    return None
+                
+                # Validate subdomain format (only alphanumeric, hyphens, underscores)
+                if not re.match(r'^[a-z0-9_-]+$', subdomain):
+                    logger.debug(f"Invalid subdomain format: {subdomain}")
+                    return None
+                
+                # Extremely minimal cache - only 10 seconds for database protection
+                cache_key = f"sub_{subdomain}"
+                tenant = cache.get(cache_key)
+                
+                if tenant is None:
+                    try:
+                        # Use safer query approach immediately
+                        logger.debug(f"Querying for subdomain: {subdomain}")
+                        tenant = Tenant.objects.using('default').filter(
+                            subdomain=subdomain, 
+                            is_active=True
+                        ).first()
                         
                         if tenant:
-                            # REAL-TIME: Only 10-second cache for database protection
-                            cache.set(cache_key, tenant, timeout=10)
+                            logger.debug(f"Found tenant: {tenant.id} for subdomain: {subdomain}")
+                            # Validate tenant UUID fields before caching
+                            try:
+                                if not is_valid_uuid(tenant.id):
+                                    logger.error(f"Tenant {subdomain} has invalid UUID: {tenant.id}")
+                                    # Don't try to fix UUIDs in middleware, just reject the tenant
+                                    tenant = None
+                            except Exception as uuid_error:
+                                logger.error(f"UUID validation error for subdomain {subdomain}: {uuid_error}")
+                                import traceback
+                                logger.error(f"Traceback: {traceback.format_exc()}")
+                                tenant = None
                             
-                except Exception as e:
-                    logger.error(f"Database error resolving subdomain {subdomain}: {e}")
-                    tenant = None
+                            if tenant:
+                                # REAL-TIME: Only 10-second cache for database protection
+                                cache.set(cache_key, tenant, timeout=10)
+                        else:
+                            logger.debug(f"No tenant found for subdomain: {subdomain}")
+                                
+                    except Exception as e:
+                        logger.error(f"Database error resolving subdomain {subdomain}: {e}")
+                        logger.error(f"Hostname was: {hostname}, Main domain: {main_domain}")
+                        import traceback
+                        logger.error(f"Full traceback: {traceback.format_exc()}")
+                        tenant = None
+                
+                return tenant
             
-            return tenant
-        
-        return None
+            return None
+            
+        except Exception as e:
+            logger.error(f"Critical error in _resolve_from_subdomain for hostname {hostname}: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            return None
     
     def _resolve_from_path(self, path):
         """Resolve tenant from URL path - REAL-TIME with minimal caching"""
