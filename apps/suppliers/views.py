@@ -58,6 +58,8 @@ def get_supplier_urls(request):
         'ajax_search_purchase_orders': f"{base_url}/ajax/search-purchase-orders/",
         'ajax_purchase_order_details': f"{base_url}/ajax/purchase-order-details/",
         'ajax_supplier_details': f"{base_url}/ajax/supplier-details/",
+        'ajax_get_po_items': f"{base_url}/ajax/po-items/",
+        'ajax_get_inventory_items': f"{base_url}/ajax/inventory-items/",
     }
 
 def get_business_url(request, url_name, **kwargs):
@@ -1071,6 +1073,8 @@ def ajax_search_purchase_orders(request):
     query = request.GET.get('q', '').strip()
     show_all = request.GET.get('show_all', 'false').lower() == 'true'
     invoice_mode = request.GET.get('invoice_mode', 'false').lower() == 'true'
+    supplier_id = request.GET.get('supplier_id')
+    status = request.GET.get('status')
     
     if invoice_mode:
         queryset = PurchaseOrder.objects.filter(
@@ -1095,6 +1099,17 @@ def ajax_search_purchase_orders(request):
             Q(supplier_reference__icontains=query)
         )
     
+    # Filter by supplier if provided
+    if supplier_id:
+        queryset = queryset.filter(supplier_id=supplier_id)
+    
+    # Filter by status if provided (overrides the default status filtering)
+    if status:
+        if status == 'completed':
+            queryset = queryset.filter(status='completed')
+        elif status in ['approved', 'sent', 'acknowledged', 'partially_received']:
+            queryset = queryset.filter(status=status)
+    
     queryset = queryset[:20]
     
     results = []
@@ -1111,18 +1126,27 @@ def ajax_search_purchase_orders(request):
             'supplier_name': po.supplier.name,
             'supplier_id': str(po.supplier.pk),
             'order_date': po.order_date.strftime('%Y-%m-%d'),
-            'expected_delivery': po.expected_delivery_date.strftime('%Y-%m-%d'),
+            'expected_delivery': po.expected_delivery_date.strftime('%Y-%m-%d') if po.expected_delivery_date else None,
             'total_amount': float(po.total_amount),
             'status': po.status,
             'status_display': po.get_status_display(),
             'pending_items': pending_items_count,
             'completion_percentage': float(po.completion_percentage) if hasattr(po, 'completion_percentage') else 0,
             'items_count': po.items.count(),
+            'has_invoice': po.invoices.exists(),
         })
     
     return JsonResponse({
-        'results': results,
-        'total': len(results)
+        'success': True,
+        'purchase_orders': results,
+        'results': results,  # Keep both for backwards compatibility
+        'total': len(results),
+        'debug': {
+            'supplier_id': supplier_id,
+            'status': status,
+            'invoice_mode': invoice_mode,
+            'query_count': queryset.count() if hasattr(queryset, 'count') else 0
+        }
     })
 
 @login_required

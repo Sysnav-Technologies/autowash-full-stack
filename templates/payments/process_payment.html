@@ -483,36 +483,15 @@ function selectPaymentMethod(methodId, methodType) {
     const paymentAmountInput = document.getElementById('paymentAmount');
     const skipAmountText = document.getElementById('skipAmountText');
     
-    if (methodType === 'cash' || methodType === 'mpesa') {
-        // Hide amount input for cash and M-Pesa payments
-        amountInputRow.style.display = 'none';
-        skipAmountMessage.style.display = 'block';
-        paymentAmountInput.removeAttribute('required');
-        
-        // Set appropriate message
-        if (methodType === 'cash') {
-            skipAmountText.textContent = 'Amount will be entered during cash processing.';
-        } else if (methodType === 'mpesa') {
-            skipAmountText.textContent = 'Amount will be entered during M-Pesa processing.';
-        }
-        
-        // Set default amount for service orders
-        {% if service_order %}
-        {% if service_order.balance_due %}
-        paymentAmountInput.value = '{{ service_order.balance_due }}';
-        {% else %}
-        paymentAmountInput.value = '{{ service_order.total_amount }}';
-        {% endif %}
-        {% endif %}
-        
-        // Don't show method details for cash and M-Pesa (they'll be entered in processing screen)
-    } else {
-        // Show amount input for other payment methods
-        amountInputRow.style.display = 'flex';
-        skipAmountMessage.style.display = 'none';
-        paymentAmountInput.setAttribute('required', 'required');
-        
-        // Show relevant method details for other payment methods
+    // Show amount input for all payment methods
+    amountInputRow.style.display = 'flex';
+    skipAmountMessage.style.display = 'none';
+    paymentAmountInput.setAttribute('required', 'required');
+    
+    // Amount input is already populated by the HTML template, no need to set it here
+    
+    // Show relevant method details for payment methods that need them
+    if (methodType !== 'cash' && methodType !== 'mpesa') {
         const detailsId = methodType + 'Details';
         const detailsElement = document.getElementById(detailsId);
         if (detailsElement) {
@@ -601,15 +580,13 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
     const selectedMethodElement = document.querySelector(`[data-method-id="${selectedMethod}"]`);
     const methodType = selectedMethodElement ? selectedMethodElement.dataset.methodType : '';
     
-    // Skip amount validation for cash and M-Pesa payments (amount entered in processing screen)
-    if (methodType !== 'cash' && methodType !== 'mpesa') {
-        const amount = parseFloat(document.getElementById('paymentAmount').value);
-        
-        if (!amount || amount < 1) {
-            e.preventDefault();
-            alert('Please enter a valid payment amount');
-            return;
-        }
+    // Validate amount for all payment methods
+    const amount = parseFloat(document.getElementById('paymentAmount').value);
+    
+    if (!amount || amount < 1) {
+        e.preventDefault();
+        alert('Please enter a valid payment amount');
+        return;
     }
     
     if (isSplitPayment) {

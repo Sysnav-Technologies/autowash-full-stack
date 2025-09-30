@@ -728,38 +728,30 @@ def process_payment_view(request, order_id=None):
             
             payment_method = get_object_or_404(PaymentMethod, id=payment_method_id)
             
-            # For cash and M-Pesa payments, amount will be entered in processing screen
-            if payment_method.method_type in ['cash', 'mpesa']:
-                # Use service order amount or default to 0 (will be set in processing screen)
-                if service_order:
-                    amount = getattr(service_order, 'balance_due', service_order.total_amount)
-                else:
-                    amount = Decimal('0')  # Will be set in processing screen
-            else:
-                # For other payment methods, require amount input
-                try:
-                    amount = Decimal(str(request.POST.get('amount', 0)))
-                except (ValueError, TypeError):
-                    messages.error(request, 'Please enter a valid amount.')
-                    return render(request, 'payments/process_payment.html', {
-                        'service_order': service_order,
-                        'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
-                        'title': 'Process Payment'
-                    })
+            # Get amount from form for all payment methods
+            try:
+                amount = Decimal(str(request.POST.get('amount', 0)))
+            except (ValueError, TypeError):
+                messages.error(request, 'Please enter a valid amount.')
+                return render(request, 'payments/process_payment.html', {
+                    'service_order': service_order,
+                    'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                    'title': 'Process Payment'
+                })
                 
-                # Validate amount for non-cash/mpesa payments
-                if amount <= 0:
-                    messages.error(request, 'Payment amount must be greater than zero.')
-                    return render(request, 'payments/process_payment.html', {
-                        'service_order': service_order,
-                        'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
-                        'title': 'Process Payment'
-                    })
+            # Validate amount for all payment methods
+            if amount <= 0:
+                messages.error(request, 'Payment amount must be greater than zero.')
+                return render(request, 'payments/process_payment.html', {
+                    'service_order': service_order,
+                    'payment_methods': PaymentMethod.objects.filter(is_active=True).order_by('display_order'),
+                    'title': 'Process Payment'
+                })
             
             payment_type = request.POST.get('payment_type', 'full')
             
-            # For non-cash/mpesa payments, validate amount against service order
-            if payment_method.method_type not in ['cash', 'mpesa'] and service_order:
+            # Validate amount against service order for all payment methods
+            if service_order:
                 balance_due = getattr(service_order, 'balance_due', service_order.total_amount)
                 if payment_type == 'partial' and amount > balance_due:
                     messages.error(request, f'Payment amount (KES {amount}) cannot exceed remaining balance (KES {balance_due}).')
