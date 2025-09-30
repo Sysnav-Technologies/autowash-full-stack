@@ -20,28 +20,75 @@
 
 {% block extra_css %}
 <style>
-.form-section {
+.supplier-form-container {
     background: white;
     border-radius: 12px;
     border: 1px solid #e2e8f0;
-    margin-bottom: 1.5rem;
     overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-.form-section-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+.form-tabs {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0;
+    margin: 0;
+}
+
+.form-tabs .nav-tabs {
+    border: none;
+    margin: 0;
+}
+
+.form-tabs .nav-tabs .nav-link {
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-weight: 500;
     padding: 1rem 1.5rem;
-    font-weight: 600;
-    font-size: 1.1rem;
+    border-radius: 0;
+    position: relative;
+    transition: all 0.3s ease;
 }
 
-.form-section-body {
-    padding: 1.5rem;
+.form-tabs .nav-tabs .nav-link:hover {
+    background: rgba(99, 132, 234, 0.1);
+    color: #4f46e5;
+}
+
+.form-tabs .nav-tabs .nav-link.active {
+    background: white;
+    color: #4f46e5;
+    border-bottom: 3px solid #4f46e5;
+}
+
+.form-tabs .nav-tabs .nav-link.has-error {
+    color: #ef4444;
+}
+
+.form-tabs .nav-tabs .nav-link.has-error::after {
+    content: '!';
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-content {
+    padding: 2rem;
+    min-height: 500px;
 }
 
 .form-floating {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .form-floating label {
@@ -50,13 +97,13 @@
 }
 
 .form-control:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 0.2rem rgba(79, 70, 229, 0.25);
 }
 
 .form-select:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 0.2rem rgba(79, 70, 229, 0.25);
 }
 
 .btn-primary {
@@ -64,11 +111,13 @@
     border: none;
     padding: 0.75rem 2rem;
     font-weight: 600;
+    transition: all 0.3s ease;
 }
 
 .btn-primary:hover {
     background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .required-field label::after {
@@ -88,56 +137,121 @@
     margin-top: 0.25rem;
 }
 
-.collapsible-section {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    margin-bottom: 1rem;
-}
-
-.collapsible-header {
-    background: #f8fafc;
-    padding: 1rem 1.5rem;
-    cursor: pointer;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: between;
-    align-items: center;
-}
-
-.collapsible-header:hover {
-    background: #f1f5f9;
-}
-
-.collapsible-body {
-    padding: 1.5rem;
-}
-
 .input-group-text {
     background: #f8fafc;
     border-color: #d1d5db;
     color: #64748b;
 }
 
+.tab-section-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.form-navigation {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.progress-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+.progress-bar-custom {
+    width: 200px;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s ease;
+}
+
 @media (max-width: 768px) {
-    .form-section-body {
+    .tab-content {
         padding: 1rem;
+    }
+    
+    .form-tabs .nav-tabs .nav-link {
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .form-navigation {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 1rem;
     }
     
     .btn-group-mobile {
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
+        width: 100%;
     }
     
     .btn-group-mobile .btn {
         width: 100%;
     }
+    
+    .progress-indicator {
+        order: -1;
+    }
+}
+
+/* Tab-specific styles */
+.tab-icon {
+    margin-right: 0.5rem;
+}
+
+.section-subtitle {
+    color: #64748b;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    font-style: italic;
+}
+
+.form-row-spacing {
+    margin-bottom: 1rem;
+}
+
+.contact-section {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.contact-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<form method="post" enctype="multipart/form-data" novalidate>
+<form method="post" enctype="multipart/form-data" novalidate id="supplierForm">
     {% csrf_token %}
     
     <!-- Page Header -->
@@ -152,244 +266,298 @@
             </h1>
             <p class="text-muted mb-0">
                 {% if object %}
-                Update {{ object.name }}'s information
+                Update {{ object.name }}'s information across different sections
                 {% else %}
-                Fill in the details to register a new supplier
+                Complete the supplier registration by filling out all relevant sections
                 {% endif %}
             </p>
         </div>
-        <div class="btn-group-mobile">
+        <div class="btn-group-mobile d-none d-md-flex">
             <a href="{{ urls.list }}" class="btn btn-outline-secondary">
                 <i class="fas fa-times me-2"></i>Cancel
             </a>
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save me-2"></i>
-                {% if object %}Update Supplier{% else %}Add Supplier{% endif %}
-            </button>
         </div>
     </div>
 
-    <!-- Basic Information Section -->
-    <div class="form-section">
-        <div class="form-section-header">
-            <i class="fas fa-info-circle me-2"></i>Basic Information
+    <!-- Tabbed Form Container -->
+    <div class="supplier-form-container">
+        <!-- Form Tabs -->
+        <div class="form-tabs">
+            <ul class="nav nav-tabs" id="supplierTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab">
+                        <i class="fas fa-info-circle tab-icon"></i>Basic Info
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact" type="button" role="tab">
+                        <i class="fas fa-address-book tab-icon"></i>Contact
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="business-tab" data-bs-toggle="tab" data-bs-target="#business" type="button" role="tab">
+                        <i class="fas fa-building tab-icon"></i>Business
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="financial-tab" data-bs-toggle="tab" data-bs-target="#financial" type="button" role="tab">
+                        <i class="fas fa-money-bill-wave tab-icon"></i>Financial
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="banking-tab" data-bs-toggle="tab" data-bs-target="#banking" type="button" role="tab">
+                        <i class="fas fa-university tab-icon"></i>Banking
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="notes-tab" data-bs-toggle="tab" data-bs-target="#notes" type="button" role="tab">
+                        <i class="fas fa-sticky-note tab-icon"></i>Notes
+                    </button>
+                </li>
+            </ul>
         </div>
-        <div class="form-section-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="form-floating required-field">
-                        {{ form.name|add_class:"form-control" }}
-                        <label for="{{ form.name.id_for_label }}">Supplier Name</label>
-                        {% if form.name.errors %}
-                            <div class="error-message">{{ form.name.errors.0 }}</div>
-                        {% endif %}
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="supplierTabContent">
+            <!-- Basic Information Tab -->
+            <div class="tab-pane fade show active" id="basic" role="tabpanel">
+                <div class="tab-section-title">Basic Information</div>
+                <div class="section-subtitle">Essential supplier details and classification</div>
+                
+                <div class="row form-row-spacing">
+                    <div class="col-md-6">
+                        <div class="form-floating required-field">
+                            {{ form.name|add_class:"form-control" }}
+                            <label for="{{ form.name.id_for_label }}">Supplier Name</label>
+                            {% if form.name.errors %}
+                                <div class="error-message">{{ form.name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-floating required-field">
+                            {{ form.supplier_code|add_class:"form-control" }}
+                            <label for="{{ form.supplier_code.id_for_label }}">Supplier Code</label>
+                            <div class="form-help">Unique identifier for this supplier</div>
+                            {% if form.supplier_code.errors %}
+                                <div class="error-message">{{ form.supplier_code.errors.0 }}</div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="form-floating required-field">
-                        {{ form.supplier_code|add_class:"form-control" }}
-                        <label for="{{ form.supplier_code.id_for_label }}">Supplier Code</label>
-                        <div class="form-help">Unique identifier for this supplier</div>
-                        {% if form.supplier_code.errors %}
-                            <div class="error-message">{{ form.supplier_code.errors.0 }}</div>
-                        {% endif %}
+
+                <div class="row form-row-spacing">
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            {{ form.business_name|add_class:"form-control" }}
+                            <label for="{{ form.business_name.id_for_label }}">Business Name</label>
+                            <div class="form-help">Legal business name (if different from supplier name)</div>
+                            {% if form.business_name.errors %}
+                                <div class="error-message">{{ form.business_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-floating">
+                            {{ form.category|add_class:"form-select" }}
+                            <label for="{{ form.category.id_for_label }}">Category</label>
+                            {% if form.category.errors %}
+                                <div class="error-message">{{ form.category.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-floating required-field">
+                            {{ form.supplier_type|add_class:"form-select" }}
+                            <label for="{{ form.supplier_type.id_for_label }}">Supplier Type</label>
+                            {% if form.supplier_type.errors %}
+                                <div class="error-message">{{ form.supplier_type.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row form-row-spacing">
+                    <div class="col-md-4">
+                        <div class="form-floating">
+                            {{ form.status|add_class:"form-select" }}
+                            <label for="{{ form.status.id_for_label }}">Status</label>
+                            {% if form.status.errors %}
+                                <div class="error-message">{{ form.status.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch mt-4">
+                            {{ form.is_preferred|add_class:"form-check-input" }}
+                            <label class="form-check-label" for="{{ form.is_preferred.id_for_label }}">
+                                <i class="fas fa-star me-2"></i>Preferred Supplier
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch mt-4">
+                            {{ form.is_verified|add_class:"form-check-input" }}
+                            <label class="form-check-label" for="{{ form.is_verified.id_for_label }}">
+                                <i class="fas fa-shield-alt me-2"></i>Verified Supplier
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="form-floating">
-                        {{ form.business_name|add_class:"form-control" }}
-                        <label for="{{ form.business_name.id_for_label }}">Business Name</label>
-                        <div class="form-help">Legal business name (if different from supplier name)</div>
-                        {% if form.business_name.errors %}
-                            <div class="error-message">{{ form.business_name.errors.0 }}</div>
-                        {% endif %}
+            <!-- Contact Information Tab -->
+            <div class="tab-pane fade" id="contact" role="tabpanel">
+                <div class="tab-section-title">Contact Information</div>
+                <div class="section-subtitle">Primary communication details and location information</div>
+                
+                <!-- General Contact -->
+                <div class="contact-section">
+                    <div class="contact-section-title">
+                        <i class="fas fa-envelope"></i>General Contact
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                {{ form.email|add_class:"form-control" }}
+                                <label for="{{ form.email.id_for_label }}">Email Address</label>
+                                {% if form.email.errors %}
+                                    <div class="error-message">{{ form.email.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                {{ form.phone|add_class:"form-control" }}
+                                <label for="{{ form.phone.id_for_label }}">Phone Number</label>
+                                {% if form.phone.errors %}
+                                    <div class="error-message">{{ form.phone.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="form-floating">
-                        {{ form.category|add_class:"form-select" }}
-                        <label for="{{ form.category.id_for_label }}">Category</label>
-                        {% if form.category.errors %}
-                            <div class="error-message">{{ form.category.errors.0 }}</div>
-                        {% endif %}
+
+                <!-- Primary Contact -->
+                <div class="contact-section">
+                    <div class="contact-section-title">
+                        <i class="fas fa-user-tie"></i>Primary Contact Person
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                {{ form.primary_contact_name|add_class:"form-control" }}
+                                <label for="{{ form.primary_contact_name.id_for_label }}">Contact Name</label>
+                                {% if form.primary_contact_name.errors %}
+                                    <div class="error-message">{{ form.primary_contact_name.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                {{ form.primary_contact_title|add_class:"form-control" }}
+                                <label for="{{ form.primary_contact_title.id_for_label }}">Job Title</label>
+                                {% if form.primary_contact_title.errors %}
+                                    <div class="error-message">{{ form.primary_contact_title.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="form-floating required-field">
-                        {{ form.supplier_type|add_class:"form-select" }}
-                        <label for="{{ form.supplier_type.id_for_label }}">Supplier Type</label>
-                        {% if form.supplier_type.errors %}
-                            <div class="error-message">{{ form.supplier_type.errors.0 }}</div>
-                        {% endif %}
+
+                <!-- Secondary Contact -->
+                <div class="contact-section">
+                    <div class="contact-section-title">
+                        <i class="fas fa-user"></i>Secondary Contact Person
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-floating">
+                                {{ form.secondary_contact_name|add_class:"form-control" }}
+                                <label for="{{ form.secondary_contact_name.id_for_label }}">Contact Name</label>
+                                {% if form.secondary_contact_name.errors %}
+                                    <div class="error-message">{{ form.secondary_contact_name.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-floating">
+                                {{ form.secondary_contact_phone|add_class:"form-control" }}
+                                <label for="{{ form.secondary_contact_phone.id_for_label }}">Phone Number</label>
+                                {% if form.secondary_contact_phone.errors %}
+                                    <div class="error-message">{{ form.secondary_contact_phone.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-floating">
+                                {{ form.secondary_contact_email|add_class:"form-control" }}
+                                <label for="{{ form.secondary_contact_email.id_for_label }}">Email Address</label>
+                                {% if form.secondary_contact_email.errors %}
+                                    <div class="error-message">{{ form.secondary_contact_email.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location Information -->
+                <div class="contact-section">
+                    <div class="contact-section-title">
+                        <i class="fas fa-map-marker-alt"></i>Location Details
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-floating">
+                                {{ form.city|add_class:"form-control" }}
+                                <label for="{{ form.city.id_for_label }}">City</label>
+                                {% if form.city.errors %}
+                                    <div class="error-message">{{ form.city.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-floating">
+                                {{ form.state|add_class:"form-control" }}
+                                <label for="{{ form.state.id_for_label }}">State/County</label>
+                                {% if form.state.errors %}
+                                    <div class="error-message">{{ form.state.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-floating">
+                                {{ form.postal_code|add_class:"form-control" }}
+                                <label for="{{ form.postal_code.id_for_label }}">Postal Code</label>
+                                {% if form.postal_code.errors %}
+                                    <div class="error-message">{{ form.postal_code.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-floating">
+                                {{ form.country|add_class:"form-control" }}
+                                <label for="{{ form.country.id_for_label }}">Country</label>
+                                {% if form.country.errors %}
+                                    <div class="error-message">{{ form.country.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="form-floating">
-                        {{ form.status|add_class:"form-select" }}
-                        <label for="{{ form.status.id_for_label }}">Status</label>
-                        {% if form.status.errors %}
-                            <div class="error-message">{{ form.status.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-check form-switch mt-3">
-                        {{ form.is_preferred|add_class:"form-check-input" }}
-                        <label class="form-check-label" for="{{ form.is_preferred.id_for_label }}">
-                            Preferred Supplier
-                        </label>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-check form-switch mt-3">
-                        {{ form.is_verified|add_class:"form-check-input" }}
-                        <label class="form-check-label" for="{{ form.is_verified.id_for_label }}">
-                            Verified Supplier
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Contact Information Section -->
-    <div class="form-section">
-        <div class="form-section-header">
-            <i class="fas fa-address-book me-2"></i>Contact Information
-        </div>
-        <div class="form-section-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="form-floating">
-                        {{ form.email|add_class:"form-control" }}
-                        <label for="{{ form.email.id_for_label }}">Email Address</label>
-                        {% if form.email.errors %}
-                            <div class="error-message">{{ form.email.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="form-floating">
-                        {{ form.phone|add_class:"form-control" }}
-                        <label for="{{ form.phone.id_for_label }}">Phone Number</label>
-                        {% if form.phone.errors %}
-                            <div class="error-message">{{ form.phone.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="form-floating">
-                        {{ form.primary_contact_name|add_class:"form-control" }}
-                        <label for="{{ form.primary_contact_name.id_for_label }}">Primary Contact Name</label>
-                        {% if form.primary_contact_name.errors %}
-                            <div class="error-message">{{ form.primary_contact_name.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="form-floating">
-                        {{ form.primary_contact_title|add_class:"form-control" }}
-                        <label for="{{ form.primary_contact_title.id_for_label }}">Primary Contact Title</label>
-                        {% if form.primary_contact_title.errors %}
-                            <div class="error-message">{{ form.primary_contact_title.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="form-floating">
-                        {{ form.secondary_contact_name|add_class:"form-control" }}
-                        <label for="{{ form.secondary_contact_name.id_for_label }}">Secondary Contact Name</label>
-                        {% if form.secondary_contact_name.errors %}
-                            <div class="error-message">{{ form.secondary_contact_name.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-floating">
-                        {{ form.secondary_contact_phone|add_class:"form-control" }}
-                        <label for="{{ form.secondary_contact_phone.id_for_label }}">Secondary Contact Phone</label>
-                        {% if form.secondary_contact_phone.errors %}
-                            <div class="error-message">{{ form.secondary_contact_phone.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-floating">
-                        {{ form.secondary_contact_email|add_class:"form-control" }}
-                        <label for="{{ form.secondary_contact_email.id_for_label }}">Secondary Contact Email</label>
-                        {% if form.secondary_contact_email.errors %}
-                            <div class="error-message">{{ form.secondary_contact_email.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="form-floating">
-                        {{ form.city|add_class:"form-control" }}
-                        <label for="{{ form.city.id_for_label }}">City</label>
-                        {% if form.city.errors %}
-                            <div class="error-message">{{ form.city.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="form-floating">
-                        {{ form.state|add_class:"form-control" }}
-                        <label for="{{ form.state.id_for_label }}">State/County</label>
-                        {% if form.state.errors %}
-                            <div class="error-message">{{ form.state.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        {{ form.postal_code|add_class:"form-control" }}
-                        <label for="{{ form.postal_code.id_for_label }}">Postal Code</label>
-                        {% if form.postal_code.errors %}
-                            <div class="error-message">{{ form.postal_code.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-floating">
-                        {{ form.country|add_class:"form-control" }}
-                        <label for="{{ form.country.id_for_label }}">Country</label>
-                        {% if form.country.errors %}
-                            <div class="error-message">{{ form.country.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Business Details Section -->
-    <div class="collapsible-section">
-        <div class="collapsible-header" data-bs-toggle="collapse" data-bs-target="#businessDetails">
-            <span><i class="fas fa-building me-2"></i>Business Details</span>
-            <i class="fas fa-chevron-down"></i>
-        </div>
-        <div id="businessDetails" class="collapse">
-            <div class="collapsible-body">
-                <div class="row">
+            <!-- Business Details Tab -->
+            <div class="tab-pane fade" id="business" role="tabpanel">
+                <div class="tab-section-title">Business Details</div>
+                <div class="section-subtitle">Legal and regulatory information</div>
+                
+                <div class="row form-row-spacing">
                     <div class="col-md-4">
                         <div class="form-floating">
                             {{ form.registration_number|add_class:"form-control" }}
                             <label for="{{ form.registration_number.id_for_label }}">Registration Number</label>
+                            <div class="form-help">Business registration or incorporation number</div>
                             {% if form.registration_number.errors %}
                                 <div class="error-message">{{ form.registration_number.errors.0 }}</div>
                             {% endif %}
@@ -399,6 +567,7 @@
                         <div class="form-floating">
                             {{ form.tax_number|add_class:"form-control" }}
                             <label for="{{ form.tax_number.id_for_label }}">Tax Number</label>
+                            <div class="form-help">Tax identification number (TIN)</div>
                             {% if form.tax_number.errors %}
                                 <div class="error-message">{{ form.tax_number.errors.0 }}</div>
                             {% endif %}
@@ -408,6 +577,7 @@
                         <div class="form-floating">
                             {{ form.vat_number|add_class:"form-control" }}
                             <label for="{{ form.vat_number.id_for_label }}">VAT Number</label>
+                            <div class="form-help">Value Added Tax registration number</div>
                             {% if form.vat_number.errors %}
                                 <div class="error-message">{{ form.vat_number.errors.0 }}</div>
                             {% endif %}
@@ -415,12 +585,12 @@
                     </div>
                 </div>
 
-                <div class="row">
+                <div class="row form-row-spacing">
                     <div class="col-12">
                         <div class="form-floating">
                             {{ form.certifications|add_class:"form-control" }}
                             <label for="{{ form.certifications.id_for_label }}">Certifications</label>
-                            <div class="form-help">List any relevant certifications (ISO, quality standards, etc.)</div>
+                            <div class="form-help">List any relevant certifications (ISO 9001, ISO 14001, quality standards, etc.)</div>
                             {% if form.certifications.errors %}
                                 <div class="error-message">{{ form.certifications.errors.0 }}</div>
                             {% endif %}
@@ -428,22 +598,18 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Financial Information Section -->
-    <div class="collapsible-section">
-        <div class="collapsible-header" data-bs-toggle="collapse" data-bs-target="#financialDetails">
-            <span><i class="fas fa-money-bill-wave me-2"></i>Financial Information</span>
-            <i class="fas fa-chevron-down"></i>
-        </div>
-        <div id="financialDetails" class="collapse">
-            <div class="collapsible-body">
-                <div class="row">
+            <!-- Financial Information Tab -->
+            <div class="tab-pane fade" id="financial" role="tabpanel">
+                <div class="tab-section-title">Financial Information</div>
+                <div class="section-subtitle">Payment terms, credit limits, and order requirements</div>
+                
+                <div class="row form-row-spacing">
                     <div class="col-md-4">
                         <div class="form-floating">
                             {{ form.payment_terms|add_class:"form-select" }}
                             <label for="{{ form.payment_terms.id_for_label }}">Payment Terms</label>
+                            <div class="form-help">Standard payment terms for this supplier</div>
                             {% if form.payment_terms.errors %}
                                 <div class="error-message">{{ form.payment_terms.errors.0 }}</div>
                             {% endif %}
@@ -456,6 +622,7 @@
                                 {{ form.credit_limit|add_class:"form-control" }}
                             </div>
                             <label for="{{ form.credit_limit.id_for_label }}">Credit Limit</label>
+                            <div class="form-help">Maximum credit allowed for this supplier</div>
                             {% if form.credit_limit.errors %}
                                 <div class="error-message">{{ form.credit_limit.errors.0 }}</div>
                             {% endif %}
@@ -465,6 +632,7 @@
                         <div class="form-floating">
                             {{ form.currency|add_class:"form-control" }}
                             <label for="{{ form.currency.id_for_label }}">Currency</label>
+                            <div class="form-help">Primary currency for transactions</div>
                             {% if form.currency.errors %}
                                 <div class="error-message">{{ form.currency.errors.0 }}</div>
                             {% endif %}
@@ -472,7 +640,7 @@
                     </div>
                 </div>
 
-                <div class="row">
+                <div class="row form-row-spacing">
                     <div class="col-md-6">
                         <div class="form-floating">
                             <div class="input-group">
@@ -480,6 +648,7 @@
                                 {{ form.minimum_order_value|add_class:"form-control" }}
                             </div>
                             <label for="{{ form.minimum_order_value.id_for_label }}">Minimum Order Value</label>
+                            <div class="form-help">Minimum order amount required by supplier</div>
                             {% if form.minimum_order_value.errors %}
                                 <div class="error-message">{{ form.minimum_order_value.errors.0 }}</div>
                             {% endif %}
@@ -500,12 +669,12 @@
                     </div>
                 </div>
 
-                <div class="row">
+                <div class="row form-row-spacing">
                     <div class="col-12">
                         <div class="form-floating">
                             {{ form.delivery_terms|add_class:"form-control" }}
                             <label for="{{ form.delivery_terms.id_for_label }}">Delivery Terms</label>
-                            <div class="form-help">e.g., FOB, CIF, EXW, etc.</div>
+                            <div class="form-help">Standard delivery terms (e.g., FOB, CIF, EXW, DDP)</div>
                             {% if form.delivery_terms.errors %}
                                 <div class="error-message">{{ form.delivery_terms.errors.0 }}</div>
                             {% endif %}
@@ -513,22 +682,18 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Banking Information Section -->
-    <div class="collapsible-section">
-        <div class="collapsible-header" data-bs-toggle="collapse" data-bs-target="#bankingDetails">
-            <span><i class="fas fa-university me-2"></i>Banking Information</span>
-            <i class="fas fa-chevron-down"></i>
-        </div>
-        <div id="bankingDetails" class="collapse">
-            <div class="collapsible-body">
-                <div class="row">
+            <!-- Banking Information Tab -->
+            <div class="tab-pane fade" id="banking" role="tabpanel">
+                <div class="tab-section-title">Banking Information</div>
+                <div class="section-subtitle">Bank account details for payments and transfers</div>
+                
+                <div class="row form-row-spacing">
                     <div class="col-md-6">
                         <div class="form-floating">
                             {{ form.bank_name|add_class:"form-control" }}
                             <label for="{{ form.bank_name.id_for_label }}">Bank Name</label>
+                            <div class="form-help">Name of the supplier's bank</div>
                             {% if form.bank_name.errors %}
                                 <div class="error-message">{{ form.bank_name.errors.0 }}</div>
                             {% endif %}
@@ -538,6 +703,7 @@
                         <div class="form-floating">
                             {{ form.bank_branch|add_class:"form-control" }}
                             <label for="{{ form.bank_branch.id_for_label }}">Bank Branch</label>
+                            <div class="form-help">Specific branch location</div>
                             {% if form.bank_branch.errors %}
                                 <div class="error-message">{{ form.bank_branch.errors.0 }}</div>
                             {% endif %}
@@ -545,11 +711,12 @@
                     </div>
                 </div>
 
-                <div class="row">
+                <div class="row form-row-spacing">
                     <div class="col-md-4">
                         <div class="form-floating">
                             {{ form.account_number|add_class:"form-control" }}
                             <label for="{{ form.account_number.id_for_label }}">Account Number</label>
+                            <div class="form-help">Bank account number for payments</div>
                             {% if form.account_number.errors %}
                                 <div class="error-message">{{ form.account_number.errors.0 }}</div>
                             {% endif %}
@@ -559,6 +726,7 @@
                         <div class="form-floating">
                             {{ form.account_name|add_class:"form-control" }}
                             <label for="{{ form.account_name.id_for_label }}">Account Name</label>
+                            <div class="form-help">Account holder's name</div>
                             {% if form.account_name.errors %}
                                 <div class="error-message">{{ form.account_name.errors.0 }}</div>
                             {% endif %}
@@ -575,24 +743,24 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Notes and Terms Section -->
-    <div class="collapsible-section">
-        <div class="collapsible-header" data-bs-toggle="collapse" data-bs-target="#notesTerms">
-            <span><i class="fas fa-sticky-note me-2"></i>Notes & Terms</span>
-            <i class="fas fa-chevron-down"></i>
-        </div>
-        <div id="notesTerms" class="collapse">
-            <div class="collapsible-body">
-                <div class="row">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Note:</strong> Banking information is used for payment processing and financial record keeping. Ensure all details are accurate to avoid payment delays.
+                </div>
+            </div>
+
+            <!-- Notes and Terms Tab -->
+            <div class="tab-pane fade" id="notes" role="tabpanel">
+                <div class="tab-section-title">Notes & Terms</div>
+                <div class="section-subtitle">Additional information and special conditions</div>
+                
+                <div class="row form-row-spacing">
                     <div class="col-md-6">
                         <div class="form-floating">
                             {{ form.notes|add_class:"form-control" }}
                             <label for="{{ form.notes.id_for_label }}">Internal Notes</label>
-                            <div class="form-help">Internal notes about this supplier</div>
+                            <div class="form-help">Internal notes about this supplier (not visible to supplier)</div>
                             {% if form.notes.errors %}
                                 <div class="error-message">{{ form.notes.errors.0 }}</div>
                             {% endif %}
@@ -602,35 +770,56 @@
                         <div class="form-floating">
                             {{ form.terms_and_conditions|add_class:"form-control" }}
                             <label for="{{ form.terms_and_conditions.id_for_label }}">Terms & Conditions</label>
-                            <div class="form-help">Special terms or conditions</div>
+                            <div class="form-help">Special terms or conditions for this supplier</div>
                             {% if form.terms_and_conditions.errors %}
                                 <div class="error-message">{{ form.terms_and_conditions.errors.0 }}</div>
                             {% endif %}
                         </div>
                     </div>
                 </div>
+
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Reminder:</strong> Internal notes are for your team's reference only and won't be shared with the supplier. Terms & conditions may be included in purchase orders and contracts.
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Navigation -->
+        <div class="form-navigation">
+            <div class="progress-indicator">
+                <span>Progress:</span>
+                <div class="progress-bar-custom">
+                    <div class="progress-bar-fill" id="formProgress"></div>
+                </div>
+                <span id="progressText">1 of 6</span>
+            </div>
+            
+            <div class="btn-group-mobile">
+                <button type="button" id="prevTab" class="btn btn-outline-secondary" disabled>
+                    <i class="fas fa-chevron-left me-2"></i>Previous
+                </button>
+                <button type="button" id="nextTab" class="btn btn-outline-primary">
+                    Next<i class="fas fa-chevron-right ms-2"></i>
+                </button>
+                <button type="submit" id="submitBtn" class="btn btn-primary d-none">
+                    <i class="fas fa-save me-2"></i>
+                    {% if object %}Update Supplier{% else %}Save Supplier{% endif %}
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Form Actions -->
-    <div class="d-flex justify-content-between align-items-center mt-4 py-3">
-        <div>
-            <a href="{{ urls.list }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-2"></i>Back to List
-            </a>
-        </div>
-        <div class="btn-group-mobile">
-            {% if object %}
-            <a href="/business/{{ request.tenant.slug }}/suppliers/{{ object.pk }}/" class="btn btn-outline-primary">
-                <i class="fas fa-eye me-2"></i>View Details
-            </a>
-            {% endif %}
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save me-2"></i>
-                {% if object %}Update Supplier{% else %}Save Supplier{% endif %}
-            </button>
-        </div>
+    <!-- Mobile Actions (visible on mobile) -->
+    <div class="d-flex justify-content-between align-items-center mt-3 d-md-none">
+        <a href="{{ urls.list }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to List
+        </a>
+        {% if object %}
+        <a href="/business/{{ request.tenant.slug }}/suppliers/{{ object.pk }}/" class="btn btn-outline-primary">
+            <i class="fas fa-eye me-2"></i>View
+        </a>
+        {% endif %}
     </div>
 </form>
 {% endblock %}
@@ -638,6 +827,108 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
+    // Tab management
+    const tabs = ['basic', 'contact', 'business', 'financial', 'banking', 'notes'];
+    let currentTab = 0;
+    
+    // Update progress indicator
+    function updateProgress() {
+        const progressPercent = ((currentTab + 1) / tabs.length) * 100;
+        $('#formProgress').css('width', progressPercent + '%');
+        $('#progressText').text(`${currentTab + 1} of ${tabs.length}`);
+        
+        // Update button states
+        $('#prevTab').prop('disabled', currentTab === 0);
+        
+        if (currentTab === tabs.length - 1) {
+            $('#nextTab').hide();
+            $('#submitBtn').removeClass('d-none').show();
+        } else {
+            $('#nextTab').show();
+            $('#submitBtn').addClass('d-none').hide();
+        }
+    }
+    
+    // Next tab handler
+    $('#nextTab').on('click', function() {
+        if (validateCurrentTab()) {
+            if (currentTab < tabs.length - 1) {
+                currentTab++;
+                $(`#${tabs[currentTab]}-tab`).tab('show');
+                updateProgress();
+            }
+        }
+    });
+    
+    // Previous tab handler
+    $('#prevTab').on('click', function() {
+        if (currentTab > 0) {
+            currentTab--;
+            $(`#${tabs[currentTab]}-tab`).tab('show');
+            updateProgress();
+        }
+    });
+    
+    // Handle direct tab clicks
+    $('.nav-tabs .nav-link').on('click', function() {
+        const tabId = $(this).attr('data-bs-target').substring(1);
+        currentTab = tabs.indexOf(tabId);
+        updateProgress();
+    });
+    
+    // Validate current tab
+    function validateCurrentTab() {
+        let isValid = true;
+        const currentTabPane = $(`#${tabs[currentTab]}`);
+        
+        // Check required fields in current tab
+        currentTabPane.find('input[required], select[required]').each(function() {
+            if (!$(this).val().trim()) {
+                isValid = false;
+                $(this).addClass('is-invalid');
+                markTabWithError(currentTab);
+            } else {
+                $(this).removeClass('is-invalid');
+            }
+        });
+        
+        // Email validation for contact tab
+        if (tabs[currentTab] === 'contact') {
+            const email = $('#id_email').val();
+            const secondaryEmail = $('#id_secondary_contact_email').val();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (email && !emailRegex.test(email)) {
+                isValid = false;
+                $('#id_email').addClass('is-invalid');
+                markTabWithError(currentTab);
+            }
+            
+            if (secondaryEmail && !emailRegex.test(secondaryEmail)) {
+                isValid = false;
+                $('#id_secondary_contact_email').addClass('is-invalid');
+                markTabWithError(currentTab);
+            }
+        }
+        
+        // Clear error marker if validation passes
+        if (isValid) {
+            clearTabError(currentTab);
+        }
+        
+        return isValid;
+    }
+    
+    // Mark tab with error
+    function markTabWithError(tabIndex) {
+        $(`#${tabs[tabIndex]}-tab`).addClass('has-error');
+    }
+    
+    // Clear tab error
+    function clearTabError(tabIndex) {
+        $(`#${tabs[tabIndex]}-tab`).removeClass('has-error');
+    }
+    
     // Auto-generate supplier code if empty
     $('#id_name').on('blur', function() {
         const name = $(this).val().trim();
@@ -651,47 +942,64 @@ $(document).ready(function() {
         }
     });
 
-    // Form validation
-    $('form').on('submit', function(e) {
+    // Form validation on submit
+    $('#supplierForm').on('submit', function(e) {
         let isValid = true;
         
-        // Check required fields
-        $(this).find('input[required], select[required]').each(function() {
-            if (!$(this).val()) {
+        // Validate all tabs
+        for (let i = 0; i < tabs.length; i++) {
+            const tabPane = $(`#${tabs[i]}`);
+            let tabValid = true;
+            
+            // Check required fields
+            tabPane.find('input[required], select[required]').each(function() {
+                if (!$(this).val().trim()) {
+                    tabValid = false;
+                    $(this).addClass('is-invalid');
+                }
+            });
+            
+            // Email validation
+            const emailFields = tabPane.find('input[type="email"]');
+            emailFields.each(function() {
+                const email = $(this).val();
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (email && !emailRegex.test(email)) {
+                    tabValid = false;
+                    $(this).addClass('is-invalid');
+                }
+            });
+            
+            if (!tabValid) {
                 isValid = false;
-                $(this).addClass('is-invalid');
+                markTabWithError(i);
             } else {
-                $(this).removeClass('is-invalid');
+                clearTabError(i);
             }
-        });
-
-        // Email validation
-        const email = $('#id_email').val();
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (email && !emailRegex.test(email)) {
-            isValid = false;
-            $('#id_email').addClass('is-invalid');
-            if (!$('#id_email').next('.error-message').length) {
-                $('#id_email').after('<div class="error-message">Please enter a valid email address</div>');
-            }
-        }
-
-        // Secondary email validation
-        const secondaryEmail = $('#id_secondary_contact_email').val();
-        if (secondaryEmail && !emailRegex.test(secondaryEmail)) {
-            isValid = false;
-            $('#id_secondary_contact_email').addClass('is-invalid');
         }
 
         if (!isValid) {
             e.preventDefault();
-            // Scroll to first error
-            const firstError = $('.is-invalid').first();
-            if (firstError.length) {
-                $('html, body').animate({
-                    scrollTop: firstError.offset().top - 100
-                }, 500);
+            // Switch to first tab with error
+            for (let i = 0; i < tabs.length; i++) {
+                if ($(`#${tabs[i]}-tab`).hasClass('has-error')) {
+                    currentTab = i;
+                    $(`#${tabs[i]}-tab`).tab('show');
+                    updateProgress();
+                    break;
+                }
             }
+            
+            // Focus on first error field
+            setTimeout(function() {
+                const firstError = $('.is-invalid').first();
+                if (firstError.length) {
+                    firstError.focus();
+                    $('html, body').animate({
+                        scrollTop: firstError.offset().top - 150
+                    }, 500);
+                }
+            }, 300);
         }
     });
 
@@ -701,19 +1009,7 @@ $(document).ready(function() {
         $(this).siblings('.error-message').remove();
     });
 
-    // Show/hide banking fields based on whether they have values
-    const bankingFields = ['#id_bank_name', '#id_account_number'];
-    const hasBankingInfo = bankingFields.some(field => $(field).val());
-    if (hasBankingInfo) {
-        $('#bankingDetails').addClass('show');
-    }
-
-    // Expand sections with errors
-    $('.error-message').each(function() {
-        $(this).closest('.collapse').addClass('show');
-    });
-
-    // Phone number formatting (basic)
+    // Phone number formatting
     $('#id_phone, #id_secondary_contact_phone').on('input', function() {
         let value = $(this).val().replace(/\D/g, '');
         if (value.length >= 10) {
@@ -729,11 +1025,33 @@ $(document).ready(function() {
     $('#id_supplier_code, #id_registration_number, #id_tax_number, #id_vat_number, #id_swift_code').on('input', function() {
         $(this).val($(this).val().toUpperCase());
     });
-
-    // Toggle collapsible sections
-    $('.collapsible-header').on('click', function() {
-        const icon = $(this).find('.fa-chevron-down, .fa-chevron-up');
-        icon.toggleClass('fa-chevron-down fa-chevron-up');
+    
+    // Initialize progress
+    updateProgress();
+    
+    // Mark tabs with existing errors
+    $('.error-message').each(function() {
+        const tabPane = $(this).closest('.tab-pane');
+        if (tabPane.length) {
+            const tabId = tabPane.attr('id');
+            const tabIndex = tabs.indexOf(tabId);
+            if (tabIndex !== -1) {
+                markTabWithError(tabIndex);
+            }
+        }
+    });
+    
+    // Keyboard navigation
+    $(document).on('keydown', function(e) {
+        if (e.ctrlKey) {
+            if (e.key === 'ArrowRight' && currentTab < tabs.length - 1) {
+                e.preventDefault();
+                $('#nextTab').click();
+            } else if (e.key === 'ArrowLeft' && currentTab > 0) {
+                e.preventDefault();
+                $('#prevTab').click();
+            }
+        }
     });
 });
 </script>
