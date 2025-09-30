@@ -9,6 +9,7 @@ from django.views.static import serve
 import os
 
 from apps.core.views import health_check, serve_legal_document
+from apps.core.health_api import health_check as api_health_check, ping
 
 admin.site.site_header = "Autowash System Administration"
 admin.site.site_title = "System Admin"
@@ -136,6 +137,10 @@ urlpatterns = [
     path('health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
     path('system-admin/', include('apps.system_admin.urls')),
+    
+    # API endpoints
+    path('api/health/', api_health_check, name='api_health_check'),
+    path('api/ping/', ping, name='api_ping'),
     
     # Core app URLs (PWA, manifest, etc.)
     path('', include('apps.core.urls', namespace='core')),
