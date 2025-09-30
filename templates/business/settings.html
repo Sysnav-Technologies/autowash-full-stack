@@ -505,18 +505,27 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 });
 
-// Utility functions
+// Utility functions - using unified AutoWash Manager
 function showLoading(message) {
-    // Create or update loading toast
-    const toast = document.getElementById('loading-toast') || createToast('loading-toast', 'info');
-    toast.querySelector('.toast-body').textContent = message;
-    new bootstrap.Toast(toast).show();
+    if (window.AutoWash) {
+        window.AutoWash.setGlobalLoading(true, message);
+    } else {
+        // Fallback to toast if unified manager not available
+        const toast = document.getElementById('loading-toast') || createToast('loading-toast', 'info');
+        toast.querySelector('.toast-body').textContent = message;
+        new bootstrap.Toast(toast).show();
+    }
 }
 
 function hideLoading() {
-    const toast = document.getElementById('loading-toast');
-    if (toast) {
-        bootstrap.Toast.getInstance(toast)?.hide();
+    if (window.AutoWash) {
+        window.AutoWash.setGlobalLoading(false);
+    } else {
+        // Fallback
+        const toast = document.getElementById('loading-toast');
+        if (toast) {
+            bootstrap.Toast.getInstance(toast)?.hide();
+        }
     }
 }
 

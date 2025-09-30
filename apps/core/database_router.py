@@ -277,11 +277,30 @@ class TenantDatabaseManager:
     
     @staticmethod
     def add_tenant_to_settings(tenant):
-        """Add tenant database configuration to Django settings"""
+        """Add tenant database configuration to Django settings using unified config approach"""
+        from apps.core.config_utils import ConfigManager
+        
         db_alias = f"tenant_{tenant.id}"
-        # Create a copy of the tenant database config to avoid modifying the original
-        db_config = tenant.database_config.copy()
+        
+        # Don't add if already exists
+        if db_alias in settings.DATABASES:
+            return
+        
+        # Use unified config approach for consistency
+        db_config = ConfigManager.get_db_config(
+            name=tenant.database_name,
+            user=tenant.database_user,
+            password=tenant.database_password,
+            host=tenant.database_host,
+            port=tenant.database_port
+        )
+        
         settings.DATABASES[db_alias] = db_config
+        
+        # Update connections registry if available
+        from django.db import connections
+        if hasattr(connections, '_databases'):
+            connections._databases = settings.DATABASES
     
     @staticmethod
     def remove_tenant_database(tenant):

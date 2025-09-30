@@ -23,33 +23,21 @@ class PWAManager {
             // Mark that we've shown the startup screen
             sessionStorage.setItem('pwa-startup-shown', 'true');
             
-            // Use the same overlay system as smooth navigation
-            if (!document.getElementById('smooth-loader')) {
-                const loader = document.createElement('div');
-                loader.id = 'pwa-startup-loader';
-                loader.className = 'smooth-loading-overlay active';
-                loader.innerHTML = `
-                    <div class="smooth-loader-content">
-                        <div class="smooth-spinner-container">
-                            <div class="smooth-spinner">
-                                <img src="/static/img/logo.png" alt="AutoWash" class="smooth-logo-img">
-                            </div>
-                        </div>
-                        <div class="smooth-loader-text">Starting AutoWash...</div>
-                    </div>
-                `;
-                document.body.appendChild(loader);
-                
-                // Quick fade out after 800ms for fast startup
-                setTimeout(() => {
-                    loader.classList.add('fade-out');
+            // Always use the unified loading system and wait for it if needed
+            const showPwaLoader = () => {
+                if (window.AutoWash) {
+                    window.AutoWash.setGlobalLoading(true, 'Starting AutoWash...');
                     setTimeout(() => {
-                        if (loader.parentNode) {
-                            loader.remove();
-                        }
-                    }, 400);
-                }, 800);
-            }
+                        window.AutoWash.setGlobalLoading(false);
+                    }, 800);
+                } else {
+                    // Wait for AutoWash Manager to load
+                    setTimeout(showPwaLoader, 100);
+                }
+            };
+            
+            // Start PWA loading
+            showPwaLoader();
         }
     }
 

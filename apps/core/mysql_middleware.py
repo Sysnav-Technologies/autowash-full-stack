@@ -1,19 +1,22 @@
 """
 MySQL Multi-Tenant Middleware
-Replaces django-tenants middleware for MySQL compatibility
-REAL-TIME OPTIMIZED - Minimal caching for immediate updates
+Enhanced with connection state management and error handling
 """
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
 from apps.core.tenant_models import Tenant
 from apps.core.database_router import TenantDatabaseRouter, TenantDatabaseManager
 from apps.core.uuid_utils import is_valid_uuid, safe_uuid_convert, fix_corrupted_uuid_field
+from apps.core.config_utils import (
+    config_manager, cache_utils, connection_state, error_utils
+)
 from django.core.cache import cache
 import re
 import logging
 import uuid
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +28,22 @@ class MySQLTenantMiddleware(MiddlewareMixin):
     """
     
     def process_request(self, request):
-        """Process incoming request to identify and set tenant"""
+        """Process incoming request to identify and set tenant with connection state monitoring"""
         
         # Skip tenant resolution for static and media files
         path = request.path_info
         if path.startswith('/static/') or path.startswith('/media/') or path.startswith('/favicon.ico'):
             return None
+        
+        # Check if connection is slow and handle accordingly
+        if connection_state.should_block_actions() and self._is_action_request(request):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'error': 'Connection slow',
+                    'message': 'Connection is slow. Please wait and try again.',
+                    'blocked': True
+                }, status=503)
+            # For non-AJAX requests, let them through but add warning
         
         # Clear any existing tenant context
         TenantDatabaseRouter.clear_tenant()
@@ -38,48 +51,73 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         # Get hostname and path
         hostname = request.get_host().lower()
         
-        # Try to resolve tenant from different methods
+        # Add connection state to request for template access
+        request.connection_state = connection_state.get_connection_state()
+        
+        # Track tenant resolution time
+        start_time = time.time()
         tenant = None
         
-        # Method 1: Subdomain-based (e.g., business1.autowash.co.ke)
-        if not tenant:
-            tenant = self._resolve_from_subdomain(hostname)
-        
-        # Method 2: Path-based (e.g., /business/business1/)
-        if not tenant:
-            tenant, modified_path = self._resolve_from_path(path)
-            if tenant and modified_path != path:
-                # Store the modified path for URL resolution
-                request.tenant_path_prefix = f"/business/{tenant.slug}"
-                request.path_info = modified_path
-        
-        # Method 3: Custom domain (e.g., mybusiness.com)
-        if not tenant:
-            tenant = self._resolve_from_custom_domain(hostname)
-        
-        if tenant:
-            # Set tenant in router
-            TenantDatabaseRouter.set_tenant(tenant)
+        try:
+            # Method 1: Subdomain-based (e.g., business1.autowash.co.ke)
+            if not tenant:
+                tenant = self._resolve_from_subdomain(hostname)
             
-            # Add tenant database to settings if not already there
-            db_alias = f"tenant_{tenant.id}"
-            if db_alias not in settings.DATABASES:
-                TenantDatabaseManager.add_tenant_to_settings(tenant)
+            # Method 2: Path-based (e.g., /business/business1/)
+            if not tenant:
+                tenant, modified_path = self._resolve_from_path(path)
+                if tenant and modified_path != path:
+                    # Store the modified path for URL resolution
+                    request.tenant_path_prefix = f"/business/{tenant.slug}"
+                    request.path_info = modified_path
             
-            # Store tenant in request
-            request.tenant = tenant
+            # Method 3: Custom domain (e.g., mybusiness.com)
+            if not tenant:
+                tenant = self._resolve_from_custom_domain(hostname)
             
-            # Add tenant context to request
-            request.tenant_slug = tenant.slug
-            request.tenant_subdomain = tenant.subdomain
+            # Monitor resolution time
+            resolution_time = time.time() - start_time
+            if resolution_time > config_manager.CONNECTION_RETRY_DELAY * 2:
+                logger.warning(f"Slow tenant resolution: {resolution_time:.2f}s for {hostname}")
+                connection_state.set_connection_slow(True, duration=60)
             
-        else:
-            # No tenant found - handle public area
-            request.tenant = None
-            
-            # Check if this is a tenant-specific URL without valid tenant
-            if self._is_tenant_url(path) and not self._is_public_url(path):
-                raise Http404("Business not found")
+            if tenant:
+                # Set tenant in router
+                TenantDatabaseRouter.set_tenant(tenant)
+                
+                # Add tenant database to settings if not already there
+                db_alias = f"tenant_{tenant.id}"
+                if db_alias not in settings.DATABASES:
+                    TenantDatabaseManager.add_tenant_to_settings(tenant)
+                
+                # Store tenant in request
+                request.tenant = tenant
+                
+                # Add tenant context to request
+                request.tenant_slug = tenant.slug
+                request.tenant_subdomain = tenant.subdomain
+                
+            else:
+                # No tenant found - handle public area
+                request.tenant = None
+                
+                # Check if this is a tenant-specific URL without valid tenant
+                if self._is_tenant_url(path) and not self._is_public_url(path):
+                    raise Http404("Business not found")
+                    
+        except Exception as e:
+            logger.error(f"Error in tenant resolution: {e}")
+            # Set connection as slow if database errors occur
+            if error_utils.is_connection_error(e):
+                connection_state.set_connection_slow(True, duration=120)
+                
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'error': 'Database error',
+                        'message': error_utils.get_user_friendly_error_message(e, request),
+                        'blocked': True
+                    }, status=503)
+            raise
     
     def process_response(self, request, response):
         """Clean up tenant context after request"""
@@ -112,45 +150,13 @@ class MySQLTenantMiddleware(MiddlewareMixin):
                     logger.debug(f"Invalid subdomain format: {subdomain}")
                     return None
                 
-                # Extremely minimal cache - only 10 seconds for database protection
-                cache_key = f"sub_{subdomain}"
+                # Use cache utils for consistent key generation
+                cache_key = cache_utils.get_subdomain_cache_key(subdomain)
                 tenant = cache.get(cache_key)
                 
                 if tenant is None:
-                    try:
-                        # Use safer query approach immediately
-                        logger.debug(f"Querying for subdomain: {subdomain}")
-                        tenant = Tenant.objects.using('default').filter(
-                            subdomain=subdomain, 
-                            is_active=True
-                        ).first()
-                        
-                        if tenant:
-                            logger.debug(f"Found tenant: {tenant.id} for subdomain: {subdomain}")
-                            # Validate tenant UUID fields before caching
-                            try:
-                                if not is_valid_uuid(tenant.id):
-                                    logger.error(f"Tenant {subdomain} has invalid UUID: {tenant.id}")
-                                    # Don't try to fix UUIDs in middleware, just reject the tenant
-                                    tenant = None
-                            except Exception as uuid_error:
-                                logger.error(f"UUID validation error for subdomain {subdomain}: {uuid_error}")
-                                import traceback
-                                logger.error(f"Traceback: {traceback.format_exc()}")
-                                tenant = None
-                            
-                            if tenant:
-                                # REAL-TIME: Only 10-second cache for database protection
-                                cache.set(cache_key, tenant, timeout=10)
-                        else:
-                            logger.debug(f"No tenant found for subdomain: {subdomain}")
-                                
-                    except Exception as e:
-                        logger.error(f"Database error resolving subdomain {subdomain}: {e}")
-                        logger.error(f"Hostname was: {hostname}, Main domain: {main_domain}")
-                        import traceback
-                        logger.error(f"Full traceback: {traceback.format_exc()}")
-                        tenant = None
+                    # Try database query with retry logic
+                    tenant = self._query_tenant_with_retry('subdomain', subdomain, cache_key)
                 
                 return tenant
             
@@ -170,35 +176,13 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         if match:
             tenant_slug = match.group(1)
             
-            # Minimal cache for path-based resolution - 10 seconds only
-            cache_key = f"slug_{tenant_slug}"
+            # Use cache utils for consistent key generation
+            cache_key = cache_utils.get_slug_cache_key(tenant_slug)
             tenant = cache.get(cache_key)
             
             if tenant is None:
-                try:
-                    tenant = Tenant.objects.using('default').filter(
-                        slug=tenant_slug, 
-                        is_active=True
-                    ).first()
-                    
-                    # Validate tenant UUID fields before caching
-                    if tenant and hasattr(tenant, 'id'):
-                        try:
-                            # Validate the tenant ID is a proper UUID
-                            if not is_valid_uuid(tenant.id):
-                                logger.error(f"Tenant {tenant_slug} has invalid UUID: {tenant.id}")
-                                tenant = None
-                        except Exception as uuid_error:
-                            logger.error(f"UUID validation error for tenant {tenant_slug}: {uuid_error}")
-                            tenant = None
-                    
-                    if tenant:
-                        # REAL-TIME: Only 10-second cache to prevent staleness
-                        cache.set(cache_key, tenant, timeout=10)
-                        
-                except Exception as e:
-                    logger.error(f"Database error resolving tenant {tenant_slug}: {e}")
-                    tenant = None
+                # Try database query with retry logic
+                tenant = self._query_tenant_with_retry('slug', tenant_slug, cache_key)
             
             if tenant:
                 # Remove tenant prefix from path
@@ -209,34 +193,13 @@ class MySQLTenantMiddleware(MiddlewareMixin):
     
     def _resolve_from_custom_domain(self, hostname):
         """Resolve tenant from custom domain - REAL-TIME with minimal caching"""
-        # Minimal cache for custom domains - 10 seconds only
-        cache_key = f"domain_{hostname}"
+        # Use cache utils for consistent key generation
+        cache_key = cache_utils.get_domain_cache_key(hostname)
         tenant = cache.get(cache_key)
         
         if tenant is None:
-            try:
-                tenant = Tenant.objects.using('default').filter(
-                    custom_domain=hostname, 
-                    is_active=True
-                ).first()
-                
-                if tenant:
-                    # Validate tenant UUID fields
-                    try:
-                        if not is_valid_uuid(tenant.id):
-                            logger.error(f"Tenant {hostname} has invalid UUID: {tenant.id}")
-                            tenant = None
-                    except Exception as uuid_error:
-                        logger.error(f"UUID validation error for domain {hostname}: {uuid_error}")
-                        tenant = None
-                    
-                    if tenant:
-                        # REAL-TIME: Only 10-second cache to prevent staleness
-                        cache.set(cache_key, tenant, timeout=10)
-                        
-            except Exception as e:
-                logger.error(f"Database error resolving custom domain {hostname}: {e}")
-                tenant = None
+            # Try database query with retry logic
+            tenant = self._query_tenant_with_retry('custom_domain', hostname, cache_key)
         
         return tenant
     
@@ -271,6 +234,98 @@ class MySQLTenantMiddleware(MiddlewareMixin):
         ]
         
         return any(re.match(pattern, path) for pattern in public_patterns)
+    
+    def _is_action_request(self, request):
+        """Check if request is an action that should be blocked during slow connections"""
+        # Block POST, PUT, DELETE requests during slow connections
+        if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
+            return True
+        
+        # Block specific GET requests that are actions
+        path = request.path_info
+        action_patterns = [
+            r'/api/',
+            r'/create/',
+            r'/update/',
+            r'/delete/',
+            r'/save/',
+            r'/process/',
+        ]
+        
+        return any(re.search(pattern, path) for pattern in action_patterns)
+    
+    def _query_tenant_with_retry(self, field_name, field_value, cache_key):
+        """Query tenant with retry logic using config utils"""
+        
+        for attempt in range(config_manager.CONNECTION_RETRY_ATTEMPTS + 1):
+            try:
+                logger.debug(f"Querying for {field_name}: {field_value} (attempt {attempt + 1})")
+                
+                # Build query based on field type
+                if field_name == 'subdomain':
+                    tenant = Tenant.objects.using('default').filter(
+                        subdomain=field_value, 
+                        is_active=True
+                    ).first()
+                elif field_name == 'slug':
+                    tenant = Tenant.objects.using('default').filter(
+                        slug=field_value, 
+                        is_active=True
+                    ).first()
+                elif field_name == 'custom_domain':
+                    tenant = Tenant.objects.using('default').filter(
+                        custom_domain=field_value, 
+                        is_active=True
+                    ).first()
+                else:
+                    logger.error(f"Unknown field_name: {field_name}")
+                    return None
+                
+                if tenant:
+                    logger.debug(f"Found tenant: {tenant.id} for {field_name}: {field_value}")
+                    # Validate tenant UUID fields before caching
+                    try:
+                        if not is_valid_uuid(tenant.id):
+                            logger.error(f"Tenant {field_value} has invalid UUID: {tenant.id}")
+                            return None
+                    except Exception as uuid_error:
+                        logger.error(f"UUID validation error for {field_name} {field_value}: {uuid_error}")
+                        return None
+                    
+                    # Cache successfully retrieved tenant using cache utils
+                    try:
+                        cache.set(cache_key, tenant, timeout=config_manager.TENANT_CACHE_TIMEOUT)
+                    except Exception as cache_error:
+                        logger.warning(f"Failed to cache tenant: {cache_error}")
+                    
+                    return tenant
+                else:
+                    logger.debug(f"No tenant found for {field_name}: {field_value}")
+                    return None
+                    
+            except Exception as e:
+                logger.error(f"Database error resolving {field_name} {field_value} (attempt {attempt + 1}): {e}")
+                
+                # Check if this is a connection-related error using error utils
+                if error_utils.is_connection_error(e) and attempt < config_manager.CONNECTION_RETRY_ATTEMPTS:
+                    # Connection lost, retry after a short delay
+                    retry_delay = config_manager.CONNECTION_RETRY_DELAY * (attempt + 1)
+                    logger.warning(f"Connection error, retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    continue
+                
+                # For final attempt or non-connection errors, log and return None
+                if attempt == config_manager.CONNECTION_RETRY_ATTEMPTS:
+                    logger.error(f"Final attempt failed for {field_name} {field_value}: {e}")
+                    import traceback
+                    logger.error(f"Full traceback: {traceback.format_exc()}")
+                    
+                    # Mark connection as slow for persistent errors
+                    connection_state.set_connection_slow(True, duration=300)  # 5 minutes
+                
+                return None
+        
+        return None
 
 
 class TenantBusinessContextMiddleware(MiddlewareMixin):

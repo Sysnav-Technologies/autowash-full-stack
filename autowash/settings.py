@@ -272,7 +272,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'autowash.wsgi.application'
 ASGI_APPLICATION = 'autowash.asgi.application'
 
-# MySQL Database Configuration
+# MySQL Database Configuration with Enhanced Connection Pooling
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -281,16 +281,38 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
-        'CONN_MAX_AGE': 300 if CPANEL else 600,  # Enable connection pooling: 5-10 minutes
+        'CONN_MAX_AGE': 0,  # Disable connection pooling to prevent timeout issues
+        'CONN_HEALTH_CHECKS': True,  # Enable connection health checks
         'OPTIONS': {
             'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES',autocommit=1,wait_timeout=28800,interactive_timeout=28800",
+            'init_command': (
+                "SET sql_mode='STRICT_TRANS_TABLES',"
+                "autocommit=1,"
+                "wait_timeout=28800,"
+                "interactive_timeout=28800,"
+                "net_read_timeout=600,"
+                "net_write_timeout=600,"
+                "innodb_lock_wait_timeout=120"
+            ),
             'autocommit': True,
+            # Connection pool settings for PyMySQL
+            'connect_timeout': 60,
+            'read_timeout': 60,
+            'write_timeout': 60,
+            'read_default_file': None,
+            'read_default_group': None,
+            'autocommit': True,
+            'sql_mode': 'STRICT_TRANS_TABLES',
+            # Additional MySQL specific settings
+            'isolation_level': None,  # Use MySQL default
         },
         'TEST': {
             'CHARSET': 'utf8mb4',
             'COLLATION': 'utf8mb4_unicode_ci',
-        }
+        },
+        'ATOMIC_REQUESTS': False,  # Disable for better multi-tenant performance
+        'TIME_ZONE': None,  # Use global TIME_ZONE setting
+        'AUTOCOMMIT': True,  # Enable autocommit for MySQL
     }
 }
 
@@ -462,23 +484,22 @@ CACHE_MIDDLEWARE_ALIAS = 'default'
 USE_TEMPLATE_CACHE = False  # Never cache templates to prevent staleness
 TEMPLATE_CACHE_TIMEOUT = 0  # Disable any template caching
 
-# Session configuration - optimized for reliability and high concurrency
-if CPANEL or RENDER:
-    # Production: Use cache-based sessions for better performance
-    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-    SESSION_CACHE_ALIAS = 'sessions'  # Use dedicated session cache in production
-else:
-    # Development: Use database sessions for reliability
-    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+# Session configuration - optimized for reliability and multi-tenant stability
+# Always use database sessions for maximum reliability in multi-tenant environment
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
-SESSION_COOKIE_AGE = 3600 * 8  # 8 hours for better stability
+SESSION_COOKIE_AGE = 3600 * 12  # 12 hours for better stability
 SESSION_COOKIE_NAME = 'autowash_sessionid'
-SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG and (CPANEL or RENDER)  # Secure in production
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_SAVE_EVERY_REQUEST = False  # Don't save on every request - performance boost
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'  # Use JSON serializer for better compatibility
+
+# Additional session settings for multi-tenant stability
+SESSION_COOKIE_DOMAIN = None  # Allow sessions to work across subdomains
+SESSION_FILE_PATH = None  # Not using file sessions
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
