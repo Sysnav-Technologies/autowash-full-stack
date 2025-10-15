@@ -181,10 +181,10 @@ MIDDLEWARE = [
     
     # 18. Cache fetch middleware (last for caching)
     'django.middleware.cache.FetchFromCacheMiddleware',
-] + (
-    # 19. Debug toolbar (only in debug mode, absolute last)
-    ['debug_toolbar.middleware.DebugToolbarMiddleware'] if DEBUG else []
-)
+]
+
+if DEBUG:
+    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
 
 # CSRF Configuration
 CSRF_COOKIE_NAME = 'autowash_csrftoken'
@@ -234,6 +234,14 @@ elif CPANEL:
         CSRF_TRUSTED_ORIGINS.append(f'https://{cpanel_domain}')
 
 CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
+
+# AllAuth Settings
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+ACCOUNT_LOGIN_ATTEMPTS_LIMIT = 5
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_UNIQUE_EMAIL = True
 
 # CRITICAL: Database configuration for MySQL multi-tenant routing
 DATABASE_ROUTERS = [
