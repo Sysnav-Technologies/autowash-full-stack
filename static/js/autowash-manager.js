@@ -20,7 +20,7 @@ class AutoWashManager {
             slowThreshold: 3000,       // 3 seconds
             retryAttempts: 3,
             retryDelay: 1000,
-            healthCheckInterval: 30000 // 30 seconds
+            healthCheckInterval: 300000 // 5 minutes - increased from 30 seconds
         };
         
         this.init();
@@ -95,25 +95,31 @@ class AutoWashManager {
             this.setGlobalLoading(true, 'Navigating...');
         });
         
-        // Handle page visibility changes to fix idle page loading bug
+        // Handle page visibility changes with reduced frequency
+        let lastVisibilityCheck = 0;
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                // User returned to page - check if loading should be cleared
+            const now = Date.now();
+            if (!document.hidden && (now - lastVisibilityCheck > 5000)) { // Only check every 5 seconds
+                lastVisibilityCheck = now;
                 this.handlePageVisible();
-            } else {
-                // Page hidden - set up cleanup timer
-                this.scheduleHiddenPageCleanup();
             }
         });
         
-        // Handle window focus/blur for additional cleanup
+        // Handle window focus/blur with debounce
+        let focusDebounceTimer;
         window.addEventListener('focus', () => {
-            this.handlePageVisible();
+            clearTimeout(focusDebounceTimer);
+            focusDebounceTimer = setTimeout(() => {
+                this.handlePageVisible();
+            }, 1000); // 1 second debounce
         });
         
         window.addEventListener('blur', () => {
-            // Clear any stuck loading states when page loses focus
-            this.clearStuckLoadingStates();
+            clearTimeout(focusDebounceTimer);
+            // Only clear stuck states after a delay
+            setTimeout(() => {
+                this.clearStuckLoadingStates();
+            }, 2000);
         });
         
         // Additional cleanup for dashboard idle issue
@@ -127,16 +133,18 @@ class AutoWashManager {
             this.scheduleHiddenPageCleanup();
         });
         
-        // Handle app switching scenario specifically
+        // Handle app switching scenario with reduced frequency
+        let lastAppSwitchCleanup = 0;
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
-                // When returning from another app, give it a moment then cleanup aggressively
-                setTimeout(() => {
+                const now = Date.now();
+                if (now - lastAppSwitchCleanup > 10000) { // Only cleanup every 10 seconds
+                    lastAppSwitchCleanup = now;
                     if (this.debugMode) {
                         console.log('AutoWash Debug: App switching cleanup check');
                     }
                     this.performAppSwitchCleanup();
-                }, 1000);
+                }
             }
         });
     }
@@ -214,40 +222,78 @@ class AutoWashManager {
     }
     
     setupFormHandling() {
+        // Track form submissions with their states
+        const formStates = new Map();
+        
         document.addEventListener('submit', (event) => {
             const form = event.target;
             const signature = this.createFormSignature(form);
             
-            // Prevent duplicate submissions
-            if (this.isDuplicateSubmission(signature)) {
+            // Get or create form state
+            const state = formStates.get(signature) || {
+                lastSubmission: 0,
+                submissionCount: 0,
+                isProcessing: false
+            };
+            
+            const now = Date.now();
+            
+            // Enhanced duplicate submission prevention
+            if (state.isProcessing || (now - state.lastSubmission < 5000)) { // 5 second cooldown
                 event.preventDefault();
-                this.showMessage('Please wait before submitting again', 'warning');
+                if (state.isProcessing) {
+                    this.showMessage('Form is still being processed...', 'info');
+                } else {
+                    this.showMessage('Please wait a moment before submitting again', 'warning');
+                }
                 return false;
             }
             
-            // Mark submission
-            this.markSubmission(signature);
+            // Update form state
+            state.lastSubmission = now;
+            state.submissionCount++;
+            state.isProcessing = true;
+            formStates.set(signature, state);
             
             // Handle offline submissions
             if (!this.isOnline) {
                 event.preventDefault();
                 this.queueRequest('form', { form, signature });
                 this.showMessage('You are offline. Form will be submitted when connection is restored.', 'info');
+                state.isProcessing = false;
                 return false;
             }
             
-            // Add loading state to form
+            // Add loading state to form - with smart timeout
             this.setFormLoading(form, true);
             
-            // Start request tracking
+            // Start request tracking with cleanup
             const requestId = this.generateId();
             this.startRequest(requestId, 'Submitting form...');
             
-            // Auto-cleanup after timeout
-            setTimeout(() => {
+            // Smart cleanup with state management
+            const cleanup = () => {
+                if (formStates.has(signature)) {
+                    const currentState = formStates.get(signature);
+                    currentState.isProcessing = false;
+                    // Remove state if no recent activity
+                    if (now - currentState.lastSubmission > 30000) {
+                        formStates.delete(signature);
+                    }
+                }
                 this.setFormLoading(form, false);
                 this.endRequest(requestId);
-            }, this.config.connectionTimeout);
+            };
+            
+            // Add form completion listener
+            const handleComplete = () => {
+                cleanup();
+                form.removeEventListener('AutoWashFormComplete', handleComplete);
+            };
+            form.addEventListener('AutoWashFormComplete', handleComplete);
+            
+            // Fallback cleanup after timeout
+            setTimeout(cleanup, this.config.connectionTimeout);
         });
     }
     
