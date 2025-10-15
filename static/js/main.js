@@ -31,7 +31,7 @@ function initializeApp() {
 // ===============================
 function initializeSmoothNavigation() {
     // Create loading overlay
-    createLoadingOverlay();
+    // createLoadingOverlay();
     
     // Intercept navigation clicks
     $(document).on('click', 'a[href]:not([href^="#"]):not([href^="javascript:"]):not([target="_blank"]):not(.no-smooth)', function(e) {
