@@ -1,0 +1,388 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Expense Vendors{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-responsive {
+        border-radius: 8px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        background: white;
+        overflow: hidden;
+    }
+
+    .table thead th {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        font-weight: 600;
+        padding: 15px;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+
+    .table tbody td {
+        padding: 15px;
+        border-bottom: 1px solid #f8f9fc;
+        vertical-align: middle;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fc;
+    }
+
+    .vendor-name {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 4px;
+    }
+
+    .vendor-contact {
+        color: #6c757d;
+        font-size: 0.85rem;
+        margin: 0;
+    }
+
+    .stats-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-align: center;
+        min-width: 60px;
+    }
+
+    .stats-expenses {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .stats-amount {
+        background: #e8f5e8;
+        color: #2e7d32;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+        justify-content: center;
+    }
+
+    .btn-action {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-view {
+        background: #17a2b8;
+        color: white;
+    }
+
+    .btn-view:hover {
+        background: #138496;
+        color: white;
+    }
+
+    .btn-edit {
+        background: #ffc107;
+        color: white;
+    }
+
+    .btn-edit:hover {
+        background: #e0a800;
+        color: white;
+    }
+
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-delete:hover {
+        background: #c82333;
+        color: white;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #6c757d;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .summary-cards {
+        margin-top: 30px;
+    }
+
+    .summary-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border-left: 4px solid;
+        transition: transform 0.3s ease;
+    }
+
+    .summary-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .summary-card.primary { border-left-color: #4e73df; }
+    .summary-card.success { border-left-color: #1cc88a; }
+    .summary-card.info { border-left-color: #36b9cc; }
+    .summary-card.warning { border-left-color: #f6c23e; }
+
+    .summary-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 10px;
+    }
+
+    .summary-number {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .summary-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    @media (max-width: 768px) {
+        .table-responsive {
+            font-size: 0.9rem;
+        }
+
+        .table thead th,
+        .table tbody td {
+            padding: 10px;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .btn-action {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-building text-primary"></i>
+                Expense Vendors
+            </h1>
+            <p class="text-muted mb-0">Manage and track your expense vendors</p>
+        </div>
+        <div class="d-flex gap-2">
+            {% if request.employee.role in 'owner,manager,supervisor' %}
+            <a href="{{ urls.vendor_create }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Vendor
+            </a>
+            {% endif %}
+            <a href="{{ urls.dashboard }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Vendors Table -->
+    {% if vendors %}
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Vendor Details</th>
+                    <th>Contact Information</th>
+                    <th>Statistics</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vendor in vendors %}
+                <tr>
+                    <td>
+                        <div class="vendor-name">{{ vendor.name }}</div>
+                        {% if vendor.contact_person %}
+                        <div class="vendor-contact">Contact: {{ vendor.contact_person }}</div>
+                        {% else %}
+                        <div class="vendor-contact text-muted">No contact person</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if vendor.email %}
+                        <div class="mb-1">
+                            <i class="fas fa-envelope text-muted"></i>
+                            <a href="mailto:{{ vendor.email }}" class="text-decoration-none">{{ vendor.email }}</a>
+                        </div>
+                        {% endif %}
+                        {% if vendor.phone %}
+                        <div class="mb-1">
+                            <i class="fas fa-phone text-muted"></i>
+                            <a href="tel:{{ vendor.phone }}" class="text-decoration-none">{{ vendor.phone }}</a>
+                        </div>
+                        {% else %}
+                        <div class="text-muted small">No contact info</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <span class="stats-badge stats-expenses">
+                                <i class="fas fa-receipt"></i> {{ vendor.expense_count }}
+                            </span>
+                            <span class="stats-badge stats-amount">
+                                <i class="fas fa-money-bill-wave"></i> KSh {{ vendor.total_expense_amount|floatformat:0 }}
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="{{ urls.vendor_detail|add:vendor.pk }}" class="btn btn-action btn-view" title="View Details">
+                                <i class="fas fa-eye"></i> View
+                            </a>
+                            {% if request.employee.role in 'owner,manager,supervisor' %}
+                            <a href="{{ urls.vendor_edit|add:vendor.pk }}" class="btn btn-action btn-edit" title="Edit Vendor">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <a href="{{ urls.vendor_delete|add:vendor.pk }}" class="btn btn-action btn-delete" title="Delete Vendor">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row summary-cards">
+        <div class="col-md-3 mb-4">
+            <div class="summary-card primary">
+                <div class="summary-icon bg-primary text-white">
+                    <i class="fas fa-building"></i>
+                </div>
+                <div class="summary-number">{{ vendors|length }}</div>
+                <div class="summary-label">Total Vendors</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-4">
+            <div class="summary-card success">
+                <div class="summary-icon bg-success text-white">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="summary-number">{{ vendors|length }}</div>
+                <div class="summary-label">Active Vendors</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-4">
+            <div class="summary-card info">
+                <div class="summary-icon bg-info text-white">
+                    <i class="fas fa-receipt"></i>
+                </div>
+                <div class="summary-number">
+                    {% for vendor in vendors %}
+                        {{ vendor.expense_count|add:forloop.counter0|default:0 }}
+                    {% empty %}
+                        0
+                    {% endfor %}
+                </div>
+                <div class="summary-label">Total Expenses</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-4">
+            <div class="summary-card warning">
+                <div class="summary-icon bg-warning text-white">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="summary-number">KSh
+                    {% for vendor in vendors %}
+                        {{ vendor.total_expense_amount|add:forloop.counter0|default:0|floatformat:0 }}
+                    {% empty %}
+                        0
+                    {% endfor %}
+                </div>
+                <div class="summary-label">Total Amount</div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state">
+        <i class="fas fa-building"></i>
+        <h4>No Vendors Found</h4>
+        <p>Get started by creating your first vendor to better track your expenses.</p>
+        {% if request.employee.role in 'owner,manager,supervisor' %}
+        <a href="{{ urls.vendor_create }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create First Vendor
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Add any interactive functionality here
+document.addEventListener('DOMContentLoaded', function() {
+    // Table row hover effects
+    const tableRows = document.querySelectorAll('tbody tr');
+    tableRows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fc';
+        });
+
+        row.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
+        });
+    });
+
+    // Action button hover effects
+    const actionButtons = document.querySelectorAll('.btn-action');
+    actionButtons.forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.05)';
+        });
+
+        button.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+});
+</script>
+{% endblock %}

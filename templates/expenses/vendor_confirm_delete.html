@@ -1,0 +1,357 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Delete Vendor - {{ vendor.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .delete-container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        padding: 40px;
+        margin-top: 20px;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .delete-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .delete-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #dc3545, #c82333);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px auto;
+        color: white;
+        font-size: 2rem;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    }
+
+    .delete-title {
+        color: #dc3545;
+        font-weight: 700;
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+    }
+
+    .delete-subtitle {
+        color: #6c757d;
+        font-size: 1rem;
+        margin-bottom: 0;
+    }
+
+    .vendor-info {
+        background: #f8f9fc;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+        border-left: 4px solid #dc3545;
+    }
+
+    .vendor-name {
+        font-weight: 600;
+        color: #495057;
+        font-size: 1.2rem;
+        margin-bottom: 10px;
+    }
+
+    .vendor-details {
+        color: #6c757d;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+
+    .impact-warning {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+        border-left: 4px solid #ffc107;
+    }
+
+    .impact-title {
+        color: #856404;
+        font-weight: 600;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+    }
+
+    .impact-title i {
+        margin-right: 8px;
+    }
+
+    .impact-list {
+        margin: 0;
+        padding-left: 20px;
+        color: #856404;
+    }
+
+    .impact-list li {
+        margin-bottom: 5px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 30px;
+    }
+
+    .btn-delete-confirm {
+        background: linear-gradient(135deg, #dc3545, #c82333);
+        border: none;
+        border-radius: 8px;
+        padding: 12px 30px;
+        font-size: 1rem;
+        font-weight: 600;
+        color: white;
+        transition: all 0.3s ease;
+        min-width: 150px;
+    }
+
+    .btn-delete-confirm:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+        color: white;
+    }
+
+    .btn-cancel {
+        background: #6c757d;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 30px;
+        font-size: 1rem;
+        font-weight: 600;
+        color: white;
+        transition: all 0.3s ease;
+        min-width: 150px;
+    }
+
+    .btn-cancel:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+        color: white;
+    }
+
+    .btn-edit {
+        background: #ffc107;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 30px;
+        font-size: 1rem;
+        font-weight: 600;
+        color: white;
+        transition: all 0.3s ease;
+        min-width: 150px;
+    }
+
+    .btn-edit:hover {
+        background: #e0a800;
+        transform: translateY(-2px);
+        color: white;
+    }
+
+    .alternative-actions {
+        background: #e3f2fd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        border-left: 4px solid #2196f3;
+    }
+
+    .alternative-title {
+        color: #1976d2;
+        font-weight: 600;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+    }
+
+    .alternative-title i {
+        margin-right: 8px;
+    }
+
+    .alternative-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    @media (max-width: 768px) {
+        .delete-container {
+            padding: 20px;
+            margin-top: 10px;
+        }
+
+        .delete-icon {
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+        }
+
+        .delete-title {
+            font-size: 1.2rem;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+
+        .btn-delete-confirm, .btn-cancel, .btn-edit {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .alternative-buttons {
+            flex-direction: column;
+        }
+
+        .alternative-buttons .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-trash-alt text-danger"></i>
+                Delete Vendor
+            </h1>
+            <p class="text-muted mb-0">Confirm deletion of vendor: {{ vendor.name }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ urls.vendor_detail|add:vendor.pk }}" class="btn btn-outline-primary">
+                <i class="fas fa-eye"></i> View Vendor
+            </a>
+            <a href="{{ urls.vendor_list }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Vendors
+            </a>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Container -->
+    <div class="delete-container">
+        <div class="delete-header">
+            <div class="delete-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h2 class="delete-title">Delete Vendor</h2>
+            <p class="delete-subtitle">Are you sure you want to delete this vendor? This action cannot be undone.</p>
+        </div>
+
+        <!-- Vendor Information -->
+        <div class="vendor-info">
+            <div class="vendor-name">{{ vendor.name }}</div>
+            <div class="vendor-details">
+                {% if vendor.contact_person %}
+                <strong>Contact Person:</strong> {{ vendor.contact_person }}<br>
+                {% endif %}
+                {% if vendor.email %}
+                <strong>Email:</strong> {{ vendor.email }}<br>
+                {% endif %}
+                {% if vendor.phone %}
+                <strong>Phone:</strong> {{ vendor.phone }}<br>
+                {% endif %}
+                {% if vendor.address %}
+                <strong>Address:</strong> {{ vendor.address }}<br>
+                {% endif %}
+                <strong>Created:</strong> {{ vendor.created_at|date:"M d, Y" }}
+            </div>
+        </div>
+
+        <!-- Impact Warning -->
+        <div class="impact-warning">
+            <div class="impact-title">
+                <i class="fas fa-exclamation-triangle"></i>
+                Deletion Impact
+            </div>
+            <ul class="impact-list">
+                <li>This vendor will be permanently removed from the system</li>
+                <li>All associated expense records will remain but vendor information will be lost</li>
+                <li>You won't be able to create new expenses for this vendor</li>
+                <li>This action cannot be reversed</li>
+            </ul>
+        </div>
+
+        <!-- Alternative Actions -->
+        <div class="alternative-actions">
+            <div class="alternative-title">
+                <i class="fas fa-lightbulb"></i>
+                Alternative Actions
+            </div>
+            <p class="mb-3">Consider these options instead of deleting:</p>
+            <div class="alternative-buttons">
+                <a href="{{ urls.vendor_edit|add:vendor.pk }}" class="btn btn-edit">
+                    <i class="fas fa-edit"></i> Edit Vendor Details
+                </a>
+                <a href="{{ urls.vendor_list }}" class="btn btn-cancel">
+                    <i class="fas fa-arrow-left"></i> Keep Vendor
+                </a>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <form method="post" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-delete-confirm" onclick="return confirm('Are you absolutely sure you want to delete this vendor? This action cannot be undone.')">
+                    <i class="fas fa-trash"></i> Yes, Delete Vendor
+                </button>
+            </form>
+            <a href="{{ urls.vendor_list }}" class="btn btn-cancel">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add confirmation dialog enhancement
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteButton = document.querySelector('.btn-delete-confirm');
+
+    if (deleteButton) {
+        deleteButton.addEventListener('click', function(e) {
+            const vendorName = '{{ vendor.name }}';
+            const confirmed = confirm(`Are you absolutely sure you want to delete "${vendorName}"?\n\nThis will permanently remove the vendor and cannot be undone.`);
+
+            if (!confirmed) {
+                e.preventDefault();
+                return false;
+            }
+
+            // Add loading state
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+            this.disabled = true;
+        });
+    }
+
+    // Alternative action button effects
+    const altButtons = document.querySelectorAll('.alternative-buttons .btn');
+    altButtons.forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.02)';
+        });
+
+        button.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+});
+</script>
+{% endblock %}

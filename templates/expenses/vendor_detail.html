@@ -1,0 +1,481 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Vendor Details - {{ vendor.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .vendor-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .vendor-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin-bottom: 15px;
+    }
+
+    .vendor-name {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .vendor-contact {
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+
+    .stats-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border-left: 4px solid;
+        transition: transform 0.3s ease;
+    }
+
+    .stats-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .stats-card.primary { border-left-color: #4e73df; }
+    .stats-card.success { border-left-color: #1cc88a; }
+    .stats-card.info { border-left-color: #36b9cc; }
+
+    .stats-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .stats-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    .contact-info {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        margin-bottom: 30px;
+    }
+
+    .contact-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        padding: 10px;
+        border-radius: 8px;
+        transition: background-color 0.3s ease;
+    }
+
+    .contact-item:hover {
+        background-color: #f8f9fc;
+    }
+
+    .contact-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        flex-shrink: 0;
+    }
+
+    .contact-icon.email { background: #e3f2fd; color: #1976d2; }
+    .contact-icon.phone { background: #e8f5e8; color: #2e7d32; }
+    .contact-icon.address { background: #fff3e0; color: #f57c00; }
+
+    .contact-details h6 {
+        margin: 0 0 2px 0;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .contact-details p {
+        margin: 0;
+        color: #6c757d;
+    }
+
+    .recent-expenses {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+
+    .section-header {
+        background: #f8f9fc;
+        padding: 20px 25px;
+        border-bottom: 1px solid #e3e6f0;
+        margin: 0;
+    }
+
+    .section-header h4 {
+        margin: 0;
+        color: #495057;
+        font-weight: 600;
+    }
+
+    .expense-item {
+        padding: 20px 25px;
+        border-bottom: 1px solid #f8f9fc;
+        transition: background-color 0.3s ease;
+    }
+
+    .expense-item:hover {
+        background-color: #f8f9fc;
+    }
+
+    .expense-item:last-child {
+        border-bottom: none;
+    }
+
+    .expense-title {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 5px;
+    }
+
+    .expense-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .expense-amount {
+        font-weight: 700;
+        color: #4e73df;
+        font-size: 1.1rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        opacity: 0.5;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 30px;
+    }
+
+    .btn-action {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-edit {
+        background: #ffc107;
+        color: white;
+        border: none;
+    }
+
+    .btn-edit:hover {
+        background: #e0a800;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+        border: none;
+    }
+
+    .btn-delete:hover {
+        background: #c82333;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .btn-back {
+        background: #6c757d;
+        color: white;
+        border: none;
+    }
+
+    .btn-back:hover {
+        background: #5a6268;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    @media (max-width: 768px) {
+        .vendor-header {
+            padding: 20px;
+            text-align: center;
+        }
+
+        .vendor-name {
+            font-size: 1.5rem;
+        }
+
+        .stats-card {
+            margin-bottom: 20px;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+
+        .btn-action {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-building text-primary"></i>
+                Vendor Details
+            </h1>
+            <p class="text-muted mb-0">View detailed information about {{ vendor.name }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            {% if request.employee.role in 'owner,manager,supervisor' %}
+            <a href="{{ urls.vendor_edit|add:vendor.pk }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Edit Vendor
+            </a>
+            {% endif %}
+            <a href="{{ urls.vendor_list }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Vendors
+            </a>
+        </div>
+    </div>
+
+    <!-- Vendor Header -->
+    <div class="vendor-header">
+        <div class="d-flex align-items-center">
+            <div class="vendor-avatar">
+                <i class="fas fa-building"></i>
+            </div>
+            <div class="ms-3">
+                <h2 class="vendor-name">{{ vendor.name }}</h2>
+                {% if vendor.contact_person %}
+                <div class="vendor-contact">
+                    <i class="fas fa-user"></i> {{ vendor.contact_person }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card primary">
+                <div class="stats-number">{{ expense_count }}</div>
+                <div class="stats-label">Total Expenses</div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="stats-card success">
+                <div class="stats-number">KSh {{ total_expenses|floatformat:0 }}</div>
+                <div class="stats-label">Total Amount</div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="stats-card info">
+                <div class="stats-number">
+                    KSh {{ avg_expense|floatformat:0 }}
+                </div>
+                <div class="stats-label">Average Expense</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Information -->
+    <div class="contact-info">
+        <h5 class="mb-3">
+            <i class="fas fa-address-book text-primary"></i>
+            Contact Information
+        </h5>
+
+        {% if vendor.email %}
+        <div class="contact-item">
+            <div class="contact-icon email">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <div class="contact-details">
+                <h6>Email Address</h6>
+                <p>
+                    <a href="mailto:{{ vendor.email }}" class="text-decoration-none">{{ vendor.email }}</a>
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if vendor.phone %}
+        <div class="contact-item">
+            <div class="contact-icon phone">
+                <i class="fas fa-phone"></i>
+            </div>
+            <div class="contact-details">
+                <h6>Phone Number</h6>
+                <p>
+                    <a href="tel:{{ vendor.phone }}" class="text-decoration-none">{{ vendor.phone }}</a>
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if vendor.address %}
+        <div class="contact-item">
+            <div class="contact-icon address">
+                <i class="fas fa-map-marker-alt"></i>
+            </div>
+            <div class="contact-details">
+                <h6>Business Address</h6>
+                <p>{{ vendor.address }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if not vendor.email and not vendor.phone and not vendor.address %}
+        <div class="text-center text-muted py-4">
+            <i class="fas fa-info-circle fa-2x mb-2"></i>
+            <p>No contact information available</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Expenses -->
+    <div class="recent-expenses">
+        <div class="section-header">
+            <h4>
+                <i class="fas fa-receipt text-primary"></i>
+                Recent Expenses
+            </h4>
+        </div>
+
+        {% if recent_expenses %}
+        {% for expense in recent_expenses %}
+        <div class="expense-item">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <div class="expense-title">
+                        <a href="{% url 'expenses:detail' pk=expense.pk %}" class="text-decoration-none">
+                            {{ expense.title }}
+                        </a>
+                    </div>
+                    <div class="expense-meta">
+                        <span>
+                            <i class="fas fa-calendar"></i> {{ expense.expense_date|date:"M d, Y" }}
+                        </span>
+                        <span class="badge bg-{% if expense.status == 'approved' %}success{% elif expense.status == 'pending' %}warning{% elif expense.status == 'rejected' %}danger{% else %}secondary{% endif %}">
+                            {{ expense.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="expense-amount">KSh {{ expense.total_amount|floatformat:0 }}</div>
+                    <small class="text-muted">{{ expense.category.name }}</small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-receipt"></i>
+            <h5>No Expenses Found</h5>
+            <p>This vendor doesn't have any recorded expenses yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Action Buttons -->
+    {% if request.employee.role in 'owner,manager,supervisor' %}
+    <div class="action-buttons">
+        <a href="{{ urls.vendor_edit|add:vendor.pk }}" class="btn-action btn-edit">
+            <i class="fas fa-edit"></i> Edit Vendor
+        </a>
+        <a href="{{ urls.vendor_delete|add:vendor.pk }}" class="btn-action btn-delete">
+            <i class="fas fa-trash"></i> Delete Vendor
+        </a>
+        <a href="{{ urls.vendor_list }}" class="btn-action btn-back">
+            <i class="fas fa-arrow-left"></i> Back to Vendors
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Add interactive functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Contact item hover effects
+    const contactItems = document.querySelectorAll('.contact-item');
+    contactItems.forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fc';
+        });
+
+        item.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
+        });
+    });
+
+    // Expense item hover effects
+    const expenseItems = document.querySelectorAll('.expense-item');
+    expenseItems.forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fc';
+        });
+
+        item.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
+        });
+    });
+
+    // Action button hover effects
+    const actionButtons = document.querySelectorAll('.btn-action');
+    actionButtons.forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+        });
+
+        button.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+});
+</script>
+{% endblock %}

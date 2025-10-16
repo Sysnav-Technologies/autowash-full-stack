@@ -9,7 +9,7 @@ that cause crashes in Django authentication system including MySQL
 import logging
 from django.contrib.auth import logout
 from django.contrib.sessions.models import Session
-from django.contrib.sessions.exceptions import SessionInterrupted
+from django.contrib.sessions.exceptions import SessionInterrupted, InvalidSessionKey, SuspiciousSession
 from django.db.utils import OperationalError
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -64,7 +64,7 @@ class AuthProtectionMiddleware(MiddlewareMixin):
                 # Force evaluation of lazy user object
                 is_authenticated = user.is_authenticated
 
-        except (IndexError, ValueError, TypeError, SessionInterrupted, OperationalError, pymysql.err.OperationalError) as e:
+        except (IndexError, ValueError, TypeError, SessionInterrupted, InvalidSessionKey, SuspiciousSession, OperationalError, pymysql.err.OperationalError) as e:
             # Handle authentication corruption, session interruption, and database errors
             error_type = type(e).__name__
             logger.warning(f"Authentication/Session error detected ({error_type}): {e}")
@@ -72,7 +72,7 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             logger.warning(f"Session key: {getattr(request.session, 'session_key', 'None')}")
 
             # Only clear session for REAL corruption issues, not initialization errors
-            if isinstance(e, (SessionInterrupted, OperationalError, pymysql.err.OperationalError)):
+            if isinstance(e, (SessionInterrupted, InvalidSessionKey, SuspiciousSession, OperationalError, pymysql.err.OperationalError)):
                 # Clear the corrupted session for real database/connection issues
                 try:
                     # Clear session data - handle different corruption types
@@ -119,7 +119,7 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             logger.error(f"Request path: {request.path}")
 
             # Only clear session for critical errors, not for session cache issues
-            if isinstance(e, (OperationalError, pymysql.err.OperationalError)):
+            if isinstance(e, (InvalidSessionKey, SuspiciousSession, OperationalError, pymysql.err.OperationalError)):
                 # Clear session for database connection issues
                 try:
                     request.session.flush()
@@ -250,12 +250,12 @@ class AuthProtectionMiddleware(MiddlewareMixin):
                 if request.session.modified:
                     # Try to save the session - if this fails, we'll catch it
                     pass
-        except (SessionInterrupted, OperationalError, pymysql.err.OperationalError) as e:
+        except (SessionInterrupted, InvalidSessionKey, SuspiciousSession, OperationalError, pymysql.err.OperationalError) as e:
             logger.error(f"Session save error during response: {e}")
             logger.error(f"Request path: {request.path}")
 
             # Only clear session for critical database errors, not for cache issues
-            if isinstance(e, (OperationalError, pymysql.err.OperationalError)):
+            if isinstance(e, (InvalidSessionKey, SuspiciousSession, OperationalError, pymysql.err.OperationalError)):
                 # Clear session to prevent cascade failures for real DB issues
                 try:
                     request.session.flush()
