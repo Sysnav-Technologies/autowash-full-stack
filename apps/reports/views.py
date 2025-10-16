@@ -825,7 +825,7 @@ class ReportsView(TemplateView):
         
         # Get only approved expenses for the period
         expenses = Expense.objects.filter(
-            expense_date__range=[start_date, end_date],
+            created_at__range=[start_datetime, end_datetime],
             status='approved'  # Only approved expenses
         ).aggregate(total=Sum('total_amount'))['total'] or 0
         
@@ -867,9 +867,9 @@ class ReportsView(TemplateView):
         
         # Add only approved expenses as negative transactions
         expense_items = Expense.objects.select_related('category', 'vendor').filter(
-            expense_date__range=[start_date, end_date],
+            created_at__range=[start_datetime, end_datetime],
             status='approved'  # Only approved expenses
-        ).order_by('-expense_date')[:25]
+        ).order_by('-created_at')[:25]
         
         for expense in expense_items:
             transactions.append({
@@ -1714,11 +1714,11 @@ class ReportsView(TemplateView):
             # Revenue
             total_revenue = cash_from_payments + bank_from_payments
             
-            # Total Expenses (All paid expenses in period)
+            # Total Expenses (All approved expenses in period)
             total_expenses = Expense.objects.filter(
                 created_at__range=[start_datetime, end_datetime],
-                status__in=['approved', 'paid']
-            ).aggregate(total=Sum('amount'))['total'] or 0
+                status='approved'
+            ).aggregate(total=Sum('total_amount'))['total'] or 0
             total_expenses = Decimal(str(total_expenses))
             
             # Net Income
