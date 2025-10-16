@@ -5,7 +5,9 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods, require_POST
 from django.db import transaction
-from django.db.models import Q, Count, Sum, Avg, F
+from django.db.models import Q, Count, Sum, Avg, F, Max
+from django.db.models.functions import Coalesce
+from django.db.models import DecimalField
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
@@ -703,29 +705,38 @@ def vendor_create_view(request):
 @employee_required(['owner', 'manager', 'supervisor'])
 def vendor_detail_view(request, pk):
     """View vendor details"""
-    
+
     vendor = get_object_or_404(Vendor, pk=pk, is_active=True)
-    
+
     # Get vendor expenses
     expenses = vendor.expenses.filter(is_active=True).order_by('-expense_date')[:10]
-    
+
     # Get vendor stats
     stats = vendor.expenses.filter(is_active=True).aggregate(
-        total_expenses=Sum('amount'),
+        total_expenses=Sum('total_amount'),
         expense_count=Count('id'),
-        avg_expense=Avg('amount')
+        avg_expense=Avg('total_amount')
     )
-    
+
+    # Calculate average expense safely
+    total_expenses = stats['total_expenses'] or Decimal('0.00')
+    expense_count = stats['expense_count'] or 0
+    avg_expense = Decimal('0.00')
+
+    if expense_count > 0:
+        avg_expense = total_expenses / expense_count
+
     context = {
         'vendor': vendor,
         'recent_expenses': expenses,
-        'total_expenses': stats['total_expenses'] or 0,
-        'expense_count': stats['expense_count'] or 0,
+        'total_expenses': total_expenses,
+        'expense_count': expense_count,
+        'avg_expense': avg_expense,
         'business': request.tenant,
         'urls': get_expense_urls(request),
         'title': f'Vendor - {vendor.name}'
     }
-    
+
     return render(request, 'expenses/vendor_detail.html', context)
 
 
@@ -1055,13 +1066,34 @@ def expense_export_view(request):
 @login_required
 @employee_required(['owner', 'manager', 'supervisor'])
 def category_list_view(request):
-    """List all expense categories"""
-    categories = ExpenseCategory.objects.filter(is_active=True).order_by('name')
-    return render(request, 'expenses/category_list.html', {
+    """List all expense categories with statistics"""
+
+    # Get all active categories with expense counts and totals
+    categories = ExpenseCategory.objects.filter(is_active=True).annotate(
+        expense_count=Count('expenses', filter=Q(expenses__is_active=True)),
+        total_expense_amount=Coalesce(Sum('expenses__total_amount', filter=Q(expenses__is_active=True)), Decimal('0'), output_field=DecimalField())
+    ).order_by('name')
+
+    # Calculate summary statistics
+    total_categories = categories.count()
+    total_expenses = categories.aggregate(
+        total=Coalesce(Sum('expense_count'), 0, output_field=IntegerField())
+    )['total'] or 0
+
+    total_amount = categories.aggregate(
+        total=Coalesce(Sum('total_expense_amount'), Decimal('0'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+
+    context = {
         'categories': categories,
         'title': 'Expense Categories',
         'urls': get_expense_urls(request),
-    })
+        'total_categories': total_categories,
+        'total_expenses': total_expenses,
+        'total_amount': total_amount,
+    }
+
+    return render(request, 'expenses/category_list.html', context)
 
 
 @employee_required()  
@@ -1120,15 +1152,138 @@ def budget_list_view(request):
 @login_required
 @employee_required(['owner', 'manager', 'supervisor'])
 def expense_reports_view(request):
-    """Expense reports dashboard"""
-    return render(request, 'expenses/reports.html', {
+    """Expense reports dashboard with comprehensive analytics"""
+
+    # Get period filter from request
+    period = request.GET.get('period', 'this_month')
+    today = timezone.now().date()
+
+    # Set date range based on period
+    if period == 'this_month':
+        start_date = today.replace(day=1)
+        end_date = today
+    elif period == 'last_month':
+        last_month = today.replace(day=1) - timedelta(days=1)
+        start_date = last_month.replace(day=1)
+        end_date = last_month
+    elif period == 'this_year':
+        start_date = today.replace(month=1, day=1)
+        end_date = today
+    elif period == 'custom':
+        start_date_str = request.GET.get('start_date')
+        end_date_str = request.GET.get('end_date')
+        if start_date_str and end_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        else:
+            # Default to current month if custom dates not provided
+            start_date = today.replace(day=1)
+            end_date = today
+    else:
+        # Default to current month
+        start_date = today.replace(day=1)
+        end_date = today
+
+    # Basic statistics
+    total_expenses = Expense.objects.filter(
+        is_active=True,
+        expense_date__gte=start_date,
+        expense_date__lte=end_date
+    ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+
+    total_categories = ExpenseCategory.objects.filter(is_active=True).count()
+    total_vendors = Vendor.objects.filter(is_active=True).count()
+    pending_approvals = Expense.objects.filter(status='pending', is_active=True).count()
+
+    # Monthly trend data (last 6 months for chart)
+    monthly_data = []
+    chart_labels = []
+    chart_data = []
+
+    for i in range(5, -1, -1):
+        month_start = (start_date.replace(day=1) - timedelta(days=i*30)).replace(day=1)
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
+
+        month_expenses = Expense.objects.filter(
+            expense_date__gte=month_start,
+            expense_date__lt=next_month,
+            is_active=True
+        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+
+        monthly_data.append({
+            'month': month_start.strftime('%b %Y'),
+            'amount': float(month_expenses)
+        })
+
+        chart_labels.append(month_start.strftime('%b %Y'))
+        chart_data.append(float(month_expenses))
+
+    # Top categories by spending
+    top_categories = ExpenseCategory.objects.filter(
+        is_active=True,
+        expenses__expense_date__gte=start_date,
+        expenses__expense_date__lte=end_date,
+        expenses__is_active=True
+    ).annotate(
+        total_spent=Sum('expenses__total_amount')
+    ).order_by('-total_spent')[:5]
+
+    # Budget status
+    budgets = ExpenseBudget.objects.filter(
+        year=start_date.year,
+        month=start_date.month
+    ).select_related('category')
+
+    # Additional stats
+    monthly_count = Expense.objects.filter(
+        expense_date__gte=start_date,
+        expense_date__lte=end_date,
+        is_active=True
+    ).count()
+
+    avg_expense = Expense.objects.filter(
+        expense_date__gte=start_date,
+        expense_date__lte=end_date,
+        is_active=True
+    ).aggregate(avg=Avg('total_amount'))['avg'] or Decimal('0.00')
+
+    max_expense = Expense.objects.filter(
+        expense_date__gte=start_date,
+        expense_date__lte=end_date,
+        is_active=True
+    ).aggregate(max=Coalesce(Max('total_amount'), Decimal('0'), output_field=DecimalField()))['max'] or Decimal('0.00')
+
+    overdue_count = Expense.objects.filter(
+        due_date__lt=timezone.now().date(),
+        status__in=['pending', 'approved'],
+        is_active=True
+    ).count()
+
+    context = {
         'title': 'Expense Reports',
         'urls': get_expense_urls(request),
-    })
+        'total_expenses': total_expenses,
+        'total_categories': total_categories,
+        'total_vendors': total_vendors,
+        'pending_approvals': pending_approvals,
+        'monthly_trend': monthly_data,
+        'chart_labels': chart_labels,
+        'chart_data': chart_data,
+        'top_categories': top_categories,
+        'budgets': budgets,
+        'monthly_count': monthly_count,
+        'avg_expense': avg_expense,
+        'max_expense': max_expense,
+        'overdue_count': overdue_count,
+        'start_date': start_date,
+        'end_date': end_date,
+        'current_period': period,
+    }
+
+    return render(request, 'expenses/reports.html', context)
 
 
-# Placeholder views for remaining URL patterns
-# Additional view implementations
+# Vendor Views
 @employee_required()
 @login_required
 @employee_required(['owner', 'manager', 'supervisor'])

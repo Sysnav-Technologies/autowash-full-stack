@@ -1,0 +1,373 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Expense Reports{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e3e6f0;
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+
+    .report-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+    }
+
+    .stat-number {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+
+    .stat-icon {
+        font-size: 2.5rem;
+        opacity: 0.8;
+    }
+
+    .chart-container {
+        height: 300px;
+        position: relative;
+        margin-bottom: 20px;
+    }
+
+    .report-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 32px;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+        transform: translateY(-1px);
+        text-decoration: none;
+    }
+
+    .action-btn i {
+        margin-right: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .report-card {
+            padding: 16px;
+        }
+
+        .stat-number {
+            font-size: 1.8rem;
+        }
+
+        .report-actions {
+            flex-direction: column;
+        }
+
+        .action-btn {
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Reports Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-chart-line text-primary"></i>
+                Expense Reports
+            </h1>
+            <p class="text-muted mb-0">Comprehensive expense analysis and insights</p>
+        </div>
+        <div class="text-muted">{{ "now"|date:"F d, Y" }}</div>
+    </div>
+
+    <!-- Report Actions -->
+    <div class="report-actions">
+        <a href="?report_type=monthly_summary" class="action-btn btn-primary">
+            <i class="fas fa-calendar-alt"></i>
+            Monthly Summary
+        </a>
+
+        <a href="?report_type=category_analysis" class="action-btn btn-info">
+            <i class="fas fa-tags"></i>
+            Category Analysis
+        </a>
+
+        <a href="?report_type=vendor_analysis" class="action-btn btn-success">
+            <i class="fas fa-building"></i>
+            Vendor Analysis
+        </a>
+
+        <a href="?report_type=budget_analysis" class="action-btn btn-warning">
+            <i class="fas fa-wallet"></i>
+            Budget Analysis
+        </a>
+
+        <a href="?export=csv" class="action-btn btn-outline-primary">
+            <i class="fas fa-download"></i>
+            Export CSV
+        </a>
+
+        <a href="{{ urls.dashboard }}" class="action-btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Report Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="report-card stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">KSh {{ total_expenses|floatformat:2 }}</div>
+                        <div class="stat-label">Total Expenses</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-receipt"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="report-card stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ total_categories }}</div>
+                        <div class="stat-label">Categories</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="report-card stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ total_vendors }}</div>
+                        <div class="stat-label">Vendors</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-truck"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="report-card stat-card" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #8b5a3c;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ pending_approvals }}</div>
+                        <div class="stat-label">Pending Approvals</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Content -->
+    <div class="row">
+        <!-- Main Report Area -->
+        <div class="col-lg-8 mb-4">
+            <div class="report-card">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0">Expense Analysis</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="?period=this_month">This Month</a></li>
+                            <li><a class="dropdown-item" href="?period=last_month">Last Month</a></li>
+                            <li><a class="dropdown-item" href="?period=this_year">This Year</a></li>
+                            <li><a class="dropdown-item" href="?period=custom">Custom Range</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Chart Container -->
+                <div class="chart-container">
+                    <canvas id="expenseChart" width="400" height="200"></canvas>
+                </div>
+
+                <!-- Top Categories -->
+                <div class="mt-4">
+                    <h6 class="mb-3">Top Spending Categories</h6>
+                    {% if top_categories %}
+                        {% for category in top_categories %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small">{{ category.name }}</span>
+                            <span class="small fw-bold text-success">KSh {{ category.total_spent|floatformat:2 }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center small">No expense data available</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Monthly Trend -->
+            <div class="report-card mb-4">
+                <h6 class="mb-3">Monthly Trend</h6>
+                {% if monthly_trend %}
+                    {% for month in monthly_trend %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small">{{ month.month }}</span>
+                        <span class="small fw-bold text-primary">KSh {{ month.amount|floatformat:2 }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center small">No trend data available</p>
+                {% endif %}
+            </div>
+
+            <!-- Budget Status -->
+            {% if budgets %}
+            <div class="report-card mb-4">
+                <h6 class="mb-3">Budget Status</h6>
+                {% for budget in budgets %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small">{{ budget.category.name }}</span>
+                        <span class="small">{{ budget.utilization_percentage|floatformat:0 }}%</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar {% if budget.utilization_percentage > 100 %}bg-danger{% elif budget.utilization_percentage > 80 %}bg-warning{% else %}bg-success{% endif %}"
+                             style="width: {% if budget.utilization_percentage > 100 %}100{% else %}{{ budget.utilization_percentage|default:0 }}{% endif %}%;"></div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <small class="text-muted">Spent: KSh {{ budget.spent_amount|floatformat:2 }}</small>
+                        <small class="text-muted">Budget: KSh {{ budget.budgeted_amount|floatformat:2 }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Quick Stats -->
+            <div class="report-card">
+                <h6 class="mb-3">Quick Stats</h6>
+                <div class="small">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Average Expense:</span>
+                        <strong>KSh {{ avg_expense|default:0|floatformat:2 }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Largest Expense:</span>
+                        <strong>KSh {{ max_expense|default:0|floatformat:2 }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Expenses This Month:</span>
+                        <strong>{{ monthly_count|default:0 }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Overdue Expenses:</span>
+                        <strong class="{% if overdue_count > 0 %}text-danger{% else %}text-success{% endif %}">{{ overdue_count|default:0 }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Expense Chart
+    const ctx = document.getElementById('expenseChart');
+    if (ctx) {
+        // Get data from Django context
+        const chartLabels = {{ chart_labels|default:"[]"|safe }};
+        const chartData = {{ chart_data|default:"[]"|safe }};
+
+        const expenseChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    label: 'Monthly Expenses',
+                    data: chartData,
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return 'KSh ' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Period filter functionality
+    const periodLinks = document.querySelectorAll('[href*="period="]');
+    periodLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            // Add loading state
+            const icon = this.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-spinner fa-spin';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
