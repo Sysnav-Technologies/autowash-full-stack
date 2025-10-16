@@ -7,7 +7,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.db import transaction
 from django.db.models import Q, Count, Sum, Avg, F, Max
 from django.db.models.functions import Coalesce
-from django.db.models import DecimalField
+from django.db.models import DecimalField, IntegerField
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
@@ -658,19 +658,32 @@ def expense_bulk_action_view(request):
 @login_required
 @employee_required(['owner', 'manager', 'supervisor'])
 def vendor_list_view(request):
-    """List all vendors"""
-    
+    """List all vendors with statistics"""
+
     vendors = Vendor.objects.filter(is_active=True).annotate(
-        expense_count=Count('expenses'),
-        total_expense_amount=Sum('expenses__total_amount')
+        expense_count=Count('expenses', filter=Q(expenses__is_active=True)),
+        total_expense_amount=Coalesce(Sum('expenses__total_amount', filter=Q(expenses__is_active=True)), Decimal('0'), output_field=DecimalField())
     ).order_by('name')
-    
+
+    # Calculate summary statistics
+    total_vendors = vendors.count()
+    total_expenses = vendors.aggregate(
+        total=Coalesce(Sum('expense_count'), 0, output_field=IntegerField())
+    )['total'] or 0
+
+    total_amount = vendors.aggregate(
+        total=Coalesce(Sum('total_expense_amount'), Decimal('0'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+
     context = {
         'vendors': vendors,
         'title': 'Vendors',
         'urls': get_expense_urls(request),
+        'total_vendors': total_vendors,
+        'total_expenses': total_expenses,
+        'total_amount': total_amount,
     }
-    
+
     return render(request, 'expenses/vendor_list.html', context)
 
 
