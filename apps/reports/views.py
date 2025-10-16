@@ -825,7 +825,7 @@ class ReportsView(TemplateView):
         
         # Get only approved expenses for the period
         expenses = Expense.objects.filter(
-            created_at__range=[start_datetime, end_datetime],
+            expense_date__range=[start_date, end_date],
             status='approved'  # Only approved expenses
         ).aggregate(total=Sum('total_amount'))['total'] or 0
         
@@ -2194,9 +2194,9 @@ class ReportsView(TemplateView):
 
                 # Add only approved expenses as negative transactions
                 expense_items = Expense.objects.select_related('category', 'vendor').filter(
-                    created_at__range=[start_datetime, end_datetime],
+                    expense_date__range=[start_date, end_date],
                     status='approved'  # Only approved expenses
-                ).order_by('-created_at')
+                ).order_by('-expense_date')
 
                 for expense in expense_items:
                     desc = expense.description[:15] + '...' if expense.description and len(expense.description) > 15 else (expense.description or f"{expense.category.name[:10] if expense.category else 'Gen'}")
