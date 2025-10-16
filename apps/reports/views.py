@@ -2196,7 +2196,7 @@ class ReportsView(TemplateView):
                 expense_items = Expense.objects.select_related('category', 'vendor').filter(
                     expense_date__range=[start_date, end_date],
                     status='approved'  # Only approved expenses
-                ).order_by('-expense_date')
+                ).order_by('-expense_date')[:25]
 
                 for expense in expense_items:
                     desc = expense.description[:15] + '...' if expense.description and len(expense.description) > 15 else (expense.description or f"{expense.category.name[:10] if expense.category else 'Gen'}")
