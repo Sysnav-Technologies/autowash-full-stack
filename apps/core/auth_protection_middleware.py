@@ -30,7 +30,7 @@ class AuthProtectionMiddleware(MiddlewareMixin):
     
     def process_request(self, request):
         """Process request and handle authentication corruption gracefully"""
-        
+
         # List of paths that don't require authentication protection
         exempt_paths = [
             '/admin/login/',
@@ -41,20 +41,29 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             '/media/',
             '/favicon.ico',
         ]
-        
+
         # Skip exempt paths
         if any(request.path.startswith(path) for path in exempt_paths):
             return None
-        
+
         try:
+            # Ensure session is properly initialized before accessing user
+            if hasattr(request, 'session') and hasattr(request.session, '_get_session'):
+                # Force session cache initialization to prevent AttributeError
+                try:
+                    _ = request.session._session
+                except AttributeError:
+                    # Initialize _session_cache if missing
+                    request.session._session_cache = {}
+
             # Try to access user attribute to trigger authentication
             user = getattr(request, 'user', None)
-            
+
             # If user access triggers an error, it will be caught below
             if user is not None:
                 # Force evaluation of lazy user object
                 is_authenticated = user.is_authenticated
-                
+
         except (IndexError, ValueError, TypeError, SessionInterrupted, OperationalError, pymysql.err.OperationalError) as e:
             # Handle authentication corruption, session interruption, and database errors
             error_type = type(e).__name__
