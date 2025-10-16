@@ -493,8 +493,8 @@ USE_TEMPLATE_CACHE = False  # Never cache templates to prevent staleness
 TEMPLATE_CACHE_TIMEOUT = 0  # Disable any template caching
 
 # Session configuration - optimized for reliability and multi-tenant stability
-# Always use database sessions for maximum reliability in multi-tenant environment
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+# Use cache-backed sessions for better resilience during database outages
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 
 SESSION_COOKIE_AGE = 3600 * 12  # 12 hours for better stability
 SESSION_COOKIE_NAME = 'autowash_sessionid'
