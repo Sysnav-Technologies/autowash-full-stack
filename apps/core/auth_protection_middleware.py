@@ -70,12 +70,15 @@ class AuthProtectionMiddleware(MiddlewareMixin):
                     request.session.flush()
                     # Create new session
                     request.session.create()
-                
+                    # Ensure _session_cache is initialized after session operations
+                    if not hasattr(request.session, '_session_cache'):
+                        request.session._session_cache = {}
+
                 # Set user to anonymous
                 request.user = AnonymousUser()
-                
+
                 logger.info(f"Cleared corrupted session due to {error_type}")
-                
+
             except Exception as cleanup_error:
                 logger.error(f"Error clearing corrupted session: {cleanup_error}")
                 # Force create new anonymous user
@@ -103,6 +106,9 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             # Try to clear session and continue
             try:
                 request.session.flush()
+                # Ensure _session_cache is initialized after session operations
+                if not hasattr(request.session, '_session_cache'):
+                    request.session._session_cache = {}
                 request.user = AnonymousUser()
             except Exception:
                 pass
@@ -131,6 +137,9 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             # Clear the corrupted session
             try:
                 request.session.flush()
+                # Ensure _session_cache is initialized after session operations
+                if not hasattr(request.session, '_session_cache'):
+                    request.session._session_cache = {}
                 request.user = AnonymousUser()
                 logger.info("Cleared session due to SessionInterrupted")
             except Exception as cleanup_error:
@@ -157,6 +166,9 @@ class AuthProtectionMiddleware(MiddlewareMixin):
                 # Clear session to prevent further corruption
                 try:
                     request.session.flush()
+                    # Ensure _session_cache is initialized after session operations
+                    if not hasattr(request.session, '_session_cache'):
+                        request.session._session_cache = {}
                     request.user = AnonymousUser()
                     logger.info("Cleared session due to MySQL Command Out of Sync")
                 except Exception as cleanup_error:
@@ -182,6 +194,9 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             # Try to clear the session
             try:
                 request.session.flush()
+                # Ensure _session_cache is initialized after session operations
+                if not hasattr(request.session, '_session_cache'):
+                    request.session._session_cache = {}
                 request.user = AnonymousUser()
                 logger.info("Cleared session due to IndexError")
             except Exception as cleanup_error:
@@ -214,6 +229,9 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             # Clear session to prevent cascade failures
             try:
                 request.session.flush()
+                # Ensure _session_cache is initialized after session operations
+                if not hasattr(request.session, '_session_cache'):
+                    request.session._session_cache = {}
                 logger.info("Flushed session during response processing due to save error")
             except Exception as cleanup_error:
                 logger.error(f"Error flushing session during response: {cleanup_error}")
