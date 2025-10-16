@@ -391,10 +391,10 @@ def get_cache_config():
                 # Separate cache for sessions with high-concurrency optimizations
                 'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
                 'LOCATION': str(cache_dir / 'sessions'),
-                'TIMEOUT': 3600 * 8,  # 8 hours for sessions (optimized)
+                'TIMEOUT': 3600 * 24,  # 24 hours for better session persistence
                 'OPTIONS': {
-                    'MAX_ENTRIES': 5000,   # Support more concurrent sessions
-                    'CULL_FREQUENCY': 6,   # Very light culling for better performance
+                    'MAX_ENTRIES': 10000,   # Support more concurrent sessions
+                    'CULL_FREQUENCY': 3,    # Light culling for better performance
                 }
             },
             'tenant_cache': {
@@ -493,7 +493,7 @@ USE_TEMPLATE_CACHE = False  # Never cache templates to prevent staleness
 TEMPLATE_CACHE_TIMEOUT = 0  # Disable any template caching
 
 # Session configuration - optimized for reliability and multi-tenant stability
-# Use cache-backed sessions for better resilience during database outages
+# Use cache-backed sessions for better persistence and performance on cPanel
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 
 SESSION_COOKIE_AGE = 3600 * 12  # 12 hours for better stability
