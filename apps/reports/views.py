@@ -838,7 +838,7 @@ class ReportsView(TemplateView):
             status__in=['completed', 'verified']
         ).exclude(
             payment_type='refund'
-        ).order_by('-completed_at')[:50]
+        ).order_by('-completed_at')
         
         for payment in payments:
             transactions.append({
@@ -854,7 +854,7 @@ class ReportsView(TemplateView):
             service_order__in=orders_in_period,
             status__in=['completed', 'verified'],
             payment_type='refund'
-        ).order_by('-completed_at')[:25]
+        ).order_by('-completed_at')
         
         for refund in refunds:
             transactions.append({
@@ -2196,7 +2196,7 @@ class ReportsView(TemplateView):
                 expense_items = Expense.objects.select_related('category', 'vendor').filter(
                     created_at__range=[start_datetime, end_datetime],
                     status='approved'  # Only approved expenses
-                ).order_by('-created_at')[:25]
+                ).order_by('-created_at')
 
                 for expense in expense_items:
                     desc = expense.description[:15] + '...' if expense.description and len(expense.description) > 15 else (expense.description or f"{expense.category.name[:10] if expense.category else 'Gen'}")
