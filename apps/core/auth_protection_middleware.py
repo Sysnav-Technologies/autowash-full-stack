@@ -70,67 +70,76 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             logger.warning(f"Authentication/Session error detected ({error_type}): {e}")
             logger.warning(f"Request path: {request.path}")
             logger.warning(f"Session key: {getattr(request.session, 'session_key', 'None')}")
-            
-            # Clear the corrupted session
-            try:
-                # Clear session data - handle different corruption types
-                if hasattr(request, 'session'):
-                    # Force flush the session to clear corruption
-                    request.session.flush()
-                    # Create new session
-                    request.session.create()
-                    # Ensure _session_cache is initialized after session operations
-                    if not hasattr(request.session, '_session_cache'):
-                        request.session._session_cache = {}
 
-                # Set user to anonymous
-                request.user = AnonymousUser()
-
-                logger.info(f"Cleared corrupted session due to {error_type}")
-
-            except Exception as cleanup_error:
-                logger.error(f"Error clearing corrupted session: {cleanup_error}")
-                # Force create new anonymous user
+            # Only clear session for REAL corruption issues, not initialization errors
+            if isinstance(e, (SessionInterrupted, OperationalError, pymysql.err.OperationalError)):
+                # Clear the corrupted session for real database/connection issues
                 try:
+                    # Clear session data - handle different corruption types
+                    if hasattr(request, 'session'):
+                        # Force flush the session to clear corruption
+                        request.session.flush()
+                        # Create new session
+                        request.session.create()
+                        # Ensure _session_cache is initialized after session operations
+                        if not hasattr(request.session, '_session_cache'):
+                            request.session._session_cache = {}
+
+                    # Set user to anonymous
                     request.user = AnonymousUser()
-                except Exception:
-                    pass
-            
-            # For AJAX requests, return JSON error
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-                return JsonResponse({
-                    'error': f'Session corruption detected ({error_type})',
-                    'message': 'Please refresh the page and log in again',
-                    'redirect': '/accounts/login/'
-                }, status=401)
-            
-            # For regular requests, redirect to login
-            return redirect('/accounts/login/?next=' + request.path)
+
+                    logger.info(f"Cleared corrupted session due to {error_type}")
+
+                except Exception as cleanup_error:
+                    logger.error(f"Error clearing corrupted session: {cleanup_error}")
+                    # Force create new anonymous user
+                    try:
+                        request.user = AnonymousUser()
+                    except Exception:
+                        pass
+
+                # For AJAX requests, return JSON error
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                    return JsonResponse({
+                        'error': f'Session corruption detected ({error_type})',
+                        'message': 'Please refresh the page and log in again',
+                        'redirect': '/accounts/login/'
+                    }, status=401)
+
+                # For regular requests, redirect to login
+                return redirect('/accounts/login/?next=' + request.path)
+            else:
+                # For other errors (like AttributeError from missing _session_cache), just log and continue
+                logger.warning(f"Non-critical session error ({error_type}), continuing with request")
+                # Don't clear session or logout user for these errors
         
         except Exception as e:
             # Handle any other unexpected authentication errors
             logger.error(f"Unexpected authentication error: {e}")
             logger.error(f"Request path: {request.path}")
-            
-            # Try to clear session and continue
-            try:
-                request.session.flush()
-                # Ensure _session_cache is initialized after session operations
-                if not hasattr(request.session, '_session_cache'):
-                    request.session._session_cache = {}
-                request.user = AnonymousUser()
-            except Exception:
-                pass
-            
-            # For AJAX requests
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'error': 'Authentication system error',
-                    'message': 'Please refresh the page',
-                }, status=500)
-            
-            # Continue with anonymous user for regular requests
-            request.user = AnonymousUser()
+
+            # Only clear session for critical errors, not for session cache issues
+            if isinstance(e, (OperationalError, pymysql.err.OperationalError)):
+                # Clear session for database connection issues
+                try:
+                    request.session.flush()
+                    # Ensure _session_cache is initialized after session operations
+                    if not hasattr(request.session, '_session_cache'):
+                        request.session._session_cache = {}
+                    request.user = AnonymousUser()
+                except Exception:
+                    pass
+
+                # For AJAX requests
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'error': 'Database connection error',
+                        'message': 'Please refresh the page',
+                    }, status=500)
+            else:
+                # For other errors (like AttributeError), just log and continue without clearing session
+                logger.warning(f"Non-critical authentication error ({type(e).__name__}), continuing without session clear")
+                # Don't set user to anonymous or clear session for these errors
         
         return None
 
@@ -171,7 +180,7 @@ class AuthProtectionMiddleware(MiddlewareMixin):
             if "Command Out of Sync" in error_msg or "2014" in error_msg:
                 logger.error(f"MySQL Command Out of Sync error: {exception}")
                 logger.error(f"Request path: {request.path}")
-                
+
                 # Clear session to prevent further corruption
                 try:
                     request.session.flush()
@@ -182,7 +191,7 @@ class AuthProtectionMiddleware(MiddlewareMixin):
                     logger.info("Cleared session due to MySQL Command Out of Sync")
                 except Exception as cleanup_error:
                     logger.error(f"Error clearing session after MySQL error: {cleanup_error}")
-                
+
                 # For AJAX requests
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({
@@ -190,34 +199,44 @@ class AuthProtectionMiddleware(MiddlewareMixin):
                         'message': 'Database connection corrupted. Please refresh the page.',
                         'redirect': '/accounts/login/'
                     }, status=500)
-                
+
                 # For regular requests, redirect to a safe page
                 return redirect('/accounts/login/?db_error=1')
+            else:
+                # For other MySQL errors, don't clear session - just log
+                logger.warning(f"MySQL operational error (non-critical): {exception}")
+                logger.warning(f"Request path: {request.path}")
         
         if isinstance(exception, IndexError):
             # This is likely the 'list index out of range' error we're seeing
             logger.error(f"IndexError in authentication: {exception}")
             logger.error(f"Request path: {request.path}")
             logger.error(f"User: {getattr(request, 'user', 'Unknown')}")
-            
-            # Try to clear the session
-            try:
-                request.session.flush()
-                # Ensure _session_cache is initialized after session operations
-                if not hasattr(request.session, '_session_cache'):
-                    request.session._session_cache = {}
-                request.user = AnonymousUser()
-                logger.info("Cleared session due to IndexError")
-            except Exception as cleanup_error:
-                logger.error(f"Error clearing session after IndexError: {cleanup_error}")
-            
-            # For AJAX requests
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'error': 'Database corruption detected',
-                    'message': 'Session cleared. Please refresh and try again.',
-                    'redirect': '/accounts/login/'
-                }, status=500)
+
+            # Only clear session for critical IndexError cases, not all of them
+            error_msg = str(exception)
+            if "list index out of range" in error_msg.lower():
+                # Clear session for critical list index errors that indicate real corruption
+                try:
+                    request.session.flush()
+                    # Ensure _session_cache is initialized after session operations
+                    if not hasattr(request.session, '_session_cache'):
+                        request.session._session_cache = {}
+                    request.user = AnonymousUser()
+                    logger.info("Cleared session due to critical IndexError")
+                except Exception as cleanup_error:
+                    logger.error(f"Error clearing session after IndexError: {cleanup_error}")
+
+                # For AJAX requests
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'error': 'Database corruption detected',
+                        'message': 'Session cleared. Please refresh and try again.',
+                        'redirect': '/accounts/login/'
+                    }, status=500)
+            else:
+                # For other IndexError types, just log and continue
+                logger.warning(f"Non-critical IndexError, continuing without session clear")
         
         # Let other exceptions continue normal handling
         return None
@@ -234,19 +253,23 @@ class AuthProtectionMiddleware(MiddlewareMixin):
         except (SessionInterrupted, OperationalError, pymysql.err.OperationalError) as e:
             logger.error(f"Session save error during response: {e}")
             logger.error(f"Request path: {request.path}")
-            
-            # Clear session to prevent cascade failures
-            try:
-                request.session.flush()
-                # Ensure _session_cache is initialized after session operations
-                if not hasattr(request.session, '_session_cache'):
-                    request.session._session_cache = {}
-                logger.info("Flushed session during response processing due to save error")
-            except Exception as cleanup_error:
-                logger.error(f"Error flushing session during response: {cleanup_error}")
-            
-            # Return the response anyway - session is cleared
+
+            # Only clear session for critical database errors, not for cache issues
+            if isinstance(e, (OperationalError, pymysql.err.OperationalError)):
+                # Clear session to prevent cascade failures for real DB issues
+                try:
+                    request.session.flush()
+                    # Ensure _session_cache is initialized after session operations
+                    if not hasattr(request.session, '_session_cache'):
+                        request.session._session_cache = {}
+                    logger.info("Flushed session during response processing due to DB save error")
+                except Exception as cleanup_error:
+                    logger.error(f"Error flushing session during response: {cleanup_error}")
+            else:
+                # For SessionInterrupted and other errors, just log
+                logger.warning(f"Session error during response (not cleared): {type(e).__name__}")
+
         except Exception as e:
             logger.error(f"Unexpected session error during response: {e}")
-        
+
         return response

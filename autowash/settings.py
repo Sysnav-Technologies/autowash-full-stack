@@ -493,10 +493,10 @@ USE_TEMPLATE_CACHE = False  # Never cache templates to prevent staleness
 TEMPLATE_CACHE_TIMEOUT = 0  # Disable any template caching
 
 # Session configuration - optimized for reliability and multi-tenant stability
-# Use cache-backed sessions for better persistence and performance on cPanel
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+# Use database sessions for maximum reliability in multi-tenant environment
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
-SESSION_COOKIE_AGE = 3600 * 12  # 12 hours for better stability
+SESSION_COOKIE_AGE = 3600 * 24  # 24 hours for better session persistence
 SESSION_COOKIE_NAME = 'autowash_sessionid'
 SESSION_COOKIE_SECURE = not DEBUG and (CPANEL or RENDER)  # Secure in production
 SESSION_COOKIE_HTTPONLY = True
