@@ -24,9 +24,10 @@ class DatabaseConnectionProtectionMiddleware(MiddlewareMixin):
     """
     
     # Connection health check settings
-    HEALTH_CHECK_INTERVAL = 300  # 5 minutes
-    MAX_RETRY_ATTEMPTS = 3
-    RETRY_DELAY = 0.5  # 500ms between retries
+    HEALTH_CHECK_INTERVAL = 60  # 1 minute
+    MAX_RETRY_ATTEMPTS = 5  # Increased retries
+    RETRY_DELAY = 1.0  # 1 second between retries
+    CONNECTION_TIMEOUT = 5  # 5 seconds connection timeout
     
     def process_request(self, request):
         """Process request with enhanced database connection management"""
@@ -35,7 +36,17 @@ class DatabaseConnectionProtectionMiddleware(MiddlewareMixin):
         if self._is_static_request(request):
             return None
             
-        return self._ensure_database_health(request)
+        try:
+            return self._ensure_database_health(request)
+        except (pymysql.Error, ConnectionError) as e:
+            logger.error(f"Database connection error: {str(e)}")
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'error': 'Database Connection Error',
+                    'message': 'Unable to connect to database. Please try again.',
+                    'retry': True
+                }, status=503)
+            return HttpResponse("Database connection error. Please try again later.", status=503)
     
     def _is_static_request(self, request):
         """Check if request is for static content"""
@@ -46,6 +57,32 @@ class DatabaseConnectionProtectionMiddleware(MiddlewareMixin):
     def _ensure_database_health(self, request):
         """Ensure database connections are healthy with retry logic"""
         
+        attempt = 0
+        last_error = None
+        
+        while attempt < self.MAX_RETRY_ATTEMPTS:
+            try:
+                # Set connection timeouts
+                connection.ensure_connection()
+                for conn in connections.all():
+                    conn.connect()
+                    if hasattr(conn.connection, 'ping'):
+                        conn.connection.ping(reconnect=True)
+                return None
+                
+            except (pymysql.Error, ConnectionError) as e:
+                last_error = e
+                attempt += 1
+                if attempt < self.MAX_RETRY_ATTEMPTS:
+                    time.sleep(self.RETRY_DELAY * attempt)  # Exponential backoff
+                    continue
+                    
+                # Clear connection on persistent failure
+                for conn in connections.all():
+                    conn.close_if_unusable_or_obsolete()
+                    
+                raise  # Re-raise the last error if all retries failed
+                
         # Check if we need to perform health check
         if not self._should_check_connection_health():
             return None

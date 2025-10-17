@@ -289,7 +289,7 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
-        'CONN_MAX_AGE': 0,  # Disable connection pooling to prevent timeout issues
+        'CONN_MAX_AGE': 60,  # 1 minute connection age for controlled pooling
         'CONN_HEALTH_CHECKS': True,  # Enable connection health checks
         'OPTIONS': {
             'charset': 'utf8mb4',
@@ -303,16 +303,20 @@ DATABASES = {
                 "innodb_lock_wait_timeout=120"
             ),
             'autocommit': True,
-            # Connection pool settings for PyMySQL
-            'connect_timeout': 60,
-            'read_timeout': 60,
-            'write_timeout': 60,
+            # Connection pool settings for PyMySQL with better timeout handling
+            'connect_timeout': 10,  # Reduced from 60 to fail faster
+            'read_timeout': 30,    # Reduced from 60 for faster failure detection
+            'write_timeout': 30,   # Reduced from 60 for faster failure detection
             'read_default_file': None,
             'read_default_group': None,
             'autocommit': True,
             'sql_mode': 'STRICT_TRANS_TABLES',
             # Additional MySQL specific settings
             'isolation_level': None,  # Use MySQL default
+            'pool_reset_session': True,  # Reset session variables on connection return to pool
+            'retry_reads': True,   # Enable automatic retry for read operations
+            'retry_writes': True,  # Enable automatic retry for write operations
+            'max_allowed_packet': 64 * 1024 * 1024,  # 64MB to handle larger transactions
         },
         'TEST': {
             'CHARSET': 'utf8mb4',

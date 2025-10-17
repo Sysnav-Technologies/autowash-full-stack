@@ -371,6 +371,7 @@ class CreateTemplateView(LoginRequiredMixin, CreateView):
     model = SMSTemplate
     template_name = 'messaging/create_template.html'
     fields = ['name', 'template_type', 'subject', 'message', 'variables', 'is_active']
+    success_url = '/messaging/templates/'  # Redirect to templates list after creation
     
     def form_valid(self, form):
         tenant = getattr(self.request, 'tenant', None)
