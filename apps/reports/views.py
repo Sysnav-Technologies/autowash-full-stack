@@ -2483,7 +2483,7 @@ class ReportsView(TemplateView):
             headers = ['Item Name', 'Category', 'Current Stock', 'Stock Value', 'Movements']
             table_data = [headers]
             total_value = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 stock_value = float(item.current_stock or 0) * float(getattr(item, 'unit_cost', 0) or 0)
                 total_value += stock_value
                 table_data.append([
@@ -2500,7 +2500,7 @@ class ReportsView(TemplateView):
             headers = ['Service Name', 'Category', 'Price', 'Payments', 'Revenue']
             table_data = [headers]
             total_revenue = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 revenue = float(getattr(item, 'total_revenue', 0) or 0)
                 total_revenue += revenue
                 table_data.append([
@@ -2517,7 +2517,7 @@ class ReportsView(TemplateView):
             headers = ['Customer Name', 'Email', 'Phone', 'Payments', 'Total Spent']
             table_data = [headers]
             total_spent = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 spent = float(getattr(item, 'total_spent', 0) or 0)
                 total_spent += spent
                 table_data.append([
@@ -2534,7 +2534,7 @@ class ReportsView(TemplateView):
             headers = ['Employee Name', 'Department', 'Position', 'Payments', 'Revenue']
             table_data = [headers]
             total_revenue = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 revenue = float(getattr(item, 'revenue_generated', 0) or 0)
                 total_revenue += revenue
                 table_data.append([
@@ -2553,7 +2553,7 @@ class ReportsView(TemplateView):
                 headers = ['Payment Date', 'Order #', 'Customer', 'Payment Method', 'Amount', 'Status']
                 table_data = [headers]
                 total_amount = 0
-                for item in items[:50]:
+                for item in items:  # Show all items like in Excel
                     amount = float(item.amount or 0)
                     total_amount += amount
                     table_data.append([
@@ -2629,7 +2629,7 @@ class ReportsView(TemplateView):
             table_data = [headers]
             total_revenue = 0
             total_orders = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 revenue = float(item.get('revenue_from_payments', 0) or 0)
                 orders_count = int(item.get('orders_count', 0) or 0)
                 paid_orders = int(item.get('paid_orders_count', 0) or 0)
@@ -2657,7 +2657,7 @@ class ReportsView(TemplateView):
             headers = ['Week', 'Orders Count', 'Revenue', 'Completed Orders']
             table_data = [headers]
             total_revenue = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 revenue = float(item.get('revenue_from_payments', 0) or 0)
                 total_revenue += revenue
                 week_str = item.get('week', 'N/A')
@@ -2676,7 +2676,7 @@ class ReportsView(TemplateView):
             headers = ['Month', 'Orders Count', 'Revenue', 'Completed Orders']
             table_data = [headers]
             total_revenue = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 revenue = float(item.get('revenue_from_payments', 0) or 0)
                 total_revenue += revenue
                 month_str = item.get('month', 'N/A')
@@ -2695,7 +2695,7 @@ class ReportsView(TemplateView):
             headers = ['Service', 'Category', 'Quantity', 'Revenue', 'Orders']
             table_data = [headers]
             total_revenue = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 revenue = float(item.get('total_revenue', 0) or 0)
                 total_revenue += revenue
                 service_name = item.get('service__name', 'N/A')
@@ -2716,7 +2716,7 @@ class ReportsView(TemplateView):
             headers = ['Date', 'Description', 'Category', 'Vendor', 'Amount']
             table_data = [headers]
             total_amount = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 amount = float(item.total_amount or 0)
                 total_amount += amount
                 table_data.append([
@@ -2734,7 +2734,7 @@ class ReportsView(TemplateView):
             table_data = [headers]
             total_revenue = 0
             total_services = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 spent = float(item.total_spent or 0)
                 services = int(item.paid_services_count or 0)
                 total_revenue += spent
@@ -2787,7 +2787,7 @@ class ReportsView(TemplateView):
             table_data = [headers]
             total_refund_amount = 0
             
-            for item in items[:50]:  # Limit to 50 items for PDF
+            for item in items:  # Show all items like in Excel
                 if isinstance(item, dict):
                     amount = float(item.get('amount', 0))
                     total_refund_amount += amount
@@ -2820,9 +2820,9 @@ class ReportsView(TemplateView):
             # Generic format for other report types
             headers = ['Item', 'Details', 'Value']
             table_data = [headers]
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 table_data.append([
-                    str(item)[:40],
+                    str(item),  # Show full item string
                     f"{report_type.title()} data",
                     'N/A'
                 ])
