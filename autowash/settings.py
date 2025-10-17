@@ -303,20 +303,11 @@ DATABASES = {
                 "innodb_lock_wait_timeout=120"
             ),
             'autocommit': True,
-            # Connection pool settings for PyMySQL with better timeout handling
             'connect_timeout': 10,  # Reduced from 60 to fail faster
             'read_timeout': 30,    # Reduced from 60 for faster failure detection
             'write_timeout': 30,   # Reduced from 60 for faster failure detection
-            'read_default_file': None,
-            'read_default_group': None,
-            'autocommit': True,
             'sql_mode': 'STRICT_TRANS_TABLES',
-            # Additional MySQL specific settings
             'isolation_level': None,  # Use MySQL default
-            'pool_reset_session': True,  # Reset session variables on connection return to pool
-            'retry_reads': True,   # Enable automatic retry for read operations
-            'retry_writes': True,  # Enable automatic retry for write operations
-            'max_allowed_packet': 64 * 1024 * 1024,  # 64MB to handle larger transactions
         },
         'TEST': {
             'CHARSET': 'utf8mb4',
