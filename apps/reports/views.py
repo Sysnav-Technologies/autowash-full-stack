@@ -2457,7 +2457,7 @@ class ReportsView(TemplateView):
             table_data = [headers]
             total_amount = 0
             paid_orders_total = 0
-            for item in items[:50]:  # Limit to 50 items for PDF
+            for item in items:  # Show all items like in Excel
                 amount = float(item.total_amount or 0)
                 total_amount += amount
                 
@@ -2574,7 +2574,7 @@ class ReportsView(TemplateView):
             table_data = [headers]
             total_revenue = 0
             total_expenses = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 amount = float(item.get('amount', 0) or 0)
                 if item.get('type') == 'Revenue':
                     total_revenue += amount
@@ -2611,7 +2611,7 @@ class ReportsView(TemplateView):
             headers = ['Payment Date', 'Order #', 'Customer', 'Method', 'Amount']
             table_data = [headers]
             total_amount = 0
-            for item in items[:50]:
+            for item in items:  # Show all items like in Excel
                 amount = float(item.amount or 0)
                 total_amount += amount
                 table_data.append([
