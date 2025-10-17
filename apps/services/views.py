@@ -1511,11 +1511,17 @@ from django.views.decorators.cache import never_cache
 def order_detail_view(request, pk):
     """Service order detail view - always gets fresh data"""
     from django.db import transaction
+    from django.shortcuts import redirect
+    from django.contrib import messages
     
-    # Use a fresh database connection to avoid any cached queries
-    with transaction.atomic():
-        # Force fresh data from database - no caching
-        order = ServiceOrder.objects.select_related('customer', 'vehicle', 'assigned_attendant').get(pk=pk)
+    try:
+        # Use a fresh database connection to avoid any cached queries
+        with transaction.atomic():
+            # Force fresh data from database - no caching
+            order = ServiceOrder.objects.select_related('customer', 'vehicle', 'assigned_attendant').get(pk=pk)
+    except ServiceOrder.DoesNotExist:
+        messages.error(request, 'The requested service order was not found or has been deleted.')
+        return redirect('services:order_list')
         
         # Clear persistent success messages for cancelled orders to prevent repeated display
         if order.status == 'cancelled' and request.GET.get('refresh'):
