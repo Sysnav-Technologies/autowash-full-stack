@@ -121,6 +121,7 @@ urlpatterns = [
     path('commissions/<int:item_id>/', views.commission_detail_view, name='commission_detail'),
     path('commissions/<int:item_id>/mark-paid/', views.mark_commission_paid, name='mark_commission_paid'),
     path('commissions/<int:item_id>/mark-unpaid/', views.mark_commission_unpaid, name='mark_commission_unpaid'),
+    path('commissions/<int:item_id>/create-expense/', views.create_commission_expense, name='create_commission_expense'),
     path('commissions/employee/<uuid:employee_id>/', views.employee_commission_report, name='employee_commission_report'),
     path('commissions/bulk-payment/', views.bulk_commission_payment, name='bulk_commission_payment'),
 ]

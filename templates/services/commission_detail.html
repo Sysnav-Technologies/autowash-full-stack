@@ -195,6 +195,13 @@ so{% extends 'base/base.html' %}
                                     <small class="text-muted">Commission Rate</small>
                                 </div>
                             </div>
+                            {% if commission_item.commission_paid and not expense %}
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-warning btn-sm w-100" onclick="createExpenseRecord()">
+                                        <i class="fas fa-plus me-2"></i>Create Expense Record
+                                    </button>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -332,6 +339,31 @@ function markAsPaid() {
 
 function markAsUnpaid() {
     new bootstrap.Modal(document.getElementById('markUnpaidModal')).show();
+}
+
+function createExpenseRecord() {
+    if (confirm('Create an expense record for this commission payment?')) {
+        fetch(window.location.pathname + 'create-expense/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: 'csrfmiddlewaretoken=' + document.querySelector('[name=csrfmiddlewaretoken]').value
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload(); // Refresh to show the new expense record
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating expense record');
+        });
+    }
 }
 
 // Update hidden field when checkbox changes

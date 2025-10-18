@@ -363,13 +363,22 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to mark this commission as paid? This will create an expense record.</p>
+                <p>Are you sure you want to mark this commission as paid?</p>
                 <div id="commissionDetails"></div>
+
+                <div class="form-check mt-3">
+                    <input type="checkbox" class="form-check-input" id="createExpenseRecord" name="create_expense" checked>
+                    <label class="form-check-label" for="createExpenseRecord">
+                        Create expense record for this payment
+                    </label>
+                    <small class="form-text text-muted">Uncheck if you don't want to create an expense record in the accounting system.</small>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <form id="markPaidForm" method="POST" style="display: inline;">
                     {% csrf_token %}
+                    <input type="hidden" name="create_expense" id="createExpenseHidden" value="true">
                     <button type="submit" class="btn btn-success">Mark as Paid</button>
                 </form>
             </div>
@@ -412,9 +421,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const checkboxes = document.querySelectorAll('.commission-checkbox');
         checkboxes.forEach(checkbox => checkbox.checked = this.checked);
     });
+
+    // Handle expense record checkbox
+    document.getElementById('createExpenseRecord').addEventListener('change', function() {
+        document.getElementById('createExpenseHidden').value = this.checked ? 'true' : 'false';
+    });
 });
 
 function markAsPaid(commissionId) {
+    // Reset checkbox to checked state
+    document.getElementById('createExpenseRecord').checked = true;
+    document.getElementById('createExpenseHidden').value = 'true';
+
     // Get commission details
     fetch(`/business/{{ request.tenant.slug }}/services/commissions/${commissionId}/`)
         .then(response => response.text())

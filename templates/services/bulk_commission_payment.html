@@ -37,7 +37,58 @@
         <div class="col-12">
             <div class="alert alert-info">
                 <h5><i class="fas fa-info-circle me-2"></i>Bulk Commission Payment</h5>
-                <p class="mb-0">Select multiple pending commissions and mark them as paid or unpaid in bulk. This will create expense records for all selected commissions.</p>
+                <p class="mb-0">Select multiple pending commissions and mark them as paid or unpaid in bulk. You can filter by period and employee, and choose whether to create expense records.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Filter Commissions</h6>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="period" class="form-label">Period</label>
+                            <select class="form-select" id="period" name="period">
+                                <option value="all" {% if current_period == 'all' %}selected{% endif %}>All Time</option>
+                                <option value="today" {% if current_period == 'today' %}selected{% endif %}>Today</option>
+                                <option value="week" {% if current_period == 'week' %}selected{% endif %}>This Week</option>
+                                <option value="month" {% if current_period == 'month' %}selected{% endif %}>This Month</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="employee" class="form-label">Employee</label>
+                            <select class="form-select" id="employee" name="employee">
+                                <option value="">All Employees</option>
+                                {% for employee in employees %}
+                                <option value="{{ employee.id }}" {% if current_employee == employee.id|stringformat:'s' %}selected{% endif %}>
+                                    {{ employee.full_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-filter me-2"></i>Filter
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <a href="{% url 'services:bulk_commission_payment' %}" class="btn btn-secondary">
+                                    <i class="fas fa-redo me-2"></i>Reset
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -54,7 +105,7 @@
                     <form method="POST" action="/business/{{ request.tenant.slug }}/services/commissions/bulk-payment/">
                         {% csrf_token %}
                         <div class="row">
-                            <div class="col-md-8">
+                            <div class="col-md-6">
                                 <div class="form-check">
                                     <input type="checkbox" class="form-check-input" id="selectAllBulk" />
                                     <label for="selectAllBulk" class="form-check-label">
@@ -63,10 +114,21 @@
                                 </div>
                                 <p class="text-muted mt-2">
                                     <strong>{{ unpaid_commissions|length }}</strong> pending commissions found.
-                                    Total amount: <strong>KES {{ total_pending|floatformat:2 }}</strong>
+                                    Total amount: <strong>KES {{ total_amount|floatformat:2 }}</strong>
                                 </p>
                             </div>
-                            <div class="col-md-4 text-end">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="bulkCreateExpense" name="create_expense" checked>
+                                    <label for="bulkCreateExpense" class="form-check-label">
+                                        Create expense records for selected payments
+                                    </label>
+                                    <small class="form-text text-muted">Uncheck if you don't want to create expense records in the accounting system.</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 text-end">
                                 <div class="btn-group">
                                     <button type="submit" name="action" value="mark_paid" class="btn btn-success">
                                         <i class="fas fa-check me-2"></i>Mark Selected as Paid
