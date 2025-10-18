@@ -9,52 +9,49 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h1 class="h3 mb-0 text-gray-800">Commission Management</h1>
+                    <h1 class="h3 mb-0 text-gray-800">Commission Management Dashboard</h1>
                     <p class="mb-0 text-muted">Track and manage employee commissions</p>
                 </div>
                 <div class="d-flex gap-2">
                     <a href="/business/{{ request.tenant.slug }}/services/commissions/list/" class="btn btn-primary">
-                        <i class="fas fa-list me-2"></i>View All Commissions
+                        <i class="fas fa-list me-2"></i>All Commissions
                     </a>
                     <a href="/business/{{ request.tenant.slug }}/services/commissions/bulk-payment/" class="btn btn-success">
                         <i class="fas fa-money-bill-wave me-2"></i>Bulk Payment
                     </a>
+                    <button type="button" class="btn btn-info" onclick="refreshDashboard()">
+                        <i class="fas fa-sync-alt me-2"></i>Refresh
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Date Range Filter -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
-                    <form method="GET" class="row g-3">
-                        <div class="col-md-3">
+                    <form method="GET" class="row g-3 align-items-end">
+                        <div class="col-md-4">
                             <label for="date_from" class="form-label">From Date</label>
                             <input type="date" class="form-control" id="date_from" name="date_from"
                                    value="{{ date_from|default:'' }}">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label for="date_to" class="form-label">To Date</label>
                             <input type="date" class="form-control" id="date_to" name="date_to"
                                    value="{{ date_to|default:'' }}">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">&nbsp;</label>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-filter me-2"></i>Filter
-                                </button>
-                            </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-filter me-2"></i>Filter
+                            </button>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">&nbsp;</label>
-                            <div class="d-grid">
-                                <a href="{% url 'services:commission_dashboard' %}" class="btn btn-secondary">
-                                    <i class="fas fa-redo me-2"></i>Reset
-                                </a>
-                            </div>
+                        <div class="col-md-2">
+                            <a href="{% url 'services:commission_dashboard' %}" class="btn btn-secondary w-100">
+                                <i class="fas fa-redo me-2"></i>Reset
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -74,6 +71,7 @@
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 KES {{ total_commission|floatformat:2 }}
                             </div>
+                            <small class="text-muted">{{ commission_items.count }} records</small>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-coins fa-2x text-gray-300"></i>
@@ -93,6 +91,7 @@
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 KES {{ paid_commission|floatformat:2 }}
                             </div>
+                            <small class="text-muted">{{ commission_items|length }} paid</small>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-check-circle fa-2x text-gray-300"></i>
@@ -112,6 +111,7 @@
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 KES {{ pending_commission|floatformat:2 }}
                             </div>
+                            <small class="text-muted">{{ pending_count }} pending</small>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-clock fa-2x text-gray-300"></i>
@@ -135,6 +135,7 @@
                                     0%
                                 {% endif %}
                             </div>
+                            <small class="text-muted">of total commission</small>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-percentage fa-2x text-gray-300"></i>
@@ -145,25 +146,41 @@
         </div>
     </div>
 
-    <!-- Charts Row -->
+    <!-- Main Content Row -->
     <div class="row mb-4">
-        <!-- Employee Commission Breakdown -->
+        <!-- Employee Commission Table -->
         <div class="col-lg-8 mb-4">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Employee Commission Breakdown</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-users me-2"></i>Employee Commission Summary
+                    </h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="employeeDropdown" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in">
+                            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/commissions/list/?status=pending">
+                                <i class="fas fa-clock me-2"></i>View Pending Only
+                            </a>
+                            <a class="dropdown-item" href="/business/{{ request.tenant.slug }}/services/commissions/list/?status=paid">
+                                <i class="fas fa-check me-2"></i>View Paid Only
+                            </a>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if employee_commissions %}
                         <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead>
+                            <table class="table table-hover">
+                                <thead class="table-light">
                                     <tr>
                                         <th>Employee</th>
+                                        <th>Services Completed</th>
                                         <th>Total Commission</th>
                                         <th>Paid</th>
                                         <th>Pending</th>
-                                        <th>Services</th>
+                                        <th>Payment Rate</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -171,18 +188,54 @@
                                     {% for emp in employee_commissions %}
                                     <tr>
                                         <td>
-                                            <strong>{{ emp.assigned_to__first_name|default:"Unknown" }} {{ emp.assigned_to__last_name|default:"Employee" }}</strong>
-                                            <br><small class="text-muted">{{ emp.assigned_to__employee_id|default:"N/A" }}</small>
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                                <div>
+                                                    <strong>{{ emp.assigned_to__first_name|default:"Unknown" }} {{ emp.assigned_to__last_name|default:"Employee" }}</strong>
+                                                    <br><small class="text-muted">{{ emp.assigned_to__employee_id|default:"N/A" }}</small>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td>KES {{ emp.total_commission|floatformat:2 }}</td>
-                                        <td><span class="text-success">KES {{ emp.paid_commission|floatformat:2 }}</span></td>
-                                        <td><span class="text-warning">KES {{ emp.pending_commission|floatformat:2 }}</span></td>
-                                        <td>{{ emp.completed_services }}</td>
                                         <td>
-                                            <a href="/business/{{ request.tenant.slug }}/services/commissions/employee/{{ emp.assigned_to__employee_id }}/?date_from={{ date_from }}&date_to={{ date_to }}"
-                                               class="btn btn-sm btn-info">
-                                                <i class="fas fa-chart-bar me-1"></i>View Report
-                                            </a>
+                                            <span class="badge bg-info">{{ emp.completed_services }}</span>
+                                        </td>
+                                        <td>
+                                            <strong>KES {{ emp.total_commission|floatformat:2 }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="text-success fw-bold">KES {{ emp.paid_commission|floatformat:2 }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-warning fw-bold">KES {{ emp.pending_commission|floatformat:2 }}</span>
+                                        </td>
+                                        <td>
+                                            {% if emp.total_commission > 0 %}
+                                                <div class="progress" style="width: 60px;">
+                                                    <div class="progress-bar bg-success" role="progressbar"
+                                                         style="width: {{ emp.paid_commission|floatformat:0 }}%"
+                                                         aria-valuenow="{{ emp.paid_commission|floatformat:0 }}"
+                                                         aria-valuemin="0" aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <small class="ms-2">{{ emp.paid_commission|floatformat:0 }}%</small>
+                                            {% else %}
+                                                <span class="text-muted">0%</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="/business/{{ request.tenant.slug }}/services/commissions/employee/{{ emp.assigned_to__employee_id }}/?date_from={{ date_from }}&date_to={{ date_to }}"
+                                                   class="btn btn-sm btn-outline-primary" title="View Employee Report">
+                                                    <i class="fas fa-chart-bar"></i>
+                                                </a>
+                                                <button type="button" class="btn btn-sm btn-outline-success"
+                                                        onclick="payEmployeeCommissions('{{ emp.assigned_to__employee_id }}')"
+                                                        title="Pay All Pending">
+                                                    <i class="fas fa-money-bill-wave"></i>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -190,31 +243,38 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-coins fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">No commission data found for the selected period.</p>
+                        <div class="text-center py-5">
+                            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Employee Commission Data</h5>
+                            <p class="text-muted">No commission records found for the selected period.</p>
+                            <a href="/business/{{ request.tenant.slug }}/services/orders/" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Complete Some Services
+                            </a>
                         </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- Service Commission Breakdown -->
+        <!-- Right Sidebar -->
         <div class="col-lg-4 mb-4">
+            <!-- Top Services -->
             <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Top Services</h6>
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-trophy me-2"></i>Top Services
+                    </h6>
                 </div>
                 <div class="card-body">
                     {% if service_commissions %}
                         {% for service in service_commissions %}
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <h6 class="mb-0">{{ service.service__name|default:"Unknown Service" }}</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-3 p-2 border rounded">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ service.service__name|default:"Unknown Service" }}</h6>
                                 <small class="text-muted">{{ service.service__category__name|default:"No Category" }}</small>
                             </div>
-                            <div class="text-right">
-                                <div class="font-weight-bold">KES {{ service.total_commission|floatformat:2 }}</div>
+                            <div class="text-end ms-3">
+                                <div class="fw-bold text-primary">KES {{ service.total_commission|floatformat:2 }}</div>
                                 <small class="text-muted">{{ service.service_count }} services</small>
                             </div>
                         </div>
@@ -222,7 +282,7 @@
                     {% else %}
                         <div class="text-center py-4">
                             <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">No service commission data found.</p>
+                            <p class="text-muted">No service data available</p>
                         </div>
                     {% endif %}
                 </div>
@@ -231,7 +291,9 @@
             <!-- Quick Actions -->
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h6>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
@@ -244,30 +306,74 @@
                         <button type="button" class="btn btn-info" onclick="exportCommissions()">
                             <i class="fas fa-download me-2"></i>Export Data
                         </button>
+                        <button type="button" class="btn btn-warning" onclick="processDailyCommissions()">
+                            <i class="fas fa-calendar-day me-2"></i>Process Daily
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Commission Status -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-info-circle me-2"></i>Status Overview
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <div class="h4 mb-0 text-success">{{ paid_count|default:0 }}</div>
+                                <small class="text-muted">Paid</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="h4 mb-0 text-warning">{{ pending_count|default:0 }}</div>
+                            <small class="text-muted">Pending</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                        <small class="text-muted">Period: {{ date_from|default:"All" }} to {{ date_to|default:"Now" }}</small>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Recent Commissions -->
+    <!-- Recent Commissions Table -->
     <div class="row">
         <div class="col-12">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Recent Commission Records</h6>
-                    <a href="/business/{{ request.tenant.slug }}/services/commissions/list/" class="btn btn-sm btn-primary">
-                        View All <i class="fas fa-arrow-right ms-1"></i>
-                    </a>
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-clock me-2"></i>Recent Commission Records
+                    </h6>
+                    <div class="d-flex gap-2">
+                        <a href="/business/{{ request.tenant.slug }}/services/commissions/list/" class="btn btn-sm btn-primary">
+                            View All <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                        <div class="dropdown no-arrow">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-filter me-1"></i>Filter
+                            </button>
+                            <div class="dropdown-menu">
+                                <a class="dropdown-item" href="?status=pending">Pending Only</a>
+                                <a class="dropdown-item" href="?status=paid">Paid Only</a>
+                                <a class="dropdown-item" href="?">All Records</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if commission_items %}
                         <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead>
+                            <table class="table table-hover">
+                                <thead class="table-light">
                                     <tr>
                                         <th>Date</th>
-                                        <th>Order</th>
+                                        <th>Order #</th>
                                         <th>Customer</th>
                                         <th>Employee</th>
                                         <th>Service</th>
@@ -279,16 +385,21 @@
                                 <tbody>
                                     {% for item in commission_items %}
                                     <tr>
-                                        <td>{{ item.completed_at|date:"M d, Y" }}</td>
                                         <td>
-                                            <a href="{% url 'services:order_detail' item.order.id %}" class="text-decoration-none">
+                                            <small>{{ item.completed_at|date:"M d, Y" }}</small>
+                                            <br><small class="text-muted">{{ item.completed_at|date:"H:i" }}</small>
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'services:order_detail' item.order.id %}" class="text-decoration-none fw-bold">
                                                 {{ item.order.order_number }}
                                             </a>
                                         </td>
                                         <td>{{ item.order.customer.full_name }}</td>
-                                        <td>{{ item.assigned_to.full_name }}</td>
+                                        <td>{{ item.assigned_to.full_name|default:"Unassigned" }}</td>
                                         <td>{% if item.service %}{{ item.service.name }}{% else %}N/A{% endif %}</td>
-                                        <td>KES {{ item.commission_amount|floatformat:2 }}</td>
+                                        <td>
+                                            <span class="fw-bold">KES {{ item.commission_amount|floatformat:2 }}</span>
+                                        </td>
                                         <td>
                                             {% if item.commission_paid %}
                                                 <span class="badge bg-success">Paid</span>
@@ -297,10 +408,18 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            <a href="/business/{{ request.tenant.slug }}/services/commissions/{{ item.id }}/"
-                                               class="btn btn-sm btn-info">
-                                                <i class="fas fa-eye me-1"></i>View
-                                            </a>
+                                            <div class="btn-group" role="group">
+                                                <a href="/business/{{ request.tenant.slug }}/services/commissions/{{ item.id }}/"
+                                                   class="btn btn-sm btn-outline-info" title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if not item.commission_paid %}
+                                                    <button type="button" class="btn btn-sm btn-outline-success"
+                                                            onclick="markAsPaid({{ item.id }})" title="Mark as Paid">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -308,9 +427,11 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-coins fa-3x text-muted mb-3"></i>
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Commission Records</h5>
                             <p class="text-muted">No commission records found for the selected period.</p>
+                            <p class="text-muted">Complete some services to generate commission records.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -319,16 +440,126 @@
     </div>
 </div>
 
+<!-- Commission Payment Modal -->
+<div class="modal fade" id="commissionPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Mark Commission as Paid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="commissionDetails">
+                    <!-- Commission details will be loaded here -->
+                </div>
+                <div class="form-check mt-3">
+                    <input type="checkbox" class="form-check-input" id="createExpenseRecordModal" checked>
+                    <label class="form-check-label" for="createExpenseRecordModal">
+                        Create expense record for this payment
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmPaymentBtn">Mark as Paid</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+let currentCommissionId = null;
+
+function markAsPaid(commissionId) {
+    currentCommissionId = commissionId;
+
+    // Get commission details via AJAX
+    fetch(`/business/{{ request.tenant.slug }}/services/commissions/${commissionId}/`)
+        .then(response => response.text())
+        .then(html => {
+            // Extract commission info from the response (simplified approach)
+            document.getElementById('confirmPaymentBtn').onclick = function() {
+                processCommissionPayment(commissionId);
+            };
+            new bootstrap.Modal(document.getElementById('commissionPaymentModal')).show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading commission details');
+        });
+}
+
+function processCommissionPayment(commissionId) {
+    const createExpense = document.getElementById('createExpenseRecordModal').checked;
+
+    fetch(`/business/{{ request.tenant.slug }}/services/commissions/${commissionId}/mark-paid/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `create_expense=${createExpense}&csrfmiddlewaretoken=${document.querySelector('[name=csrfmiddlewaretoken]').value}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('commissionPaymentModal')).hide();
+            location.reload(); // Refresh to show updated status
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error processing payment');
+    });
+}
+
+function payEmployeeCommissions(employeeId) {
+    if (confirm('Are you sure you want to mark all pending commissions as paid for this employee?')) {
+        // Implement bulk payment for employee
+        window.location.href = `/business/{{ request.tenant.slug }}/services/commissions/bulk-payment/?employee=${employeeId}`;
+    }
+}
+
+function processDailyCommissions() {
+    if (confirm('Process all pending commissions for today?')) {
+        window.location.href = `/business/{{ request.tenant.slug }}/services/commissions/bulk-payment/?period=daily`;
+    }
+}
+
 function exportCommissions() {
     const dateFrom = document.getElementById('date_from').value;
     const dateTo = document.getElementById('date_to').value;
 
-    let url = "{% url 'services:commission_list' %}?export=1";
+    let url = "/business/{{ request.tenant.slug }}/services/commissions/list/?export=1";
     if (dateFrom) url += "&date_from=" + dateFrom;
     if (dateTo) url += "&date_to=" + dateTo;
 
     window.open(url, '_blank');
 }
+
+function refreshDashboard() {
+    location.reload();
+}
+
+// Auto-refresh every 5 minutes
+setInterval(refreshDashboard, 300000);
 </script>
+
+<style>
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+.card:hover {
+    transform: translateY(-2px);
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+.badge {
+    font-size: 0.75rem;
+}
+</style>
 {% endblock %}
