@@ -269,16 +269,24 @@ so{% extends 'base/base.html' %}
                 <p>Are you sure you want to mark this commission as paid?</p>
                 <div class="alert alert-info">
                     <strong>Employee:</strong> {{ commission_item.assigned_to.full_name }}<br>
-                    <strong>Service:</strong> {{ commission_item.item_name|default:"N/A" }}<br>
+                    <strong>Service:</strong> {% if commission_item.service %}{{ commission_item.service.name }}{% elif commission_item.inventory_item %}{{ commission_item.inventory_item.name }}{% else %}{{ commission_item.description|default:"N/A" }}{% endif %}<br>
                     <strong>Amount:</strong> KES {{ commission_item.commission_amount|floatformat:2 }}<br>
                     <strong>Date:</strong> {{ commission_item.completed_at|date:"M d, Y" }}
                 </div>
-                <p class="text-muted">This action will create an expense record for the commission payment.</p>
+
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="createExpenseRecord" name="create_expense" checked>
+                    <label class="form-check-label" for="createExpenseRecord">
+                        Create expense record for this payment
+                    </label>
+                    <small class="form-text text-muted">Uncheck if you don't want to create an expense record in the accounting system.</small>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <form method="POST" action="/business/{{ request.tenant.slug }}/services/commissions/{{ commission_item.id }}/mark-paid/">
                     {% csrf_token %}
+                    <input type="hidden" name="create_expense" id="createExpenseHidden" value="true">
                     <button type="submit" class="btn btn-success">Mark as Paid</button>
                 </form>
             </div>
@@ -316,11 +324,19 @@ so{% extends 'base/base.html' %}
 
 <script>
 function markAsPaid() {
+    // Reset checkbox to checked state
+    document.getElementById('createExpenseRecord').checked = true;
+    document.getElementById('createExpenseHidden').value = 'true';
     new bootstrap.Modal(document.getElementById('markPaidModal')).show();
 }
 
 function markAsUnpaid() {
     new bootstrap.Modal(document.getElementById('markUnpaidModal')).show();
 }
+
+// Update hidden field when checkbox changes
+document.getElementById('createExpenseRecord').addEventListener('change', function() {
+    document.getElementById('createExpenseHidden').value = this.checked ? 'true' : 'false';
+});
 </script>
 {% endblock %}

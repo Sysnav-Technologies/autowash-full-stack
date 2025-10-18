@@ -932,10 +932,9 @@ class ServiceOrderItem(models.Model):
         
         super().save(*args, **kwargs)
         
-        # Create commission expense if service is completed and commission not yet paid
-        if (self.assigned_to and self.completed_at and not self.commission_paid 
-            and self.commission_amount > 0 and not self.commission_expense_id):
-            self._create_commission_expense()
+        # Commission will be paid manually later - don't auto-create expense
+        # Only calculate commission amount, don't mark as paid
+        pass
     
     def _create_commission_expense(self):
         """Create expense record for commission payment"""

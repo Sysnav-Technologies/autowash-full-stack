@@ -6081,41 +6081,52 @@ def mark_commission_paid(request, item_id):
         return redirect('services:commission_detail', item_id=item_id)
 
     try:
-        # Create expense record for the commission
-        from apps.expenses.models import Expense, ExpenseCategory
-        from django.utils import timezone
+        # Check if expense record should be created
+        create_expense = request.POST.get('create_expense', 'false') == 'true'
 
-        # Get or create commission category
-        commission_category, created = ExpenseCategory.objects.get_or_create(
-            name='Employee Commissions',
-            defaults={
-                'description': 'Commission payments to employees for completed services',
-                'is_active': True
-            }
-        )
+        expense = None
+        if create_expense:
+            # Create expense record for the commission
+            from apps.expenses.models import Expense, ExpenseCategory
+            from django.utils import timezone
 
-        # Create expense record
-        expense = Expense.objects.create(
-            title=f"Commission for {commission_item.item_name} - Order #{commission_item.order.order_number}",
-            category=commission_category,
-            amount=commission_item.commission_amount,
-            expense_date=timezone.now().date(),
-            status='approved',
-            expense_type='commission',
-            linked_employee_id=commission_item.assigned_to.id if commission_item.assigned_to else None,
-            linked_service_order_item_id=commission_item.id,
-            notes=f"Commission payment recorded for service completion"
-        )
+            # Get or create commission category
+            commission_category, created = ExpenseCategory.objects.get_or_create(
+                name='Employee Commissions',
+                defaults={
+                    'description': 'Commission payments to employees for completed services',
+                    'is_active': True
+                }
+            )
+
+            # Create expense record
+            expense = Expense.objects.create(
+                title=f"Commission for {commission_item.item_name} - Order #{commission_item.order.order_number}",
+                category=commission_category,
+                amount=commission_item.commission_amount,
+                expense_date=timezone.now().date(),
+                status='approved',
+                expense_type='commission',
+                linked_employee_id=commission_item.assigned_to.id if commission_item.assigned_to else None,
+                linked_service_order_item_id=commission_item.id,
+                notes=f"Commission payment recorded for service completion"
+            )
 
         # Update commission tracking
-        commission_item.commission_expense_id = expense.id
+        commission_item.commission_expense_id = expense.id if expense else None
         commission_item.commission_paid = True
         commission_item.save()
 
-        messages.success(
-            request,
-            f'Commission of KES {commission_item.commission_amount} marked as paid for {commission_item.assigned_to.full_name}.'
-        )
+        if create_expense:
+            messages.success(
+                request,
+                f'Commission of KES {commission_item.commission_amount} marked as paid for {commission_item.assigned_to.full_name}. Expense record created.'
+            )
+        else:
+            messages.success(
+                request,
+                f'Commission of KES {commission_item.commission_amount} marked as paid for {commission_item.assigned_to.full_name}. No expense record created.'
+            )
 
     except Exception as e:
         messages.error(request, f'Error marking commission as paid: {str(e)}')
