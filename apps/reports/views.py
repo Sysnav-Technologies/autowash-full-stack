@@ -1967,8 +1967,8 @@ class ReportsView(TemplateView):
             # Employee commission breakdown
             employee_commissions = commission_items.values(
                 'assigned_to__employee_id',
-                'assigned_to__user__first_name',
-                'assigned_to__user__last_name'
+                'assigned_to__first_name',
+                'assigned_to__last_name'
             ).annotate(
                 total_commission=Sum('commission_amount'),
                 paid_commission=Sum('commission_amount', filter=Q(commission_paid=True)),

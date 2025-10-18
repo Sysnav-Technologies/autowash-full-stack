@@ -102,6 +102,14 @@ def get_business_url(request, url_name, **kwargs):
         'services:performance_report': f"{base_url}/services/reports/performance/",
         'services:payment_receipt': f"{base_url}/services/orders/{{order_id}}/receipt/",
         'payments:create': f"{base_url}/payments/create/{{order_id}}/",
+        'services:commission_dashboard': f"{base_url}/services/commissions/",
+        'services:commission_list': f"{base_url}/services/commissions/list/",
+        'services:commission_detail': f"{base_url}/services/commissions/{{item_id}}/",
+        'services:mark_commission_paid': f"{base_url}/services/commissions/{{item_id}}/mark-paid/",
+        'services:mark_commission_unpaid': f"{base_url}/services/commissions/{{item_id}}/mark-unpaid/",
+        'services:create_commission_expense': f"{base_url}/services/commissions/{{item_id}}/create-expense/",
+        'services:employee_commission_report': f"{base_url}/services/commissions/employee/{{employee_id}}/",
+        'services:bulk_commission_payment': f"{base_url}/services/commissions/bulk-payment/",
     }
     
     url = url_mapping.get(url_name, f"{base_url}/")
@@ -2805,7 +2813,7 @@ def start_next_service(request):
             return JsonResponse({
                 'success': True,
                 'message': f'Started service for order {next_order.order_number}',
-                'redirect_url': reverse('services:order_detail', kwargs={'pk': next_order.pk})
+                'redirect_url': get_business_url(request, 'services:order_detail', pk=next_order.pk)
             })
         else:
             return JsonResponse({
@@ -6086,7 +6094,7 @@ def mark_commission_paid(request, item_id):
 
     if commission_item.commission_paid:
         messages.warning(request, 'Commission is already marked as paid.')
-        return redirect('services:commission_detail', item_id=item_id)
+        return redirect(get_business_url(request, 'services:commission_detail', item_id=item_id))
 
     try:
         # Check if expense record should be created
@@ -6139,7 +6147,7 @@ def mark_commission_paid(request, item_id):
     except Exception as e:
         messages.error(request, f'Error marking commission as paid: {str(e)}')
 
-    return redirect('services:commission_detail', item_id=item_id)
+    return redirect(get_business_url(request, 'services:commission_detail', item_id=item_id))
 
 
 @login_required
@@ -6213,7 +6221,7 @@ def mark_commission_unpaid(request, item_id):
 
     if not commission_item.commission_paid:
         messages.warning(request, 'Commission is already marked as unpaid.')
-        return redirect('services:commission_detail', item_id=item_id)
+        return redirect(get_business_url(request, 'services:commission_detail', item_id=item_id))
 
     try:
         # Delete or cancel the expense record
@@ -6238,7 +6246,7 @@ def mark_commission_unpaid(request, item_id):
     except Exception as e:
         messages.error(request, f'Error reversing commission payment: {str(e)}')
 
-    return redirect('services:commission_detail', item_id=item_id)
+    return redirect(get_business_url(request, 'services:commission_detail', item_id=item_id))
 
 
 @login_required
@@ -6326,11 +6334,11 @@ def bulk_commission_payment(request):
 
         if not commission_ids:
             messages.error(request, 'No commissions selected.')
-            return redirect('services:commission_list')
+            return redirect(get_business_url(request, 'services:commission_list'))
 
         if action not in ['mark_paid', 'mark_unpaid']:
             messages.error(request, 'Invalid action.')
-            return redirect('services:commission_list')
+            return redirect(get_business_url(request, 'services:commission_list'))
 
         try:
             commission_items = ServiceOrderItem.objects.filter(
@@ -6407,7 +6415,7 @@ def bulk_commission_payment(request):
         except Exception as e:
             messages.error(request, f'Error processing bulk commission payments: {str(e)}')
 
-        return redirect('services:commission_list')
+        return redirect(get_business_url(request, 'services:commission_list'))
 
     # GET request - show selection form
     # Get filter parameters
