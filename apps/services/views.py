@@ -1607,6 +1607,9 @@ def order_detail_view(request, pk):
     # Sort timeline events by time
     timeline_events.sort(key=lambda x: x['time'])
 
+    # Get order items
+    order_items = order.order_items.select_related('service').all()
+
     context = {
         'order': order,
         'order_items': order_items,
@@ -5819,3 +5822,520 @@ def generate_quotation_pdf(quotation, business):
         raise Exception("PDF generation library not available. Please install reportlab.")
     except Exception as e:
         raise Exception(f"Error generating PDF: {str(e)}")
+
+
+# ================================
+# COMMISSION MANAGEMENT VIEWS
+# ================================
+
+@login_required
+@employee_required(['owner', 'manager'])
+def commission_dashboard_view(request):
+    """Commission management dashboard"""
+    from django.db.models import Sum, Count, Q
+    from datetime import datetime, timedelta
+
+    # Date range filters
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    # Default to current month if no dates provided
+    if not date_from:
+        date_from = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+    if not date_to:
+        date_to = datetime.now().strftime('%Y-%m-%d')
+
+    # Convert to date objects
+    try:
+        date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+        date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+    except ValueError:
+        date_from_obj = datetime.now().replace(day=1).date()
+        date_to_obj = datetime.now().date()
+
+    # Get commission data for service order items
+    commission_items = ServiceOrderItem.objects.filter(
+        commission_amount__gt=0,
+        completed_at__date__range=[date_from_obj, date_to_obj]
+    ).select_related(
+        'order', 'order__customer', 'assigned_to', 'service'
+    ).order_by('-completed_at')
+
+    # Calculate summary statistics
+    total_commission = commission_items.aggregate(
+        total=Sum('commission_amount')
+    )['total'] or Decimal('0')
+
+    paid_commission = commission_items.filter(
+        commission_paid=True
+    ).aggregate(
+        total=Sum('commission_amount')
+    )['total'] or Decimal('0')
+
+    pending_commission = total_commission - paid_commission
+
+    # Employee commission breakdown - using employee properties
+    employee_commissions = []
+    employees_with_commissions = commission_items.values('assigned_to').distinct()
+
+    for emp_data in employees_with_commissions:
+        employee_id = emp_data['assigned_to']
+        if employee_id:
+            emp_commissions = commission_items.filter(assigned_to_id=employee_id)
+            employee = emp_commissions.first().assigned_to if emp_commissions.exists() else None
+
+            if employee:
+                total_commission = emp_commissions.aggregate(total=Sum('commission_amount'))['total'] or Decimal('0')
+                paid_commission = emp_commissions.filter(commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or Decimal('0')
+                pending_commission = emp_commissions.filter(commission_paid=False).aggregate(total=Sum('commission_amount'))['total'] or Decimal('0')
+
+                employee_commissions.append({
+                    'assigned_to__employee_id': employee.employee_id,
+                    'assigned_to__first_name': employee.first_name,
+                    'assigned_to__last_name': employee.last_name,
+                    'total_commission': total_commission,
+                    'paid_commission': paid_commission,
+                    'pending_commission': pending_commission,
+                    'completed_services': emp_commissions.count()
+                })
+
+    # Sort by total commission
+    employee_commissions.sort(key=lambda x: x['total_commission'], reverse=True)
+
+    # Commission by service type
+    service_commissions = commission_items.values(
+        'service__name',
+        'service__category__name'
+    ).annotate(
+        total_commission=Sum('commission_amount'),
+        service_count=Count('id')
+    ).order_by('-total_commission')[:10]
+
+    # Daily commission trend
+    daily_commissions = commission_items.extra(
+        select={'day': 'DATE(completed_at)'}
+    ).values('day').annotate(
+        total_commission=Sum('commission_amount'),
+        services_count=Count('id')
+    ).order_by('day')
+
+    context = {
+        'commission_items': commission_items[:50],  # Show recent 50
+        'total_commission': total_commission,
+        'paid_commission': paid_commission,
+        'pending_commission': pending_commission,
+        'employee_commissions': employee_commissions,
+        'service_commissions': service_commissions,
+        'daily_commissions': daily_commissions,
+        'date_from': date_from,
+        'date_to': date_to,
+        'title': 'Commission Management'
+    }
+
+    return render(request, 'services/commission_dashboard.html', context)
+
+
+@login_required
+@employee_required(['owner', 'manager'])
+def commission_list_view(request):
+    """List all commission records with filtering"""
+    from django.db.models import Sum, Count, Q
+
+    # Filters
+    employee_id = request.GET.get('employee')
+    status = request.GET.get('status')  # 'paid' or 'pending'
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    search = request.GET.get('search')
+
+    # Base queryset
+    commission_items = ServiceOrderItem.objects.filter(
+        commission_amount__gt=0
+    ).select_related(
+        'order', 'order__customer', 'assigned_to', 'service'
+    ).order_by('-completed_at')
+
+    # Apply filters
+    if employee_id:
+        commission_items = commission_items.filter(assigned_to_id=employee_id)
+
+    if status:
+        if status == 'paid':
+            commission_items = commission_items.filter(commission_paid=True)
+        elif status == 'pending':
+            commission_items = commission_items.filter(commission_paid=False)
+
+    if date_from:
+        try:
+            from datetime import datetime
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            commission_items = commission_items.filter(completed_at__date__gte=date_from_obj)
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            from datetime import datetime
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+            commission_items = commission_items.filter(completed_at__date__lte=date_to_obj)
+        except ValueError:
+            pass
+
+    if search:
+        # Search in related fields using the actual model structure
+        order_search = Q(order__order_number__icontains=search)
+        customer_search = Q(order__customer__first_name__icontains=search) | Q(order__customer__last_name__icontains=search)
+        service_search = Q(service__name__icontains=search)
+
+        # For employee search, we need to use a different approach since first_name/last_name are properties
+        employee_matches = Employee.objects.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(employee_id__icontains=search)
+        ).values_list('id', flat=True)
+
+        employee_search = Q(assigned_to_id__in=employee_matches) if employee_matches else Q()
+
+        commission_items = commission_items.filter(
+            order_search | customer_search | service_search | employee_search
+        )
+
+    # Pagination
+    paginator = Paginator(commission_items, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # Get employees for filter
+    from apps.employees.models import Employee
+    employees = Employee.objects.filter(
+        is_active=True,
+        role__in=['attendant', 'supervisor', 'manager']
+    ).order_by('employee_id')
+
+    # Summary statistics
+    stats = {
+        'total_commission': commission_items.aggregate(total=Sum('commission_amount'))['total'] or Decimal('0'),
+        'paid_commission': commission_items.filter(commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or Decimal('0'),
+        'pending_commission': commission_items.filter(commission_paid=False).aggregate(total=Sum('commission_amount'))['total'] or Decimal('0'),
+        'total_records': commission_items.count(),
+        'paid_records': commission_items.filter(commission_paid=True).count(),
+        'pending_records': commission_items.filter(commission_paid=False).count(),
+    }
+
+    context = {
+        'page_obj': page_obj,
+        'employees': employees,
+        'stats': stats,
+        'current_filters': {
+            'employee': employee_id or '',
+            'status': status or '',
+            'date_from': date_from or '',
+            'date_to': date_to or '',
+            'search': search or ''
+        },
+        'title': 'Commission Records'
+    }
+
+    return render(request, 'services/commission_list.html', context)
+
+
+@login_required
+@employee_required(['owner', 'manager'])
+def commission_detail_view(request, item_id):
+    """View commission details for a specific service item"""
+    commission_item = get_object_or_404(
+        ServiceOrderItem.objects.select_related(
+            'order', 'order__customer', 'assigned_to', 'service'
+        ),
+        id=item_id,
+        commission_amount__gt=0
+    )
+
+    # Get related expense if commission is paid
+    expense = None
+    if commission_item.commission_paid and commission_item.commission_expense_id:
+        try:
+            from apps.expenses.models import Expense
+            expense = Expense.objects.get(id=commission_item.commission_expense_id)
+        except Expense.DoesNotExist:
+            pass
+
+    context = {
+        'commission_item': commission_item,
+        'expense': expense,
+        'title': f'Commission Details - {commission_item.service.name if commission_item.service else "Service"}'
+    }
+
+    return render(request, 'services/commission_detail.html', context)
+
+
+@login_required
+@employee_required(['owner', 'manager'])
+@require_POST
+def mark_commission_paid(request, item_id):
+    """Mark commission as paid"""
+    commission_item = get_object_or_404(ServiceOrderItem, id=item_id)
+
+    if commission_item.commission_paid:
+        messages.warning(request, 'Commission is already marked as paid.')
+        return redirect('services:commission_detail', item_id=item_id)
+
+    try:
+        # Create expense record for the commission
+        from apps.expenses.models import Expense, ExpenseCategory
+        from django.utils import timezone
+
+        # Get or create commission category
+        commission_category, created = ExpenseCategory.objects.get_or_create(
+            name='Employee Commissions',
+            defaults={
+                'description': 'Commission payments to employees for completed services',
+                'is_active': True
+            }
+        )
+
+        # Create expense record
+        expense = Expense.objects.create(
+            title=f"Commission for {commission_item.item_name} - Order #{commission_item.order.order_number}",
+            category=commission_category,
+            amount=commission_item.commission_amount,
+            expense_date=timezone.now().date(),
+            status='approved',
+            expense_type='commission',
+            linked_employee_id=commission_item.assigned_to.id if commission_item.assigned_to else None,
+            linked_service_order_item_id=commission_item.id,
+            notes=f"Commission payment recorded for service completion"
+        )
+
+        # Update commission tracking
+        commission_item.commission_expense_id = expense.id
+        commission_item.commission_paid = True
+        commission_item.save()
+
+        messages.success(
+            request,
+            f'Commission of KES {commission_item.commission_amount} marked as paid for {commission_item.assigned_to.full_name}.'
+        )
+
+    except Exception as e:
+        messages.error(request, f'Error marking commission as paid: {str(e)}')
+
+    return redirect('services:commission_detail', item_id=item_id)
+
+
+@login_required
+@employee_required(['owner', 'manager'])
+@require_POST
+def mark_commission_unpaid(request, item_id):
+    """Mark commission as unpaid (reverse payment)"""
+    commission_item = get_object_or_404(ServiceOrderItem, id=item_id)
+
+    if not commission_item.commission_paid:
+        messages.warning(request, 'Commission is already marked as unpaid.')
+        return redirect('services:commission_detail', item_id=item_id)
+
+    try:
+        # Delete or cancel the expense record
+        if commission_item.commission_expense_id:
+            from apps.expenses.models import Expense
+            try:
+                expense = Expense.objects.get(id=commission_item.commission_expense_id)
+                expense.delete()  # This will soft delete the expense
+            except Expense.DoesNotExist:
+                pass
+
+        # Update commission tracking
+        commission_item.commission_expense_id = None
+        commission_item.commission_paid = False
+        commission_item.save()
+
+        messages.success(
+            request,
+            f'Commission payment reversed for {commission_item.assigned_to.full_name}.'
+        )
+
+    except Exception as e:
+        messages.error(request, f'Error reversing commission payment: {str(e)}')
+
+    return redirect('services:commission_detail', item_id=item_id)
+
+
+@login_required
+@employee_required(['owner', 'manager'])
+def employee_commission_report(request, employee_id):
+    """Detailed commission report for a specific employee"""
+    from datetime import datetime, timedelta
+
+    employee = get_object_or_404(Employee, id=employee_id, is_active=True)
+
+    # Date range filters
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    # Default to current month
+    if not date_from:
+        date_from = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+    if not date_to:
+        date_to = datetime.now().strftime('%Y-%m-%d')
+
+    try:
+        date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+        date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+    except ValueError:
+        date_from_obj = datetime.now().replace(day=1).date()
+        date_to_obj = datetime.now().date()
+
+    # Get employee's commission records
+    commission_items = ServiceOrderItem.objects.filter(
+        assigned_to=employee,
+        commission_amount__gt=0,
+        completed_at__date__range=[date_from_obj, date_to_obj]
+    ).select_related(
+        'order', 'order__customer', 'service'
+    ).order_by('-completed_at')
+
+    # Calculate totals
+    total_commission = commission_items.aggregate(
+        total=Sum('commission_amount')
+    )['total'] or Decimal('0')
+
+    paid_commission = commission_items.filter(
+        commission_paid=True
+    ).aggregate(
+        total=Sum('commission_amount')
+    )['total'] or Decimal('0')
+
+    pending_commission = total_commission - paid_commission
+
+    # Monthly breakdown
+    monthly_commissions = commission_items.extra(
+        select={'month': 'DATE_FORMAT(completed_at, "%%Y-%%m")'}
+    ).values('month').annotate(
+        total_commission=Sum('commission_amount'),
+        paid_commission=Sum(Case(
+            When(commission_paid=True, then='commission_amount'),
+            default=Decimal('0')
+        )),
+        service_count=Count('id')
+    ).order_by('-month')
+
+    context = {
+        'employee': employee,
+        'commission_items': commission_items,
+        'total_commission': total_commission,
+        'paid_commission': paid_commission,
+        'pending_commission': pending_commission,
+        'monthly_commissions': monthly_commissions,
+        'date_from': date_from,
+        'date_to': date_to,
+        'title': f'Commission Report - {employee.full_name}'
+    }
+
+    return render(request, 'services/employee_commission_report.html', context)
+
+
+@login_required
+@employee_required(['owner', 'manager'])
+def bulk_commission_payment(request):
+    """Bulk commission payment processing"""
+    if request.method == 'POST':
+        commission_ids = request.POST.getlist('commission_ids')
+        action = request.POST.get('action')  # 'mark_paid' or 'mark_unpaid'
+
+        if not commission_ids:
+            messages.error(request, 'No commissions selected.')
+            return redirect('services:commission_list')
+
+        if action not in ['mark_paid', 'mark_unpaid']:
+            messages.error(request, 'Invalid action.')
+            return redirect('services:commission_list')
+
+        try:
+            commission_items = ServiceOrderItem.objects.filter(
+                id__in=commission_ids,
+                commission_amount__gt=0
+            )
+
+            success_count = 0
+            error_count = 0
+
+            for item in commission_items:
+                try:
+                    if action == 'mark_paid' and not item.commission_paid:
+                        # Create expense for unpaid commission
+                        from apps.expenses.models import Expense, ExpenseCategory
+                        from django.utils import timezone
+
+                        commission_category, created = ExpenseCategory.objects.get_or_create(
+                            name='Employee Commissions',
+                            defaults={
+                                'description': 'Commission payments to employees for completed services',
+                                'is_active': True
+                            }
+                        )
+
+                        expense = Expense.objects.create(
+                            title=f"Commission for {item.item_name} - Order #{item.order.order_number}",
+                            category=commission_category,
+                            amount=item.commission_amount,
+                            expense_date=timezone.now().date(),
+                            status='approved',
+                            expense_type='commission',
+                            linked_employee_id=item.assigned_to.id if item.assigned_to else None,
+                            linked_service_order_item_id=item.id,
+                            notes=f"Bulk commission payment recorded"
+                        )
+
+                        item.commission_expense_id = expense.id
+                        item.commission_paid = True
+                        item.save()
+                        success_count += 1
+
+                    elif action == 'mark_unpaid' and item.commission_paid:
+                        # Remove expense for paid commission
+                        if item.commission_expense_id:
+                            from apps.expenses.models import Expense
+                            try:
+                                expense = Expense.objects.get(id=item.commission_expense_id)
+                                expense.delete()
+                            except Expense.DoesNotExist:
+                                pass
+
+                        item.commission_expense_id = None
+                        item.commission_paid = False
+                        item.save()
+                        success_count += 1
+
+                except Exception as e:
+                    error_count += 1
+                    logger.error(f"Error processing commission {item.id}: {str(e)}")
+
+            if success_count > 0:
+                messages.success(
+                    request,
+                    f'Successfully processed {success_count} commissions. '
+                    f'{error_count} errors occurred.'
+                )
+            else:
+                messages.warning(request, f'No commissions were processed. {error_count} errors occurred.')
+
+        except Exception as e:
+            messages.error(request, f'Error processing bulk commission payments: {str(e)}')
+
+        return redirect('services:commission_list')
+
+    # GET request - show selection form
+    # Get unpaid commissions for bulk payment
+    unpaid_commissions = ServiceOrderItem.objects.filter(
+        commission_amount__gt=0,
+        commission_paid=False
+    ).select_related(
+        'order', 'order__customer', 'assigned_to', 'service'
+    ).order_by('-completed_at')[:100]
+
+    context = {
+        'unpaid_commissions': unpaid_commissions,
+        'title': 'Bulk Commission Payment'
+    }
+
+    return render(request, 'services/bulk_commission_payment.html', context)

@@ -1,0 +1,326 @@
+so{% extends 'base/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/business/{{ request.tenant.slug }}/services/commissions/">Commission Management</a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a href="/business/{{ request.tenant.slug }}/services/commissions/list/">Commission Records</a>
+                            </li>
+                            <li class="breadcrumb-item active">Commission Details</li>
+                        </ol>
+                    </nav>
+                    <h1 class="h4 mb-0 text-gray-800">Commission Details</h1>
+                    <p class="mb-0 text-muted">{{ commission_item.item_name|default:"Service" }} - {{ commission_item.order.order_number }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/business/{{ request.tenant.slug }}/services/orders/{{ commission_item.order.id }}/" class="btn btn-info">
+                        <i class="fas fa-eye me-2"></i>View Order
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/services/commissions/list/" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to List
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Commission Information -->
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-info-circle me-2"></i>Commission Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td class="text-muted">Order Number:</td>
+                                    <td class="fw-bold">
+                                        <a href="{% url 'services:order_detail' commission_item.order.id %}">
+                                            {{ commission_item.order.order_number }}
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Customer:</td>
+                                    <td>{{ commission_item.order.customer.full_name }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Service:</td>
+                                    <td>{{ commission_item.item_name|default:"N/A" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Service Date:</td>
+                                    <td>{{ commission_item.completed_at|date:"M d, Y H:i" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td class="text-muted">Employee:</td>
+                                    <td class="fw-bold">{{ commission_item.assigned_to.full_name }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Employee ID:</td>
+                                    <td>{{ commission_item.assigned_to.employee_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Commission Rate:</td>
+                                    <td>{{ commission_item.commission_rate|floatformat:1 }}%</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Service Amount:</td>
+                                    <td>KES {{ commission_item.total_price|floatformat:2 }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-list me-2"></i>Order Items
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Quantity</th>
+                                    <th>Unit Price</th>
+                                    <th>Total</th>
+                                    <th>Commission</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in commission_item.order.order_items.all %}
+                                <tr {% if item.id == commission_item.id %}class="table-primary"{% endif %}>
+                                    <td>
+                                        {% if item.service %}{{ item.service.name }}{% elif item.inventory_item %}{{ item.inventory_item.name }}{% else %}{{ item.description|default:"N/A" }}{% endif %}
+                                        {% if item.id == commission_item.id %}
+                                            <span class="badge bg-primary ms-2">Current</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>KES {{ item.unit_price|floatformat:2 }}</td>
+                                    <td>KES {{ item.total_price|floatformat:2 }}</td>
+                                    <td>
+                                        {% if item.commission_amount > 0 %}
+                                            <span class="fw-bold text-success">KES {{ item.commission_amount|floatformat:2 }}</span>
+                                            {% if item.commission_paid %}
+                                                <br><small class="text-muted">Paid</small>
+                                            {% else %}
+                                                <br><small class="text-muted">Pending</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Commission Status & Actions -->
+        <div class="col-lg-4">
+            <!-- Current Status -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-chart-pie me-2"></i>Commission Status
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4" id="commissionDetails">
+                        {% if commission_item.commission_paid %}
+                            <div class="mb-3">
+                                <i class="fas fa-check-circle fa-4x text-success"></i>
+                            </div>
+                            <h4 class="text-success">Commission Paid</h4>
+                            <p class="text-muted mb-3">This commission has been marked as paid</p>
+                            {% if expense %}
+                            <div class="alert alert-success">
+                                <strong>Expense Record:</strong> #{{ expense.id }}<br>
+                                <strong>Date:</strong> {{ expense.date|date:"M d, Y" }}<br>
+                                <strong>Amount:</strong> KES {{ expense.amount|floatformat:2 }}
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="mb-3">
+                                <i class="fas fa-clock fa-4x text-warning"></i>
+                            </div>
+                            <h4 class="text-warning">Commission Pending</h4>
+                            <p class="text-muted mb-3">This commission is awaiting payment</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Commission Summary -->
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5 class="card-title">Commission Summary</h5>
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <div class="border-end">
+                                        <div class="h4 mb-0 text-primary">KES {{ commission_item.commission_amount|floatformat:2 }}</div>
+                                        <small class="text-muted">Commission Amount</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="h4 mb-0 text-info">{{ commission_item.commission_rate|floatformat:1 }}%</div>
+                                    <small class="text-muted">Commission Rate</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-cogs me-2"></i>Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if not commission_item.commission_paid %}
+                        <button type="button" class="btn btn-success" onclick="markAsPaid()">
+                            <i class="fas fa-check me-2"></i>Mark as Paid
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-warning" onclick="markAsUnpaid()">
+                            <i class="fas fa-undo me-2"></i>Mark as Unpaid
+                        </button>
+                        {% endif %}
+
+                        <a href="/business/{{ request.tenant.slug }}/services/commissions/employee/{{ commission_item.assigned_to.id }}/"
+                           class="btn btn-info">
+                            <i class="fas fa-chart-bar me-2"></i>Employee Report
+                        </a>
+
+                        {% if expense %}
+                        <a href="{% url 'expenses:detail' expense.id %}" class="btn btn-secondary">
+                            <i class="fas fa-receipt me-2"></i>View Expense
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-chart-line me-2"></i>Quick Stats
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="h5 mb-0 text-primary">{{ commission_item.commission_rate|floatformat:1 }}%</div>
+                            <small class="text-muted">Rate</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h5 mb-0 text-success">KES {{ commission_item.commission_amount|floatformat:2 }}</div>
+                            <small class="text-muted">Amount</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mark as Paid Modal -->
+<div class="modal fade" id="markPaidModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Mark Commission as Paid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to mark this commission as paid?</p>
+                <div class="alert alert-info">
+                    <strong>Employee:</strong> {{ commission_item.assigned_to.full_name }}<br>
+                    <strong>Service:</strong> {{ commission_item.item_name|default:"N/A" }}<br>
+                    <strong>Amount:</strong> KES {{ commission_item.commission_amount|floatformat:2 }}<br>
+                    <strong>Date:</strong> {{ commission_item.completed_at|date:"M d, Y" }}
+                </div>
+                <p class="text-muted">This action will create an expense record for the commission payment.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="/business/{{ request.tenant.slug }}/services/commissions/{{ commission_item.id }}/mark-paid/">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">Mark as Paid</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mark as Unpaid Modal -->
+<div class="modal fade" id="markUnpaidModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Mark Commission as Unpaid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to mark this commission as unpaid?</p>
+                {% if expense %}
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> This will remove the expense record #{{ expense.id }}.
+                </div>
+                {% endif %}
+                <p class="text-muted">This action will reverse the commission payment status.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="/business/{{ request.tenant.slug }}/services/commissions/{{ commission_item.id }}/mark-unpaid/">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning">Mark as Unpaid</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function markAsPaid() {
+    new bootstrap.Modal(document.getElementById('markPaidModal')).show();
+}
+
+function markAsUnpaid() {
+    new bootstrap.Modal(document.getElementById('markUnpaidModal')).show();
+}
+</script>
+{% endblock %}
