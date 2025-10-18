@@ -114,4 +114,13 @@ urlpatterns = [
     path('quotations/<uuid:quotation_id>/accept/', views.quotation_accept, name='quotation_accept'),
     path('quotations/<uuid:quotation_id>/reject/', views.quotation_reject, name='quotation_reject'),
     path('quotations/<uuid:quotation_id>/convert/', views.quotation_convert_to_order, name='quotation_convert'),
+
+    # Commission Management
+    path('commissions/', views.commission_dashboard_view, name='commission_dashboard'),
+    path('commissions/list/', views.commission_list_view, name='commission_list'),
+    path('commissions/<int:item_id>/', views.commission_detail_view, name='commission_detail'),
+    path('commissions/<int:item_id>/mark-paid/', views.mark_commission_paid, name='mark_commission_paid'),
+    path('commissions/<int:item_id>/mark-unpaid/', views.mark_commission_unpaid, name='mark_commission_unpaid'),
+    path('commissions/employee/<uuid:employee_id>/', views.employee_commission_report, name='employee_commission_report'),
+    path('commissions/bulk-payment/', views.bulk_commission_payment, name='bulk_commission_payment'),
 ]

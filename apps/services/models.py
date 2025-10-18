@@ -954,13 +954,14 @@ class ServiceOrderItem(models.Model):
             
             # Create expense record
             expense = Expense.objects.create(
+                title=f"Commission for {self.item_name} - Order #{self.order.order_number}",
                 category=commission_category,
                 amount=self.commission_amount,
-                description=f"Commission for {self.item_name} - Order #{self.order.order_number}",
-                date=timezone.now().date(),
+                expense_date=timezone.now().date(),
                 status='pending',
-                employee=self.assigned_to,
-                service_order_item=self,
+                expense_type='commission',
+                linked_employee_id=self.assigned_to.id if self.assigned_to else None,
+                linked_service_order_item_id=self.id,
                 notes=f"Auto-generated commission expense for service completion"
             )
             

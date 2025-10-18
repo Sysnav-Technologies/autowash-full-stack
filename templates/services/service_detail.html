@@ -5,6 +5,97 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/service-detail.css' %}">
+<style>
+/* Commission Card Styles */
+.commission-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.commission-title {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.commission-info {
+    text-align: center;
+}
+
+.commission-rate {
+    margin-bottom: 1rem;
+}
+
+.commission-main {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.commission-type {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.commission-fixed {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.commission-note {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+.no-commission {
+    text-align: center;
+    padding: 1rem;
+}
+
+.no-commission i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.8;
+}
+
+.no-commission div {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.no-commission small {
+    opacity: 0.8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .commission-card {
+        padding: 1rem;
+    }
+
+    .commission-main {
+        font-size: 2rem;
+    }
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -205,6 +296,37 @@
                     <div class="pricing-note">
                         <i class="fas fa-info-circle"></i>
                         Final price may vary based on vehicle size and condition
+                    </div>
+                </div>
+
+                <!-- Commission Card -->
+                <div class="commission-card">
+                    <h3 class="commission-title">
+                        <i class="fas fa-coins"></i>
+                        Commission Settings
+                    </h3>
+                    <div class="commission-info">
+                        {% if service.commission_rate > 0 %}
+                            <div class="commission-rate">
+                                <div class="commission-main">{{ service.commission_rate|floatformat:1 }}%</div>
+                                <div class="commission-type">{{ service.get_commission_type_display }}</div>
+                            </div>
+                            {% if service.commission_type == 'fixed' %}
+                                <div class="commission-fixed">
+                                    <strong>Fixed Amount:</strong> KES {{ service.fixed_commission|floatformat:2 }}
+                                </div>
+                            {% endif %}
+                            <div class="commission-note">
+                                <i class="fas fa-info-circle"></i>
+                                Commission is calculated automatically when orders are completed
+                            </div>
+                        {% else %}
+                            <div class="no-commission">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <div>No commission configured</div>
+                                <small class="text-muted">Employees will not receive commission for this service</small>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
 

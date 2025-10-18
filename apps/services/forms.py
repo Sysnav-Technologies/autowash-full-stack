@@ -48,7 +48,7 @@ class ServiceForm(forms.ModelForm):
             'name', 'description', 'category', 'base_price', 'min_price', 'max_price',
             'estimated_duration', 'min_duration', 'max_duration', 'requires_booking',
             'is_popular', 'is_premium', 'required_skill_level', 'compatible_vehicle_types',
-            'image', 'display_order', 'is_active'
+            'image', 'display_order', 'is_active', 'commission_rate', 'commission_type', 'fixed_commission'
         ]
         widgets = {
             'description': forms.Textarea(attrs={'rows': 4}),
@@ -101,6 +101,14 @@ class ServiceForm(forms.ModelForm):
                 Column('is_premium', css_class='form-group col-md-3'),
                 Column('is_active', css_class='form-group col-md-3'),
             ),
+
+            HTML('<h5 class="mt-4">Commission Settings</h5>'),
+            Row(
+                Column('commission_rate', css_class='form-group col-md-4'),
+                Column('commission_type', css_class='form-group col-md-4'),
+                Column('fixed_commission', css_class='form-group col-md-4'),
+            ),
+
             'display_order',
             
             FormActions(

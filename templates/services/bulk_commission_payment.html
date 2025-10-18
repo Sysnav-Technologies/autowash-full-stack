@@ -1,0 +1,245 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/business/{{ request.tenant.slug }}/services/commissions/">Commission Management</a>
+                            </li>
+                            <li class="breadcrumb-item active">Bulk Payment</li>
+                        </ol>
+                    </nav>
+                    <h1 class="h4 mb-0 text-gray-800">Bulk Commission Payment</h1>
+                    <p class="mb-0 text-muted">Process multiple commission payments at once</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/business/{{ request.tenant.slug }}/services/commissions/" class="btn btn-info">
+                        <i class="fas fa-chart-bar me-2"></i>Dashboard
+                    </a>
+                    <a href="/business/{{ request.tenant.slug }}/services/commissions/list/" class="btn btn-primary">
+                        <i class="fas fa-list me-2"></i>Commission List
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5><i class="fas fa-info-circle me-2"></i>Bulk Commission Payment</h5>
+                <p class="mb-0">Select multiple pending commissions and mark them as paid or unpaid in bulk. This will create expense records for all selected commissions.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Form -->
+    {% if unpaid_commissions %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Bulk Actions</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/business/{{ request.tenant.slug }}/services/commissions/bulk-payment/">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="selectAllBulk" />
+                                    <label for="selectAllBulk" class="form-check-label">
+                                        <strong>Select All Pending Commissions</strong>
+                                    </label>
+                                </div>
+                                <p class="text-muted mt-2">
+                                    <strong>{{ unpaid_commissions|length }}</strong> pending commissions found.
+                                    Total amount: <strong>KES {{ total_pending|floatformat:2 }}</strong>
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <div class="btn-group">
+                                    <button type="submit" name="action" value="mark_paid" class="btn btn-success">
+                                        <i class="fas fa-check me-2"></i>Mark Selected as Paid
+                                    </button>
+                                    <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                                        <span class="visually-hidden">Toggle Dropdown</span>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <button type="submit" name="action" value="mark_paid" class="dropdown-item">
+                                                <i class="fas fa-check me-2"></i>Mark as Paid
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button type="submit" name="action" value="mark_unpaid" class="dropdown-item">
+                                                <i class="fas fa-undo me-2"></i>Mark as Unpaid
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pending Commissions Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Pending Commissions</h6>
+                    <span class="badge bg-warning text-dark">{{ unpaid_commissions|length }} pending</span>
+                </div>
+                <div class="card-body">
+                    {% if unpaid_commissions %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="40">
+                                            <input type="checkbox" class="form-check-input" id="selectAllTable">
+                                        </th>
+                                        <th>Date</th>
+                                        <th>Order #</th>
+                                        <th>Customer</th>
+                                        <th>Employee</th>
+                                        <th>Service</th>
+                                        <th>Commission</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in unpaid_commissions %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input commission-checkbox"
+                                                   name="commission_ids" value="{{ item.id }}" form="bulkCommissionForm">
+                                        </td>
+                                        <td>{{ item.completed_at|date:"M d, Y H:i" }}</td>
+                                        <td>
+                                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ item.order.id }}/"
+                                               class="text-decoration-none fw-bold">
+                                                {{ item.order.order_number }}
+                                            </a>
+                                        </td>
+                                        <td>{{ item.order.customer.full_name }}</td>
+                                        <td>
+                                            <div>{{ item.assigned_to.full_name }}</div>
+                                            <small class="text-muted">{{ item.assigned_to.employee_id }}</small>
+                                        </td>
+                                        <td>{{ item.service.name|default:"N/A" }}</td>
+                                        <td class="text-end">
+                                            <span class="fw-bold text-warning">KES {{ item.commission_amount|floatformat:2 }}</span>
+                                            <br>
+                                            <small class="text-muted">{{ item.commission_rate|floatformat:1 }}%</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="/business/{{ request.tenant.slug }}/services/commissions/{{ item.id }}/"
+                                                   class="btn btn-sm btn-info" title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <button type="button" class="btn btn-sm btn-success"
+                                                        onclick="markSingleAsPaid('{{ item.id }}')"
+                                                        title="Mark as Paid">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                            <h5 class="text-success">All Commissions Paid!</h5>
+                            <p class="text-muted">There are no pending commissions to process.</p>
+                            <a href="/business/{{ request.tenant.slug }}/services/commissions/" class="btn btn-primary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mark as Paid Modal -->
+<div class="modal fade" id="markPaidModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Mark Commission as Paid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to mark this commission as paid?</p>
+                <div class="alert alert-info">
+                    <div id="singleCommissionDetails"></div>
+                </div>
+                <p class="text-muted">This action will create an expense record for the commission payment.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="singleMarkPaidForm" method="POST" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">Mark as Paid</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Select All functionality
+    document.getElementById('selectAllBulk').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.commission-checkbox');
+        checkboxes.forEach(checkbox => checkbox.checked = this.checked);
+    });
+
+    document.getElementById('selectAllTable').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.commission-checkbox');
+        checkboxes.forEach(checkbox => checkbox.checked = this.checked);
+    });
+});
+
+function markSingleAsPaid(commissionId) {
+    // Get commission details
+    fetch(`/business/{{ request.tenant.slug }}/services/commissions/${commissionId}/`)
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const details = doc.querySelector('.card-body');
+            document.getElementById('singleCommissionDetails').innerHTML = `
+                <strong>Commission ID:</strong> ${commissionId}<br>
+                ${details ? details.innerHTML : ''}
+            `;
+
+            // Update form action
+            document.getElementById('singleMarkPaidForm').action = `/business/{{ request.tenant.slug }}/services/commissions/${commissionId}/mark-paid/`;
+
+            // Show modal
+            new bootstrap.Modal(document.getElementById('markPaidModal')).show();
+        });
+}
+</script>
+{% endblock %}
