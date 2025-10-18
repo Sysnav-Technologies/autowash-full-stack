@@ -138,6 +138,9 @@ class ReportsView(TemplateView):
             ('subscription_analysis', 'Subscription Analysis'),
             ('balance_sheet', 'Balance Sheet'),
             ('refunds_report', 'Refunds & Returns'),
+            ('commissions_report', 'Commission Report'),
+            ('commissions_report', 'Commission Report'),
+            ('commissions_report', 'Commission Report'),
         ]
     
     def _get_report_data(self, report_type, start_date, end_date, page):
@@ -197,6 +200,8 @@ class ReportsView(TemplateView):
                 data.update(self._get_balance_sheet_data(start_date, end_date, page))
             elif report_type == 'refunds_report':
                 data.update(self._get_refunds_report_data(start_date, end_date, page))
+            elif report_type == 'commissions_report':
+                data.update(self._get_commissions_report_data(start_date, end_date, page))
             else:  # business_overview
                 data.update(self._get_business_overview_data(start_date, end_date, page))
                 
@@ -231,6 +236,7 @@ class ReportsView(TemplateView):
             'subscription_analysis': 'Subscription Analysis Report',
             'balance_sheet': 'Balance Sheet Report',
             'refunds_report': 'Refunds & Returns Report',
+            'commissions_report': 'Commission Report',
         }
         return titles.get(report_type, 'Business Report')
     
@@ -1920,6 +1926,97 @@ class ReportsView(TemplateView):
             
         except Exception as e:
             return {'error': f'Refunds data not available: {str(e)}', 'items': [], 'summary': {}}
+
+    def _get_commissions_report_data(self, start_date, end_date, page):
+        """Get commission-specific data based on completed services in the period"""
+        from django.core.paginator import Paginator
+        from apps.services.models import ServiceOrderItem
+
+        # Convert dates to datetime for proper filtering
+        start_datetime, end_datetime = self._get_datetime_range(start_date, end_date)
+
+        try:
+            # Get commission items for services completed in the period
+            commission_items = ServiceOrderItem.objects.filter(
+                commission_amount__gt=0,
+                completed_at__range=[start_datetime, end_datetime]
+            ).select_related(
+                'order', 'order__customer', 'assigned_to', 'service'
+            ).order_by('-completed_at')
+
+            # Paginate commission items
+            paginator = Paginator(commission_items, 20)
+            commission_items_page = paginator.get_page(page)
+
+            # Calculate summary statistics
+            total_commission = commission_items.aggregate(
+                total=Sum('commission_amount')
+            )['total'] or 0
+
+            paid_commission = commission_items.filter(
+                commission_paid=True
+            ).aggregate(
+                total=Sum('commission_amount')
+            )['total'] or 0
+
+            pending_commission = total_commission - paid_commission
+            total_records = commission_items.count()
+            paid_records = commission_items.filter(commission_paid=True).count()
+            pending_records = commission_items.filter(commission_paid=False).count()
+
+            # Employee commission breakdown
+            employee_commissions = commission_items.values(
+                'assigned_to__employee_id',
+                'assigned_to__user__first_name',
+                'assigned_to__user__last_name'
+            ).annotate(
+                total_commission=Sum('commission_amount'),
+                paid_commission=Sum('commission_amount', filter=Q(commission_paid=True)),
+                pending_commission=Sum('commission_amount', filter=Q(commission_paid=False)),
+                completed_services=Count('id')
+            ).order_by('-total_commission')
+
+            # Service commission breakdown
+            service_commissions = commission_items.values(
+                'service__name',
+                'service__category__name'
+            ).annotate(
+                total_commission=Sum('commission_amount'),
+                service_count=Count('id')
+            ).order_by('-total_commission')[:10]
+
+            return {
+                'items': commission_items_page,
+                'summary': {
+                    'total_commission': total_commission,
+                    'paid_commission': paid_commission,
+                    'pending_commission': pending_commission,
+                    'total_records': total_records,
+                    'paid_records': paid_records,
+                    'pending_records': pending_records,
+                    'payment_rate': (paid_commission / max(total_commission, 1)) * 100,
+                },
+                'employee_commissions': list(employee_commissions),
+                'service_commissions': list(service_commissions),
+                'pagination': self._get_pagination_data(commission_items_page, paginator)
+            }
+        except Exception as e:
+            return {
+                'items': [],
+                'summary': {
+                    'total_commission': 0,
+                    'paid_commission': 0,
+                    'pending_commission': 0,
+                    'total_records': 0,
+                    'paid_records': 0,
+                    'pending_records': 0,
+                    'payment_rate': 0,
+                },
+                'employee_commissions': [],
+                'service_commissions': [],
+                'pagination': {},
+                'error': f'Commission report error: {str(e)}'
+            }
 
     # ============== HELPER METHODS ==============
     

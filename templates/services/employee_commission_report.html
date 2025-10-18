@@ -1,0 +1,493 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/business/{{ request.tenant.slug }}/services/commissions/">Commission Management</a>
+                            </li>
+                            <li class="breadcrumb-item active">Employee Commission Report</li>
+                        </ol>
+                    </nav>
+                    <h1 class="h4 mb-0 text-gray-800">{{ employee.full_name }} - Commission Report</h1>
+                    <p class="mb-0 text-muted">Commission details for {{ date_from }} to {{ date_to }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/business/{{ request.tenant.slug }}/services/commissions/" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                    <button type="button" class="btn btn-info" onclick="exportReport()">
+                        <i class="fas fa-download me-2"></i>Export Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Info Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-2">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px;">
+                                <i class="fas fa-user fa-2x"></i>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h3 class="mb-1">{{ employee.full_name }}</h3>
+                            <p class="text-muted mb-1">Employee ID: {{ employee.employee_id }}</p>
+                            <p class="text-muted mb-1">Role: {{ employee.role|title }}</p>
+                            <p class="text-muted mb-0">Department: {{ employee.department|default:"Not Assigned" }}</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="h4 mb-0 text-primary">{{ total_commission|floatformat:2 }}</div>
+                                    <small class="text-muted">Total Commission</small>
+                                </div>
+                                <div class="col-4">
+                                    <div class="h4 mb-0 text-success">{{ paid_commission|floatformat:2 }}</div>
+                                    <small class="text-muted">Paid</small>
+                                </div>
+                                <div class="col-4">
+                                    <div class="h4 mb-0 text-warning">{{ pending_commission|floatformat:2 }}</div>
+                                    <small class="text-muted">Pending</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Services Completed</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ commission_items.count }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Average Commission</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                KES {% if commission_items.count > 0 %}{{ total_commission|floatformat:2 }}{% else %}0.00{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Payment Rate</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% if total_commission > 0 %}
+                                    {{ paid_commission|floatformat:0 }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-percentage fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Period</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ date_from }} - {{ date_to }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Breakdown -->
+    {% if monthly_commissions %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-calendar me-2"></i>Monthly Commission Breakdown
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Services</th>
+                                    <th>Total Commission</th>
+                                    <th>Paid</th>
+                                    <th>Pending</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for monthly in monthly_commissions %}
+                                <tr>
+                                    <td>{{ monthly.month|default:"Unknown" }}</td>
+                                    <td>{{ monthly.service_count }}</td>
+                                    <td>KES {{ monthly.total_commission|floatformat:2 }}</td>
+                                    <td><span class="text-success">KES {{ monthly.paid_commission|floatformat:2 }}</span></td>
+                                    <td><span class="text-warning">KES {{ monthly.pending_commission|floatformat:2 }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Commission Records Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-list me-2"></i>Commission Records
+                    </h6>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-success btn-sm" onclick="markAllAsPaid()">
+                            <i class="fas fa-check-double me-2"></i>Mark All as Paid
+                        </button>
+                        <button type="button" class="btn btn-info btn-sm" onclick="exportDetailedReport()">
+                            <i class="fas fa-file-export me-2"></i>Export Detailed
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if commission_items %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" class="form-check-input" id="selectAllRecords">
+                                        </th>
+                                        <th>Date</th>
+                                        <th>Order #</th>
+                                        <th>Customer</th>
+                                        <th>Service</th>
+                                        <th>Commission Rate</th>
+                                        <th>Commission Amount</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in commission_items %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" class="form-check-input record-checkbox"
+                                                   name="commission_ids" value="{{ item.id }}">
+                                        </td>
+                                        <td>
+                                            <small>{{ item.completed_at|date:"M d, Y" }}</small>
+                                            <br><small class="text-muted">{{ item.completed_at|date:"H:i" }}</small>
+                                        </td>
+                                        <td>
+                                            <a href="/business/{{ request.tenant.slug }}/services/orders/{{ item.order.id }}/"
+                                               class="text-decoration-none fw-bold">
+                                                {{ item.order.order_number }}
+                                            </a>
+                                        </td>
+                                        <td>{{ item.order.customer.full_name }}</td>
+                                        <td>{% if item.service %}{{ item.service.name }}{% else %}N/A{% endif %}</td>
+                                        <td>
+                                            <span class="badge bg-info">{{ item.commission_rate|floatformat:1 }}%</span>
+                                        </td>
+                                        <td>
+                                            <strong>KES {{ item.commission_amount|floatformat:2 }}</strong>
+                                        </td>
+                                        <td>
+                                            {% if item.commission_paid %}
+                                                <span class="badge bg-success">Paid</span>
+                                                {% if item.commission_expense_id %}
+                                                    <br><small class="text-muted">Expense #{{ item.commission_expense_id }}</small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-warning">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="/business/{{ request.tenant.slug }}/services/commissions/{{ item.id }}/"
+                                                   class="btn btn-sm btn-outline-info" title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if not item.commission_paid %}
+                                                    <button type="button" class="btn btn-sm btn-outline-success"
+                                                            onclick="markSingleAsPaid({{ item.id|stringformat:'s' }})"
+                                                            title="Mark as Paid">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                {% else %}
+                                                    <button type="button" class="btn btn-sm btn-outline-warning"
+                                                            onclick="markSingleAsUnpaid({{ item.id|stringformat:'s' }})"
+                                                            title="Mark as Unpaid">
+                                                        <i class="fas fa-undo"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Commission Records</h5>
+                            <p class="text-muted">No commission records found for {{ employee.full_name }} in the selected period.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Payment Modal -->
+<div class="modal fade" id="bulkPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Bulk Mark as Paid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Mark selected commission records as paid?</p>
+                <div class="alert alert-info">
+                    <strong>Employee:</strong> {{ employee.full_name }}<br>
+                    <strong>Records:</strong> <span id="selectedCount">0</span> selected<br>
+                    <strong>Total Amount:</strong> KES <span id="selectedAmount">0.00</span>
+                </div>
+
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="bulkCreateExpense" checked>
+                    <label class="form-check-label" for="bulkCreateExpense">
+                        Create expense records for all selected payments
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmBulkPayment">Mark as Paid</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Select All functionality
+    document.getElementById('selectAllRecords').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.record-checkbox');
+        checkboxes.forEach(checkbox => checkbox.checked = this.checked);
+        updateBulkPaymentInfo();
+    });
+
+    // Update bulk payment info when individual checkboxes change
+    document.querySelectorAll('.record-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateBulkPaymentInfo);
+    });
+});
+
+function updateBulkPaymentInfo() {
+    const selectedCheckboxes = document.querySelectorAll('.record-checkbox:checked');
+    const selectedCount = selectedCheckboxes.length;
+    let selectedAmount = 0;
+
+    selectedCheckboxes.forEach(checkbox => {
+        const row = checkbox.closest('tr');
+        const amountText = row.querySelector('td:nth-child(7) strong').textContent;
+        const amount = parseFloat(amountText.replace('KES ', '').replace(',', ''));
+        selectedAmount += amount;
+    });
+
+    document.getElementById('selectedCount').textContent = selectedCount;
+    document.getElementById('selectedAmount').textContent = selectedAmount.toFixed(2);
+}
+
+function markAllAsPaid() {
+    const selectedCheckboxes = document.querySelectorAll('.record-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select at least one commission record.');
+        return;
+    }
+
+    updateBulkPaymentInfo();
+    new bootstrap.Modal(document.getElementById('bulkPaymentModal')).show();
+}
+
+function markSingleAsPaid(commissionId) {
+    if (confirm('Mark this commission as paid?')) {
+        const createExpense = true; // Default to creating expense for single payments
+
+        fetch(`/business/{{ request.tenant.slug }}/services/commissions/${commissionId}/mark-paid/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: `create_expense=${createExpense}&csrfmiddlewaretoken=${document.querySelector('[name=csrfmiddlewaretoken]').value}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error processing payment');
+        });
+    }
+}
+
+function markSingleAsUnpaid(commissionId) {
+    if (confirm('Mark this commission as unpaid? This will remove the expense record.')) {
+        fetch(`/business/{{ request.tenant.slug }}/services/commissions/${commissionId}/mark-unpaid/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: 'csrfmiddlewaretoken=' + document.querySelector('[name=csrfmiddlewaretoken]').value
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error processing payment');
+        });
+    }
+}
+
+document.getElementById('confirmBulkPayment').addEventListener('click', function() {
+    const selectedCheckboxes = document.querySelectorAll('.record-checkbox:checked');
+    const commissionIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+    const createExpense = document.getElementById('bulkCreateExpense').checked;
+
+    if (commissionIds.length === 0) {
+        alert('No commissions selected.');
+        return;
+    }
+
+    // Process bulk payment
+    fetch('/business/{{ request.tenant.slug }}/services/commissions/bulk-payment/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `commission_ids=${commissionIds.join(',')}&action=mark_paid&create_expense=${createExpense}&csrfmiddlewaretoken=${document.querySelector('[name=csrfmiddlewaretoken]').value}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('bulkPaymentModal')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error processing bulk payment');
+    });
+});
+
+function exportReport() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('export', '1');
+    window.open(url, '_blank');
+}
+
+function exportDetailedReport() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('export', 'detailed');
+    window.open(url, '_blank');
+}
+</script>
+
+<style>
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+.card:hover {
+    transform: translateY(-2px);
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+    background-color: #f8f9fc;
+}
+</style>
+{% endblock %}

@@ -920,15 +920,9 @@ class ServiceOrderItem(models.Model):
         # Calculate total price with discount consideration
         self.calculate_discount()
         
-        # Calculate commission if assigned to employee and service is completed
-        if self.assigned_to and self.completed_at and not self.commission_paid:
-            # Only services have commission rates, not inventory items
-            if self.service and not self.commission_rate and self.service.commission_rate:
-                self.commission_rate = self.service.commission_rate
-            
-            if self.commission_rate > 0:
-                # Commission is calculated on the discounted price
-                self.commission_amount = (self.total_price * self.commission_rate) / 100
+        # Commission will be calculated only when service is completed
+        # This prevents commission calculation during order creation
+        pass
         
         super().save(*args, **kwargs)
         
@@ -980,7 +974,13 @@ class ServiceOrderItem(models.Model):
     
     def calculate_commission(self):
         """Calculate commission amount for this service item"""
-        if self.assigned_to and self.commission_rate > 0:
+        # Only calculate commission if:
+        # 1. There is an assigned employee
+        # 2. The commission rate is positive
+        # 3. The service item is completed
+        if (self.assigned_to and 
+            self.commission_rate > 0 and 
+            self.completed_at is not None):
             return (self.total_price * self.commission_rate) / 100
         return Decimal('0.00')
     
@@ -1587,6 +1587,7 @@ class Quotation(TenantTimeStampedModel):
         
         # Copy quotation items to order items
         for quotation_item in self.quotation_items.all():
+            # Create service order item with proper commission handling
             ServiceOrderItem.objects.create(
                 order=order,
                 service=quotation_item.service,
@@ -1594,7 +1595,8 @@ class Quotation(TenantTimeStampedModel):
                 description=quotation_item.description,
                 quantity=quotation_item.quantity,
                 unit_price=quotation_item.unit_price,
-                total_price=quotation_item.total_price
+                total_price=quotation_item.total_price,
+                commission_rate=quotation_item.service.commission_rate if quotation_item.service else Decimal('0')
             )
         
         # Update quotation status

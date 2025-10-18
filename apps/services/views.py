@@ -474,11 +474,16 @@ def order_create_view(request):
                         quantity = service_data['quantity']
                         unit_price = service_data.get('unit_price', service.base_price)
                         
+                        # Calculate total price
+                        item_total = quantity * unit_price
                         ServiceOrderItem.objects.create(
                             order=order,
                             service=service,
                             quantity=quantity,
-                            unit_price=unit_price
+                            unit_price=unit_price,
+                            total_price=item_total,
+                            assigned_to=order.assigned_attendant,  # Assign to order's attendant
+                            commission_rate=service.commission_rate  # Set commission rate from service
                         )
                         total_amount += quantity * unit_price
                     
@@ -783,7 +788,7 @@ def quick_order_view(request):
                 order = ServiceOrder.objects.create(
                     customer=customer,
                     vehicle=vehicle,
-                    assigned_attendant=getattr(request, 'employee', None),
+                    assigned_attendant=None,  # Don't auto-assign during order creation
                     status='confirmed',
                     priority=request.POST.get('priority', 'normal'),
                     special_instructions=request.POST.get('special_instructions', '').strip(),
@@ -829,7 +834,7 @@ def quick_order_view(request):
                                 service=package_service.service,
                                 quantity=package_service.quantity,
                                 unit_price=package_service.custom_price or package_service.service.base_price,
-                                assigned_to=getattr(request, 'employee', None)
+                                assigned_to=order.assigned_attendant  # Use order's assigned attendant consistently
                             )
                         logger.info(f"Added package services: {package.name}")
                     except ServicePackage.DoesNotExist:
@@ -895,7 +900,8 @@ def quick_order_view(request):
                                 quantity=quantity,
                                 unit_price=unit_price,
                                 total_price=item_total,
-                                assigned_to=getattr(request, 'employee', None)
+                                assigned_to=order.assigned_attendant,  # Use order's assigned attendant consistently
+                                commission_rate=service.commission_rate  # Set commission rate from service
                             )
                             total_amount += item_total
                             logger.info(f"Added service: {service.name} quantity {quantity} at price {unit_price} (total: {item_total})")
@@ -924,7 +930,8 @@ def quick_order_view(request):
                                     quantity=quantity,
                                     unit_price=service.base_price,
                                     total_price=item_total,
-                                    assigned_to=getattr(request, 'employee', None)
+                                    assigned_to=order.assigned_attendant,  # Use order's assigned attendant consistently
+                                    commission_rate=service.commission_rate  # Set commission rate in fallback case
                                 )
                                 total_amount += item_total
                                 logger.info(f"Added service: {service.name} quantity {quantity} at base price")
@@ -1024,9 +1031,8 @@ def quick_order_view(request):
                                     quantity=quantity,
                                     unit_price=unit_price,
                                     total_price=total_price,
-                                    assigned_to=getattr(request, 'employee', None)
+                                    assigned_to=order.assigned_attendant  # Use order's assigned attendant consistently
                                 )
-                                
                                 # Note: Stock deduction timing depends on order type:
                                 # - Service orders: Deducted immediately after order creation (old flow)
                                 # - Inventory-only orders: Deducted when payment is completed (new flow)
@@ -1066,7 +1072,8 @@ def quick_order_view(request):
                                 unit_price=Decimal('0'),  # Customer parts are free
                                 total_price=Decimal('0'),  # Explicitly set total price
                                 is_customer_provided=True,
-                                assigned_to=getattr(request, 'employee', None)
+                                assigned_to=order.assigned_attendant,  # Use order's assigned attendant consistently
+                                commission_rate=Decimal('0')  # Explicitly set no commission for customer parts
                             )
                             
                             logger.info(f"Added customer part: {part_name} x{part_quantity}")
@@ -1758,59 +1765,50 @@ def start_service(request, order_id):
         messages.error(request, 'An employee must be assigned before starting the service.')
         return redirect(get_business_url(request, 'services:order_detail', pk=order.pk))
     
-    # Update order status
-    order.status = 'in_progress'
-    order.actual_start_time = timezone.now()
-    
-    # Assign attendant from form or current user as fallback
-    assigned_attendant_id = request.POST.get('assigned_attendant')
-    if assigned_attendant_id:
-        try:
-            from apps.employees.models import Employee
-            attendant = Employee.objects.get(id=assigned_attendant_id)
-            order.assigned_attendant = attendant
-        except Employee.DoesNotExist:
-            # Fall back to current user if selected attendant doesn't exist
+    # Start transaction for order update
+    with transaction.atomic():
+        # Update order status
+        order.status = 'in_progress'
+        order.actual_start_time = timezone.now()
+        
+        # Handle employee assignment
+        if assigned_attendant_id:
+            try:
+                from apps.employees.models import Employee
+                attendant = Employee.objects.get(id=assigned_attendant_id)
+                order.assigned_attendant = attendant
+            except Employee.DoesNotExist:
+                # Fall back to current user if selected attendant doesn't exist
+                if hasattr(request, 'employee') and request.employee:
+                    order.assigned_attendant = request.employee
+        elif not order.assigned_attendant:
+            # Assign current user if no attendant specified and none already assigned
             if hasattr(request, 'employee') and request.employee:
                 order.assigned_attendant = request.employee
-    elif not order.assigned_attendant:
-        # Assign current user if no attendant specified and none already assigned
-        if hasattr(request, 'employee') and request.employee:
-            order.assigned_attendant = request.employee
-    
-    order.save()
-    
-    # REAL-TIME: No cache invalidation needed - system operates in real-time
-    
-    # Update queue entry
-    if hasattr(order, 'queue_entry'):
-        queue_entry = order.queue_entry
-        queue_entry.status = 'in_service'  # Fixed: should be 'in_service', not 'completed'
-        queue_entry.actual_start_time = timezone.now()  # Fixed: should be start_time, not end_time
-        queue_entry.save()
-    
-    # Assign service bay if provided
-    bay_id = request.POST.get('service_bay')
-    if bay_id:
+        
+        order.save()
+        
+        # Update any unassigned service items to use the order's attendant
+        for item in order.order_items.filter(assigned_to__isnull=True):
+            item.assigned_to = order.assigned_attendant
+            item.save()
+        
+        # Update queue entry
+        if hasattr(order, 'queue_entry'):
+            queue_entry = order.queue_entry
+            queue_entry.status = 'in_service'
+            queue_entry.save()
+        
+        # Send service started notification
         try:
-            bay = ServiceBay.objects.get(id=bay_id)
-            bay.assign_order(order)
-        except ServiceBay.DoesNotExist:
-            pass
-    
-    # Send service start notification
-    # Ensure tenant context is set from request
-    from apps.core.database_router import set_current_tenant
-    from apps.core.notifications import send_order_started_notification
-    
-    if hasattr(request, 'tenant') and request.tenant:
-        set_current_tenant(request.tenant)
-    
-    send_order_started_notification(
-        order=order,
-        attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None,
-        tenant=request.tenant if hasattr(request, 'tenant') else None
-    )
+            from apps.core.notifications import send_order_started_notification
+            send_order_started_notification(
+                order=order,
+                attendant_name=order.assigned_attendant.full_name if order.assigned_attendant else None,
+                tenant=request.tenant if hasattr(request, 'tenant') else None
+            )
+        except Exception as e:
+            logger.error(f"Error sending service started notification: {e}")
     
     messages.success(request, f'Service started for order {order.order_number}')
     
@@ -1904,11 +1902,19 @@ def complete_service(request, order_id):
     
     # REAL-TIME: Cache invalidation added for immediate UI updates
     
+    # Update order items and calculate commissions
     for item in order.order_items.all():
         if not item.completed_at:
             item.completed_at = timezone.now()
             if not item.started_at:
                 item.started_at = order.actual_start_time
+            
+            # Only calculate commission if employee is assigned to this specific item
+            if item.assigned_to:
+                item.commission_amount = item.calculate_commission()
+            else:
+                item.commission_amount = Decimal('0.00')
+                
             item.save()
     
     # Update queue entry
@@ -3977,7 +3983,9 @@ def quick_service_assign(request):
                         service=service,
                         quantity=1,
                         unit_price=service.base_price,
-                        assigned_to=request.employee
+                        total_price=service.base_price,
+                        assigned_to=request.employee,
+                        commission_rate=service.commission_rate  # Set commission rate from service
                     )
                     total_amount += service.base_price
                 
@@ -4285,7 +4293,7 @@ def attendance_status_ajax(request):
     """Get employee attendance status"""
     try:
         # Get the current employee
-        employee = Employee.objects.get(user=request.user)
+        employee = Employee.objects.get(user_id=request.user.id)
         
         # Get today's attendance record if it exists
         today = timezone.now().date()
@@ -6137,6 +6145,68 @@ def mark_commission_paid(request, item_id):
 @login_required
 @employee_required(['owner', 'manager'])
 @require_POST
+def create_commission_expense(request, item_id):
+    """Create expense record for an already paid commission"""
+    commission_item = get_object_or_404(ServiceOrderItem, id=item_id)
+
+    if not commission_item.commission_paid:
+        return JsonResponse({
+            'success': False,
+            'message': 'Commission must be marked as paid first'
+        })
+
+    if commission_item.commission_expense_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Expense record already exists for this commission'
+        })
+
+    try:
+        # Create expense record for the commission
+        from apps.expenses.models import Expense, ExpenseCategory
+        from django.utils import timezone
+
+        # Get or create commission category
+        commission_category, created = ExpenseCategory.objects.get_or_create(
+            name='Employee Commissions',
+            defaults={
+                'description': 'Commission payments to employees for completed services',
+                'is_active': True
+            }
+        )
+
+        # Create expense record
+        expense = Expense.objects.create(
+            title=f"Commission for {commission_item.item_name} - Order #{commission_item.order.order_number}",
+            category=commission_category,
+            amount=commission_item.commission_amount,
+            expense_date=timezone.now().date(),
+            status='approved',
+            expense_type='commission',
+            linked_employee_id=commission_item.assigned_to.id if commission_item.assigned_to else None,
+            linked_service_order_item_id=commission_item.id,
+            notes=f"Commission payment expense record created manually"
+        )
+
+        # Update commission tracking
+        commission_item.commission_expense_id = expense.id
+        commission_item.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Expense record created successfully for commission payment'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating expense record: {str(e)}'
+        })
+
+
+@login_required
+@employee_required(['owner', 'manager'])
+@require_POST
 def mark_commission_unpaid(request, item_id):
     """Mark commission as unpaid (reverse payment)"""
     commission_item = get_object_or_404(ServiceOrderItem, id=item_id)
@@ -6252,6 +6322,7 @@ def bulk_commission_payment(request):
     if request.method == 'POST':
         commission_ids = request.POST.getlist('commission_ids')
         action = request.POST.get('action')  # 'mark_paid' or 'mark_unpaid'
+        create_expense = request.POST.get('create_expense', 'true') == 'true'
 
         if not commission_ids:
             messages.error(request, 'No commissions selected.')
@@ -6273,31 +6344,33 @@ def bulk_commission_payment(request):
             for item in commission_items:
                 try:
                     if action == 'mark_paid' and not item.commission_paid:
-                        # Create expense for unpaid commission
-                        from apps.expenses.models import Expense, ExpenseCategory
-                        from django.utils import timezone
+                        expense = None
+                        if create_expense:
+                            # Create expense for unpaid commission
+                            from apps.expenses.models import Expense, ExpenseCategory
+                            from django.utils import timezone
 
-                        commission_category, created = ExpenseCategory.objects.get_or_create(
-                            name='Employee Commissions',
-                            defaults={
-                                'description': 'Commission payments to employees for completed services',
-                                'is_active': True
-                            }
-                        )
+                            commission_category, created = ExpenseCategory.objects.get_or_create(
+                                name='Employee Commissions',
+                                defaults={
+                                    'description': 'Commission payments to employees for completed services',
+                                    'is_active': True
+                                }
+                            )
 
-                        expense = Expense.objects.create(
-                            title=f"Commission for {item.item_name} - Order #{item.order.order_number}",
-                            category=commission_category,
-                            amount=item.commission_amount,
-                            expense_date=timezone.now().date(),
-                            status='approved',
-                            expense_type='commission',
-                            linked_employee_id=item.assigned_to.id if item.assigned_to else None,
-                            linked_service_order_item_id=item.id,
-                            notes=f"Bulk commission payment recorded"
-                        )
+                            expense = Expense.objects.create(
+                                title=f"Commission for {item.item_name} - Order #{item.order.order_number}",
+                                category=commission_category,
+                                amount=item.commission_amount,
+                                expense_date=timezone.now().date(),
+                                status='approved',
+                                expense_type='commission',
+                                linked_employee_id=item.assigned_to.id if item.assigned_to else None,
+                                linked_service_order_item_id=item.id,
+                                notes=f"Bulk commission payment recorded"
+                            )
 
-                        item.commission_expense_id = expense.id
+                        item.commission_expense_id = expense.id if expense else None
                         item.commission_paid = True
                         item.save()
                         success_count += 1
@@ -6322,9 +6395,10 @@ def bulk_commission_payment(request):
                     logger.error(f"Error processing commission {item.id}: {str(e)}")
 
             if success_count > 0:
+                expense_msg = " with expense records created" if create_expense else " without expense records"
                 messages.success(
                     request,
-                    f'Successfully processed {success_count} commissions. '
+                    f'Successfully processed {success_count} commissions{expense_msg}. '
                     f'{error_count} errors occurred.'
                 )
             else:
@@ -6336,16 +6410,57 @@ def bulk_commission_payment(request):
         return redirect('services:commission_list')
 
     # GET request - show selection form
-    # Get unpaid commissions for bulk payment
+    # Get filter parameters
+    period = request.GET.get('period', 'all')  # all, today, week, month
+    employee_id = request.GET.get('employee')
+
+    # Base queryset for unpaid commissions
     unpaid_commissions = ServiceOrderItem.objects.filter(
         commission_amount__gt=0,
         commission_paid=False
     ).select_related(
         'order', 'order__customer', 'assigned_to', 'service'
-    ).order_by('-completed_at')[:100]
+    )
+
+    # Apply period filter
+    from django.utils import timezone
+    today = timezone.now().date()
+
+    if period == 'today':
+        unpaid_commissions = unpaid_commissions.filter(completed_at__date=today)
+    elif period == 'week':
+        week_start = today - timezone.timedelta(days=today.weekday())
+        unpaid_commissions = unpaid_commissions.filter(completed_at__date__gte=week_start)
+    elif period == 'month':
+        month_start = today.replace(day=1)
+        unpaid_commissions = unpaid_commissions.filter(completed_at__date__gte=month_start)
+
+    # Apply employee filter
+    if employee_id:
+        unpaid_commissions = unpaid_commissions.filter(assigned_to_id=employee_id)
+
+    unpaid_commissions = unpaid_commissions.order_by('-completed_at')[:200]
+
+    # Get employees for filter
+    from apps.employees.models import Employee
+    employees = Employee.objects.filter(
+        is_active=True,
+        role__in=['attendant', 'supervisor', 'manager']
+    ).order_by('employee_id')
+
+    # Calculate summary statistics
+    total_pending = unpaid_commissions.count()
+    total_amount = unpaid_commissions.aggregate(
+        total=models.Sum('commission_amount')
+    )['total'] or Decimal('0')
 
     context = {
         'unpaid_commissions': unpaid_commissions,
+        'employees': employees,
+        'total_pending': total_pending,
+        'total_amount': total_amount,
+        'current_period': period,
+        'current_employee': employee_id,
         'title': 'Bulk Commission Payment'
     }
 
